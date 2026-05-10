@@ -76,11 +76,35 @@ let
     lib.mkOption {
       description = "Schema — typed record registry with extension points";
       default = { };
-      type = lib.types.submodule {
-        freeformType = lib.types.lazyAttrsOf (mkSchemaEntryType {
-          inherit strict baseModule;
-        });
-      };
+      type = lib.types.submodule (
+        { config, ... }:
+        {
+          freeformType = lib.types.lazyAttrsOf (mkSchemaEntryType {
+            inherit strict baseModule;
+          });
+          options._meta = lib.mkOption {
+            readOnly = true;
+            internal = true;
+            type = lib.types.raw;
+          };
+          config._meta = {
+            kindNames = lib.sort (a: b: a < b) (
+              builtins.filter (n: !(lib.hasPrefix "_" n)) (builtins.attrNames config)
+            );
+            kindMeta =
+              kind:
+              let
+                dummy = lib.evalModules { modules = [ config.${kind} ]; };
+              in
+              {
+                optionNames = builtins.attrNames dummy.options;
+                options = dummy.options;
+                hasIdentity = dummy.options ? id_hash;
+                identityKeys = dummy.config._identity.keys or [ ];
+              };
+          };
+        }
+      );
     };
 in
 {

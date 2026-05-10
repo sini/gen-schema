@@ -9,6 +9,7 @@ let
   };
   instance = import ./instance.nix { inherit lib; };
   refType = import ./ref-type.nix { inherit lib; };
+  docs = import ./docs.nix { inherit lib; };
 in
 {
   inherit (strict) mkStrictModule;
@@ -16,4 +17,5 @@ in
   inherit (entryType) mkSchema mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (refType) mkRefType;
+  inherit (docs) renderDocs;
 }
