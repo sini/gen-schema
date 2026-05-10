@@ -1,4 +1,7 @@
 { lib }:
+let
+  strict = import ./strict.nix { inherit lib; };
+in
 {
-  # Public API — populated by subsequent tasks
+  inherit (strict) mkStrictModule;
 }
