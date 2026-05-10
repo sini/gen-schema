@@ -27,6 +27,7 @@
             };
             config.schema.host = ./schema/host.nix;
             config.schema.user = ./schema/user.nix;
+            config.schema.service = ./schema/service.nix;
           }
           # Fleet: declare instances
           ./fleet.nix
@@ -64,6 +65,12 @@
 
         # Identity hash: deterministic sha256 of kind + primitive fields
         iglooHash = cfg.hosts.igloo.id_hash;
+
+        # Cross-instance references: service.host resolves to the full host instance
+        serviceNames = builtins.attrNames cfg.services;
+        nginxHost = cfg.services.nginx.host.name;
+        nginxHostAddr = cfg.services.nginx.host.addr;
+        postgresHost = cfg.services.postgres.host.name;
       };
     };
 }

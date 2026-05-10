@@ -5,7 +5,7 @@
   ...
 }:
 let
-  inherit (schemaLib) mkInstanceRegistry;
+  inherit (schemaLib) mkInstanceRegistry mkRefType;
 in
 {
   options.hosts = mkInstanceRegistry config.schema "host" {
@@ -14,6 +14,21 @@ in
 
   options.users = mkInstanceRegistry config.schema "user" {
     description = "Fleet user instances.";
+  };
+
+  options.services = mkInstanceRegistry config.schema "service" {
+    description = "Fleet service instances.";
+    extraModules = [
+      (
+        { ... }:
+        {
+          options.host = lib.mkOption {
+            type = mkRefType config.hosts;
+            description = "Host this service runs on (reference by name).";
+          };
+        }
+      )
+    ];
   };
 
   config.hosts.igloo = {
@@ -36,5 +51,15 @@ in
   config.users.yeti = {
     userName = "yeti";
     # shell takes the default: /bin/bash
+  };
+
+  config.services.nginx = {
+    host = "igloo";
+    port = 80;
+  };
+
+  config.services.postgres = {
+    host = "iceberg";
+    port = 5432;
   };
 }
