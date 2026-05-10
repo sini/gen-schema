@@ -2,6 +2,7 @@
   lib,
   mkStrictModule,
   identityModule,
+  mkMethodsModule,
 }:
 let
   mkSchemaEntryType =
@@ -19,7 +20,12 @@ let
         let
           kind = lib.last loc;
 
-          # Strip methods sidecar (future Task 8)
+          # Collect methods sidecar from all defs
+          allMethods = lib.foldl' (
+            acc: d: if builtins.isAttrs d.value && d.value ? methods then acc // d.value.methods else acc
+          ) { } defs;
+
+          # Strip methods sidecar before merging
           strippedDefs = map (
             d:
             if builtins.isAttrs d.value then d // { value = builtins.removeAttrs d.value [ "methods" ]; } else d
@@ -54,7 +60,11 @@ let
                 file = "den-schema/identity";
                 value = identityModule kind;
               }
-            ];
+            ]
+            ++ lib.optional (allMethods != { }) {
+              file = "den-schema/methods";
+              value = mkMethodsModule allMethods;
+            };
 
           merged = base.merge loc (strippedDefs ++ injected);
         in
