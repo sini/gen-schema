@@ -1,0 +1,63 @@
+{ lib, schemaLib, ... }:
+let
+  inherit (schemaLib) mkSchema;
+
+  # mkSchema with a baseModule that adds a description option
+  schemaEval = lib.evalModules {
+    modules = [
+      {
+        options.schema = mkSchema {
+          baseModule = {
+            options.description = lib.mkOption {
+              type = lib.types.str;
+              default = "no description";
+            };
+          };
+        };
+        config.schema.host = {
+          options.name = lib.mkOption { type = lib.types.str; };
+        };
+        config.schema.user = {
+          options.email = lib.mkOption { type = lib.types.str; };
+        };
+      }
+    ];
+  };
+
+  hostInstance = lib.evalModules {
+    modules = [
+      schemaEval.config.schema.host
+      {
+        config.name = "igloo";
+        config.description = "a frosty host";
+      }
+    ];
+  };
+
+  userInstance = lib.evalModules {
+    modules = [
+      schemaEval.config.schema.user
+      {
+        config.email = "yeti@snow.land";
+      }
+    ];
+  };
+in
+{
+  base.test-host-has-base-option = {
+    expr = hostInstance.config.description;
+    expected = "a frosty host";
+  };
+  base.test-user-has-base-default = {
+    expr = userInstance.config.description;
+    expected = "no description";
+  };
+  base.test-host-own-option = {
+    expr = hostInstance.config.name;
+    expected = "igloo";
+  };
+  base.test-user-own-option = {
+    expr = userInstance.config.email;
+    expected = "yeti@snow.land";
+  };
+}
