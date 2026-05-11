@@ -2,7 +2,7 @@
 {
   mkStrictModule =
     kind:
-    { lib, ... }:
+    { ... }:
     {
       _module.freeformType = lib.mkDefault (lib.mkOptionType {
         name = "strict";

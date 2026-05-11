@@ -36,20 +36,23 @@
             reflectedKeys = lib.sort (a: b: a < b) (
               lib.attrNames (lib.filterAttrs isPrimitive options)
             );
-            # When explicit keys are provided, validate they reference primitive options
-            # to avoid toString on attrsets/lists producing garbage hashes.
+            # Explicit keys are user intent — validate they exist and are primitive.
+            # Throw on invalid keys rather than silently dropping them.
             validatedExplicitKeys =
               let
                 sorted = lib.sort (a: b: a < b) explicitKeys;
               in
-              lib.filter (
+              map (
                 k:
                 let
                   opt = options.${k} or null;
                 in
-                opt != null
-                && (opt ? type)
-                && lib.elem (opt.type.name or "") primitiveTypeNames
+                if opt == null then
+                  throw "_identity.keys: '${k}' is not declared on kind '${kind}'"
+                else if !(opt ? type) || !(lib.elem (opt.type.name or "") primitiveTypeNames) then
+                  throw "_identity.keys: '${k}' on kind '${kind}' is not a primitive type (str/int/bool)"
+                else
+                  k
               ) sorted;
             identityKeys = if explicitKeys != [ ] then validatedExplicitKeys else reflectedKeys;
             encode = k: "${k}=${toString config.${k}}";

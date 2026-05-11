@@ -8,7 +8,7 @@ let
   mkSchemaEntryType =
     {
       strict ? true,
-      baseModule ? { },
+      baseModule ? null,
     }:
     let
       base = lib.types.deferredModule;
@@ -25,15 +25,18 @@ let
             acc: d: if builtins.isAttrs d.value && d.value ? methods then acc // d.value.methods else acc
           ) { } defs;
 
-          # Strip methods sidecar before merging (only when present)
+          # Strip methods sidecar before merging (only attrset defs can have methods)
           strippedDefs = map (
             d:
-            if d.value ? methods then d // { value = builtins.removeAttrs d.value [ "methods" ]; } else d
+            if builtins.isAttrs d.value && d.value ? methods then
+              d // { value = builtins.removeAttrs d.value [ "methods" ]; }
+            else
+              d
           ) defs;
 
           # Injected modules
           injected =
-            lib.optional (baseModule != { }) {
+            lib.optional (baseModule != null) {
               file = "den-schema/base";
               value = baseModule;
             }
@@ -48,7 +51,7 @@ let
                   {
                     file = "den-schema/permissive";
                     value =
-                      { lib, ... }:
+                      { ... }:
                       {
                         _module.freeformType = lib.types.attrsOf lib.types.anything;
                       };
@@ -81,7 +84,7 @@ let
   mkSchema =
     {
       strict ? true,
-      baseModule ? { },
+      baseModule ? null,
     }:
     lib.mkOption {
       description = "Schema — typed record registry with extension points";
