@@ -1,4 +1,7 @@
 { lib }:
+let
+  escapeMd = s: builtins.replaceStrings [ "|" ] [ "\\|" ] s;
+in
 {
   renderDocs =
     schema:
@@ -8,14 +11,17 @@
         kind:
         let
           meta = schema._meta.kindMeta kind;
-          userOpts = builtins.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") meta.optionNames;
+          userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") meta.optionNames;
         in
-        ''
-          ## ${kind}
-
-          | Option | Type | Default | Description |
-          |--------|------|---------|-------------|
-          ${lib.concatMapStringsSep "\n" (renderOption meta.options) userOpts}'';
+        lib.concatStringsSep "\n" (
+          [
+            "## ${kind}"
+            ""
+            "| Option | Type | Default | Description |"
+            "|--------|------|---------|-------------|"
+          ]
+          ++ map (renderOption meta.options) userOpts
+        );
       renderOption =
         options: name:
         let
@@ -26,7 +32,7 @@
             else
               "—";
         in
-        "| ${name} | ${opt.type.name or "?"} | ${defaultStr} | ${opt.description or ""} |";
+        "| ${escapeMd name} | ${escapeMd (opt.type.name or "?")} | ${escapeMd defaultStr} | ${escapeMd (opt.description or "")} |";
     in
     lib.concatMapStringsSep "\n\n" renderKind kinds;
 }

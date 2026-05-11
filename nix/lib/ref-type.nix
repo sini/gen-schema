@@ -2,10 +2,10 @@
 {
   mkRefType =
     instances:
-    lib.types.str
-    // {
+    lib.mkOptionType {
       name = "refType";
-      check = v: builtins.isString v;
+      description = "reference to an instance key";
+      check = builtins.isString;
       merge =
         loc: defs:
         let

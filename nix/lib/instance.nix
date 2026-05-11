@@ -2,6 +2,9 @@
   lib,
 }:
 let
+  # `name` is a reserved option on all instance types — it defaults to the
+  # attrset key and is always `types.str`. If a schema kind declares its own
+  # `options.name` with the same type, the declarations merge harmlessly.
   mkInstanceType =
     schema: kind:
     {

@@ -14,11 +14,17 @@ let
   docs = import ./docs.nix { inherit lib; };
 in
 {
-  inherit (strict) mkStrictModule;
-  inherit (identity) identityModule;
+  # Public API
   inherit (methods) schemaFn;
   inherit (entryType) mkSchema mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (refType) mkRefType;
   inherit (docs) renderDocs;
+
+  # Internals — accessible for testing and advanced use, not public API contract
+  _internal = {
+    inherit (strict) mkStrictModule;
+    inherit (identity) identityModule;
+    inherit (methods) mkMethodsModule;
+  };
 }

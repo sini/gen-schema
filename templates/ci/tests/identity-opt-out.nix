@@ -1,6 +1,6 @@
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib) identityModule;
+  inherit (schemaLib._internal) identityModule;
   mkEval =
     kind: modules:
     lib.evalModules {

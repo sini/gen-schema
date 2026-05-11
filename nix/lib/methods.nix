@@ -1,12 +1,11 @@
 { lib }:
 let
   schemaFn = description: type: fn: {
-    _schemaMethod = true;
     inherit description type fn;
   };
 
   mkMethodsModule =
-    allMethods:
+    kind: allMethods:
     { config, ... }:
     {
       options = lib.mapAttrs (
@@ -21,13 +20,13 @@ let
         name: m:
         let
           args = builtins.functionArgs m.fn;
-          argNames = builtins.attrNames args;
-          missingArgs = builtins.filter (n: !(config ? ${n})) argNames;
+          argNames = lib.attrNames args;
+          missingArgs = lib.filter (n: !(config ? ${n})) argNames;
           resolved = lib.genAttrs argNames (n: config.${n});
         in
         if missingArgs != [ ] then
-          throw "method '${name}': references config keys ${
-            builtins.concatStringsSep ", " (map (a: "'${a}'") missingArgs)
+          throw "method '${name}' on ${kind}: references config keys ${
+            lib.concatMapStringsSep ", " (a: "'${a}'") missingArgs
           } which are not declared on this kind"
         else
           m.fn resolved

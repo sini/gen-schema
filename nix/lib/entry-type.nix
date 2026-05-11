@@ -25,10 +25,10 @@ let
             acc: d: if builtins.isAttrs d.value && d.value ? methods then acc // d.value.methods else acc
           ) { } defs;
 
-          # Strip methods sidecar before merging
+          # Strip methods sidecar before merging (only when present)
           strippedDefs = map (
             d:
-            if builtins.isAttrs d.value then d // { value = builtins.removeAttrs d.value [ "methods" ]; } else d
+            if d.value ? methods then d // { value = builtins.removeAttrs d.value [ "methods" ]; } else d
           ) defs;
 
           # Injected modules
@@ -63,7 +63,7 @@ let
             ]
             ++ lib.optional (allMethods != { }) {
               file = "den-schema/methods";
-              value = mkMethodsModule allMethods;
+              value = mkMethodsModule kind allMethods;
             };
 
           merged = base.merge loc (strippedDefs ++ injected);
@@ -95,19 +95,28 @@ let
           options._meta = lib.mkOption {
             readOnly = true;
             internal = true;
-            type = lib.types.raw;
+            type = lib.types.submodule {
+              options.kindNames = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                description = "All kind names in the schema";
+              };
+              options.kindMeta = lib.mkOption {
+                type = lib.types.functionTo lib.types.raw;
+                description = "Per-kind introspection: options, types, identity keys";
+              };
+            };
           };
           config._meta = {
             kindNames = lib.sort (a: b: a < b) (
-              builtins.filter (n: !(lib.hasPrefix "_" n)) (builtins.attrNames config)
+              lib.filter (n: !(lib.hasPrefix "_" n)) (lib.attrNames config)
             );
             kindMeta =
-              kind:
+              k:
               let
-                dummy = lib.evalModules { modules = [ config.${kind} ]; };
+                dummy = lib.evalModules { modules = [ config.${k} ]; };
               in
               {
-                optionNames = builtins.attrNames dummy.options;
+                optionNames = lib.attrNames dummy.options;
                 options = dummy.options;
                 hasIdentity = dummy.options ? id_hash;
                 identityKeys = dummy.config._identity.keys or [ ];

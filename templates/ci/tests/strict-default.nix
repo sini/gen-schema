@@ -1,6 +1,6 @@
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib) mkStrictModule;
+  inherit (schemaLib._internal) mkStrictModule;
   eval = lib.evalModules {
     modules = [
       (mkStrictModule "host")
