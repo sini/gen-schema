@@ -83,6 +83,44 @@ config.schema.host.options.monitored = lib.mkOption { type = bool; default = tru
 
 Both contributions merge cleanly. Neither module needs to know about the other.
 
+### Base Module
+
+A module injected into every kind automatically. Use it for options shared across all kinds without manual `imports`:
+
+```nix
+options.schema = schemaLib.mkSchemaOption {
+  baseModule = {
+    options.description = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+      description = "Human-readable description.";
+    };
+  };
+};
+
+# Every kind gets `description` for free:
+config.fleet.hosts.igloo.description  # → ""
+config.fleet.users.tux.description    # → ""
+```
+
+`baseModule` is static — set at `mkSchemaOption` call time, not extensible by downstream modules. For extensible shared bases, use the kind mix-in pattern instead (a shared kind imported by others via `imports`).
+
+### Default Propagation
+
+Kind modules can set default config values. These flow through to every instance via deferred module merge:
+
+```nix
+config.schema.host = {
+  options.system = lib.mkOption { type = lib.types.str; };
+  config.system = lib.mkDefault "x86_64-linux";
+};
+
+config.fleet.hosts.igloo = {};          # system → "x86_64-linux"
+config.fleet.hosts.mac.system = "aarch64-darwin";  # override works
+```
+
+This is standard NixOS module system behavior — `lib.mkDefault` sets a low-priority value that any explicit setting overrides.
+
 ### Strict Validation
 
 Kinds are **strict by default** — undeclared keys error immediately with a fix suggestion:
@@ -129,6 +167,48 @@ Each instance:
 - Gets `id_hash` — a stable SHA-256 for safe comparison
 - Inherits the kind's strict/freeform setting
 
+### Nested Registries
+
+Registries can nest inside instances via `extraModules`. This establishes parent-child relationships structurally:
+
+```nix
+options.fleet.hosts = schemaLib.mkInstanceRegistry config.schema "host" {
+  extraModules = [({ config, ... }: {
+    options.users = schemaLib.mkInstanceRegistry config.schema "user" {
+      extraModules = [
+        # Inject parent host into child user's module args
+        ({ ... }: { config._module.args.host = config; })
+      ];
+    };
+  })];
+};
+
+config.fleet.hosts.igloo = {
+  addr = "10.0.1.1";
+  users.tux.shell = "/bin/zsh";
+  users.deploy.shell = "/bin/sh";
+};
+
+# Child instances access their parent:
+config.fleet.hosts.igloo.users.tux._module.args.host.addr  # → "10.0.1.1"
+```
+
+Cross-entity bindings (`_module.args.host = config`) are the consumer's responsibility via `extraModules`. The schema library doesn't impose nesting semantics — different consumers wire cross-entity context differently.
+
+### Per-Kind Strict Override
+
+Individual registries can override the schema-level strict setting:
+
+```nix
+# Schema is strict by default
+options.schema = schemaLib.mkSchemaOption { strict = true; };
+
+# But this specific registry allows freeform
+options.fleet.configs = schemaLib.mkInstanceRegistry config.schema "config" {
+  strict = false;
+};
+```
+
 ### Identity Hashing
 
 Nix's `==` on module system values can diverge or infinitely recurse. `id_hash` gives you a cheap, stable string comparison:
@@ -150,13 +230,24 @@ The hash is computed from all non-internal primitive options (str, int, bool), p
 3. **Auto-reflection** — all non-internal primitives included (default).
 
 ```nix
-# Layer 1: explicit keys
+# Layer 1: explicit keys — composable across modules
+# Module A:
 config.schema.host.config._identity.keys = [ "name" "addr" ];
+# Module B (extends the kind):
+config.schema.host.config._identity.keys = [ "vpnAlias" ];
+# Result: [ "name" "addr" "vpnAlias" ] — list merge via mkMerge
 
-# Layer 2: exclude an option
+# Layer 2: exclude an option from reflection
 options.description = lib.mkOption { type = str; } // { identity = false; };
 
 # Layer 3: automatic (default) — all non-internal str/int/bool options
+```
+
+Explicit keys are validated — referencing a nonexistent option or a non-primitive type throws at eval time:
+
+```
+_identity.keys: 'nonexistent' is not declared on kind 'host'
+_identity.keys: 'tags' on kind 'host' is not a primitive type (str/int/bool)
 ```
 
 ### Cross-Instance References
@@ -252,11 +343,33 @@ config.fleet.hosts.igloo.hasService "nginx"     # → true
 config.fleet.hosts.igloo.hasService "postgres"   # → false
 ```
 
+Methods compose across modules — multiple modules can each add methods to the same kind:
+
+```nix
+# Module A
+config.schema.host.methods.ping = schemaLib.schemaFn
+  "Ping command" lib.types.str
+  ({ addr, ... }: "ping ${addr}");
+
+# Module B (separate file, separate flake input — doesn't matter)
+config.schema.host.methods.ssh = schemaLib.schemaFn
+  "SSH command" lib.types.str
+  ({ name, ... }: "ssh ${name}");
+
+# Both methods available on every host instance:
+config.fleet.hosts.igloo.ping  # → "ping 10.0.1.1"
+config.fleet.hosts.igloo.ssh   # → "ssh igloo"
+```
+
+If two modules declare the same method name, the later definition wins (attrset `//` semantics).
+
 Methods with arguments that don't match any config key produce a clear error:
 
 ```
 method 'bad' on host: references config keys 'nonexistent' which are not declared on this kind
 ```
+
+Methods must be declared via inline attrsets, not path modules. This is a constraint shared with all sidecar fields.
 
 ### Sidecar Fields
 
@@ -281,9 +394,31 @@ config.schema.host = {
 config.schema.host.includes  # → [ policy-a policy-b ]
 ```
 
-Merge strategy is inferred from the default type (list → `++`, attrset → `//`) or set explicitly. Sidecar keys are stripped before the deferred module merge — they never leak into the module system.
+**Merge strategy inference:**
 
-`methods` is a built-in sidecar. User-declared sidecars are additional.
+| Default type | Inferred merge | Example |
+|---|---|---|
+| List (`[]`) | `acc ++ val` | `includes`, `excludes` |
+| Attrset (`{}`) | `acc // val` | `metadata`, `methods` (built-in) |
+| Other | Explicit `merge` required | `priority = { default = 0; merge = _acc: val: val; }` |
+
+Providing a non-list, non-attrset default without an explicit `merge` function throws at evaluation time.
+
+Sidecar keys are stripped before the deferred module merge — they never leak into the module system. Sidecars must be declared via inline attrsets, not path modules (path defs get the sidecar's default value).
+
+`methods` is a built-in sidecar with `{ default = {}; }`. User-declared sidecars are additional. `__functor` is reserved and cannot be used as a sidecar key.
+
+Multiple modules contributing to the same sidecar merge according to the sidecar's strategy:
+
+```nix
+# Module A
+config.schema.host.includes = [ policy-a ];
+
+# Module B
+config.schema.host.includes = [ policy-b policy-c ];
+
+# Result: [ policy-a policy-b policy-c ]
+```
 
 ### Computed Fields
 
@@ -322,7 +457,19 @@ Every schema has `_meta` for programmatic access:
 
 ```nix
 config.schema._meta.kindNames                # → [ "host" "service" "user" ]
-config.schema._meta.kindMeta "host"          # → { optionNames, options, ... }
+
+# Per-kind metadata — evaluates a throwaway instance to reflect on options
+meta = config.schema._meta.kindMeta "host";
+meta.optionNames   # → [ "addr" "describe" "hasService" "metricsPort" ... ]
+meta.options       # → full option declarations (type, description, default, ...)
+meta.hasIdentity   # → false (bare schema kinds don't have id_hash)
+meta.identityKeys  # → [] (identity is instance-level)
+```
+
+`kindMeta` is lazy — the `lib.evalModules` call only fires when accessed. Querying an undeclared kind throws:
+
+```
+kindMeta: 'nonexistent' is not a declared schema kind
 ```
 
 ### Documentation Generation
