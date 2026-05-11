@@ -211,6 +211,8 @@ config.schema.host = {
 
 Kinds are deferred modules — they define options and config but aren't evaluated until imported by an instance.
 
+Kind names starting with `_` are reserved for internal use (`_meta`, `_strict`). They are excluded from `_meta.kindNames` and `renderDocs`.
+
 ### Extension
 
 Any module can extend any kind. Extensions merge through deferred module merge:
