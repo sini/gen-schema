@@ -12,6 +12,10 @@ in
     description = "Fleet user instances.";
   };
 
+  options.fleet.admins = mkInstanceRegistry config.schema "admin-user" {
+    description = "Fleet admin user instances (inherits user kind).";
+  };
+
   options.fleet.services = mkInstanceRegistry config.schema "service" {
     description = "Fleet service instances.";
     extraModules = [

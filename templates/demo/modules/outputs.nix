@@ -47,9 +47,24 @@ in
       iglooDescribe = fleet.hosts.igloo.describe;
       icebergDescribe = fleet.hosts.iceberg.describe;
 
+      # --- Kind mix-in composition ---
+      # admin-user imports user kind — gets userName, shell for free
+      adminNames = builtins.attrNames fleet.admins;
+      rootShell = fleet.admins.root.shell;
+      rootSudo = fleet.admins.root.sudoPrivileges;
+      rootSshKeyCount = builtins.length fleet.admins.root.sshKeys;
+      deployUserName = fleet.admins.deploy.userName;
+      deploySudo = fleet.admins.deploy.sudoPrivileges;
+
+      # admin-user and user have independent identity hashes (different kind prefix)
+      rootHash = fleet.admins.root.id_hash;
+      tuxHash = fleet.users.tux.id_hash;
+      hashesDiffer = fleet.admins.root.id_hash != fleet.users.tux.id_hash;
+
       # --- Introspection ---
       kindNames = config.schema._meta.kindNames;
       hostOptionCount = builtins.length (config.schema._meta.kindMeta "host").optionNames;
+      adminOptionCount = builtins.length (config.schema._meta.kindMeta "admin-user").optionNames;
     };
 
     # --- Documentation generation ---

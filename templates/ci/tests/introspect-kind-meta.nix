@@ -28,9 +28,10 @@ in
     expr = builtins.elem "addr" meta.optionNames;
     expected = true;
   };
-  introspect-meta.test-has-identity = {
+  # Bare schema kinds don't have identity — it's an instance-level concern
+  introspect-meta.test-bare-schema-no-identity = {
     expr = meta.hasIdentity;
-    expected = true;
+    expected = false;
   };
   introspect-meta.test-user-opts = {
     expr = lib.sort (a: b: a < b) userOpts;

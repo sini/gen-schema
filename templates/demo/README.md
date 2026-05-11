@@ -28,6 +28,7 @@ Kind definitions live in `modules/schema/` and are plain NixOS-style modules set
 | Cross-instance refs | `modules/fleet/registries.nix` | `mkRefType config.fleet.hosts` on service's `host` option |
 | Ref resolution | `modules/fleet/services.nix` | `host = "igloo"` resolves to the full host instance |
 | Schema composition | `modules/schema/monitoring-plugin.nix` | Extends host + service kinds from a separate module — merges cleanly |
+| Kind mix-ins | `modules/schema/admin-user.nix` | Imports user kind — inherits userName, shell, adds sudoPrivileges, sshKeys |
 | Declarative methods | `modules/fleet/methods.nix` | `hasService` closes over services registry; `describe` resolves all args from config |
 | Doc generation | `modules/outputs.nix` | `renderDocs` produces markdown tables from schema metadata |
 | Introspection | `modules/outputs.nix` | `_meta.kindNames`, `_meta.kindMeta` for programmatic schema access |
@@ -44,11 +45,13 @@ modules/
     host.nix                      — host kind: addr, system, role
     user.nix                      — user kind: userName, shell
     service.nix                   — service kind: port, protocol
+    admin-user.nix                — kind mix-in: imports user, adds sudoPrivileges + sshKeys
     monitoring-plugin.nix         — composition: extends host + service from a separate module
   fleet/
     registries.nix                — mkInstanceRegistry for hosts, users, services (+ mkRefType on service.host)
     hosts.nix                     — host instances: igloo (web), iceberg (db)
     users.nix                     — user instances: tux, yeti
+    admins.nix                    — admin-user instances: root, deploy (inherit user fields)
     services.nix                  — service instances: nginx → igloo, postgres → iceberg
     methods.nix                   — declarative methods: hasService, describe
   outputs.nix                     — exposes fleet summary + generated docs as flake outputs
@@ -97,6 +100,44 @@ fleet.hosts.igloo.role → "web"          (from host.nix)
 ```
 
 The generated docs (`nix eval .#docs --raw`) list all options from all contributing modules in a single table per kind. No manual aggregation needed.
+
+## Kind Mix-ins
+
+A kind can import another kind's schema, inheriting all of its options. This is how you build specialized variants without duplicating field declarations.
+
+`admin-user` imports the base `user` kind and adds admin-specific fields:
+
+```nix
+# modules/schema/admin-user.nix
+config.schema.admin-user = {
+  imports = [ config.schema.user ];
+  options.sudoPrivileges = lib.mkOption { type = bool; default = true; };
+  options.sshKeys = lib.mkOption { type = listOf str; default = []; };
+};
+```
+
+Admin-user instances get `userName` and `shell` from the user kind, plus `sudoPrivileges` and `sshKeys` from their own definition. Each kind gets its own registry with independent instances:
+
+```nix
+options.fleet.users = mkInstanceRegistry config.schema "user" {};
+options.fleet.admins = mkInstanceRegistry config.schema "admin-user" {};
+```
+
+Instances in each registry are independent — admins don't appear in the user registry. Identity hashes include the kind prefix, so a user "root" and an admin "root" hash differently.
+
+This pattern composes with multiple mix-ins:
+
+```nix
+config.schema.deploy-user = {
+  imports = [
+    config.schema.user
+    config.schema.ssh-access    # sshKeys, sshPort
+    config.schema.sudo-access   # sudoPrivileges, sudoCommands
+  ];
+};
+```
+
+All imported options merge through deferred module merge. Conflicts (two imports declaring the same option with different types) are caught at evaluation time.
 
 ## Declarative Methods
 

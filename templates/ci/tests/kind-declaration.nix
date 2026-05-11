@@ -41,12 +41,10 @@ in
     expr = instance.config.addr;
     expected = "192.168.1.1";
   };
-  kind.test-instance-has-id-hash = {
-    expr = builtins.isString instance.config.id_hash;
-    expected = true;
-  };
-  kind.test-id-hash-length = {
-    expr = builtins.stringLength instance.config.id_hash;
-    expected = 64;
+  # Bare schema kinds don't have id_hash — that's an instance-level concern.
+  # See instance-identity.nix for instance-level identity tests.
+  kind.test-bare-kind-no-id-hash = {
+    expr = instance.config ? id_hash;
+    expected = false;
   };
 }

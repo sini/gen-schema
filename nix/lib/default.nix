@@ -5,11 +5,13 @@ let
   methods = import ./methods.nix { inherit lib; };
   entryType = import ./entry-type.nix {
     inherit lib;
-    inherit (strict) mkStrictModule;
-    inherit (identity) mkIdentityModule;
     inherit (methods) mkMethodsModule;
   };
-  instance = import ./instance.nix { inherit lib; };
+  instance = import ./instance.nix {
+    inherit lib;
+    inherit (strict) mkStrictModule;
+    inherit (identity) mkIdentityModule;
+  };
   refType = import ./ref-type.nix { inherit lib; };
   docs = import ./docs.nix { inherit lib; };
 in

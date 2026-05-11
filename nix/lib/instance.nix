@@ -1,5 +1,13 @@
+# Instance type and registry constructors.
+#
+# Instances add the infrastructure that bare schema kinds don't have:
+# strict validation, identity hashing, and the `name` option. This means
+# kind-level composition (imports between kinds) is pure schema merging,
+# while instance-level evaluation gets strict + id_hash injected once.
 {
   lib,
+  mkStrictModule,
+  mkIdentityModule,
 }:
 let
   # `name` is a reserved option on all instance types — it defaults to the
@@ -9,11 +17,23 @@ let
     schema: kind:
     {
       extraModules ? [ ],
+      strict ? schema._strict or true,
     }:
     lib.types.submodule (
       { name, config, ... }:
       {
-        imports = [ schema.${kind} ] ++ extraModules;
+        imports =
+          [ schema.${kind} ]
+          ++ [
+            (
+              if strict then
+                mkStrictModule kind
+              else
+                { _module.freeformType = lib.types.attrsOf lib.types.anything; }
+            )
+            (mkIdentityModule kind)
+          ]
+          ++ extraModules;
         config._module.args.${kind} = config;
         options.name = lib.mkOption {
           type = lib.types.str;
@@ -26,12 +46,13 @@ let
     schema: kind:
     {
       extraModules ? [ ],
+      strict ? schema._strict or true,
       description ? "${kind} instances",
     }:
     lib.mkOption {
       inherit description;
       default = { };
-      type = lib.types.attrsOf (mkInstanceType schema kind { inherit extraModules; });
+      type = lib.types.attrsOf (mkInstanceType schema kind { inherit extraModules strict; });
     };
 in
 {

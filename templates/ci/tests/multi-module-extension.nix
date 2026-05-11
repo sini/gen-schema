@@ -52,8 +52,9 @@ in
     expr = instance.config.port;
     expected = 22;
   };
-  kind-extend.test-has-id-hash = {
-    expr = builtins.isString instance.config.id_hash;
-    expected = true;
+  # Bare schema kinds don't have id_hash — see instance-identity.nix
+  kind-extend.test-bare-kind-no-id-hash = {
+    expr = instance.config ? id_hash;
+    expected = false;
   };
 }

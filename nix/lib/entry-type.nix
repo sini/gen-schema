@@ -1,13 +1,17 @@
+# Schema entry type and mkSchemaOption.
+#
+# A schema kind is a pure declaration — options, config, defaults, methods.
+# It does NOT include strict validation or identity hashing; those are
+# instance-level concerns injected by mkInstanceType. This means kind-level
+# composition via `imports = [ config.schema.user ]` works without duplicate
+# infrastructure module conflicts.
 {
   lib,
-  mkStrictModule,
-  mkIdentityModule,
   mkMethodsModule,
 }:
 let
   mkSchemaEntryType =
     {
-      strict ? true,
       baseModule ? null,
     }:
     let
@@ -39,36 +43,12 @@ let
               d
           ) defs;
 
-          # Injected modules
+          # Injected modules — only baseModule and methods (no strict/identity)
           injected =
             lib.optional (baseModule != null) {
               file = "den-schema/base";
               value = baseModule;
             }
-            ++ [
-              (
-                if strict then
-                  {
-                    file = "den-schema/strict-default";
-                    value = mkStrictModule kind;
-                  }
-                else
-                  {
-                    file = "den-schema/permissive";
-                    value =
-                      { ... }:
-                      {
-                        _module.freeformType = lib.types.attrsOf lib.types.anything;
-                      };
-                  }
-              )
-            ]
-            ++ [
-              {
-                file = "den-schema/identity";
-                value = mkIdentityModule kind;
-              }
-            ]
             ++ lib.optional (allMethods != { }) {
               file = "den-schema/methods";
               value = mkMethodsModule kind allMethods;
@@ -98,8 +78,16 @@ let
         { config, ... }:
         {
           freeformType = lib.types.lazyAttrsOf (mkSchemaEntryType {
-            inherit strict baseModule;
+            inherit baseModule;
           });
+
+          # Schema-level strict setting — stored for mkInstanceType to read
+          options._strict = lib.mkOption {
+            internal = true;
+            type = lib.types.bool;
+            default = strict;
+          };
+
           options._meta = lib.mkOption {
             readOnly = true;
             internal = true;
@@ -129,8 +117,8 @@ let
                 {
                   optionNames = lib.attrNames dummy.options;
                   options = dummy.options;
-                  hasIdentity = dummy.options ? id_hash;
-                  identityKeys = dummy.config._identity.keys or [ ];
+                  hasIdentity = false; # bare schema kinds don't have identity
+                  identityKeys = [ ];
                 };
           };
         }

@@ -1,33 +1,23 @@
+# Strict toggle: strict = false on mkSchemaOption flows to instances via mkInstanceRegistry.
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib) mkSchemaOption;
+  inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
 
-  # Schema with strict = false — undeclared keys should be accepted
-  schemaEval = lib.evalModules {
+  eval = lib.evalModules {
     modules = [
       {
         options.schema = mkSchemaOption { strict = false; };
-        config.schema.host = {
-          options.name = lib.mkOption { type = lib.types.str; };
+        options.hosts = mkInstanceRegistry eval.config.schema "host" {};
+        config.schema.host.options.name = lib.mkOption { type = lib.types.str; };
+        config.hosts.igloo = {
+          name = "igloo";
+          undeclaredKey = "should work";
         };
       }
     ];
   };
 
-  hostKind = schemaEval.config.schema.host;
-
-  # Instance with an undeclared key — should not throw with strict = false
-  instance = lib.evalModules {
-    modules = [
-      hostKind
-      {
-        config.name = "igloo";
-        config.undeclaredKey = "should work";
-      }
-    ];
-  };
-
-  result = builtins.tryEval (builtins.deepSeq instance.config instance.config);
+  result = builtins.tryEval (builtins.deepSeq eval.config.hosts.igloo eval.config.hosts.igloo);
 in
 {
   strict-toggle.test-non-strict-accepts-undeclared = {
