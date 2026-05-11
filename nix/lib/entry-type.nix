@@ -22,12 +22,14 @@ let
       base = lib.types.deferredModule;
 
       # methods is a built-in sidecar — user sidecars are additional
-      allSidecars = {
-        methods = {
-          default = { };
-        };
-      }
-      // sidecars;
+      allSidecars =
+        let
+          merged = { methods = { default = { }; }; } // sidecars;
+        in
+        if merged ? __functor then
+          throw "sidecar '__functor' is reserved — cannot be used as a sidecar key"
+        else
+          merged;
 
       # Infer merge strategy from default type
       inferMerge =
