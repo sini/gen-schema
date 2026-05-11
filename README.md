@@ -51,6 +51,149 @@ in
 # use schemaLib.mkSchemaOption, schemaLib.mkInstanceRegistry, etc.
 ```
 
+## Use Cases
+
+### Plugin system — extensible application config
+
+A base application defines its schema. Plugins extend it from external flake inputs without touching the base:
+
+```nix
+# Base app — defines the plugin kind
+config.schema.plugin = {
+  options.enabled = lib.mkOption { type = lib.types.bool; default = true; };
+  options.priority = lib.mkOption { type = lib.types.int; default = 50; };
+};
+
+# Logging plugin (separate flake input) — extends the kind
+config.schema.plugin.options.logLevel = lib.mkOption {
+  type = lib.types.enum [ "debug" "info" "warn" "error" ];
+  default = "info";
+};
+
+# Metrics plugin (another flake input) — extends the same kind
+config.schema.plugin.options.metricsEndpoint = lib.mkOption {
+  type = lib.types.nullOr lib.types.str;
+  default = null;
+};
+
+# Instances — validated against the merged schema from all inputs
+config.plugins.logging = { logLevel = "debug"; priority = 10; };
+config.plugins.metrics = { metricsEndpoint = "/metrics"; };
+config.plugins.logging.badOption = "x";  # → STRICT MODE error with fix guidance
+```
+
+### Microservice registry — services referencing each other
+
+```nix
+config.schema.service = {
+  options.port = lib.mkOption { type = lib.types.int; };
+  options.protocol = lib.mkOption { type = lib.types.str; default = "http"; };
+  options.healthPath = lib.mkOption { type = lib.types.str; default = "/health"; };
+};
+
+# Services can reference each other
+options.services = schemaLib.mkInstanceRegistry config.schema "service" {
+  extraModules = [({ ... }: {
+    options.upstream = lib.mkOption {
+      type = lib.types.nullOr (schemaLib.mkRefType config.services);
+      default = null;
+      description = "Upstream service this proxies to";
+    };
+  })];
+};
+
+config.services.api = { port = 8080; };
+config.services.gateway = { port = 443; upstream = "api"; };
+
+# Ref resolves to the full instance:
+config.services.gateway.upstream.port  # → 8080
+```
+
+### Kubernetes resources — typed manifests with cross-references
+
+```nix
+config.schema.namespace = {
+  options.labels = lib.mkOption { type = lib.types.attrsOf lib.types.str; default = {}; };
+};
+
+config.schema.deployment = {
+  options.replicas = lib.mkOption { type = lib.types.int; default = 1; };
+  options.image = lib.mkOption { type = lib.types.str; };
+  options.containerPort = lib.mkOption { type = lib.types.int; };
+};
+
+config.schema.service = {
+  options.port = lib.mkOption { type = lib.types.int; };
+  options.targetPort = lib.mkOption { type = lib.types.int; };
+};
+
+# Deployments reference their namespace
+options.deployments = schemaLib.mkInstanceRegistry config.schema "deployment" {
+  extraModules = [({ ... }: {
+    options.namespace = lib.mkOption {
+      type = schemaLib.mkRefType config.namespaces;
+    };
+  })];
+};
+
+config.namespaces.production = { labels.env = "prod"; };
+config.deployments.api = {
+  namespace = "production";  # → resolves to the namespace instance
+  image = "myapp:v1.2.3";
+  replicas = 3;
+  containerPort = 8080;
+};
+
+config.deployments.api.namespace.labels.env  # → "prod"
+```
+
+### Homelab config — hosts with environment inheritance
+
+```nix
+# Shared base for all entity types
+options.schema = schemaLib.mkSchemaOption {
+  baseModule.options.tags = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [];
+  };
+};
+
+config.schema.host = {
+  options.ip = lib.mkOption { type = lib.types.str; };
+  options.os = lib.mkOption { type = lib.types.str; default = "nixos"; };
+  methods.sshCmd = schemaLib.schemaFn
+    "SSH command for this host"
+    lib.types.str
+    ({ name, ip, ... }: "ssh root@${ip} # ${name}");
+};
+
+config.schema.network = {
+  options.cidr = lib.mkOption { type = lib.types.str; };
+  options.gateway = lib.mkOption { type = lib.types.str; };
+};
+
+# Hosts reference their network
+options.hosts = schemaLib.mkInstanceRegistry config.schema "host" {
+  extraModules = [({ ... }: {
+    options.network = lib.mkOption {
+      type = schemaLib.mkRefType config.networks;
+    };
+  })];
+};
+options.networks = schemaLib.mkInstanceRegistry config.schema "network" {};
+
+config.networks.lan = { cidr = "10.0.1.0/24"; gateway = "10.0.1.1"; };
+config.hosts.nas = {
+  ip = "10.0.1.10";
+  network = "lan";
+  tags = [ "storage" "backup" ];
+};
+
+config.hosts.nas.sshCmd        # → "ssh root@10.0.1.10 # nas"
+config.hosts.nas.network.cidr  # → "10.0.1.0/24"
+config.hosts.nas.tags          # → [ "storage" "backup" ] (from baseModule)
+```
+
 ## Core Concepts
 
 ### Kinds
@@ -462,8 +605,6 @@ config.schema._meta.kindNames                # → [ "host" "service" "user" ]
 meta = config.schema._meta.kindMeta "host";
 meta.optionNames   # → [ "addr" "describe" "hasService" "metricsPort" ... ]
 meta.options       # → full option declarations (type, description, default, ...)
-meta.hasIdentity   # → false (bare schema kinds don't have id_hash)
-meta.identityKeys  # → [] (identity is instance-level)
 ```
 
 `kindMeta` is lazy — the `lib.evalModules` call only fires when accessed. Querying an undeclared kind throws:
