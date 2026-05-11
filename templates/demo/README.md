@@ -69,6 +69,76 @@ nix eval --override-input den-schema ../.. .#fleet
 # }
 ```
 
+## Why den-schema Over Bare Submodules
+
+The NixOS module system gives you `lib.types.submodule` — a typed record with options, defaults, and merge semantics. You can build entity registries with `attrsOf submodule` directly. den-schema is built on top of this, not instead of it. The question is what you get for the extra layer.
+
+### Bare submodule approach
+
+```nix
+# Define the type inline:
+hostType = lib.types.submodule ({ name, config, ... }: {
+  options.name = lib.mkOption { type = str; default = name; };
+  options.addr = lib.mkOption { type = str; };
+  options.system = lib.mkOption { type = str; };
+  options.role = lib.mkOption { type = str; };
+  config.system = lib.mkDefault "x86_64-linux";
+});
+
+# Use it:
+options.hosts = lib.mkOption {
+  type = lib.types.attrsOf hostType;
+  default = {};
+};
+```
+
+This works. You get typed fields, defaults, and merge. For a single file or a small project, it's the right choice.
+
+### Where it breaks down
+
+**Extension from other modules.** With bare submodules, `hostType` is a closed value — defined in one place, consumed everywhere. If a second flake input wants to add a `vpnAlias` field to every host, it can't. It would need to wrap `hostType` in another submodule and hope the merge works. With den-schema, any module can extend any kind:
+
+```nix
+# In your flake:
+config.schema.host.options.addr = lib.mkOption { type = str; };
+
+# In an external input's module:
+config.schema.host.options.vpnAlias = lib.mkOption { type = str; default = config.name; };
+```
+
+Both contributions merge through `deferredModule` — the kind type is open, not closed.
+
+**Typo detection.** Bare `attrsOf submodule` is freeform by default. Setting `hosts.igloo.addrr = "10.0.1.1"` (typo) silently creates an untyped attribute. You find out at deploy time, or never. den-schema is strict by default — undeclared keys error immediately with a message telling you how to declare them.
+
+**Identity comparison.** Nix's `==` on module system values does deep structural comparison that can diverge or infinitely recurse across different thunks of the same entity. With bare submodules, comparing two references to the same host requires careful workarounds. den-schema auto-computes `id_hash` from primitive options — a cheap string comparison that's safe across module system boundaries.
+
+**Cross-instance references.** Bare submodules have no notion of references between registries. If a service needs to point at a host, you'd use a string and manually look it up. den-schema's `mkRefType` validates the reference at eval time and resolves it to the target instance — `config.services.nginx.host.addr` works directly.
+
+**Introspection.** With bare submodules, there's no way to ask "what kinds exist?" or "what options does a host have?" without evaluating an instance. den-schema's `_meta.kindNames` and `_meta.kindMeta` provide this at the schema level — the foundation for documentation generation, tooling, and diag.
+
+### Comparison
+
+| Concern | Bare `attrsOf submodule` | den-schema |
+|---|---|---|
+| Type definition | Closed value in one file | Open — any module can extend via `config.schema.<kind>` |
+| Undeclared keys | Silently accepted (freeform default) | Error with fix guidance (strict default) |
+| Entity comparison | `==` (fragile, can diverge) | `id_hash` (cheap, deterministic) |
+| Cross-references | Manual string lookup | `mkRefType` — validated, resolves to instance |
+| Defaults | `config.x = mkDefault val` (same) | Same — deferred module merge preserves this |
+| Introspection | None without evaluating instances | `_meta.kindNames`, `_meta.kindMeta` |
+| Declarative methods | Manual `functionTo` options + config wiring | `schemaFn` — auto-resolves config args |
+| Documentation | Write it yourself | `renderDocs` generates from schema metadata |
+| Dependencies | None | nixpkgs only |
+| Overhead | None | Thin layer (~330 lines) over `deferredModule` + `submodule` |
+
+### When to use which
+
+**Bare submodule:** single-file projects, internal types that won't be extended, types where freeform is intentional (e.g., arbitrary user-defined metadata).
+
+**den-schema:** multi-module projects, types extended across flake inputs, entity registries where typos matter, anything where you need safe cross-instance references or introspection.
+
+den-schema doesn't replace the module system — it's a pattern library on top of it. Every `mkSchemaOption`, `mkInstanceType`, and `mkRefType` produces standard module system types. You can mix den-schema kinds with bare submodules in the same project.
+
 ## Extending
 
 Add a new kind by creating a file in `modules/schema/`:
