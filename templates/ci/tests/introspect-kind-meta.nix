@@ -17,7 +17,7 @@ let
   meta = eval.config.schema._meta.kindMeta "host";
 
   # Filter out internal options for assertions
-  userOpts = builtins.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") meta.optionNames;
+  userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") meta.optionNames;
 in
 {
   introspect-meta.test-option-names-contain-name = {
