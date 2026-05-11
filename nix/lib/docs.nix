@@ -30,8 +30,13 @@ in
             if opt ? defaultText then
               if builtins.isAttrs opt.defaultText then opt.defaultText.text or "—" else toString opt.defaultText
             else if opt ? default then
-              let d = builtins.tryEval (builtins.deepSeq opt.default opt.default);
-              in if d.success then toString d.value else "—"
+              let
+                d = builtins.tryEval (builtins.deepSeq opt.default opt.default);
+                fmt = v:
+                  if builtins.isBool v then (if v then "true" else "false")
+                  else if builtins.isList v then "[ ... ]"
+                  else toString v;
+              in if d.success then fmt d.value else "—"
             else
               "—";
         in

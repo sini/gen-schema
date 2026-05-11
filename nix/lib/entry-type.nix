@@ -158,8 +158,6 @@ let
                 {
                   optionNames = lib.attrNames dummy.options;
                   options = dummy.options;
-                  hasIdentity = false;
-                  identityKeys = [ ];
                 };
           };
         }
