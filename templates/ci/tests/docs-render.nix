@@ -1,11 +1,11 @@
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib) mkSchema renderDocs;
+  inherit (schemaLib) mkSchemaOption renderDocs;
 
   eval = lib.evalModules {
     modules = [
       {
-        options.schema = mkSchema { };
+        options.schema = mkSchemaOption { };
         config.schema.host = {
           options.name = lib.mkOption {
             type = lib.types.str;

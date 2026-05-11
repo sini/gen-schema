@@ -1,11 +1,11 @@
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib._internal) identityModule;
+  inherit (schemaLib._internal) mkIdentityModule;
 
   # Explicit key naming a nonexistent option
   evalMissing = lib.evalModules {
     modules = [
-      (identityModule "host")
+      (mkIdentityModule "host")
       { options.name = lib.mkOption { type = lib.types.str; }; }
       {
         config.name = "igloo";
@@ -18,7 +18,7 @@ let
   # Explicit key naming a non-primitive option
   evalNonPrimitive = lib.evalModules {
     modules = [
-      (identityModule "host")
+      (mkIdentityModule "host")
       { options.name = lib.mkOption { type = lib.types.str; }; }
       { options.tags = lib.mkOption { type = lib.types.listOf lib.types.str; default = []; }; }
       {

@@ -1,12 +1,12 @@
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib) mkSchema;
+  inherit (schemaLib) mkSchemaOption;
 
   # Declare a schema with a "host" kind
   schemaEval = lib.evalModules {
     modules = [
       {
-        options.schema = mkSchema { };
+        options.schema = mkSchemaOption { };
         config.schema.host = {
           options.name = lib.mkOption { type = lib.types.str; };
           options.addr = lib.mkOption { type = lib.types.str; };

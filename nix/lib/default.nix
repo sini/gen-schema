@@ -6,7 +6,7 @@ let
   entryType = import ./entry-type.nix {
     inherit lib;
     inherit (strict) mkStrictModule;
-    inherit (identity) identityModule;
+    inherit (identity) mkIdentityModule;
     inherit (methods) mkMethodsModule;
   };
   instance = import ./instance.nix { inherit lib; };
@@ -16,7 +16,7 @@ in
 {
   # Public API
   inherit (methods) schemaFn;
-  inherit (entryType) mkSchema mkSchemaEntryType;
+  inherit (entryType) mkSchemaOption mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (refType) mkRefType;
   inherit (docs) renderDocs;
@@ -24,7 +24,7 @@ in
   # Internals — accessible for testing and advanced use, not public API contract
   _internal = {
     inherit (strict) mkStrictModule;
-    inherit (identity) identityModule;
+    inherit (identity) mkIdentityModule;
     inherit (methods) mkMethodsModule;
   };
 }

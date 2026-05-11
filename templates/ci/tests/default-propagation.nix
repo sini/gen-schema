@@ -1,11 +1,11 @@
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib) mkSchema mkInstanceRegistry;
+  inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
 
   eval = lib.evalModules {
     modules = [
       {
-        options.schema = mkSchema { };
+        options.schema = mkSchemaOption { };
         options.hosts = mkInstanceRegistry eval.config.schema "host" { };
         config.schema.host = {
           options.system = lib.mkOption { type = lib.types.str; };

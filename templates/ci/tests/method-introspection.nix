@@ -1,11 +1,11 @@
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib) mkSchema schemaFn;
+  inherit (schemaLib) mkSchemaOption schemaFn;
 
   eval = lib.evalModules {
     modules = [
       {
-        options.schema = mkSchema { };
+        options.schema = mkSchemaOption { };
         config.schema.host = {
           options.name = lib.mkOption { type = lib.types.str; };
           methods.greet = schemaFn "Greet" lib.types.str ({ name, ... }: "hi ${name}");

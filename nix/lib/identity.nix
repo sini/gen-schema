@@ -1,6 +1,6 @@
 { lib }:
 {
-  identityModule =
+  mkIdentityModule =
     kind:
     { config, options, ... }:
     {

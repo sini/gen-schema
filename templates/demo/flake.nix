@@ -9,14 +9,14 @@
     let
       lib = nixpkgs.lib;
       schemaLib = den-schema.lib;
-      inherit (schemaLib) mkSchema;
+      inherit (schemaLib) mkSchemaOption;
 
       eval = lib.evalModules {
         specialArgs = { inherit schemaLib; };
         modules = [
           # Schema: declare kinds (host, user) and their options
           {
-            options.schema = mkSchema {
+            options.schema = mkSchemaOption {
               baseModule = {
                 options.description = lib.mkOption {
                   type = lib.types.str;

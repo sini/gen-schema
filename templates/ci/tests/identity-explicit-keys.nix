@@ -1,10 +1,10 @@
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib._internal) identityModule;
+  inherit (schemaLib._internal) mkIdentityModule;
   mkEval =
     kind: modules:
     lib.evalModules {
-      modules = [ (identityModule kind) ] ++ modules;
+      modules = [ (mkIdentityModule kind) ] ++ modules;
     };
 
   # _identity.keys overrides reflection when non-empty

@@ -1,7 +1,7 @@
 {
   lib,
   mkStrictModule,
-  identityModule,
+  mkIdentityModule,
   mkMethodsModule,
 }:
 let
@@ -20,7 +20,12 @@ let
         let
           kind = lib.last loc;
 
-          # Collect methods sidecar from all defs
+          # Collect methods sidecar from all defs.
+          # NOTE: methods must be declared via inline attrsets, not path modules.
+          # Path-based kind declarations (e.g., `schema.host = ./host.nix;`) pass
+          # through as paths — the isAttrs check skips them, so methods declared
+          # in path modules are not extracted and will cause strict mode errors.
+          # If two modules declare the same method name, the later def wins (// semantics).
           allMethods = lib.foldl' (
             acc: d: if builtins.isAttrs d.value && d.value ? methods then acc // d.value.methods else acc
           ) { } defs;
@@ -61,7 +66,7 @@ let
             ++ [
               {
                 file = "den-schema/identity";
-                value = identityModule kind;
+                value = mkIdentityModule kind;
               }
             ]
             ++ lib.optional (allMethods != { }) {
@@ -81,7 +86,7 @@ let
         };
     };
 
-  mkSchema =
+  mkSchemaOption =
     {
       strict ? true,
       baseModule ? null,
@@ -115,20 +120,23 @@ let
             );
             kindMeta =
               k:
-              let
-                dummy = lib.evalModules { modules = [ config.${k} ]; };
-              in
-              {
-                optionNames = lib.attrNames dummy.options;
-                options = dummy.options;
-                hasIdentity = dummy.options ? id_hash;
-                identityKeys = dummy.config._identity.keys or [ ];
-              };
+              if !(config ? ${k}) then
+                throw "kindMeta: '${k}' is not a declared schema kind"
+              else
+                let
+                  dummy = lib.evalModules { modules = [ config.${k} ]; };
+                in
+                {
+                  optionNames = lib.attrNames dummy.options;
+                  options = dummy.options;
+                  hasIdentity = dummy.options ? id_hash;
+                  identityKeys = dummy.config._identity.keys or [ ];
+                };
           };
         }
       );
     };
 in
 {
-  inherit mkSchemaEntryType mkSchema;
+  inherit mkSchemaEntryType mkSchemaOption;
 }

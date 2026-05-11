@@ -3,5 +3,5 @@ let
   schemaLib = import ./lib { inherit lib; };
 in
 {
-  options.schema = schemaLib.mkSchema { };
+  options.schema = schemaLib.mkSchemaOption { };
 }

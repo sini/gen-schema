@@ -1,12 +1,12 @@
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib) mkSchema;
+  inherit (schemaLib) mkSchemaOption;
 
   # Schema with strict = false — undeclared keys should be accepted
   schemaEval = lib.evalModules {
     modules = [
       {
-        options.schema = mkSchema { strict = false; };
+        options.schema = mkSchemaOption { strict = false; };
         config.schema.host = {
           options.name = lib.mkOption { type = lib.types.str; };
         };

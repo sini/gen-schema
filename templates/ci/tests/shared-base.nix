@@ -1,12 +1,12 @@
 { lib, schemaLib, ... }:
 let
-  inherit (schemaLib) mkSchema;
+  inherit (schemaLib) mkSchemaOption;
 
-  # mkSchema with a baseModule that adds a description option
+  # mkSchemaOption with a baseModule that adds a description option
   schemaEval = lib.evalModules {
     modules = [
       {
-        options.schema = mkSchema {
+        options.schema = mkSchemaOption {
           baseModule = {
             options.description = lib.mkOption {
               type = lib.types.str;

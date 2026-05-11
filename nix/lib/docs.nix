@@ -31,7 +31,7 @@ in
               if builtins.isAttrs opt.defaultText then opt.defaultText.text or "—" else toString opt.defaultText
             else if opt ? default then
               let d = builtins.tryEval (builtins.deepSeq opt.default opt.default);
-              in if d.success then escapeMd (toString d.value) else "—"
+              in if d.success then toString d.value else "—"
             else
               "—";
         in
