@@ -17,14 +17,27 @@ den-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } {
     imports = [ inputs.den-schema.flakeModules.default ];
 
-    # Define kinds
+    # Define a kind
     schema.host = {
       options.addr = lib.mkOption { type = lib.types.str; };
       options.role = lib.mkOption { type = lib.types.str; default = "worker"; };
     };
+
+    # Create a registry and instances
+    options.hosts = schemaLib.mkInstanceRegistry config.schema "host" {};
+    hosts.igloo = { addr = "10.0.1.1"; role = "web"; };
+    hosts.iceberg = { addr = "10.0.2.1"; };  # role defaults to "worker"
+
+    # Use them
+    flake.fleet = {
+      iglooAddr = config.hosts.igloo.addr;     # → "10.0.1.1"
+      iglooHash = config.hosts.igloo.id_hash;  # → deterministic SHA-256
+    };
   };
 }
 ```
+
+The flake-parts module provides `schema` and `schemaLib` with default settings (`strict = true`, no `baseModule`). For custom `strict`, `baseModule`, `sidecars`, or `computed` settings, use the programmatic API instead.
 
 ### Programmatic use
 
@@ -46,7 +59,7 @@ lib.evalModules {
 
 ```nix
 let
-  schemaLib = import ./path/to/den-schema { inherit lib; };
+  schemaLib = import ./path/to/den-schema/nix/lib { inherit lib; };
 in
 # use schemaLib.mkSchemaOption, schemaLib.mkInstanceRegistry, etc.
 ```
@@ -317,16 +330,23 @@ Each instance:
 Registries can nest inside instances via `extraModules`. This establishes parent-child relationships structurally:
 
 ```nix
-options.fleet.hosts = schemaLib.mkInstanceRegistry config.schema "host" {
-  extraModules = [({ config, ... }: {
-    options.users = schemaLib.mkInstanceRegistry config.schema "user" {
-      extraModules = [
-        # Inject parent host into child user's module args
-        ({ ... }: { config._module.args.host = config; })
-      ];
-    };
-  })];
-};
+# Capture the top-level schema before entering extraModules closures
+let schema = config.schema;
+in {
+  options.fleet.hosts = schemaLib.mkInstanceRegistry schema "host" {
+    extraModules = [({ config, ... }:
+      let hostConfig = config;  # capture the host instance's config
+      in {
+        options.users = schemaLib.mkInstanceRegistry schema "user" {
+          extraModules = [
+            # Inject parent host into child user's module args
+            ({ ... }: { config._module.args.host = hostConfig; })
+          ];
+        };
+      }
+    )];
+  };
+}
 
 config.fleet.hosts.igloo = {
   addr = "10.0.1.1";
@@ -338,7 +358,9 @@ config.fleet.hosts.igloo = {
 config.fleet.hosts.igloo.users.tux._module.args.host.addr  # → "10.0.1.1"
 ```
 
-Cross-entity bindings (`_module.args.host = config`) are the consumer's responsibility via `extraModules`. The schema library doesn't impose nesting semantics — different consumers wire cross-entity context differently.
+Note the scoping: `schema` is captured at the top level (before the `extraModules` closure), and `hostConfig` captures the host instance's config (before the nested `extraModules` closure). Without these captures, `config` inside the closures would shadow the outer `config`.
+
+Cross-entity bindings (`_module.args.host = hostConfig`) are the consumer's responsibility via `extraModules`. The schema library doesn't impose nesting semantics — different consumers wire cross-entity context differently.
 
 ### Per-Kind Strict Override
 
@@ -367,6 +389,8 @@ lib.elem target.id_hash (map (h: h.id_hash) candidates)
 ```
 
 The hash is computed from all non-internal primitive options (str, int, bool), prefixed by the kind name. Two hosts with the same values hash identically. A host and a user with the same name hash differently (kind prefix).
+
+`id_hash` is marked `internal = true` and `readOnly = true` — it won't appear in NixOS option documentation generators, but is always accessible via `instance.id_hash`.
 
 **Three-layer precedence for key selection:**
 
@@ -640,6 +664,8 @@ mkSchemaOption {
 
 Returns `lib.mkOption` — use as `options.schema = mkSchemaOption { ... }`.
 
+`mkSchemaEntryType` is also exported for advanced use — it returns the raw `deferredModule` type used for schema kind values, without wrapping in `mkOption` or adding `_meta`/`_strict`. Most consumers should use `mkSchemaOption`.
+
 ### `mkInstanceType`
 
 ```nix
@@ -742,7 +768,7 @@ nix eval --override-input den-schema ../.. .#docs --raw
 
 ## Testing
 
-113 tests using nix-unit in `templates/ci/`:
+115 tests using nix-unit in `templates/ci/`:
 
 ```bash
 cd templates/ci
