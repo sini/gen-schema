@@ -8,11 +8,11 @@ A minimal fleet management example using den-schema as a standalone typed record
 
 Each kind is a named record type with declared options. Undeclared keys error immediately with fix guidance (strict-by-default).
 
-- **host** — machines in the fleet (`addr`, `system`, `role`)
+- **host** — machines in the fleet (`addr`, `system`, `role`, plus monitoring fields from a plugin)
 - **user** — accounts (`userName`, `shell`)
-- **service** — services running on hosts (`port`, `protocol`, `host` ref)
+- **service** — services running on hosts (`port`, `protocol`, `healthPath`, `host` ref)
 
-Kind definitions live in `modules/schema/` and are plain NixOS-style modules setting `config.schema.<kind>`.
+Kind definitions live in `modules/schema/` and are plain NixOS-style modules setting `config.schema.<kind>`. Multiple modules can extend the same kind — their options merge through deferred module merge.
 
 ### Instance Registries
 
@@ -27,6 +27,10 @@ Kind definitions live in `modules/schema/` and are plain NixOS-style modules set
 | Identity hashing | `modules/outputs.nix` | `iglooHash` — deterministic SHA-256 from primitive options + kind prefix |
 | Cross-instance refs | `modules/fleet/registries.nix` | `mkRefType config.fleet.hosts` on service's `host` option |
 | Ref resolution | `modules/fleet/services.nix` | `host = "igloo"` resolves to the full host instance |
+| Schema composition | `modules/schema/monitoring-plugin.nix` | Extends host + service kinds from a separate module — merges cleanly |
+| Declarative methods | `modules/fleet/methods.nix` | `hasService` closes over services registry; `describe` resolves all args from config |
+| Doc generation | `modules/outputs.nix` | `renderDocs` produces markdown tables from schema metadata |
+| Introspection | `modules/outputs.nix` | `_meta.kindNames`, `_meta.kindMeta` for programmatic schema access |
 | flake-parts integration | `modules/schema.nix` | Single import of `den-schema.flakeModules.default` |
 | import-tree | `flake.nix` | `inputs.import-tree ./modules` auto-imports all module files |
 
@@ -40,12 +44,14 @@ modules/
     host.nix                      — host kind: addr, system, role
     user.nix                      — user kind: userName, shell
     service.nix                   — service kind: port, protocol
+    monitoring-plugin.nix         — composition: extends host + service from a separate module
   fleet/
     registries.nix                — mkInstanceRegistry for hosts, users, services (+ mkRefType on service.host)
     hosts.nix                     — host instances: igloo (web), iceberg (db)
     users.nix                     — user instances: tux, yeti
     services.nix                  — service instances: nginx → igloo, postgres → iceberg
-  outputs.nix                     — exposes fleet summary as flake.fleet
+    methods.nix                   — declarative methods: hasService, describe
+  outputs.nix                     — exposes fleet summary + generated docs as flake outputs
 ```
 
 ## Running
@@ -68,6 +74,86 @@ nix eval --override-input den-schema ../.. .#fleet
 #   ...
 # }
 ```
+
+## Schema Composition
+
+Kinds are open — any module can extend any kind by setting `config.schema.<kind>.options.*`. Extensions merge cleanly through deferred module merge. Neither the base definition nor the extension needs to know about the other.
+
+`modules/schema/host.nix` declares the base host kind (`addr`, `system`, `role`). `modules/schema/monitoring-plugin.nix` extends it with `metricsPort` and `monitored` — simulating what a separate flake input would do:
+
+```nix
+# monitoring-plugin.nix — extends host without touching host.nix
+config.schema.host = {
+  options.metricsPort = lib.mkOption { type = lib.types.int; default = 9100; };
+  options.monitored = lib.mkOption { type = lib.types.bool; default = true; };
+};
+```
+
+Both modules contribute to the same kind type. Instances see all options from both:
+
+```
+fleet.hosts.igloo.metricsPort → 9100   (from monitoring-plugin.nix)
+fleet.hosts.igloo.role → "web"          (from host.nix)
+```
+
+The generated docs (`nix eval .#docs --raw`) list all options from all contributing modules in a single table per kind. No manual aggregation needed.
+
+## Declarative Methods
+
+`schemaFn` declares functions on entity instances. Named arguments in the function signature are automatically resolved from the instance's config — no manual wiring.
+
+```nix
+# Describe: all args (name, role, addr) come from the host instance's config
+schema.host.methods.describe = schemaFn
+  "Human-readable summary of this host."
+  lib.types.str
+  ({ name, role, addr, ... }: "${name} (${role}) at ${addr}");
+
+fleet.hosts.igloo.describe → "igloo (web) at 10.0.1.1"
+```
+
+Methods can also close over values from their declaration scope. `hasService` captures `config.fleet.services` from the module where it's defined, then receives `name` from the host instance:
+
+```nix
+# hasService: name from instance, services from module scope
+schema.host.methods.hasService = schemaFn
+  "Check whether a named service targets this host."
+  (lib.types.functionTo lib.types.bool)
+  ({ name, ... }:
+    serviceName:
+    let services = config.fleet.services;
+    in services ? ${serviceName} && services.${serviceName}.host.name == name);
+
+fleet.hosts.igloo.hasService "nginx"    → true
+fleet.hosts.igloo.hasService "postgres" → false
+fleet.hosts.iceberg.hasService "postgres" → true
+```
+
+Methods compose across modules — multiple modules can each add methods to the same kind, and they merge naturally.
+
+## Documentation Generation
+
+`renderDocs` produces markdown reference documentation from schema metadata. It reflects on all kinds and their options — including extensions from composition and methods:
+
+```bash
+nix eval --override-input den-schema ../.. .#docs --raw
+```
+
+```markdown
+## host
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| addr | str | — | Host IP address or hostname. |
+| describe | str | — | Human-readable summary of this host. |
+| hasService | functionTo | — | Check whether a named service targets this host. |
+| metricsPort | int | 9100 | Port exposing Prometheus metrics. |
+| monitored | bool | 1 | Whether this host is scraped by the monitoring stack. |
+| role | str | — | Host role (web, db, worker, ...). |
+| system | str | — | Target system architecture. |
+```
+
+The monitoring plugin's fields (`metricsPort`, `monitored`) and the methods (`describe`, `hasService`) appear alongside the base options — generated automatically from the merged schema, not maintained by hand.
 
 ## Why den-schema Over Bare Submodules
 
