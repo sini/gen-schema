@@ -1,10 +1,12 @@
 # Schema entry type and mkSchemaOption.
 #
-# A schema kind is a pure declaration — options, config, defaults, methods.
-# It does NOT include strict validation or identity hashing; those are
-# instance-level concerns injected by mkInstanceType. This means kind-level
-# composition via `imports = [ config.schema.user ]` works without duplicate
-# infrastructure module conflicts.
+# A schema kind is a pure declaration — options, config, defaults, methods,
+# and user-defined sidecar fields. Sidecars are extracted from defs before
+# deferred module merge and exposed as attributes on the merged result.
+# Computed fields are derived from extracted sidecars post-merge.
+#
+# Strict validation and identity hashing are instance-level concerns
+# injected by mkInstanceType, not here.
 {
   lib,
   mkMethodsModule,
@@ -13,9 +15,33 @@ let
   mkSchemaEntryType =
     {
       baseModule ? null,
+      sidecars ? { },
+      computed ? null,
     }:
     let
       base = lib.types.deferredModule;
+
+      # methods is a built-in sidecar — user sidecars are additional
+      allSidecars = {
+        methods = {
+          default = { };
+        };
+      }
+      // sidecars;
+
+      # Infer merge strategy from default type
+      inferMerge =
+        name: sidecar:
+        if sidecar ? merge then
+          sidecar.merge
+        else if builtins.isList sidecar.default then
+          (acc: val: acc ++ val)
+        else if builtins.isAttrs sidecar.default then
+          (acc: val: acc // val)
+        else
+          throw "sidecar '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
+
+      sidecarKeys = lib.attrNames allSidecars;
     in
     base
     // {
@@ -24,38 +50,49 @@ let
         let
           kind = lib.last loc;
 
-          # Collect methods sidecar from all defs.
-          # NOTE: methods must be declared via inline attrsets, not path modules.
-          # Path-based kind declarations (e.g., `schema.host = ./host.nix;`) pass
-          # through as paths — the isAttrs check skips them, so methods declared
-          # in path modules are not extracted and will cause strict mode errors.
-          # If two modules declare the same method name, the later def wins (// semantics).
-          allMethods = lib.foldl' (
-            acc: d: if builtins.isAttrs d.value && d.value ? methods then acc // d.value.methods else acc
-          ) { } defs;
+          # Extract each sidecar from defs, merge with strategy.
+          # NOTE: sidecars must be declared via inline attrsets, not path modules.
+          # Path-based kind declarations pass through as paths — the isAttrs check
+          # skips them. If two modules declare the same sidecar key, they merge
+          # according to the sidecar's merge strategy.
+          extractedSidecars = lib.mapAttrs (
+            name: sidecar:
+            let
+              merge = inferMerge name sidecar;
+            in
+            lib.foldl' (
+              acc: d: if builtins.isAttrs d.value && d.value ? ${name} then merge acc d.value.${name} else acc
+            ) sidecar.default defs
+          ) allSidecars;
 
-          # Strip methods sidecar before merging (only attrset defs can have methods)
+          # Computed fields from extracted sidecars + raw defs
+          computedFields = if computed != null then computed extractedSidecars defs else { };
+
+          # Strip all sidecar keys before deferredModule merge
           strippedDefs = map (
             d:
-            if builtins.isAttrs d.value && d.value ? methods then
-              d // { value = builtins.removeAttrs d.value [ "methods" ]; }
+            if builtins.isAttrs d.value && lib.any (k: d.value ? ${k}) sidecarKeys then
+              d // { value = builtins.removeAttrs d.value sidecarKeys; }
             else
               d
           ) defs;
 
-          # Injected modules — only baseModule and methods (no strict/identity)
+          # Inject baseModule + methods module (methods is the only sidecar
+          # that generates instance-level options via mkMethodsModule)
           injected =
             lib.optional (baseModule != null) {
               file = "den-schema/base";
               value = baseModule;
             }
-            ++ lib.optional (allMethods != { }) {
+            ++ lib.optional (extractedSidecars.methods != { }) {
               file = "den-schema/methods";
-              value = mkMethodsModule kind allMethods;
+              value = mkMethodsModule kind extractedSidecars.methods;
             };
 
           merged = base.merge loc (strippedDefs ++ injected);
         in
+        # Precedence: computed overrides sidecars of the same name.
+        # __functor is reserved — sidecars/computed must not use it as a key.
         {
           __functor =
             _:
@@ -63,13 +100,17 @@ let
             {
               imports = [ merged ];
             };
-        };
+        }
+        // extractedSidecars
+        // computedFields;
     };
 
   mkSchemaOption =
     {
       strict ? true,
       baseModule ? null,
+      sidecars ? { },
+      computed ? null,
     }:
     lib.mkOption {
       description = "Schema — typed record registry with extension points";
@@ -78,7 +119,7 @@ let
         { config, ... }:
         {
           freeformType = lib.types.lazyAttrsOf (mkSchemaEntryType {
-            inherit baseModule;
+            inherit baseModule sidecars computed;
           });
 
           # Schema-level strict setting — stored for mkInstanceType to read
@@ -103,9 +144,7 @@ let
             };
           };
           config._meta = {
-            kindNames = lib.sort (a: b: a < b) (
-              lib.filter (n: !(lib.hasPrefix "_" n)) (lib.attrNames config)
-            );
+            kindNames = lib.sort (a: b: a < b) (lib.filter (n: !(lib.hasPrefix "_" n)) (lib.attrNames config));
             kindMeta =
               k:
               if !(config ? ${k}) then
@@ -117,7 +156,7 @@ let
                 {
                   optionNames = lib.attrNames dummy.options;
                   options = dummy.options;
-                  hasIdentity = false; # bare schema kinds don't have identity
+                  hasIdentity = false;
                   identityKeys = [ ];
                 };
           };
