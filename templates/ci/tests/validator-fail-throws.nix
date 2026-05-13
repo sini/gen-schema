@@ -1,0 +1,35 @@
+{ lib, schemaLib, ... }:
+let
+  eval = lib.evalModules {
+    modules = [
+      {
+        options.schema = schemaLib.mkSchemaOption { };
+        options.hosts = schemaLib.mkInstanceRegistry eval.config.schema "host" { };
+        config.schema.host = {
+          options.addr = lib.mkOption { type = lib.types.str; };
+          validators = [
+            (schemaLib.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
+          ];
+        };
+        config.hosts.bad = {
+          addr = "";
+        };
+      }
+    ];
+  };
+  result = schemaLib.validateInstances eval.config.schema "host" eval.config.hosts;
+in
+{
+  "validator-fail".test-left-returned = {
+    expr = result ? left;
+    expected = true;
+  };
+  "validator-fail".test-error-has-instance-name = {
+    expr = (lib.head result.left).name;
+    expected = "bad";
+  };
+  "validator-fail".test-error-has-validator-name = {
+    expr = (lib.head result.left).validator;
+    expected = "has-addr";
+  };
+}

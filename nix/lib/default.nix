@@ -12,6 +12,7 @@ let
     inherit (strict) mkStrictModule;
     inherit (identity) mkIdentityModule;
   };
+  validate = import ./validate.nix { inherit lib; };
   refType = import ./ref-type.nix { inherit lib; };
   docs = import ./docs.nix { inherit lib; };
 in
@@ -20,6 +21,7 @@ in
   inherit (methods) schemaFn;
   inherit (entryType) mkSchemaOption mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;
+  inherit (validate) mkValidator validateInstances;
   inherit (refType) mkRefType;
   inherit (docs) renderDocs;
 
@@ -28,5 +30,6 @@ in
     inherit (strict) mkStrictModule;
     inherit (identity) mkIdentityModule;
     inherit (methods) mkMethodsModule;
+    inherit (validate) runValidators;
   };
 }

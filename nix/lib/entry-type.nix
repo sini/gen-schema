@@ -24,7 +24,15 @@ let
       # methods is a built-in sidecar — user sidecars are additional
       allSidecars =
         let
-          merged = { methods = { default = { }; }; } // sidecars;
+          merged = {
+            methods = {
+              default = { };
+            };
+            validators = {
+              default = [ ];
+            };
+          }
+          // sidecars;
         in
         if merged ? __functor then
           throw "sidecar '__functor' is reserved — cannot be used as a sidecar key"
