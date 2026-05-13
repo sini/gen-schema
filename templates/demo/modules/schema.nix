@@ -5,4 +5,8 @@
   imports = [
     inputs.den-schema.flakeModules.default
   ];
+  config._module.args = {
+    bend = inputs.bend.lib;
+    inherit inputs;
+  };
 }

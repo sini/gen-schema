@@ -1,14 +1,29 @@
 {
   "nodes": {
+    "bend": {
+      "locked": {
+        "lastModified": 1778636925,
+        "narHash": "sha256-ixRihaAtyD4SpsSStUZkW3FwRcYW5LGLA/OeLt5urP8=",
+        "owner": "denful",
+        "repo": "bend",
+        "rev": "6e21806ec0163534bd421d3de80c6688f7784e89",
+        "type": "github"
+      },
+      "original": {
+        "owner": "denful",
+        "repo": "bend",
+        "type": "github"
+      }
+    },
     "den-schema": {
       "inputs": {
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "dirtyRev": "af5932699bbb3ed20068c1c025c0985739754a99-dirty",
-        "dirtyShortRev": "af59326-dirty",
-        "lastModified": 1778462961,
-        "narHash": "sha256-NZWb3s8g5GOu2dbACCSCGlGq5Rj7FK5X3xFNYm9tCJk=",
+        "dirtyRev": "54b0f7d5dc69228a1528677cc43d84cccf75caa9-dirty",
+        "dirtyShortRev": "54b0f7d-dirty",
+        "lastModified": 1778711708,
+        "narHash": "sha256-ehRgaeh4unJ9tADJS5b5BZfkr3YNGvw+M5GHKoKqIrc=",
         "type": "git",
         "url": "file:///home/sini/Documents/repos/den-schema"
       },
@@ -71,11 +86,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1777954456,
-        "narHash": "sha256-hGdgeU2Nk87RAuZyYjyDjFL6LK7dAZN5RE9+hrDTkDU=",
+        "lastModified": 1778443072,
+        "narHash": "sha256-zi7/fsqM/kFdNuED//4WOCUtezGtKKqRNORjMvfwjnA=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "549bd84d6279f9852cae6225e372cc67fb91a4c1",
+        "rev": "da5ad661ba4e5ef59ba743f0d112cbc30e474f32",
         "type": "github"
       },
       "original": {
@@ -87,6 +102,7 @@
     },
     "root": {
       "inputs": {
+        "bend": "bend",
         "den-schema": "den-schema",
         "flake-parts": "flake-parts",
         "import-tree": "import-tree",

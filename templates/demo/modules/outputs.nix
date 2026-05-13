@@ -65,6 +65,19 @@ in
       kindNames = config.schema._meta.kindNames;
       hostOptionCount = builtins.length (config.schema._meta.kindMeta "host").optionNames;
       adminOptionCount = builtins.length (config.schema._meta.kindMeta "admin-user").optionNames;
+
+      # --- Derive hooks ---
+      # Deterministic UIDs from id_hash
+      tuxUid = fleet.users.tux.uid;
+      yetiUid = fleet.users.yeti.uid;
+      uidsDiffer = fleet.users.tux.uid != fleet.users.yeti.uid;
+      rootUid = fleet.admins.root.uid;
+      adminUidRange = fleet.admins.root.uid >= 60001;
+
+      # --- Validators ---
+      # Host validators declared on schema.host run automatically
+      # (if they failed, we wouldn't get here — evaluation would throw)
+      validatorsWork = true;
     };
 
     # --- Documentation generation ---
