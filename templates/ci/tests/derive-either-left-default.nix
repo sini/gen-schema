@@ -1,0 +1,29 @@
+{ lib, schemaLib, ... }:
+let
+  eval = lib.evalModules {
+    modules = [
+      {
+        options.schema = schemaLib.mkSchemaOption { };
+        options.hosts = schemaLib.mkInstanceRegistry eval.config.schema "host" {
+          deriveEither = {
+            derive = _instances: { left = "something went wrong"; };
+          };
+        };
+        config.schema.host = {
+          options.addr = lib.mkOption { type = lib.types.str; };
+        };
+        config.hosts.igloo.addr = "10.0.1.1";
+      }
+    ];
+  };
+in
+{
+  "derive-either-left" = {
+    test-throws-on-left = {
+      expr =
+        (builtins.tryEval (builtins.deepSeq eval.config.hosts.igloo.addr eval.config.hosts.igloo.addr))
+        .success;
+      expected = false;
+    };
+  };
+}

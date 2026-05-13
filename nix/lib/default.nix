@@ -11,6 +11,7 @@ let
     inherit lib;
     inherit (strict) mkStrictModule;
     inherit (identity) mkIdentityModule;
+    inherit (validate) runValidators;
   };
   validate = import ./validate.nix { inherit lib; };
   refType = import ./ref-type.nix { inherit lib; };

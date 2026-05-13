@@ -8,11 +8,9 @@
   lib,
   mkStrictModule,
   mkIdentityModule,
+  runValidators,
 }:
 let
-  # `name` is a reserved option on all instance types — it defaults to the
-  # attrset key and is always `types.str`. If a schema kind declares its own
-  # `options.name` with the same type, the declarations merge harmlessly.
   mkInstanceType =
     schema: kind:
     {
@@ -22,18 +20,19 @@ let
     lib.types.submodule (
       { name, config, ... }:
       {
-        imports =
-          [ schema.${kind} ]
-          ++ [
-            (
-              if strict then
-                mkStrictModule kind
-              else
-                { _module.freeformType = lib.types.attrsOf lib.types.anything; }
-            )
-            (mkIdentityModule kind)
-          ]
-          ++ extraModules;
+        imports = [
+          schema.${kind}
+        ]
+        ++ [
+          (
+            if strict then
+              mkStrictModule kind
+            else
+              { _module.freeformType = lib.types.attrsOf lib.types.anything; }
+          )
+          (mkIdentityModule kind)
+        ]
+        ++ extraModules;
         config._module.args.${kind} = config;
         options.name = lib.mkOption {
           type = lib.types.str;
@@ -48,12 +47,70 @@ let
       extraModules ? [ ],
       strict ? schema._strict or true,
       description ? "${kind} instances",
+      derive ? null,
+      deriveEither ? null,
     }:
-    lib.mkOption {
-      inherit description;
-      default = { };
-      type = lib.types.attrsOf (mkInstanceType schema kind { inherit extraModules strict; });
-    };
+    assert
+      !(derive != null && deriveEither != null)
+      || throw "mkInstanceRegistry: derive and deriveEither are mutually exclusive";
+    let
+      formatErrors =
+        failures:
+        lib.concatMapStringsSep "\n" (f: "  ${kind} '${f.name}': ${f.validator} — ${f.message}") failures;
+
+      defaultOnError =
+        left:
+        if builtins.isList left then
+          throw "schema validation failed:\n${formatErrors left}"
+        else
+          throw "derive: ${builtins.toJSON left}";
+
+      onError = if deriveEither != null then deriveEither.onError or defaultOnError else defaultOnError;
+
+      deriveFn =
+        if derive != null then
+          derive
+        else if deriveEither != null then
+          instances:
+          let
+            result = deriveEither.derive instances;
+          in
+          if result ? right then result.right else onError result.left
+        else
+          null;
+
+      validators = schema.${kind}.validators or [ ];
+
+      hasPipeline = derive != null || deriveEither != null;
+
+      applyPipeline =
+        instances:
+        let
+          validationResult =
+            if validators == [ ] then { right = instances; } else runValidators kind validators instances;
+
+          # When validation fails and onError doesn't throw, use original
+          # instances with onError's return as the derived overlay.
+          validated = if validationResult ? right then validationResult.right else instances;
+
+          derived =
+            if !(validationResult ? right) then
+              onError validationResult.left
+            else if deriveFn == null then
+              { }
+            else
+              deriveFn validated;
+        in
+        lib.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
+    in
+    lib.mkOption (
+      {
+        inherit description;
+        default = { };
+        type = lib.types.attrsOf (mkInstanceType schema kind { inherit extraModules strict; });
+      }
+      // lib.optionalAttrs hasPipeline { apply = applyPipeline; }
+    );
 in
 {
   inherit mkInstanceType mkInstanceRegistry;
