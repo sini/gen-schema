@@ -25,32 +25,35 @@ let
     let raw = hexToInt (builtins.substring 0 8 hash);
     in min + lib.mod raw (max - min);
 
-  # Collision-free ID assignment. Accepts pre-taken slots so explicit
-  # overrides are excluded from the pool.
+  # Deterministic ID assignment. Collisions are errors — use explicit
+  # uid overrides to resolve them instead of silent probing.
+  # initialTaken: { "slot" = "instance-name"; } — pre-occupied slots from explicit UIDs.
   assignIdsWithTaken = range: initialTaken: instances:
     let
       sorted = lib.sort (a: b: a < b) (lib.attrNames instances);
     in (lib.foldl' (acc: name:
       let
-        want = idFromHash range instances.${name}.id_hash;
-        probe = slot:
-          if !(acc.taken ? ${toString slot}) then slot
-          else probe (range.min + lib.mod (slot - range.min + 1) (range.max - range.min));
-        assigned = probe want;
-      in {
-        taken = acc.taken // { ${toString assigned} = true; };
-        ids = acc.ids // { ${name} = assigned; };
+        slot = idFromHash range instances.${name}.id_hash;
+        slotStr = toString slot;
+        collision = acc.taken.${slotStr} or null;
+      in
+      if collision != null then
+        throw "UID collision: '${name}' and '${collision}' both hash to ${slotStr}. Fix: set an explicit uid on one of them."
+      else {
+        taken = acc.taken // { ${slotStr} = name; };
+        ids = acc.ids // { ${name} = slot; };
       }
     ) { taken = initialTaken; ids = {}; } sorted).ids;
 
   # Derive hook: assign UIDs, respecting explicit overrides.
   # Instances with uid != 0 keep their value. The rest get computed UIDs
-  # from id_hash, with the explicit UIDs excluded from the pool.
+  # from id_hash. Collisions error — use explicit uid to resolve.
   deriveUids = range: instances:
     let
       explicit = lib.filterAttrs (_: u: u.uid != 0) instances;
       auto = lib.filterAttrs (_: u: u.uid == 0) instances;
-      taken = lib.mapAttrs' (_: u: { name = toString u.uid; value = true; }) explicit;
+      # Pre-taken: map slot → instance name (for collision error messages)
+      taken = lib.mapAttrs' (_: u: { name = toString u.uid; value = u.name; }) explicit;
       computed = assignIdsWithTaken range taken auto;
     in
     lib.mapAttrs (name: user:
