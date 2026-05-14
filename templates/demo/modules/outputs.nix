@@ -67,10 +67,16 @@ in
       adminOptionCount = builtins.length (config.schema._meta.kindMeta "admin-user").optionNames;
 
       # --- Derive hooks ---
-      # Deterministic UIDs from id_hash
+      # Deterministic UIDs from id_hash (auto-assigned)
       tuxUid = fleet.users.tux.uid;
       yetiUid = fleet.users.yeti.uid;
       uidsDiffer = fleet.users.tux.uid != fleet.users.yeti.uid;
+
+      # Explicit override — service-account keeps uid 999
+      serviceAccountUid = fleet.users.service-account.uid;
+      overridePreserved = fleet.users.service-account.uid == 999;
+
+      # Admin UIDs in a separate range
       rootUid = fleet.admins.root.uid;
       adminUidRange = fleet.admins.root.uid >= 60001;
 

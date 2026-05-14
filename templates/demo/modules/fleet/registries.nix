@@ -1,7 +1,15 @@
 # Instance registries with derive hooks.
+#
+# Demonstrates:
+# - Plain derive: deterministic UID assignment from id_hash
+# - User override: explicit uid on an instance skips auto-assignment
+# - deriveEither + bend: computed endpoint strings from host ref + port
 { lib, config, schemaLib, bend, ... }:
 let
   inherit (schemaLib) mkInstanceRegistry mkRefType;
+
+  # --- UID assignment helpers ---
+
   hexToInt = s:
     let
       hexChars = {
@@ -17,8 +25,11 @@ let
     let raw = hexToInt (builtins.substring 0 8 hash);
     in min + lib.mod raw (max - min);
 
-  assignIds = range: instances:
-    let sorted = lib.sort (a: b: a < b) (lib.attrNames instances);
+  # Collision-free ID assignment. Accepts pre-taken slots so explicit
+  # overrides are excluded from the pool.
+  assignIdsWithTaken = range: initialTaken: instances:
+    let
+      sorted = lib.sort (a: b: a < b) (lib.attrNames instances);
     in (lib.foldl' (acc: name:
       let
         want = idFromHash range instances.${name}.id_hash;
@@ -30,10 +41,25 @@ let
         taken = acc.taken // { ${toString assigned} = true; };
         ids = acc.ids // { ${name} = assigned; };
       }
-    ) { taken = {}; ids = {}; } sorted).ids;
+    ) { taken = initialTaken; ids = {}; } sorted).ids;
 
-  # Bend lens: extract host addr + service port into an endpoint string.
-  # focus extracts the relevant fields, parse refines into the endpoint string.
+  # Derive hook: assign UIDs, respecting explicit overrides.
+  # Instances with uid != 0 keep their value. The rest get computed UIDs
+  # from id_hash, with the explicit UIDs excluded from the pool.
+  deriveUids = range: instances:
+    let
+      explicit = lib.filterAttrs (_: u: u.uid != 0) instances;
+      auto = lib.filterAttrs (_: u: u.uid == 0) instances;
+      taken = lib.mapAttrs' (_: u: { name = toString u.uid; value = true; }) explicit;
+      computed = assignIdsWithTaken range taken auto;
+    in
+    lib.mapAttrs (name: user:
+      if user.uid != 0 then {}
+      else { uid = computed.${name}; }
+    ) instances;
+
+  # --- Bend lens for endpoint derivation ---
+
   mkEndpoint = bend.pipe [
     (bend.focus
       (s: { addr = s.host.addr; port = s.port; protocol = s.protocol; })
@@ -51,31 +77,22 @@ in
 
   options.fleet.users = mkInstanceRegistry config.schema "user" {
     description = "Fleet user instances.";
-    derive = users:
-      let uids = assignIds { min = 1000; max = 60000; } users;
-      in lib.mapAttrs (name: _: { uid = uids.${name}; }) users;
+    derive = deriveUids { min = 1000; max = 60000; };
   };
 
   options.fleet.admins = mkInstanceRegistry config.schema "admin-user" {
     description = "Fleet admin user instances (inherits user kind).";
-    derive = admins:
-      let uids = assignIds { min = 60001; max = 65000; } admins;
-      in lib.mapAttrs (name: _: { uid = uids.${name}; }) admins;
+    derive = deriveUids { min = 60001; max = 65000; };
   };
 
   options.fleet.services = mkInstanceRegistry config.schema "service" {
     description = "Fleet service instances.";
-    # deriveEither with bend: compute endpoint strings from host ref + port.
-    # Port validation is handled by schema.service.validators (in validation.nix).
     deriveEither = {
       derive = services:
-        let
-          result = (bend.eachValue mkEndpoint).get services;
-        in
-        if result ? right then
+        let result = (bend.eachValue mkEndpoint).get services;
+        in if result ? right then
           { right = lib.mapAttrs (_: endpoint: { inherit endpoint; }) result.right; }
-        else
-          result;
+        else result;
     };
     extraModules = [
       ({ ... }: {
