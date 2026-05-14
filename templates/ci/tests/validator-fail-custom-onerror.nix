@@ -38,9 +38,10 @@ in
         .success;
       expected = true;
     };
-    test-fallback-tag = {
+    # After recovery, derive still runs — tag gets the derived value
+    test-derive-runs-after-recovery = {
       expr = eval.config.hosts.igloo.tag;
-      expected = "fallback";
+      expected = "derived-igloo";
     };
   };
 }

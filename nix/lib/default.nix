@@ -7,13 +7,13 @@ let
     inherit lib;
     inherit (methods) mkMethodsModule;
   };
+  validate = import ./validate.nix { inherit lib; };
   instance = import ./instance.nix {
     inherit lib;
     inherit (strict) mkStrictModule;
     inherit (identity) mkIdentityModule;
     inherit (validate) runValidators;
   };
-  validate = import ./validate.nix { inherit lib; };
   refType = import ./ref-type.nix { inherit lib; };
   docs = import ./docs.nix { inherit lib; };
 in

@@ -82,8 +82,6 @@ let
         else
           null;
 
-      hasDeriveHook = derive != null || deriveEither != null;
-
       # The apply pipeline: validate → derive → overlay.
       # Validators are read lazily inside apply — schema.${kind}.validators
       # is only forced when instances are actually evaluated, not at
@@ -93,19 +91,28 @@ let
         let
           validators = schema.${kind}.validators or [ ];
 
-          validationResult =
-            if validators == [ ] then { right = instances; } else runValidators kind validators instances;
-
-          validated = if validationResult ? right then validationResult.right else instances;
-
-          derived =
-            if !(validationResult ? right) then
-              onError validationResult.left
-            else if deriveFn == null then
-              { }
+          # Step 1: validate. onError either throws (terminating) or returns
+          # a recovery overlay applied to the original instances.
+          vResult =
+            if validators == [ ] then null
             else
-              deriveFn validated;
+              let r = runValidators kind validators instances;
+              in if r ? right then null else r.left;
+
+          validated =
+            if vResult == null then instances
+            else
+              let recovery = onError vResult;
+              in lib.mapAttrs (name: instance:
+                instance // (recovery.${name} or { })
+              ) instances;
+
+          # Step 2: derive enrichment from the validated set.
+          derived =
+            if deriveFn == null then { }
+            else deriveFn validated;
         in
+        # Step 3: overlay derived config at high priority.
         lib.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
     in
     lib.mkOption {
