@@ -201,6 +201,82 @@ nix eval --override-input den-schema ../.. .#docs --raw
 
 The monitoring plugin's fields (`metricsPort`, `monitored`) and the methods (`describe`, `hasService`) appear alongside the base options — generated automatically from the merged schema, not maintained by hand.
 
+## Schema Validators
+
+Validators are cross-field constraints declared on schema kinds. They travel with the kind and run automatically on every registry.
+
+```nix
+# modules/fleet/validation.nix
+config.schema.host.validators = [
+  (schemaLib.mkValidator "has-addr"
+    ({ addr, ... }: addr != "")
+    "host must have a non-empty addr")
+  (schemaLib.mkValidator "valid-role"
+    ({ role, ... }: lib.elem role [ "web" "db" "worker" "lb" ])
+    "role must be one of: web, db, worker, lb")
+];
+
+config.schema.service.validators = [
+  (schemaLib.mkValidator "valid-port"
+    ({ port, ... }: port > 0 && port < 65536)
+    "port must be between 1 and 65535")
+];
+```
+
+Multiple modules can contribute validators to the same kind — they merge via `++`. If any instance fails validation, evaluation throws with an error listing all failures (accumulated, not short-circuit).
+
+## Derive Hooks
+
+Derive hooks compute values from the full evaluated registry and merge them back at high priority. The pipeline is: **validate → derive → apply**.
+
+**Plain derive — deterministic UIDs:**
+
+```nix
+# modules/fleet/registries.nix
+options.fleet.users = mkInstanceRegistry config.schema "user" {
+  derive = users:
+    let uids = assignIds { min = 1000; max = 60000; } users;
+    in lib.mapAttrs (name: _: { uid = uids.${name}; }) users;
+};
+
+fleet.users.tux.uid   → 34213  (deterministic from id_hash)
+fleet.users.yeti.uid  → 33045  (different hash → different UID)
+```
+
+Derive reads `id_hash` from each instance to compute collision-free UIDs. Derived fields are `internal = true` (excluded from `id_hash`) and `readOnly = true` (only the derive hook writes them).
+
+## Bend Integration
+
+The `deriveEither` hook supports Either-based enrichment — the natural fit for [bend](https://github.com/denful/bend) lens pipelines. Bend is not a library dependency; it's a consumer choice demonstrated here.
+
+```nix
+# modules/fleet/registries.nix
+mkEndpoint = bend.pipe [
+  (bend.focus
+    (s: { addr = s.host.addr; port = s.port; protocol = s.protocol; })
+    (_: v: v))
+  (bend.parse
+    ({ addr, port, protocol, ... }:
+      bend.right "${protocol}://${addr}:${toString port}")
+    bend.identity)
+];
+
+options.fleet.services = mkInstanceRegistry config.schema "service" {
+  deriveEither = {
+    derive = services:
+      let result = (bend.eachValue mkEndpoint).get services;
+      in if result ? right
+         then { right = lib.mapAttrs (_: endpoint: { inherit endpoint; }) result.right; }
+         else result;
+  };
+};
+
+fleet.services.nginx.endpoint     → "tcp://10.0.1.1:80"
+fleet.services.postgres.endpoint  → "tcp://10.0.2.1:5432"
+```
+
+The bend lens extracts host addr + port + protocol from each service, computes the endpoint string, and returns it as Either. On success, the endpoints are merged onto instances. On failure (if the lens pipeline returns `left`), the default handler throws — or a custom `onError` handles it.
+
 ## Why den-schema Over Bare Submodules
 
 The NixOS module system gives you `lib.types.submodule` — a typed record with options, defaults, and merge semantics. You can build entity registries with `attrsOf submodule` directly. den-schema is built on top of this, not instead of it. The question is what you get for the extra layer.

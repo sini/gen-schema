@@ -639,6 +639,82 @@ meta.options       # → full option declarations (type, description, default, .
 kindMeta: 'nonexistent' is not a declared schema kind
 ```
 
+### Schema Validators
+
+Declare cross-field validation constraints on kinds. Validators are a built-in sidecar — they travel with the kind and run automatically on every registry of that kind.
+
+```nix
+config.schema.host.validators = [
+  (schemaLib.mkValidator "has-addr"
+    ({ addr, ... }: addr != "")
+    "host must have a non-empty addr")
+  (schemaLib.mkValidator "valid-role"
+    ({ role, ... }: lib.elem role [ "web" "db" "worker" ])
+    "role must be one of: web, db, worker")
+];
+```
+
+Validators compose across modules — multiple modules can contribute validators to the same kind via the sidecar `++` merge:
+
+```nix
+# Module A
+config.schema.host.validators = [ (schemaLib.mkValidator "a" ...) ];
+# Module B
+config.schema.host.validators = [ (schemaLib.mkValidator "b" ...) ];
+# Both fire on every host registry
+```
+
+When validation fails, errors accumulate (not short-circuit) and include the instance name, validator name, and message:
+
+```
+schema validation failed:
+  host 'igloo': has-addr — host must have a non-empty addr
+  host 'iceberg': valid-role — role must be one of: web, db, worker
+```
+
+For standalone validation without throwing, use `validateInstances`:
+
+```nix
+result = schemaLib.validateInstances config.schema "host" config.fleet.hosts;
+# → { right = instances; } or { left = [ { name; validator; message; } ]; }
+```
+
+### Derive Hooks
+
+`derive` and `deriveEither` on `mkInstanceRegistry` compute values from the full evaluated registry and merge them back at high priority. The pipeline is: **validate → derive → apply**.
+
+**Plain derive** — attrset in, attrset out:
+
+```nix
+options.fleet.users = schemaLib.mkInstanceRegistry config.schema "user" {
+  derive = users:
+    let uids = assignIds { min = 1000; max = 60000; } users;
+    in lib.mapAttrs (name: _: { uid = uids.${name}; }) users;
+  extraModules = [({ ... }: {
+    options.uid = lib.mkOption { type = lib.types.int; readOnly = true; internal = true; };
+  })];
+};
+
+config.fleet.users.tux.uid  # → 34213 (deterministic from id_hash)
+```
+
+Derive can read `id_hash` and all instance config — it runs after full module system evaluation. Derived fields must be `internal = true` (excluded from `id_hash` to avoid cycles) and `readOnly = true` (the derive hook is the only writer).
+
+**`deriveEither`** — returns Either with configurable error handling:
+
+```nix
+options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
+  deriveEither = {
+    derive = services: someEitherPipeline services;
+    onError = left: lib.warn "enrichment failed" {};  # optional, default throws
+  };
+};
+```
+
+`derive` and `deriveEither` are mutually exclusive. `onError` receives the `left` value — throw, warn, or return a fallback attrset. The default `onError` throws with a formatted message.
+
+Validator errors flow through the same `onError` handler — a custom `onError` on `deriveEither` handles both validator failures and derive failures.
+
 ### Documentation Generation
 
 `renderDocs` produces markdown reference from schema metadata:
@@ -684,10 +760,14 @@ mkInstanceRegistry schema kind {
   extraModules ? [],
   strict ? schema._strict or true,
   description ? "${kind} instances",
+  derive ? null,         # { name → instance } → { name → attrset } — plain enrichment
+  deriveEither ? null,   # { derive; onError? } — Either-based enrichment
 }
 ```
 
-Returns `lib.mkOption` with `type = attrsOf (mkInstanceType ...)`.
+Returns `lib.mkOption` with `type = attrsOf (mkInstanceType ...)` and an `apply` pipeline that runs validators then derive.
+
+`derive` and `deriveEither` are mutually exclusive.
 
 ### `mkRefType`
 
@@ -705,6 +785,22 @@ schemaFn description type fn
 
 Declares a method on a kind. `fn` receives an attrset of config values matching its named arguments. Declare via `schema.<kind>.methods.<name> = schemaFn ...`.
 
+### `mkValidator`
+
+```nix
+mkValidator name pred message
+```
+
+Creates a validator record. `pred` receives the instance config and returns bool. Declare via `schema.<kind>.validators = [ (mkValidator ...) ]`.
+
+### `validateInstances`
+
+```nix
+validateInstances schema kind instances
+```
+
+Runs the kind's validators against instances. Returns `{ right = instances; }` on success or `{ left = [ { name; validator; message; } ]; }` on failure. Does not throw — returns Either for consumer-controlled handling.
+
 ### `renderDocs`
 
 ```nix
@@ -719,6 +815,7 @@ Returns a markdown string with a table per kind.
 schemaLib._internal.mkStrictModule    # strict freeform type module
 schemaLib._internal.mkIdentityModule  # id_hash + _identity.keys module
 schemaLib._internal.mkMethodsModule   # methods option/config wiring
+schemaLib._internal.runValidators     # validator execution (used by apply pipeline)
 ```
 
 Not part of the public API contract. Available for testing and advanced use.
@@ -752,6 +849,7 @@ nix/lib/
   strict.nix         — mkStrictModule (strict freeform type)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)
   ref-type.nix       — mkRefType (cross-instance references)
+  validate.nix       — mkValidator, runValidators, validateInstances
   docs.nix           — renderDocs (markdown generation)
 nix/flakeModule.nix  — flake-parts integration (provides schema option + schemaLib)
 ```
@@ -768,7 +866,7 @@ nix eval --override-input den-schema ../.. .#docs --raw
 
 ## Testing
 
-115 tests using nix-unit in `templates/ci/`:
+149 tests using nix-unit in `templates/ci/`:
 
 ```bash
 cd templates/ci
