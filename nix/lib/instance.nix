@@ -4,6 +4,9 @@
 # strict validation, identity hashing, and the `name` option. This means
 # kind-level composition (imports between kinds) is pure schema merging,
 # while instance-level evaluation gets strict + id_hash injected once.
+#
+# The validate → derive → apply pipeline runs in `apply` on the option,
+# after module system evaluation. Validators and derive hooks are optional.
 {
   lib,
   mkStrictModule,
@@ -79,18 +82,20 @@ let
         else
           null;
 
-      validators = schema.${kind}.validators or [ ];
+      hasDeriveHook = derive != null || deriveEither != null;
 
-      hasPipeline = derive != null || deriveEither != null;
-
+      # The apply pipeline: validate → derive → overlay.
+      # Validators are read lazily inside apply — schema.${kind}.validators
+      # is only forced when instances are actually evaluated, not at
+      # mkInstanceRegistry call time (avoids circular eval in self-referential patterns).
       applyPipeline =
         instances:
         let
+          validators = schema.${kind}.validators or [ ];
+
           validationResult =
             if validators == [ ] then { right = instances; } else runValidators kind validators instances;
 
-          # When validation fails and onError doesn't throw, use original
-          # instances with onError's return as the derived overlay.
           validated = if validationResult ? right then validationResult.right else instances;
 
           derived =
@@ -103,14 +108,12 @@ let
         in
         lib.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
     in
-    lib.mkOption (
-      {
-        inherit description;
-        default = { };
-        type = lib.types.attrsOf (mkInstanceType schema kind { inherit extraModules strict; });
-      }
-      // lib.optionalAttrs hasPipeline { apply = applyPipeline; }
-    );
+    lib.mkOption {
+      inherit description;
+      default = { };
+      type = lib.types.attrsOf (mkInstanceType schema kind { inherit extraModules strict; });
+      apply = applyPipeline;
+    };
 in
 {
   inherit mkInstanceType mkInstanceRegistry;

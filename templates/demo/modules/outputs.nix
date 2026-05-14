@@ -74,10 +74,10 @@ in
       rootUid = fleet.admins.root.uid;
       adminUidRange = fleet.admins.root.uid >= 60001;
 
-      # --- Validators ---
-      # Host validators declared on schema.host run automatically
-      # (if they failed, we wouldn't get here — evaluation would throw)
-      validatorsWork = true;
+      # --- Derive + Bend ---
+      # Computed endpoint from bend lens pipeline (host addr + port + protocol)
+      nginxEndpoint = fleet.services.nginx.endpoint;
+      postgresEndpoint = fleet.services.postgres.endpoint;
     };
 
     # --- Documentation generation ---

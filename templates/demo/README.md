@@ -30,6 +30,9 @@ Kind definitions live in `modules/schema/` and are plain NixOS-style modules set
 | Schema composition | `modules/schema/monitoring-plugin.nix` | Extends host + service kinds from a separate module — merges cleanly |
 | Kind mix-ins | `modules/schema/admin-user.nix` | Imports user kind — inherits userName, shell, adds sudoPrivileges, sshKeys |
 | Declarative methods | `modules/fleet/methods.nix` | `hasService` closes over services registry; `describe` resolves all args from config |
+| Schema validators | `modules/fleet/validation.nix` | Host addr/role + service port validators declared on kinds, fire automatically |
+| Derive hooks | `modules/fleet/registries.nix` | Plain `derive` assigns deterministic UIDs from `id_hash` |
+| Bend integration | `modules/fleet/registries.nix` | `deriveEither` with bend lens computes service endpoints |
 | Doc generation | `modules/outputs.nix` | `renderDocs` produces markdown tables from schema metadata |
 | Introspection | `modules/outputs.nix` | `_meta.kindNames`, `_meta.kindMeta` for programmatic schema access |
 | flake-parts integration | `modules/schema.nix` | Single import of `den-schema.flakeModules.default` |
@@ -48,13 +51,15 @@ modules/
     admin-user.nix                — kind mix-in: imports user, adds sudoPrivileges + sshKeys
     monitoring-plugin.nix         — composition: extends host + service from a separate module
   fleet/
-    registries.nix                — mkInstanceRegistry for hosts, users, services (+ mkRefType on service.host)
+    registries.nix                — mkInstanceRegistry with derive hooks + bend endpoint derivation
     hosts.nix                     — host instances: igloo (web), iceberg (db)
     users.nix                     — user instances: tux, yeti
     admins.nix                    — admin-user instances: root, deploy (inherit user fields)
     services.nix                  — service instances: nginx → igloo, postgres → iceberg
     methods.nix                   — declarative methods: hasService, describe
-  outputs.nix                     — exposes fleet summary + generated docs as flake outputs
+    derived.nix                   — uid option on user kind (for derive hook)
+    validation.nix                — schema validators: host addr/role, service port
+  outputs.nix                     — exposes fleet summary, derived UIDs, endpoints, docs
 ```
 
 ## Running
