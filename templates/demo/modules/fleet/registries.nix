@@ -46,18 +46,18 @@ let
     ) { taken = initialTaken; ids = {}; } sorted).ids;
 
   # Derive hook: assign UIDs, respecting explicit overrides.
-  # Instances with uid != 0 keep their value. The rest get computed UIDs
+  # Instances with uid != null keep their value. The rest get computed UIDs
   # from id_hash. Collisions error — use explicit uid to resolve.
   deriveUids = range: instances:
     let
-      explicit = lib.filterAttrs (_: u: u.uid != 0) instances;
-      auto = lib.filterAttrs (_: u: u.uid == 0) instances;
+      explicit = lib.filterAttrs (_: u: u.uid != null) instances;
+      auto = lib.filterAttrs (_: u: u.uid == null) instances;
       # Pre-taken: map slot → instance name (for collision error messages)
       taken = lib.mapAttrs' (_: u: { name = toString u.uid; value = u.name; }) explicit;
       computed = assignIdsWithTaken range taken auto;
     in
     lib.mapAttrs (name: user:
-      if user.uid != 0 then {}
+      if user.uid != null then {}
       else { uid = computed.${name}; }
     ) instances;
 

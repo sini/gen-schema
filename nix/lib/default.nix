@@ -12,7 +12,7 @@ let
     inherit lib;
     inherit (strict) mkStrictModule;
     inherit (identity) mkIdentityModule;
-    inherit (validate) runValidators;
+    inherit (validate) runValidators defaultOnError;
   };
   refType = import ./ref-type.nix { inherit lib; };
   docs = import ./docs.nix { inherit lib; };
@@ -31,6 +31,6 @@ in
     inherit (strict) mkStrictModule;
     inherit (identity) mkIdentityModule;
     inherit (methods) mkMethodsModule;
-    inherit (validate) runValidators;
+    inherit (validate) runValidators formatErrors defaultOnError;
   };
 }

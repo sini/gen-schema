@@ -17,7 +17,7 @@ let
             else
               [
                 {
-                  inherit name;
+                  inherit kind name;
                   validator = v.name;
                   inherit (v) message;
                 }
@@ -28,6 +28,19 @@ let
     in
     if failures == [ ] then { right = instances; } else { left = failures; };
 
+  formatErrors =
+    failures:
+    lib.concatMapStringsSep "\n" (
+      f: "  ${f.kind} '${f.name}': ${f.validator} — ${f.message}"
+    ) failures;
+
+  defaultOnError =
+    left:
+    if builtins.isList left then
+      throw "schema validation failed:\n${formatErrors left}"
+    else
+      throw "derive: ${builtins.toJSON left}";
+
   validateInstances =
     schema: kind: instances:
     let
@@ -36,5 +49,5 @@ let
     runValidators kind validators instances;
 in
 {
-  inherit mkValidator runValidators validateInstances;
+  inherit mkValidator runValidators validateInstances formatErrors defaultOnError;
 }

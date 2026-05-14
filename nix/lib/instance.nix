@@ -12,6 +12,7 @@
   mkStrictModule,
   mkIdentityModule,
   runValidators,
+  defaultOnError,
 }:
 let
   mkInstanceType =
@@ -53,22 +54,14 @@ let
       derive ? null,
       deriveEither ? null,
     }:
-    assert
-      !(derive != null && deriveEither != null)
+    assert (derive == null || deriveEither == null)
       || throw "mkInstanceRegistry: derive and deriveEither are mutually exclusive";
     let
-      formatErrors =
-        failures:
-        lib.concatMapStringsSep "\n" (f: "  ${kind} '${f.name}': ${f.validator} — ${f.message}") failures;
-
-      defaultOnError =
-        left:
-        if builtins.isList left then
-          throw "schema validation failed:\n${formatErrors left}"
+      onError =
+        if deriveEither != null then
+          deriveEither.onError or defaultOnError
         else
-          throw "derive: ${builtins.toJSON left}";
-
-      onError = if deriveEither != null then deriveEither.onError or defaultOnError else defaultOnError;
+          defaultOnError;
 
       deriveFn =
         if derive != null then
@@ -91,8 +84,9 @@ let
         let
           validators = schema.${kind}.validators or [ ];
 
-          # Step 1: validate. onError either throws (terminating) or returns
-          # a recovery overlay applied to the original instances.
+          # null = no validation errors (fast path when validators == []).
+          # This avoids constructing an Either when there are no validators,
+          # which is the common case for registries without validation.
           vResult =
             if validators == [ ] then null
             else
@@ -107,13 +101,12 @@ let
                 instance // (recovery.${name} or { })
               ) instances;
 
-          # Step 2: derive enrichment from the validated set.
           derived =
             if deriveFn == null then { }
             else deriveFn validated;
         in
-        # Step 3: overlay derived config at high priority.
-        lib.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
+        if derived == { } then validated
+        else lib.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
     in
     lib.mkOption {
       inherit description;
