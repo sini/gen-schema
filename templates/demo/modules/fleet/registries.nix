@@ -33,13 +33,15 @@ let
     ) { taken = {}; ids = {}; } sorted).ids;
 
   # Bend lens: extract host addr + service port into an endpoint string.
-  # This is a real enrichment — not just validation.
+  # focus extracts the relevant fields, parse refines into the endpoint string.
   mkEndpoint = bend.pipe [
     (bend.focus
       (s: { addr = s.host.addr; port = s.port; protocol = s.protocol; })
       (_: v: v))
-    (bend.parse ({ addr, port, protocol, ... }:
-      bend.right "${protocol}://${addr}:${toString port}"))
+    (bend.parse
+      ({ addr, port, protocol, ... }:
+        bend.right "${protocol}://${addr}:${toString port}")
+      bend.identity)
   ];
 in
 {
