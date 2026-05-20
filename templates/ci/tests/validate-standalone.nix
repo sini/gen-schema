@@ -1,6 +1,6 @@
 # validateInstances is a standalone function that returns Either without throwing.
 # It operates independently of the registry pipeline.
-{ lib, schemaLib, ... }:
+{ lib, schemaLib, genLib, ... }:
 let
   # Build schema with validators, but create instances manually (not via registry)
   # to avoid the registry's apply pipeline throwing on validation failure.
@@ -10,7 +10,7 @@ let
       config.schema.host = {
         options.addr = lib.mkOption { type = lib.types.str; };
         validators = [
-          (schemaLib.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
+          (genLib.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
         ];
       };
     }];

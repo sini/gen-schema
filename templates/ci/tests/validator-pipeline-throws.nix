@@ -1,6 +1,6 @@
 # Registry applyPipeline throws when validators fail (no custom onError).
 # This tests the pipeline's default error path, not the standalone validateInstances API.
-{ lib, schemaLib, ... }:
+{ lib, schemaLib, genLib, ... }:
 let
   eval = lib.evalModules {
     modules = [{
@@ -9,7 +9,7 @@ let
       config.schema.host = {
         options.addr = lib.mkOption { type = lib.types.str; };
         validators = [
-          (schemaLib.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr required")
+          (genLib.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr required")
         ];
       };
       config.hosts.bad.addr = "";

@@ -1,6 +1,7 @@
-{ lib, schemaLib, ... }:
+{ lib, schemaLib, genLib, ... }:
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry renderDocs;
+  inherit (genLib) mkRefType;
 
   # Empty schema — zero kinds
   emptyEval = lib.evalModules {
@@ -34,7 +35,7 @@ let
         options.services = mkInstanceRegistry refConflictEval.config.schema "service" {
           extraModules = [({ ... }: {
             options.host = lib.mkOption {
-              type = schemaLib.mkRefType refConflictEval.config.hosts;
+              type = mkRefType refConflictEval.config.hosts;
             };
           })];
         };

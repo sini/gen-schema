@@ -1,4 +1,4 @@
-{ lib, schemaLib, ... }:
+{ lib, schemaLib, genLib, ... }:
 let
   eval = lib.evalModules {
     modules = [
@@ -22,7 +22,7 @@ let
         config.schema.host = {
           options.addr = lib.mkOption { type = lib.types.str; };
           validators = [
-            (schemaLib.mkValidator "always-fail" (_: false) "always fails")
+            (genLib.mkValidator "always-fail" (_: false) "always fails")
           ];
         };
         config.hosts.igloo.addr = "10.0.1.1";

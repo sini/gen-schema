@@ -1,36 +1,35 @@
-{ lib }:
+{ inputs ? {}, lib }:
 let
-  strict = import ./strict.nix { inherit lib; };
-  identity = import ./identity.nix { inherit lib; };
+  # No-flakes import: resolve gen from CI template's flake.lock
+  lock = builtins.fromJSON (builtins.readFile ../../templates/ci/flake.lock);
+  locked = lock.nodes.gen.locked;
+  genSrc = builtins.fetchTarball {
+    url = "https://github.com/${locked.owner}/${locked.repo}/archive/${locked.rev}.zip";
+    sha256 = locked.narHash;
+  };
+  gen = inputs.gen or (import genSrc { inherit lib; });
+
   methods = import ./methods.nix { inherit lib; };
   entryType = import ./entry-type.nix {
     inherit lib;
     inherit (methods) mkMethodsModule;
   };
-  validate = import ./validate.nix { inherit lib; };
+  validate = import ./validate.nix { inherit lib gen; };
   instance = import ./instance.nix {
     inherit lib;
-    inherit (strict) mkStrictModule;
-    inherit (identity) mkIdentityModule;
-    inherit (validate) runValidators defaultOnError;
+    inherit (gen) mkStrictModule mkIdentityModule runValidators defaultOnError;
   };
-  refType = import ./ref-type.nix { inherit lib; };
   docs = import ./docs.nix { inherit lib; };
 in
 {
-  # Public API
+  # gen-schema's own exports only — no gen re-exports
   inherit (methods) schemaFn;
   inherit (entryType) mkSchemaOption mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;
-  inherit (validate) mkValidator validateInstances;
-  inherit (refType) mkRefType;
+  inherit (validate) validateInstances;
   inherit (docs) renderDocs;
 
-  # Internals — accessible for testing and advanced use, not public API contract
   _internal = {
-    inherit (strict) mkStrictModule;
-    inherit (identity) mkIdentityModule;
     inherit (methods) mkMethodsModule;
-    inherit (validate) runValidators formatErrors defaultOnError;
   };
 }

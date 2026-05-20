@@ -1,6 +1,7 @@
-{ lib, schemaLib, ... }:
+{ lib, schemaLib, genLib, ... }:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry mkRefType;
+  inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
+  inherit (genLib) mkRefType;
 
   # Two separate modules: one defines hosts, another defines services with refs
   eval = lib.evalModules {
