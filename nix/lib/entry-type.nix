@@ -176,6 +176,18 @@ let
                 type = lib.types.listOf lib.types.raw;
                 description = "All ref edges: [ { from, field, to } ]";
               };
+              options.edges = lib.mkOption {
+                type = lib.types.listOf lib.types.raw;
+                description = "Unified edge view: parent (Neron P) + ref (Neron I) edges";
+              };
+              options.roots = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                description = "Kinds with no parent in the topology";
+              };
+              options.leaves = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                description = "Kinds with no children in the topology";
+              };
             };
           };
           config._meta =
@@ -220,9 +232,23 @@ let
                   to = toKind;
                 }) refs
               ) kindNames;
+              # Unified edge view: Neron P (parent) + I (ref/import) edges
+              parentEdges = lib.concatMap (k:
+                let t = topology.${k};
+                in lib.optional (t.parent != null) {
+                  from = k;
+                  to = t.parent;
+                  type = "parent";
+                }
+              ) kindNames;
+
+              edges = parentEdges ++ map (e: e // { type = "ref"; }) refEdges;
+
+              roots = builtins.filter (k: topology.${k}.parent == null) kindNames;
+              leaves = builtins.filter (k: topology.${k}.children == [ ]) kindNames;
             in
             {
-              inherit kindNames kindMeta topology refEdges;
+              inherit kindNames kindMeta topology refEdges edges roots leaves;
             };
         }
       );

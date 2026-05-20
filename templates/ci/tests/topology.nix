@@ -20,7 +20,8 @@ let
     ];
   };
 
-  topo = eval.config.schema._meta.topology;
+  meta = eval.config.schema._meta;
+  topo = meta.topology;
 in
 {
   topology = {
@@ -39,6 +40,14 @@ in
     test-network-no-relations = {
       expr = topo.network;
       expected = { parent = null; children = [ ]; };
+    };
+    test-roots = {
+      expr = meta.roots;
+      expected = [ "host" "network" ];
+    };
+    test-leaves = {
+      expr = meta.leaves;
+      expected = [ "network" "user" ];
     };
   };
 }
