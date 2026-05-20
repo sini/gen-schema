@@ -10,6 +10,7 @@
 {
   lib,
   mkMethodsModule,
+  getRefKind,
 }:
 let
   mkSchemaEntryType =
@@ -36,6 +37,8 @@ let
         in
         if merged ? __functor then
           throw "sidecar '__functor' is reserved — cannot be used as a sidecar key"
+        else if merged ? entryName then
+          throw "sidecar 'entryName' is reserved — cannot be used as a sidecar key"
         else
           merged;
 
@@ -163,11 +166,6 @@ let
               else
                 let
                   dummy = lib.evalModules { modules = [ config.${k} ]; };
-                  # Extract refKind from a type, traversing nullOr/listOf wrappers.
-                  getRefKind = type:
-                    if (type.refKind or null) != null then type.refKind
-                    else if (type.nestedTypes.elemType.refKind or null) != null then type.nestedTypes.elemType.refKind
-                    else null;
                   refFields = lib.filterAttrs (
                     _: opt: (opt ? type) && (getRefKind opt.type) != null
                   ) dummy.options;

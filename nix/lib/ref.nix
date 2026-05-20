@@ -40,9 +40,22 @@ let
     }
     // { refKind = kindName; };
 
+  # Extract refKind from a type, traversing nullOr/listOf wrappers safely.
+  # Returns the target kind name string, or null if not a ref type.
+  getRefKind =
+    type:
+    if (type.refKind or null) != null then
+      type.refKind
+    else
+      let
+        et = ((type.nestedTypes or { }).elemType or null);
+      in
+      if et != null then (et.refKind or null) else null;
 in
 {
   ref =
     target:
     if builtins.isString target then mkDeferredRef target else mkCoercingRefType target;
+
+  inherit getRefKind;
 }
