@@ -3,14 +3,12 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    gen.url = "github:sini/gen";
   };
 
-  outputs = { nixpkgs, gen, ... }:
+  outputs = { nixpkgs, ... }:
     let
       schemaLib = import ./nix/lib {
         lib = nixpkgs.lib;
-        inputs = { gen = import "${gen}" { lib = nixpkgs.lib; }; };
       };
     in {
       lib = schemaLib;

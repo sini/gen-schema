@@ -36,13 +36,12 @@
     },
     "gen_2": {
       "locked": {
-        "lastModified": 1779298945,
-        "narHash": "sha256-zAUTOrVhtMIY69QVTpSyj6/S/qdLzNf3CRmG8vWZh7c=",
-        "ref": "refs/heads/main",
-        "rev": "193ca974e1b9488734a55cefd35dd155050f9062",
-        "revCount": 3,
-        "type": "git",
-        "url": "file:///home/sini/Documents/repos/gen"
+        "lastModified": 1779304561,
+        "narHash": "sha256-aqLSLakDBxQBZmeIRBQY5BYX/xhx52RQlxEZ/kk0DQs=",
+        "owner": "sini",
+        "repo": "gen",
+        "rev": "40838941209b8f7042f4c2097e1e8d4c98a01a67",
+        "type": "github"
       },
       "original": {
         "owner": "sini",
