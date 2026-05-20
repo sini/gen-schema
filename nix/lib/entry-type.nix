@@ -92,7 +92,7 @@ let
           injected =
             lib.optional (baseModule != null) {
               file = "den-schema/base";
-              value = baseModule;
+              value = if builtins.isFunction baseModule then baseModule kind else baseModule;
             }
             ++ lib.optional (extractedSidecars.methods != { }) {
               file = "den-schema/methods";
