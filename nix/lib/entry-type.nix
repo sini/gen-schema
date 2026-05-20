@@ -37,8 +37,8 @@ let
         in
         if merged ? __functor then
           throw "sidecar '__functor' is reserved — cannot be used as a sidecar key"
-        else if merged ? entryName then
-          throw "sidecar 'entryName' is reserved — cannot be used as a sidecar key"
+        else if merged ? kind then
+          throw "sidecar 'kind' is reserved — cannot be used as a sidecar key"
         else
           merged;
 
@@ -113,7 +113,7 @@ let
             {
               imports = [ merged ];
             };
-          entryName = kind;
+          inherit kind;
         }
         // extractedSidecars
         // computedFields;
