@@ -143,6 +143,19 @@ let
             default = strict;
           };
 
+          options._topology = lib.mkOption {
+            internal = true;
+            type = lib.types.attrsOf (lib.types.submodule {
+              options.children = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+                description = "Child kind names nested inside this kind.";
+              };
+            });
+            default = { };
+            description = "Declared parent-child nesting between kinds.";
+          };
+
           options._meta = lib.mkOption {
             readOnly = true;
             internal = true;
@@ -153,26 +166,64 @@ let
               };
               options.kindMeta = lib.mkOption {
                 type = lib.types.functionTo lib.types.raw;
-                description = "Per-kind introspection: options, types, identity keys";
+                description = "Per-kind introspection: options, types, identity keys, refs";
+              };
+              options.topology = lib.mkOption {
+                type = lib.types.raw;
+                description = "Parent-child nesting: { kind = { parent, children }; }";
+              };
+              options.refEdges = lib.mkOption {
+                type = lib.types.listOf lib.types.raw;
+                description = "All ref edges: [ { from, field, to } ]";
               };
             };
           };
-          config._meta = {
-            kindNames = lib.sort (a: b: a < b) (lib.filter (n: !(lib.hasPrefix "_" n)) (lib.attrNames config));
-            kindMeta =
-              k:
-              if !(config ? ${k}) then
-                throw "kindMeta: '${k}' is not a declared schema kind"
-              else
+          config._meta =
+            let
+              kindNames = lib.sort (a: b: a < b) (lib.filter (n: !(lib.hasPrefix "_" n)) (lib.attrNames config));
+
+              kindMeta =
+                k:
+                if !(config ? ${k}) then
+                  throw "kindMeta: '${k}' is not a declared schema kind"
+                else
+                  let
+                    dummy = lib.evalModules { modules = [ config.${k} ]; };
+                  in
+                  {
+                    optionNames = lib.attrNames dummy.options;
+                    options = dummy.options;
+                    refs = refsFromOptions dummy.options;
+                  };
+
+              # Derive topology: combine declared _topology with inverse parent pointers
+              topology =
                 let
-                  dummy = lib.evalModules { modules = [ config.${k} ]; };
+                  declared = config._topology;
+                  # Build parent map from children declarations
+                  parentMap = lib.foldl' (acc: parentKind:
+                    let children = (declared.${parentKind} or { }).children or [ ];
+                    in lib.foldl' (a: child: a // { ${child} = parentKind; }) acc children
+                  ) { } (lib.attrNames declared);
                 in
-                {
-                  optionNames = lib.attrNames dummy.options;
-                  options = dummy.options;
-                  refs = refsFromOptions dummy.options;
-                };
-          };
+                lib.genAttrs kindNames (k: {
+                  parent = parentMap.${k} or null;
+                  children = (declared.${k} or { }).children or [ ];
+                });
+
+              # Materialize all ref edges from kindMeta.refs across all kinds
+              refEdges = lib.concatMap (fromKind:
+                let refs = (kindMeta fromKind).refs;
+                in lib.mapAttrsToList (field: toKind: {
+                  from = fromKind;
+                  inherit field;
+                  to = toKind;
+                }) refs
+              ) kindNames;
+            in
+            {
+              inherit kindNames kindMeta topology refEdges;
+            };
         }
       );
     };
