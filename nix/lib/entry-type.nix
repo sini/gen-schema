@@ -110,6 +110,7 @@ let
             {
               imports = [ merged ];
             };
+          entryName = kind;
         }
         // extractedSidecars
         // computedFields;
