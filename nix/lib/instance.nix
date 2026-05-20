@@ -13,7 +13,7 @@
   mkIdentityModule,
   runValidators,
   defaultOnError,
-  getRefKind,
+  refsFromOptions,
 }:
 let
   mkInstanceType =
@@ -46,18 +46,12 @@ let
       }
     );
 
-  # Scan a kind's options for deferred ref types (those with .refKind).
-  # Traverses nullOr and listOf wrappers. Returns { fieldName = refKind; }.
   findRefFields =
     schema: kind:
     let
       evaled = lib.evalModules { modules = [ schema.${kind} ]; };
-      opts = evaled.options;
-      refFields = lib.filterAttrs (
-        _: opt: (opt ? type) && (getRefKind opt.type) != null
-      ) opts;
     in
-    lib.mapAttrs (_: opt: getRefKind opt.type) refFields;
+    refsFromOptions evaled.options;
 
   # Build extra modules that override deferred ref fields with resolved types.
   mkRefBindingModules =
@@ -82,14 +76,14 @@ let
     in
     builtins.seq _ (
       lib.mapAttrsToList (
-        field: _registry:
+        field: registry:
         { ... }:
         {
           options.${field} = lib.mkOption {
             apply = val:
               if builtins.isString val then
-                if _registry ? ${val} then
-                  _registry.${val}
+                if registry ? ${val} then
+                  registry.${val}
                 else
                   throw "ref field '${field}' on kind '${kind}': reference '${val}' not found in instance registry"
               else

@@ -10,7 +10,7 @@
 {
   lib,
   mkMethodsModule,
-  getRefKind,
+  refsFromOptions,
 }:
 let
   mkSchemaEntryType =
@@ -166,14 +166,11 @@ let
               else
                 let
                   dummy = lib.evalModules { modules = [ config.${k} ]; };
-                  refFields = lib.filterAttrs (
-                    _: opt: (opt ? type) && (getRefKind opt.type) != null
-                  ) dummy.options;
                 in
                 {
                   optionNames = lib.attrNames dummy.options;
                   options = dummy.options;
-                  refs = lib.mapAttrs (_: opt: getRefKind opt.type) refFields;
+                  refs = refsFromOptions dummy.options;
                 };
           };
         }

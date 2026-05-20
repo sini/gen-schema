@@ -58,4 +58,14 @@ in
     if builtins.isString target then mkDeferredRef target else mkCoercingRefType target;
 
   inherit getRefKind;
+
+  # Scan evaluated options for deferred ref types. Returns { fieldName = refKind; }.
+  refsFromOptions =
+    opts:
+    let
+      refFields = lib.filterAttrs (
+        _: opt: (opt ? type) && (getRefKind opt.type) != null
+      ) opts;
+    in
+    lib.mapAttrs (_: opt: getRefKind opt.type) refFields;
 }

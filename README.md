@@ -104,11 +104,11 @@ config.schema.service = {
   options.healthPath = lib.mkOption { type = lib.types.str; default = "/health"; };
 };
 
-# Services can reference each other
+# Services can reference each other (direct ref — registry in scope)
 options.services = schemaLib.mkInstanceRegistry config.schema "service" {
   extraModules = [({ ... }: {
     options.upstream = lib.mkOption {
-      type = lib.types.nullOr (schemaLib.mkRefType config.services);
+      type = lib.types.nullOr (schemaLib.ref config.services);
       default = null;
       description = "Upstream service this proxies to";
     };
@@ -118,7 +118,7 @@ options.services = schemaLib.mkInstanceRegistry config.schema "service" {
 config.services.api = { port = 8080; };
 config.services.gateway = { port = 443; upstream = "api"; };
 
-# Ref resolves to the full instance:
+# Ref resolves to the full instance — accepts string keys or instance values:
 config.services.gateway.upstream.port  # → 8080
 ```
 
@@ -140,13 +140,12 @@ config.schema.service = {
   options.targetPort = lib.mkOption { type = lib.types.int; };
 };
 
-# Deployments reference their namespace
+# Deployments reference their namespace (deferred ref on kind + binding)
+config.schema.deployment.options.namespace = lib.mkOption {
+  type = schemaLib.ref "namespace";
+};
 options.deployments = schemaLib.mkInstanceRegistry config.schema "deployment" {
-  extraModules = [({ ... }: {
-    options.namespace = lib.mkOption {
-      type = schemaLib.mkRefType config.namespaces;
-    };
-  })];
+  refs.namespace = config.namespaces;
 };
 
 config.namespaces.production = { labels.env = "prod"; };
@@ -185,13 +184,12 @@ config.schema.network = {
   options.gateway = lib.mkOption { type = lib.types.str; };
 };
 
-# Hosts reference their network
+# Hosts reference their network (deferred ref)
+config.schema.host.options.network = lib.mkOption {
+  type = schemaLib.ref "network";
+};
 options.hosts = schemaLib.mkInstanceRegistry config.schema "host" {
-  extraModules = [({ ... }: {
-    options.network = lib.mkOption {
-      type = schemaLib.mkRefType config.networks;
-    };
-  })];
+  refs.network = config.networks;
 };
 options.networks = schemaLib.mkInstanceRegistry config.schema "network" {};
 
@@ -421,32 +419,49 @@ _identity.keys: 'tags' on kind 'host' is not a primitive type (str/int/bool)
 
 ### Cross-Instance References
 
-`mkRefType` creates a type that validates a string key against a registry and resolves to the target instance:
+`schema.ref` declares a reference to another kind's instances. Two modes:
+
+**Deferred ref** — declare on the kind, bind at registry time:
+
+```nix
+# Kind declares referential intent
+config.schema.service.options.host = lib.mkOption {
+  type = schemaLib.ref "host";
+};
+
+# Registry binds the ref to a concrete registry
+options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
+  refs.host = config.fleet.hosts;
+};
+```
+
+**Direct ref** — resolve immediately when the registry is in scope:
 
 ```nix
 options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
   extraModules = [({ ... }: {
-    options.host = lib.mkOption {
-      type = schemaLib.mkRefType config.fleet.hosts;
-      description = "Host this service runs on";
+    options.upstream = lib.mkOption {
+      type = lib.types.nullOr (schemaLib.ref config.fleet.services);
+      default = null;
     };
   })];
 };
+```
 
-config.fleet.services.nginx = {
-  host = "igloo";  # string in, instance out
-  port = 80;
-};
+Both modes accept string keys or instance values:
 
-# Resolves to the full host instance:
+```nix
+config.fleet.services.nginx.host = "igloo";                    # string key → lookup
+config.fleet.services.gateway.upstream = config.fleet.services.nginx;  # instance → passthrough
+
 config.fleet.services.nginx.host.addr  # → "10.0.1.1"
-config.fleet.services.nginx.host.id_hash  # → "b3e6bb..."
+config.fleet.services.gateway.upstream.port  # → 80
 ```
 
 Invalid references throw at eval time:
 
 ```
-services.nginx.host: reference 'nonexistent' not found in instance registry
+ref field 'host' on kind 'service': reference 'nonexistent' not found in instance registry
 ```
 
 ### Kind Mix-ins
@@ -645,10 +660,10 @@ Declare cross-field validation constraints on kinds. Validators are a built-in s
 
 ```nix
 config.schema.host.validators = [
-  (schemaLib.mkValidator "has-addr"
+  (gen.mkValidator "has-addr"
     ({ addr, ... }: addr != "")
     "host must have a non-empty addr")
-  (schemaLib.mkValidator "valid-role"
+  (gen.mkValidator "valid-role"
     ({ role, ... }: lib.elem role [ "web" "db" "worker" ])
     "role must be one of: web, db, worker")
 ];
@@ -658,9 +673,9 @@ Validators compose across modules — multiple modules can contribute validators
 
 ```nix
 # Module A
-config.schema.host.validators = [ (schemaLib.mkValidator "a" ...) ];
+config.schema.host.validators = [ (gen.mkValidator "a" ...) ];
 # Module B
-config.schema.host.validators = [ (schemaLib.mkValidator "b" ...) ];
+config.schema.host.validators = [ (gen.mkValidator "b" ...) ];
 # Both fire on every host registry
 ```
 
@@ -758,6 +773,7 @@ Returns `lib.types.submodule` — the type for a single instance of a kind.
 ```nix
 mkInstanceRegistry schema kind {
   extraModules ? [],
+  refs ? {},             # { fieldName = registry; } — bindings for deferred refs
   strict ? schema._strict or true,
   description ? "${kind} instances",
   derive ? null,         # { name → instance } → { name → attrset } — plain enrichment
@@ -767,15 +783,15 @@ mkInstanceRegistry schema kind {
 
 Returns `lib.mkOption` with `type = attrsOf (mkInstanceType ...)` and an `apply` pipeline that runs validators then derive.
 
-`derive` and `deriveEither` are mutually exclusive.
+`derive` and `deriveEither` are mutually exclusive. `refs` binds deferred `ref` fields to concrete registries.
 
-### `mkRefType`
+### `ref`
 
 ```nix
-mkRefType instances
+ref target
 ```
 
-Returns a type. Input: string key. Output: resolved instance. Throws on missing key.
+`target` is a string → deferred ref (kind name, bound via `refs` on `mkInstanceRegistry`). `target` is an attrset → direct ref (resolved immediately). Both modes accept string keys or instance values.
 
 ### `schemaFn`
 
@@ -785,13 +801,13 @@ schemaFn description type fn
 
 Declares a method on a kind. `fn` receives an attrset of config values matching its named arguments. Declare via `schema.<kind>.methods.<name> = schemaFn ...`.
 
-### `mkValidator`
+### `mkValidator` (from gen)
 
 ```nix
-mkValidator name pred message
+gen.mkValidator name pred message
 ```
 
-Creates a validator record. `pred` receives the instance config and returns bool. Declare via `schema.<kind>.validators = [ (mkValidator ...) ]`.
+Creates a validator record. `pred` receives the instance config and returns bool. Declare via `schema.<kind>.validators = [ (gen.mkValidator ...) ]`. Provided by [gen](https://github.com/sini/gen), not den-schema.
 
 ### `validateInstances`
 
@@ -828,7 +844,7 @@ Instance types (submodules with strict + identity injected)
   ↓ collected into
 Instance registries (attrsOf instance type)
   ↓ referenced by
-Cross-instance refs (mkRefType)
+Cross-instance refs (schema.ref)
 ```
 
 **Kinds are pure schema** — options, config, defaults, methods, sidecars. No strict validation or identity hashing at the kind level.

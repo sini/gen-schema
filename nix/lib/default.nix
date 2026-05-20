@@ -13,7 +13,7 @@ let
   entryType = import ./entry-type.nix {
     inherit lib;
     inherit (methods) mkMethodsModule;
-    inherit (refLib) getRefKind;
+    inherit (refLib) refsFromOptions;
   };
   validate = import ./validate.nix { inherit lib gen; };
   refLib = import ./ref.nix {
@@ -23,7 +23,7 @@ let
   instance = import ./instance.nix {
     inherit lib;
     inherit (gen) mkStrictModule mkIdentityModule runValidators defaultOnError;
-    inherit (refLib) getRefKind;
+    inherit (refLib) refsFromOptions;
   };
   docs = import ./docs.nix { inherit lib; };
 in
