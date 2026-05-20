@@ -33,7 +33,7 @@ in
     };
     test-parent-edge = {
       expr = builtins.head parentEdges;
-      expected = { from = "user"; to = "host"; type = "parent"; };
+      expected = { from = "user"; to = "host"; type = "parent"; field = null; };
     };
     test-ref-edge = {
       expr = builtins.head refEdgesTyped;

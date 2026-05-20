@@ -208,20 +208,41 @@ let
                     refs = refsFromOptions dummy.options;
                   };
 
-              # Derive topology: combine declared _topology with inverse parent pointers
+              # Derive topology: combine declared _topology with inverse parent pointers.
+              # Validates: no undeclared kinds, no multiple parents.
               topology =
                 let
                   declared = config._topology;
-                  # Build parent map from children declarations
+                  allDeclaredChildren = lib.concatMap (pk:
+                    declared.${pk}.children
+                  ) (lib.attrNames declared);
+
+                  # Validate: all topology keys and children must be declared kinds
+                  unknownParents = lib.filter (k: !(builtins.elem k kindNames)) (lib.attrNames declared);
+                  unknownChildren = lib.filter (k: !(builtins.elem k kindNames)) allDeclaredChildren;
+                  _ =
+                    if unknownParents != [ ] then
+                      throw "den-schema: _topology references undeclared kind '${builtins.head unknownParents}'"
+                    else if unknownChildren != [ ] then
+                      throw "den-schema: _topology.*.children references undeclared kind '${builtins.head unknownChildren}'"
+                    else null;
+
+                  # Build parent map, detecting multiple parents
                   parentMap = lib.foldl' (acc: parentKind:
-                    let children = (declared.${parentKind} or { }).children or [ ];
-                    in lib.foldl' (a: child: a // { ${child} = parentKind; }) acc children
+                    lib.foldl' (a: child:
+                      if a ? ${child} then
+                        throw "den-schema: kind '${child}' has multiple parents ('${a.${child}}' and '${parentKind}') in _topology"
+                      else
+                        a // { ${child} = parentKind; }
+                    ) acc declared.${parentKind}.children
                   ) { } (lib.attrNames declared);
                 in
-                lib.genAttrs kindNames (k: {
-                  parent = parentMap.${k} or null;
-                  children = (declared.${k} or { }).children or [ ];
-                });
+                builtins.seq _ (
+                  lib.genAttrs kindNames (k: {
+                    parent = parentMap.${k} or null;
+                    children = (declared.${k} or { }).children or [ ];
+                  })
+                );
 
               # Materialize all ref edges from kindMeta.refs across all kinds
               refEdges = lib.concatMap (fromKind:
@@ -239,6 +260,7 @@ let
                   from = k;
                   to = t.parent;
                   type = "parent";
+                  field = null;
                 }
               ) kindNames;
 
