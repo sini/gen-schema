@@ -45,10 +45,74 @@ let
       }
     );
 
+  # Extract refKind from a type, traversing nullOr/listOf wrappers.
+  getRefKind =
+    type:
+    if (type.refKind or null) != null then
+      type.refKind
+    else if (type.nestedTypes.elemType.refKind or null) != null then
+      type.nestedTypes.elemType.refKind
+    else
+      null;
+
+  # Scan a kind's options for deferred ref types (those with .refKind).
+  # Traverses nullOr and listOf wrappers. Returns { fieldName = refKind; }.
+  findRefFields =
+    schema: kind:
+    let
+      evaled = lib.evalModules { modules = [ schema.${kind} ]; };
+      opts = evaled.options;
+      refFields = lib.filterAttrs (
+        _: opt: (opt ? type) && (getRefKind opt.type) != null
+      ) opts;
+    in
+    lib.mapAttrs (_: opt: getRefKind opt.type) refFields;
+
+  # Build extra modules that override deferred ref fields with resolved types.
+  mkRefBindingModules =
+    kind: refs: refFields:
+    let
+      # Validate: every deferred ref field must have a binding
+      missingBindings = lib.filterAttrs (field: _: !(refs ? ${field})) refFields;
+      extraBindings = lib.filterAttrs (field: _: !(refFields ? ${field})) refs;
+
+      _ =
+        if missingBindings != { } then
+          let
+            missing = builtins.head (lib.attrNames missingBindings);
+            targetKind = missingBindings.${missing};
+          in
+          throw "mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
+        else if extraBindings != { } then
+          let extra = builtins.head (lib.attrNames extraBindings);
+          in throw "mkInstanceRegistry: refs.${extra} does not match any ref field on kind '${kind}'"
+        else
+          null;
+    in
+    builtins.seq _ (
+      lib.mapAttrsToList (
+        field: _registry:
+        { ... }:
+        {
+          options.${field} = lib.mkOption {
+            apply = val:
+              if builtins.isString val then
+                if _registry ? ${val} then
+                  _registry.${val}
+                else
+                  throw "ref field '${field}' on kind '${kind}': reference '${val}' not found in instance registry"
+              else
+                val;
+          };
+        }
+      ) refs
+    );
+
   mkInstanceRegistry =
     schema: kind:
     {
       extraModules ? [ ],
+      refs ? { },
       strict ? schema._strict or true,
       description ? "${kind} instances",
       derive ? null,
@@ -57,6 +121,11 @@ let
     assert (derive == null || deriveEither == null)
       || throw "mkInstanceRegistry: derive and deriveEither are mutually exclusive";
     let
+      # Resolve deferred refs: scan kind options, validate bindings, build override modules.
+      refFields = if refs == { } then { } else findRefFields schema kind;
+      refModules = if refs == { } then [ ] else mkRefBindingModules kind refs refFields;
+      allExtraModules = extraModules ++ refModules;
+
       onError =
         if deriveEither != null then
           deriveEither.onError or defaultOnError
@@ -111,7 +180,7 @@ let
     lib.mkOption {
       inherit description;
       default = { };
-      type = lib.types.attrsOf (mkInstanceType schema kind { inherit extraModules strict; });
+      type = lib.types.attrsOf (mkInstanceType schema kind { extraModules = allExtraModules; inherit strict; });
       apply = applyPipeline;
     };
 in

@@ -5,10 +5,10 @@
 
   inputs = {
     den-schema.url = "github:denful/den-schema";
+    gen.url = "github:sini/gen";
     import-tree.url = "github:vic/import-tree";
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    bend.url = "github:denful/bend";
   };
 }

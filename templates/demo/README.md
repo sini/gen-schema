@@ -32,7 +32,7 @@ Kind definitions live in `modules/schema/` and are plain NixOS-style modules set
 | Declarative methods | `modules/fleet/methods.nix` | `hasService` closes over services registry; `describe` resolves all args from config |
 | Schema validators | `modules/fleet/validation.nix` | Host addr/role + service port validators declared on kinds, fire automatically |
 | Derive hooks | `modules/fleet/registries.nix` | Plain `derive` assigns deterministic UIDs from `id_hash` |
-| Bend integration | `modules/fleet/registries.nix` | `deriveEither` with bend lens computes service endpoints |
+| Either pipeline | `modules/fleet/registries.nix` | `deriveEither` with gen's either computes service endpoints |
 | Doc generation | `modules/outputs.nix` | `renderDocs` produces markdown tables from schema metadata |
 | Introspection | `modules/outputs.nix` | `_meta.kindNames`, `_meta.kindMeta` for programmatic schema access |
 | flake-parts integration | `modules/schema.nix` | Single import of `den-schema.flakeModules.default` |
@@ -51,7 +51,7 @@ modules/
     admin-user.nix                — kind mix-in: imports user, adds sudoPrivileges + sshKeys
     monitoring-plugin.nix         — composition: extends host + service from a separate module
   fleet/
-    registries.nix                — mkInstanceRegistry with derive hooks + bend endpoint derivation
+    registries.nix                — mkInstanceRegistry with derive hooks + either endpoint derivation
     hosts.nix                     — host instances: igloo (web), iceberg (db)
     users.nix                     — user instances: tux, yeti
     admins.nix                    — admin-user instances: root, deploy (inherit user fields)
@@ -245,29 +245,29 @@ fleet.users.yeti.uid  → 33045  (different hash → different UID)
 
 Derive reads `id_hash` from each instance to compute collision-free UIDs. Derived fields are `internal = true` (excluded from `id_hash`) and `readOnly = true` (only the derive hook writes them).
 
-## Bend Integration
+## Either Pipeline
 
-The `deriveEither` hook supports Either-based enrichment — the natural fit for [bend](https://github.com/denful/bend) lens pipelines. Bend is not a library dependency; it's a consumer choice demonstrated here.
+The `deriveEither` hook supports Either-based enrichment using [gen](https://github.com/sini/gen)'s either combinators — short-circuit pipelines where each step returns `{ right = ...; }` or `{ left = ...; }`.
 
 ```nix
 # modules/fleet/registries.nix
-mkEndpoint = bend.pipe [
-  (bend.focus
-    (s: { addr = s.host.addr; port = s.port; protocol = s.protocol; })
-    (_: v: v))
-  (bend.parse
-    ({ addr, port, protocol, ... }:
-      bend.right "${protocol}://${addr}:${toString port}")
-    bend.identity)
-];
+mkEndpoint = service:
+  gen.either.pipe [
+    (s: gen.either.right { addr = s.host.addr; port = s.port; protocol = s.protocol; })
+    ({ addr, port, protocol }: gen.either.right "${protocol}://${addr}:${toString port}")
+  ] service;
 
 options.fleet.services = mkInstanceRegistry config.schema "service" {
   deriveEither = {
     derive = services:
-      let result = (bend.eachValue mkEndpoint).get services;
-      in if result ? right
-         then { right = lib.mapAttrs (_: endpoint: { inherit endpoint; }) result.right; }
-         else result;
+      let
+        results = lib.mapAttrs (_: mkEndpoint) services;
+        errors = lib.filterAttrs (_: r: r ? left) results;
+      in
+      if errors == { } then
+        { right = lib.mapAttrs (_: r: { endpoint = r.right; }) results; }
+      else
+        { left = lib.mapAttrsToList (name: r: "${name}: ${r.left}") errors; };
   };
 };
 
@@ -275,7 +275,7 @@ fleet.services.nginx.endpoint     → "tcp://10.0.1.1:80"
 fleet.services.postgres.endpoint  → "tcp://10.0.2.1:5432"
 ```
 
-The bend lens extracts host addr + port + protocol from each service, computes the endpoint string, and returns it as Either. On success, the endpoints are merged onto instances. On failure (if the lens pipeline returns `left`), the default handler throws — or a custom `onError` handles it.
+Each step in the pipeline receives the previous step's `right` value. If any step returns `left`, the pipeline short-circuits. On success, endpoints are merged onto instances. On failure, the default handler throws — or a custom `onError` handles it.
 
 ## Why den-schema Over Bare Submodules
 

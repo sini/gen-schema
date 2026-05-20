@@ -26,10 +26,16 @@ in
       # Identity hash
       iglooHash = fleet.hosts.igloo.id_hash;
 
-      # Cross-instance references
+      # --- Cross-instance references (schema.ref) ---
+      # Deferred ref: host declared as ref "host" on service kind, bound via refs
       nginxHost = fleet.services.nginx.host.name;
       nginxHostAddr = fleet.services.nginx.host.addr;
       postgresHost = fleet.services.postgres.host.name;
+
+      # Direct ref: upstream declared as ref config.fleet.services in extraModules
+      gatewayUpstreamPort = fleet.services.gateway.upstream.port;
+      gatewayUpstreamIsNginx = fleet.services.gateway.upstream.name == "nginx";
+      standaloneUpstreamNull = fleet.services.nginx.upstream == null;
 
       # --- Schema composition ---
       # Fields added by the monitoring plugin, merged into the base host kind
@@ -80,10 +86,11 @@ in
       rootUid = fleet.admins.root.uid;
       adminUidRange = fleet.admins.root.uid >= 60001;
 
-      # --- Derive + Bend ---
-      # Computed endpoint from bend lens pipeline (host addr + port + protocol)
+      # --- Derive + Either ---
+      # Computed endpoint from either pipeline (host addr + port + protocol)
       nginxEndpoint = fleet.services.nginx.endpoint;
       postgresEndpoint = fleet.services.postgres.endpoint;
+      gatewayEndpoint = fleet.services.gateway.endpoint;
     };
 
     # --- Documentation generation ---

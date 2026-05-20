@@ -162,10 +162,19 @@ let
               else
                 let
                   dummy = lib.evalModules { modules = [ config.${k} ]; };
+                  # Extract refKind from a type, traversing nullOr/listOf wrappers.
+                  getRefKind = type:
+                    if (type.refKind or null) != null then type.refKind
+                    else if (type.nestedTypes.elemType.refKind or null) != null then type.nestedTypes.elemType.refKind
+                    else null;
+                  refFields = lib.filterAttrs (
+                    _: opt: (opt ? type) && (getRefKind opt.type) != null
+                  ) dummy.options;
                 in
                 {
                   optionNames = lib.attrNames dummy.options;
                   options = dummy.options;
+                  refs = lib.mapAttrs (_: opt: getRefKind opt.type) refFields;
                 };
           };
         }

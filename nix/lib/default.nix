@@ -15,6 +15,10 @@ let
     inherit (methods) mkMethodsModule;
   };
   validate = import ./validate.nix { inherit lib gen; };
+  refLib = import ./ref.nix {
+    inherit lib;
+    inherit (gen) mkRefType;
+  };
   instance = import ./instance.nix {
     inherit lib;
     inherit (gen) mkStrictModule mkIdentityModule runValidators defaultOnError;
@@ -27,6 +31,7 @@ in
   inherit (entryType) mkSchemaOption mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (validate) validateInstances;
+  inherit (refLib) ref;
   inherit (docs) renderDocs;
 
   _internal = {

@@ -812,13 +812,12 @@ Returns a markdown string with a table per kind.
 ### `_internal`
 
 ```nix
-schemaLib._internal.mkStrictModule    # strict freeform type module
-schemaLib._internal.mkIdentityModule  # id_hash + _identity.keys module
 schemaLib._internal.mkMethodsModule   # methods option/config wiring
-schemaLib._internal.runValidators     # validator execution (used by apply pipeline)
 ```
 
 Not part of the public API contract. Available for testing and advanced use.
+
+Identity, strict, validation, and ref primitives are in [gen](https://github.com/sini/gen) — import gen directly if you need them outside of den-schema.
 
 ## Architecture
 
@@ -842,17 +841,16 @@ Cross-instance refs (mkRefType)
 
 ```
 nix/lib/
-  default.nix       — public API surface, wiring
+  default.nix       — public API surface, wiring (imports gen for primitives)
   entry-type.nix     — mkSchemaEntryType, mkSchemaOption (sidecar extraction, _meta)
   instance.nix       — mkInstanceType, mkInstanceRegistry (strict + identity injection)
-  identity.nix       — mkIdentityModule (id_hash, _identity.keys)
-  strict.nix         — mkStrictModule (strict freeform type)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)
-  ref-type.nix       — mkRefType (cross-instance references)
-  validate.nix       — mkValidator, runValidators, validateInstances
+  validate.nix       — validateInstances (schema-specific wrapper around gen.runValidators)
   docs.nix           — renderDocs (markdown generation)
 nix/flakeModule.nix  — flake-parts integration (provides schema option + schemaLib)
 ```
+
+Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), validators (`mkValidator`, `runValidators`), and cross-instance references (`mkRefType`) are provided by [gen](https://github.com/sini/gen) and consumed internally.
 
 ## Demo
 

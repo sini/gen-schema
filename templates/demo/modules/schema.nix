@@ -1,12 +1,12 @@
 # Wiring: import den-schema's flake-parts module.
 # This provides options.schema and _module.args.schemaLib.
-{ inputs, ... }:
+{ lib, inputs, ... }:
 {
   imports = [
     inputs.den-schema.flakeModules.default
   ];
   config._module.args = {
-    bend = inputs.bend.lib;
+    gen = inputs.gen { inherit lib; };
     inherit inputs;
   };
 }

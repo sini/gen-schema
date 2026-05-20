@@ -3,10 +3,11 @@
 # Demonstrates:
 # - Plain derive: deterministic UID assignment from id_hash
 # - User override: explicit uid on an instance skips auto-assignment
-# - deriveEither + bend: computed endpoint strings from host ref + port
-{ lib, config, schemaLib, bend, ... }:
+# - deriveEither + either: computed endpoint strings from host ref + port
+{ lib, config, schemaLib, gen, ... }:
 let
-  inherit (schemaLib) mkInstanceRegistry mkRefType;
+  inherit (schemaLib) mkInstanceRegistry ref;
+  inherit (gen) either;
 
   # --- UID assignment helpers ---
 
@@ -61,17 +62,13 @@ let
       else { uid = computed.${name}; }
     ) instances;
 
-  # --- Bend lens for endpoint derivation ---
+  # --- Endpoint derivation via Either pipeline ---
 
-  mkEndpoint = bend.pipe [
-    (bend.focus
-      (s: { addr = s.host.addr; port = s.port; protocol = s.protocol; })
-      (_: v: v))
-    (bend.parse
-      ({ addr, port, protocol, ... }:
-        bend.right "${protocol}://${addr}:${toString port}")
-      bend.identity)
-  ];
+  mkEndpoint = service:
+    either.pipe [
+      (s: either.right { addr = s.host.addr; port = s.port; protocol = s.protocol; })
+      ({ addr, port, protocol }: either.right "${protocol}://${addr}:${toString port}")
+    ] service;
 in
 {
   options.fleet.hosts = mkInstanceRegistry config.schema "host" {
@@ -90,18 +87,26 @@ in
 
   options.fleet.services = mkInstanceRegistry config.schema "service" {
     description = "Fleet service instances.";
+    # Deferred ref: bind "host" kind-ref to the hosts registry
+    refs.host = config.fleet.hosts;
     deriveEither = {
       derive = services:
-        let result = (bend.eachValue mkEndpoint).get services;
-        in if result ? right then
-          { right = lib.mapAttrs (_: endpoint: { inherit endpoint; }) result.right; }
-        else result;
+        let
+          results = lib.mapAttrs (_: mkEndpoint) services;
+          errors = lib.filterAttrs (_: r: r ? left) results;
+        in
+        if errors == { } then
+          { right = lib.mapAttrs (_: r: { endpoint = r.right; }) results; }
+        else
+          { left = lib.mapAttrsToList (name: r: "${name}: ${r.left}") errors; };
     };
     extraModules = [
       ({ ... }: {
-        options.host = lib.mkOption {
-          type = mkRefType config.fleet.hosts;
-          description = "Host this service runs on (reference by name).";
+        # Direct ref: upstream is optional self-reference, registry in scope
+        options.upstream = lib.mkOption {
+          type = lib.types.nullOr (ref config.fleet.services);
+          default = null;
+          description = "Upstream service this proxies to (direct ref).";
         };
         options.endpoint = lib.mkOption {
           type = lib.types.str;
