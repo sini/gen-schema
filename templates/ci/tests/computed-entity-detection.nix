@@ -13,7 +13,7 @@ let
             default = [ ];
           };
           computed =
-            sidecars: defs:
+            _kind: sidecars: defs:
             let
               hasStructural = lib.any (
                 d: builtins.isAttrs d.value && (d.value ? options || d.value ? config)

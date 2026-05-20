@@ -5,7 +5,7 @@ let
     modules = [{
       options.schema = schemaLib.mkSchemaOption {
         sidecars.isEntity = { default = false; merge = _: v: v; };
-        computed = sidecars: _defs: {
+        computed = _kind: sidecars: _defs: {
           # Computed isEntity overrides the sidecar isEntity
           isEntity = true;
         };

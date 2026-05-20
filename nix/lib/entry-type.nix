@@ -79,7 +79,8 @@ let
           ) allSidecars;
 
           # Computed fields from extracted sidecars + raw defs
-          computedFields = if computed != null then computed extractedSidecars defs else { };
+          # kind (lib.last loc) is passed so computed can produce entry-specific fields
+          computedFields = if computed != null then computed kind extractedSidecars defs else { };
 
           # Strip all sidecar keys before deferredModule merge
           strippedDefs = map (
