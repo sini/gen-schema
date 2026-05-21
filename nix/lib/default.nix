@@ -26,6 +26,7 @@ let
     inherit (refLib) refsFromOptions;
   };
   docs = import ./docs.nix { inherit lib; };
+  scopeGraph = import ./scope-graph.nix { inherit lib; };
 in
 {
   # gen-schema's own exports only — no gen re-exports
@@ -35,6 +36,7 @@ in
   inherit (validate) validateInstances;
   inherit (refLib) ref;
   inherit (docs) renderDocs;
+  inherit (scopeGraph) buildKindGraph buildInstanceGraph;
 
   _internal = {
     inherit (methods) mkMethodsModule;
