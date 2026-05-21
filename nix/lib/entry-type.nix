@@ -146,13 +146,15 @@ let
 
           options._topology = lib.mkOption {
             internal = true;
-            type = lib.types.attrsOf (lib.types.submodule {
-              options.children = lib.mkOption {
-                type = lib.types.listOf lib.types.str;
-                default = [ ];
-                description = "Child kind names nested inside this kind.";
-              };
-            });
+            type = lib.types.attrsOf (
+              lib.types.submodule {
+                options.children = lib.mkOption {
+                  type = lib.types.listOf lib.types.str;
+                  default = [ ];
+                  description = "Child kind names nested inside this kind.";
+                };
+              }
+            );
             default = { };
             description = "Declared parent-child nesting between kinds.";
           };
@@ -214,9 +216,7 @@ let
               topology =
                 let
                   declared = config._topology;
-                  allDeclaredChildren = lib.concatMap (pk:
-                    declared.${pk}.children
-                  ) (lib.attrNames declared);
+                  allDeclaredChildren = lib.concatMap (pk: declared.${pk}.children) (lib.attrNames declared);
 
                   # Validate: all topology keys and children must be declared kinds
                   unknownParents = lib.filter (k: !(builtins.elem k kindNames)) (lib.attrNames declared);
@@ -226,11 +226,14 @@ let
                       throw "den-schema: _topology references undeclared kind '${builtins.head unknownParents}'"
                     else if unknownChildren != [ ] then
                       throw "den-schema: _topology.*.children references undeclared kind '${builtins.head unknownChildren}'"
-                    else null;
+                    else
+                      null;
 
                   # Build parent map, detecting multiple parents
-                  parentMap = lib.foldl' (acc: parentKind:
-                    lib.foldl' (a: child:
+                  parentMap = lib.foldl' (
+                    acc: parentKind:
+                    lib.foldl' (
+                      a: child:
                       if a ? ${child} then
                         throw "den-schema: kind '${child}' has multiple parents ('${a.${child}}' and '${parentKind}') in _topology"
                       else
@@ -239,25 +242,33 @@ let
                   ) { } (lib.attrNames declared);
                 in
                 builtins.seq _ (
-                  lib.genAttrs kindNames (k: {
-                    parent = parentMap.${k} or null;
-                    children = (declared.${k} or { }).children or [ ];
-                  })
+                  builtins.seq parentMap (
+                    lib.genAttrs kindNames (k: {
+                      parent = parentMap.${k} or null;
+                      children = (declared.${k} or { }).children or [ ];
+                    })
+                  )
                 );
 
               # Materialize all ref edges from kindMeta.refs across all kinds
-              refEdges = lib.concatMap (fromKind:
-                let refs = (kindMeta fromKind).refs;
-                in lib.mapAttrsToList (field: toKind: {
+              refEdges = lib.concatMap (
+                fromKind:
+                let
+                  refs = (kindMeta fromKind).refs;
+                in
+                lib.mapAttrsToList (field: toKind: {
                   from = fromKind;
                   inherit field;
                   to = toKind;
                 }) refs
               ) kindNames;
               # Unified edge view: Neron P (parent) + I (ref/import) edges
-              parentEdges = lib.concatMap (k:
-                let t = topology.${k};
-                in lib.optional (t.parent != null) {
+              parentEdges = lib.concatMap (
+                k:
+                let
+                  t = topology.${k};
+                in
+                lib.optional (t.parent != null) {
                   from = k;
                   to = t.parent;
                   type = "parent";
@@ -271,7 +282,15 @@ let
               leaves = builtins.filter (k: topology.${k}.children == [ ]) kindNames;
             in
             {
-              inherit kindNames kindMeta topology refEdges edges roots leaves;
+              inherit
+                kindNames
+                kindMeta
+                topology
+                refEdges
+                edges
+                roots
+                leaves
+                ;
             };
         }
       );

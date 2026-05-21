@@ -65,7 +65,9 @@ let
   mkRefBindingModules =
     kind: refs: refFields:
     let
-      # Validate: every deferred ref field must have a binding
+      # Validate: every deferred ref field must have a binding.
+      # N.B. Missing-binding check is duplicated in applyPipeline.refValidation
+      # for the refs == {} case — keep error messages in sync.
       missingBindings = lib.filterAttrs (field: _: !(refs ? ${field})) refFields;
       extraBindings = lib.filterAttrs (field: _: !(refFields ? ${field})) refs;
 
@@ -77,8 +79,10 @@ let
           in
           throw "mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
         else if extraBindings != { } then
-          let extra = builtins.head (lib.attrNames extraBindings);
-          in throw "mkInstanceRegistry: refs.${extra} does not match any ref field on kind '${kind}'"
+          let
+            extra = builtins.head (lib.attrNames extraBindings);
+          in
+          throw "mkInstanceRegistry: refs.${extra} does not match any ref field on kind '${kind}'"
         else
           null;
     in
@@ -88,7 +92,8 @@ let
         { ... }:
         {
           options.${field} = lib.mkOption {
-            apply = val:
+            apply =
+              val:
               if builtins.isString val then
                 if registry ? ${val} then
                   registry.${val}
@@ -111,19 +116,19 @@ let
       derive ? null,
       deriveEither ? null,
     }:
-    assert (derive == null || deriveEither == null)
+    assert
+      (derive == null || deriveEither == null)
       || throw "mkInstanceRegistry: derive and deriveEither are mutually exclusive";
     let
       # Resolve deferred refs: scan kind options, validate bindings, build override modules.
+      # findRefFields evaluates schema.${kind}, which isn't available at option-declaration
+      # time (circular), so only call it when refs are provided.  Binding validation for the
+      # missing-refs case is deferred to applyPipeline where schema access is safe.
       refFields = if refs == { } then { } else findRefFields schema kind;
       refModules = if refs == { } then [ ] else mkRefBindingModules kind refs refFields;
       allExtraModules = extraModules ++ refModules;
 
-      onError =
-        if deriveEither != null then
-          deriveEither.onError or defaultOnError
-        else
-          defaultOnError;
+      onError = if deriveEither != null then deriveEither.onError or defaultOnError else defaultOnError;
 
       deriveFn =
         if derive != null then
@@ -144,36 +149,65 @@ let
       applyPipeline =
         instances:
         let
-          validators = schema.${kind}.validators or [ ];
+          # Ref binding validation — deferred to apply time so schema.${kind} is safe
+          # to evaluate (avoids circular eval at option-declaration time).
+          # Force ref module validation (extra-binding case) and check for missing
+          # bindings (refs == {} but schema declares ref fields).
+          # N.B. The missing-binding check here mirrors mkRefBindingModules (line ~72),
+          # which can't run when refs == {} — keep error messages in sync.
+          refValidation =
+            let
+              allRefFields = findRefFields schema kind;
+              missingBindings = lib.filterAttrs (field: _: !(refs ? ${field})) allRefFields;
+            in
+            if missingBindings != { } then
+              let
+                missing = builtins.head (lib.attrNames missingBindings);
+                targetKind = missingBindings.${missing};
+              in
+              throw "mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
+            else
+              builtins.length refModules; # forces builtins.seq inside mkRefBindingModules
+
+          validators = builtins.seq refValidation (schema.${kind}.validators or [ ]);
 
           # null = no validation errors (fast path when validators == []).
           # This avoids constructing an Either when there are no validators,
           # which is the common case for registries without validation.
           vResult =
-            if validators == [ ] then null
+            if validators == [ ] then
+              null
             else
-              let r = runValidators kind validators instances;
-              in if r ? right then null else r.left;
+              let
+                r = runValidators kind validators instances;
+              in
+              if r ? right then null else r.left;
 
           validated =
-            if vResult == null then instances
+            if vResult == null then
+              instances
             else
-              let recovery = onError vResult;
-              in lib.mapAttrs (name: instance:
-                instance // (recovery.${name} or { })
-              ) instances;
+              let
+                recovery = onError vResult;
+              in
+              lib.mapAttrs (name: instance: instance // (recovery.${name} or { })) instances;
 
-          derived =
-            if deriveFn == null then { }
-            else deriveFn validated;
+          derived = if deriveFn == null then { } else deriveFn validated;
         in
-        if derived == { } then validated
-        else lib.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
+        if derived == { } then
+          validated
+        else
+          lib.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
     in
     lib.mkOption {
       inherit description;
       default = { };
-      type = lib.types.attrsOf (mkInstanceType schema kind { extraModules = allExtraModules; inherit strict; });
+      type = lib.types.attrsOf (
+        mkInstanceType schema kind {
+          extraModules = allExtraModules;
+          inherit strict;
+        }
+      );
       apply = applyPipeline;
     };
 in
