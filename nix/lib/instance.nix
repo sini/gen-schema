@@ -94,13 +94,23 @@ let
           options.${field} = lib.mkOption {
             apply =
               val:
-              if builtins.isString val then
-                if registry ? ${val} then
-                  registry.${val}
-                else
-                  throw "ref field '${field}' on kind '${kind}': reference '${val}' not found in instance registry"
+              let
+                coerce =
+                  v:
+                  if builtins.isString v then
+                    if registry ? ${v} then
+                      registry.${v}
+                    else
+                      throw "ref field '${field}' on kind '${kind}': reference '${v}' not found in instance registry (available: ${builtins.concatStringsSep ", " (builtins.attrNames registry)})"
+                  else
+                    v;
+              in
+              if builtins.isList val then
+                map coerce val
+              else if val == null then
+                null
               else
-                val;
+                coerce val;
           };
         }
       ) refs
