@@ -4,19 +4,23 @@
 { lib, schemaLib, ... }:
 let
   eval = lib.evalModules {
-    modules = [{
-      options.schema = schemaLib.mkSchemaOption {
-        sidecars.includes = { default = []; };
-      };
-      # host defined via path — sidecar extraction is skipped
-      config.schema.host = ../test-fixtures/sidecar-path-kind-host.nix;
-    }];
+    modules = [
+      {
+        options.schema = schemaLib.mkSchemaOption {
+          sidecars.includes = {
+            default = [ ];
+          };
+        };
+        # host defined via path — sidecar extraction is skipped
+        config.schema.host = ../test-fixtures/sidecar-path-kind-host.nix;
+      }
+    ];
   };
 in
 {
   "sidecar-path".test-path-kind-gets-default = {
     expr = eval.config.schema.host.includes;
-    expected = [];
+    expected = [ ];
   };
   "sidecar-path".test-path-kind-still-callable = {
     expr = builtins.isFunction (eval.config.schema.host.__functor eval.config.schema.host);

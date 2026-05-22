@@ -1,4 +1,8 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry ref;
 
@@ -20,7 +24,9 @@ let
                 config.schema.service = {
                   options.host = lib.mkOption { type = ref "host"; };
                 };
-                config.hosts.igloo = { addr = "10.0.1.1"; };
+                config.hosts.igloo = {
+                  addr = "10.0.1.1";
+                };
                 config.services.nginx = {
                   host = "nonexistent";
                 };

@@ -1,4 +1,8 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry ref;
 
@@ -8,18 +12,23 @@ let
         options.schema = mkSchemaOption { };
         options.services = mkInstanceRegistry eval.config.schema "service" {
           extraModules = [
-            ({ ... }: {
-              options.upstream = lib.mkOption {
-                type = lib.types.nullOr (ref eval.config.services);
-                default = null;
-              };
-            })
+            (
+              { ... }:
+              {
+                options.upstream = lib.mkOption {
+                  type = lib.types.nullOr (ref eval.config.services);
+                  default = null;
+                };
+              }
+            )
           ];
         };
         config.schema.service = {
           options.port = lib.mkOption { type = lib.types.int; };
         };
-        config.services.api = { port = 8080; };
+        config.services.api = {
+          port = 8080;
+        };
         config.services.gateway = {
           port = 443;
           upstream = "api";

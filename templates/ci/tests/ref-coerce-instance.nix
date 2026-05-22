@@ -1,4 +1,8 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry ref;
 
@@ -17,11 +21,14 @@ let
         # Direct mode with instance value
         options.links = mkInstanceRegistry eval.config.schema "link" {
           extraModules = [
-            ({ ... }: {
-              options.target = lib.mkOption {
-                type = ref eval.config.hosts;
-              };
-            })
+            (
+              { ... }:
+              {
+                options.target = lib.mkOption {
+                  type = ref eval.config.hosts;
+                };
+              }
+            )
           ];
         };
 
@@ -35,7 +42,9 @@ let
         config.schema.link = {
           options.label = lib.mkOption { type = lib.types.str; };
         };
-        config.hosts.igloo = { addr = "10.0.1.1"; };
+        config.hosts.igloo = {
+          addr = "10.0.1.1";
+        };
 
         # Assign instance values instead of string keys
         config.services.nginx = {

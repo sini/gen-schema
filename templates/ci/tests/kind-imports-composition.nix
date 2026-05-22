@@ -6,34 +6,44 @@ let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
 
   eval = lib.evalModules {
-    modules = [{
-      options.schema = mkSchemaOption {};
+    modules = [
+      {
+        options.schema = mkSchemaOption { };
 
-      # Shared base kind
-      config.schema.conf = {
-        options.description = lib.mkOption {
-          type = lib.types.str;
-          default = "";
+        # Shared base kind
+        config.schema.conf = {
+          options.description = lib.mkOption {
+            type = lib.types.str;
+            default = "";
+          };
         };
-      };
 
-      # Host and user both import conf
-      config.schema.host = {
-        imports = [ eval.config.schema.conf ];
-        options.addr = lib.mkOption { type = lib.types.str; };
-      };
-      config.schema.user = {
-        imports = [ eval.config.schema.conf ];
-        options.shell = lib.mkOption { type = lib.types.str; default = "/bin/bash"; };
-      };
+        # Host and user both import conf
+        config.schema.host = {
+          imports = [ eval.config.schema.conf ];
+          options.addr = lib.mkOption { type = lib.types.str; };
+        };
+        config.schema.user = {
+          imports = [ eval.config.schema.conf ];
+          options.shell = lib.mkOption {
+            type = lib.types.str;
+            default = "/bin/bash";
+          };
+        };
 
-      # Instantiate both — should not conflict
-      options.hosts = mkInstanceRegistry eval.config.schema "host" {};
-      options.users = mkInstanceRegistry eval.config.schema "user" {};
+        # Instantiate both — should not conflict
+        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
+        options.users = mkInstanceRegistry eval.config.schema "user" { };
 
-      config.hosts.igloo = { addr = "10.0.1.1"; description = "main server"; };
-      config.users.tux = { shell = "/bin/zsh"; };
-    }];
+        config.hosts.igloo = {
+          addr = "10.0.1.1";
+          description = "main server";
+        };
+        config.users.tux = {
+          shell = "/bin/zsh";
+        };
+      }
+    ];
   };
 in
 {
@@ -54,8 +64,9 @@ in
     expected = "/bin/zsh";
   };
   "kind-imports".test-both-have-id-hash = {
-    expr = (builtins.isString eval.config.hosts.igloo.id_hash)
-        && (builtins.isString eval.config.users.tux.id_hash);
+    expr =
+      (builtins.isString eval.config.hosts.igloo.id_hash)
+      && (builtins.isString eval.config.users.tux.id_hash);
     expected = true;
   };
   "kind-imports".test-cross-kind-hashes-differ = {

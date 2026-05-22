@@ -95,11 +95,11 @@ let
           # that generates instance-level options via mkMethodsModule)
           injected =
             lib.optional (baseModule != null) {
-              file = "den-schema/base";
+              file = "gen-schema/base";
               value = if builtins.isFunction baseModule then baseModule kind else baseModule;
             }
             ++ lib.optional (extractedSidecars.methods != { }) {
-              file = "den-schema/methods";
+              file = "gen-schema/methods";
               value = mkMethodsModule kind extractedSidecars.methods;
             };
 
@@ -116,8 +116,12 @@ let
             };
           inherit kind;
         }
-        // extractedSidecars
-        // computedFields;
+        # parent is topology-only metadata, not a module-consumable sidecar.
+        # Store it under _parent to avoid conflicting with the module system
+        # when kindMeta evaluates a throwaway instance via lib.evalModules.
+        // (builtins.removeAttrs extractedSidecars [ "parent" ])
+        // computedFields
+        // { _parent = extractedSidecars.parent; };
     };
 
   mkSchemaOption =
@@ -142,21 +146,6 @@ let
             internal = true;
             type = lib.types.bool;
             default = strict;
-          };
-
-          options._topology = lib.mkOption {
-            internal = true;
-            type = lib.types.attrsOf (
-              lib.types.submodule {
-                options.children = lib.mkOption {
-                  type = lib.types.listOf lib.types.str;
-                  default = [ ];
-                  description = "Child kind names nested inside this kind.";
-                };
-              }
-            );
-            default = { };
-            description = "Declared parent-child nesting between kinds.";
           };
 
           options._meta = lib.mkOption {
@@ -207,48 +196,45 @@ let
                   in
                   {
                     optionNames = lib.attrNames dummy.options;
-                    options = dummy.options;
+                    inherit (dummy) options;
                     refs = refsFromOptions dummy.options;
                   };
 
-              # Derive topology: combine declared _topology with inverse parent pointers.
-              # Validates: no undeclared kinds, no multiple parents.
+              # Derive topology from parent sidecars on each kind.
+              # Child-declares-parent: config.schema.user.parent = "host"
+              # Validates: parent references must be declared kinds, no multiple parents.
               topology =
                 let
-                  declared = config._topology;
-                  allDeclaredChildren = lib.concatMap (pk: declared.${pk}.children) (lib.attrNames declared);
-
-                  # Validate: all topology keys and children must be declared kinds
-                  unknownParents = lib.filter (k: !(builtins.elem k kindNames)) (lib.attrNames declared);
-                  unknownChildren = lib.filter (k: !(builtins.elem k kindNames)) allDeclaredChildren;
-                  _ =
-                    if unknownParents != [ ] then
-                      throw "den-schema: _topology references undeclared kind '${builtins.head unknownParents}'"
-                    else if unknownChildren != [ ] then
-                      throw "den-schema: _topology.*.children references undeclared kind '${builtins.head unknownChildren}'"
-                    else
-                      null;
-
-                  # Build parent map, detecting multiple parents
+                  # Build parent map from each kind's _parent (extracted from parent sidecar)
                   parentMap = lib.foldl' (
-                    acc: parentKind:
-                    lib.foldl' (
-                      a: child:
-                      if a ? ${child} then
-                        throw "den-schema: kind '${child}' has multiple parents ('${a.${child}}' and '${parentKind}') in _topology"
-                      else
-                        a // { ${child} = parentKind; }
-                    ) acc declared.${parentKind}.children
-                  ) { } (lib.attrNames declared);
+                    acc: k:
+                    let
+                      p = config.${k}._parent or null;
+                    in
+                    if p == null then
+                      acc
+                    else if !(builtins.elem p kindNames) then
+                      throw "gen-schema: kind '${k}' declares parent '${p}' which is not a declared schema kind"
+                    else
+                      acc // { ${k} = p; }
+                  ) { } kindNames;
+
+                  # Build children map (inverse of parent)
+                  childrenMap = lib.foldl' (
+                    acc: k:
+                    let
+                      p = parentMap.${k} or null;
+                    in
+                    if p == null then
+                      acc
+                    else
+                      acc // { ${p} = (acc.${p} or [ ]) ++ [ k ]; }
+                  ) { } kindNames;
                 in
-                builtins.seq _ (
-                  builtins.seq parentMap (
-                    lib.genAttrs kindNames (k: {
-                      parent = parentMap.${k} or null;
-                      children = (declared.${k} or { }).children or [ ];
-                    })
-                  )
-                );
+                lib.genAttrs kindNames (k: {
+                  parent = parentMap.${k} or null;
+                  children = childrenMap.${k} or [ ];
+                });
 
               # Materialize all ref edges from kindMeta.refs across all kinds
               refEdges = lib.concatMap (

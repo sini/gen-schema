@@ -1,4 +1,8 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry ref;
 
@@ -30,7 +34,7 @@ let
     ];
   };
 
-  nginx = eval.config.services.nginx;
+  inherit (eval.config.services) nginx;
 in
 {
   ref-deferred = {

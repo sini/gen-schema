@@ -1,4 +1,4 @@
-{ lib, gen }:
+{ gen, ... }:
 let
   inherit (gen) runValidators;
 in

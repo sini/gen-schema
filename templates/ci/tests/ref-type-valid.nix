@@ -1,4 +1,9 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
   inherit (genLib) mkRefType;
@@ -43,7 +48,7 @@ let
     ];
   };
 
-  nginx = eval.config.services.nginx;
+  inherit (eval.config.services) nginx;
 in
 {
   ref-valid = {

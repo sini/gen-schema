@@ -1,5 +1,9 @@
 # nodeId: scope-engine canonical node identifier on instances.
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
 
@@ -30,7 +34,7 @@ let
       }
     ];
   };
-  config = eval.config;
+  inherit (eval) config;
 in
 {
   node-id = {

@@ -9,7 +9,7 @@ let
     { config, ... }:
     {
       options = lib.mapAttrs (
-        name: m:
+        _name: m:
         lib.mkOption {
           inherit (m) description type;
           readOnly = true;
@@ -28,8 +28,10 @@ let
             lib.concatMapStringsSep ", " (a: "'${a}'") missingArgs
           } which are not declared on this kind"
         else
-          let resolved = lib.genAttrs argNames (n: config.${n});
-          in m.fn resolved
+          let
+            resolved = lib.genAttrs argNames (n: config.${n});
+          in
+          m.fn resolved
       ) allMethods;
     };
 in

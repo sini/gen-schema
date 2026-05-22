@@ -1,7 +1,17 @@
 # buildKindGraph / buildInstanceGraph: scope-engine bridge.
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  ...
+}:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry ref buildKindGraph buildInstanceGraph;
+  inherit (schemaLib)
+    mkSchemaOption
+    mkInstanceRegistry
+    ref
+    buildKindGraph
+    buildInstanceGraph
+    ;
 
   eval = lib.evalModules {
     modules = [
@@ -19,6 +29,7 @@ let
           };
         };
         config.schema.user = {
+          parent = "host";
           options.shell = lib.mkOption {
             type = lib.types.str;
             default = "/bin/bash";
@@ -28,7 +39,6 @@ let
           options.port = lib.mkOption { type = lib.types.int; };
           options.host = lib.mkOption { type = ref "host"; };
         };
-        config.schema._topology.host.children = [ "user" ];
 
         config.hosts.igloo = {
           addr = "10.0.1.1";
@@ -49,7 +59,7 @@ let
       }
     ];
   };
-  config = eval.config;
+  inherit (eval) config;
 
   # ─── Kind-level graph ───────────────────────────────────────────
 
@@ -70,7 +80,11 @@ in
 
     test-kind-vertices = {
       expr = builtins.sort builtins.lessThan kindGraph.parentGraph.vertices;
-      expected = [ "host" "service" "user" ];
+      expected = [
+        "host"
+        "service"
+        "user"
+      ];
     };
 
     test-kind-parent-edges = {
@@ -135,7 +149,12 @@ in
 
     test-instance-vertices = {
       expr = builtins.sort builtins.lessThan instanceGraph.parentGraph.vertices;
-      expected = [ "host:iceberg" "host:igloo" "service:nginx" "service:postgres" ];
+      expected = [
+        "host:iceberg"
+        "host:igloo"
+        "service:nginx"
+        "service:postgres"
+      ];
     };
 
     # Ref edges: service instances → host instances

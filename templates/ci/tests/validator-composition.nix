@@ -1,4 +1,9 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
   eval = lib.evalModules {
     modules = [
@@ -28,7 +33,7 @@ let
 in
 {
   "validator-compose".test-validators-merged = {
-    expr = lib.length (eval.config.schema.host.validators);
+    expr = lib.length eval.config.schema.host.validators;
     expected = 2;
   };
 }

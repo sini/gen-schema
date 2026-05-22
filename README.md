@@ -1,8 +1,8 @@
-# den-schema
+# gen-schema
 
 A typed record registry for Nix with extension points, strict validation, identity hashing, cross-instance references, introspection, and declarative methods. Built on the NixOS module system.
 
-den-schema gives you what `lib.types.submodule` doesn't: open kind definitions that any module can extend, strict-by-default validation that catches typos immediately, stable identity comparison via `id_hash`, cross-registry references that resolve to instances, and auto-generated documentation from your schema.
+gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions that any module can extend, strict-by-default validation that catches typos immediately, stable identity comparison via `id_hash`, cross-registry references that resolve to instances, and auto-generated documentation from your schema.
 
 ## Quick Start
 
@@ -11,11 +11,11 @@ den-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
 ```nix
 # flake.nix
 {
-  inputs.den-schema.url = "github:denful/den-schema";
+  inputs.gen-schema.url = "github:sini/gen-schema";
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
 
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } {
-    imports = [ inputs.den-schema.flakeModules.default ];
+    imports = [ inputs.gen-schema.flakeModules.default ];
 
     # Define a kind
     schema.host = {
@@ -44,8 +44,8 @@ The flake-parts module provides `schema` and `schemaLib` with default settings (
 ```nix
 # Without flake-parts — call the library directly
 let
-  schemaLib = den-schema.lib;
-  # or: schemaLib = import ./path/to/den-schema/nix/lib { inherit lib; };
+  schemaLib = gen-schema.lib;
+  # or: schemaLib = import ./path/to/gen-schema/nix/lib { inherit lib; };
 in
 lib.evalModules {
   modules = [{
@@ -59,7 +59,7 @@ lib.evalModules {
 
 ```nix
 let
-  schemaLib = import ./path/to/den-schema/nix/lib { inherit lib; };
+  schemaLib = import ./path/to/gen-schema/nix/lib { inherit lib; };
 in
 # use schemaLib.mkSchemaOption, schemaLib.mkInstanceRegistry, etc.
 ```
@@ -807,7 +807,7 @@ Declares a method on a kind. `fn` receives an attrset of config values matching 
 gen.mkValidator name pred message
 ```
 
-Creates a validator record. `pred` receives the instance config and returns bool. Declare via `schema.<kind>.validators = [ (gen.mkValidator ...) ]`. Provided by [gen](https://github.com/sini/gen), not den-schema.
+Creates a validator record. `pred` receives the instance config and returns bool. Declare via `schema.<kind>.validators = [ (gen.mkValidator ...) ]`. Provided by [gen](https://github.com/sini/gen), not gen-schema.
 
 ### `validateInstances`
 
@@ -833,7 +833,7 @@ schemaLib._internal.mkMethodsModule   # methods option/config wiring
 
 Not part of the public API contract. Available for testing and advanced use.
 
-Identity, strict, validation, and ref primitives are in [gen](https://github.com/sini/gen) — import gen directly if you need them outside of den-schema.
+Identity, strict, validation, and ref primitives are in [gen](https://github.com/sini/gen) — import gen directly if you need them outside of gen-schema.
 
 ## Architecture
 
@@ -874,18 +874,18 @@ See [`templates/demo/`](templates/demo/) for a complete fleet management example
 
 ```bash
 cd templates/demo
-nix eval --override-input den-schema ../.. .#fleet
-nix eval --override-input den-schema ../.. .#docs --raw
+nix eval --override-input gen-schema ../.. .#fleet
+nix eval --override-input gen-schema ../.. .#docs --raw
 ```
 
 ## Testing
 
-149 tests using nix-unit in `templates/ci/`:
+Tests use nix-unit in `templates/ci/`:
 
 ```bash
 cd templates/ci
-nix develop --override-input den-schema ../.. -c nix-unit \
-  --override-input den-schema ../.. --flake .#.tests
+nix develop --override-input gen-schema ../.. -c nix-unit \
+  --override-input gen-schema ../.. --flake .#.tests
 ```
 
 ## License

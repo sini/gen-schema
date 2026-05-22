@@ -1,4 +1,8 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption;
 
@@ -10,12 +14,12 @@ let
           options.addr = lib.mkOption { type = lib.types.str; };
         };
         config.schema.user = {
+          parent = "host";
           options.shell = lib.mkOption { type = lib.types.str; };
         };
         config.schema.network = {
           options.cidr = lib.mkOption { type = lib.types.str; };
         };
-        config.schema._topology.host.children = [ "user" ];
       }
     ];
   };
@@ -39,15 +43,24 @@ in
     };
     test-network-no-relations = {
       expr = topo.network;
-      expected = { parent = null; children = [ ]; };
+      expected = {
+        parent = null;
+        children = [ ];
+      };
     };
     test-roots = {
       expr = meta.roots;
-      expected = [ "host" "network" ];
+      expected = [
+        "host"
+        "network"
+      ];
     };
     test-leaves = {
       expr = meta.leaves;
-      expected = [ "network" "user" ];
+      expected = [
+        "network"
+        "user"
+      ];
     };
   };
 }

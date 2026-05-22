@@ -1,51 +1,35 @@
 {
   "nodes": {
-    "den-schema": {
+    "gen": {
+      "locked": {
+        "lastModified": 1779386011,
+        "narHash": "sha256-BU4pNxqCT7eyI2SpExe6wXoy8mGUGwJ3+B9xM1ejDhw=",
+        "owner": "sini",
+        "repo": "gen",
+        "rev": "129ed5c8db220615c12ce17e8fe2f24eeecd2351",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen",
+        "type": "github"
+      }
+    },
+    "gen-schema": {
       "inputs": {
-        "gen": "gen",
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "dirtyRev": "d233ca618fe3e2cd0674a027d1f3e8f1e0965fcb-dirty",
-        "dirtyShortRev": "d233ca6-dirty",
-        "lastModified": 1778719748,
-        "narHash": "sha256-N6huW6Uyei7E+h77yoZ+XvmDXj39XQRhPpooTZDSQ+Q=",
+        "dirtyRev": "246ccaee53afe4abdd488f8ec5b66bd8ee90369a-dirty",
+        "dirtyShortRev": "246ccae-dirty",
+        "lastModified": 1779386005,
+        "narHash": "sha256-kevFKFpKy3jYd3bT3AFaucC+U2S/uAiKpp+JIiUFrVE=",
         "type": "git",
-        "url": "file:///home/sini/Documents/repos/den-schema"
-      },
-      "original": {
-        "owner": "denful",
-        "repo": "den-schema",
-        "type": "github"
-      }
-    },
-    "gen": {
-      "locked": {
-        "lastModified": 1779298945,
-        "narHash": "sha256-zAUTOrVhtMIY69QVTpSyj6/S/qdLzNf3CRmG8vWZh7c=",
-        "owner": "sini",
-        "repo": "gen",
-        "rev": "193ca974e1b9488734a55cefd35dd155050f9062",
-        "type": "github"
+        "url": "file:///home/sini/Documents/repos/gen-schema"
       },
       "original": {
         "owner": "sini",
-        "repo": "gen",
-        "type": "github"
-      }
-    },
-    "gen_2": {
-      "locked": {
-        "lastModified": 1779304561,
-        "narHash": "sha256-aqLSLakDBxQBZmeIRBQY5BYX/xhx52RQlxEZ/kk0DQs=",
-        "owner": "sini",
-        "repo": "gen",
-        "rev": "40838941209b8f7042f4c2097e1e8d4c98a01a67",
-        "type": "github"
-      },
-      "original": {
-        "owner": "sini",
-        "repo": "gen",
+        "repo": "gen-schema",
         "type": "github"
       }
     },
@@ -79,11 +63,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1778306706,
-        "narHash": "sha256-68bQGOfejrJ6lqCk7IR4yfIFchSlAtN3diPc1imV+3k=",
+        "lastModified": 1779338171,
+        "narHash": "sha256-affUbv/bwE8SLGhuWKniDr7SVO+Lo1XEPjCZdyU5kgQ=",
         "owner": "nix-community",
         "repo": "nix-unit",
-        "rev": "9317bef0ef5af9381902543e219a3c12d45cf5f6",
+        "rev": "6ab1f232562a01d18b40d5ed6a58718c4f3a74bc",
         "type": "github"
       },
       "original": {
@@ -110,11 +94,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1777954456,
-        "narHash": "sha256-qeRNZKcA0igTdRVnBe6hyo49CqxME92s4G8Sr78ARJw=",
-        "rev": "549bd84d6279f9852cae6225e372cc67fb91a4c1",
+        "lastModified": 1778869304,
+        "narHash": "sha256-VdRy3A14M5vIE882DJcaaR+5wrss9Qsg4YNVbr7uj3k=",
+        "rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
         "type": "tarball",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.05pre992384.549bd84d6279/nixexprs.tar.xz?lastModified=1777954456&rev=549bd84d6279f9852cae6225e372cc67fb91a4c1"
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.05pre998534.d233902339c0/nixexprs.tar.xz?lastModified=1778869304&rev=d233902339c02a9c334e7e593de68855ad26c4cb"
       },
       "original": {
         "type": "tarball",
@@ -123,8 +107,8 @@
     },
     "root": {
       "inputs": {
-        "den-schema": "den-schema",
-        "gen": "gen_2",
+        "gen": "gen",
+        "gen-schema": "gen-schema",
         "nix-unit": "nix-unit",
         "nixpkgs": "nixpkgs_2"
       }

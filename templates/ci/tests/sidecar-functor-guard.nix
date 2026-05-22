@@ -2,17 +2,19 @@
 { lib, schemaLib, ... }:
 let
   eval = lib.evalModules {
-    modules = [{
-      options.schema = schemaLib.mkSchemaOption {
-        sidecars.__functor = { default = {}; };
-      };
-      config.schema.host.options.name = lib.mkOption { type = lib.types.str; };
-    }];
+    modules = [
+      {
+        options.schema = schemaLib.mkSchemaOption {
+          sidecars.__functor = {
+            default = { };
+          };
+        };
+        config.schema.host.options.name = lib.mkOption { type = lib.types.str; };
+      }
+    ];
   };
   # Force the schema kind evaluation to trigger the guard
-  result = builtins.tryEval (
-    builtins.deepSeq eval.config.schema.host eval.config.schema.host
-  );
+  result = builtins.tryEval (builtins.deepSeq eval.config.schema.host eval.config.schema.host);
 in
 {
   "sidecar-functor".test-reserved-key-throws = {
