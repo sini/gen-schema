@@ -464,6 +464,76 @@ Invalid references throw at eval time:
 ref field 'host' on kind 'service': reference 'nonexistent' not found in instance registry
 ```
 
+### Parent-Child Topology
+
+Kinds can declare their parent kind via the `parent` sidecar. This establishes a schema-level nesting relationship:
+
+```nix
+config.schema.host = {
+  options.addr = lib.mkOption { type = lib.types.str; };
+};
+
+config.schema.user = {
+  parent = "host";  # users nest inside hosts
+  options.shell = lib.mkOption { type = lib.types.str; };
+};
+```
+
+The `parent` sidecar is optional — kinds without it are root kinds. The schema derives both directions:
+
+```nix
+config.schema._meta.topology.host   # → { parent = null; children = [ "user" ]; }
+config.schema._meta.topology.user   # → { parent = "host"; children = []; }
+```
+
+Declaring a parent that doesn't exist as a schema kind throws at eval time.
+
+### Schema Introspection
+
+Every schema has `_meta` for programmatic access:
+
+```nix
+config.schema._meta.kindNames    # → [ "host" "service" "user" ]
+config.schema._meta.roots        # → [ "host" ]  — kinds with no parent
+config.schema._meta.leaves       # → [ "user" ]  — kinds with no children
+
+# Per-kind metadata
+meta = config.schema._meta.kindMeta "host";
+meta.optionNames   # → [ "addr" "role" ... ]
+meta.options       # → full option declarations
+meta.refs          # → { }  (ref fields on this kind)
+
+# Unified edge view (Neron scope graph P + I edges)
+config.schema._meta.edges
+# → [
+#   { from = "user"; to = "host"; type = "parent"; field = null; }
+#   { from = "service"; to = "host"; type = "ref"; field = "host"; }
+# ]
+
+# Ref edges only
+config.schema._meta.refEdges
+# → [ { from = "service"; field = "host"; to = "host"; } ]
+```
+
+`_meta.edges` combines parent edges (from topology) and ref edges (from `schema.ref` declarations) into a single typed list. Every edge has `{ from, to, type, field }` — `field` is `null` for parent edges and the option name for ref edges.
+
+### Scope Graph Bridge
+
+`buildKindGraph` and `buildInstanceGraph` convert schema metadata into the `{ parentGraph, importGraph, decls, types }` structure that scope-engine's `buildNodes` expects:
+
+```nix
+# Kind-level graph: kinds as nodes, topology as edges
+kindGraph = schemaLib.buildKindGraph config.schema;
+kindGraph.parentGraph.vertices   # → [ "host" "service" "user" ]
+kindGraph.parentGraph.edges      # → [ { from = "user"; to = "host"; } ]
+
+# Instance-level graph: instances as nodes, resolved refs as edges
+fleet = { host = config.hosts; service = config.services; };
+instanceGraph = schemaLib.buildInstanceGraph config.schema fleet;
+instanceGraph.parentGraph.vertices  # → [ "host:igloo" "host:iceberg" ... ]
+instanceGraph.importGraph.edges     # → [ { from = "service:nginx"; to = "host:igloo"; } ]
+```
+
 ### Kind Mix-ins
 
 A kind can import another kind's schema, inheriting all options:
@@ -825,6 +895,22 @@ renderDocs schema
 
 Returns a markdown string with a table per kind.
 
+### `buildKindGraph`
+
+```nix
+buildKindGraph schema
+```
+
+Returns `{ parentGraph, importGraph, decls, types }` — the kind-level scope graph. Kinds are nodes, topology provides parent edges, refs provide import edges. Compatible with scope-engine's `buildNodes`.
+
+### `buildInstanceGraph`
+
+```nix
+buildInstanceGraph schema fleet
+```
+
+Returns `{ parentGraph, importGraph, decls, types }` — the instance-level scope graph. `fleet` is `{ kindName = { instanceName = instanceConfig; }; }`. Instance refs are resolved to import edges.
+
 ### `_internal`
 
 ```nix
@@ -838,13 +924,15 @@ Identity, strict, validation, and ref primitives are in [gen](https://github.com
 ## Architecture
 
 ```
-Schema kinds (deferred modules)
+Schema kinds (deferred modules, parent sidecar, ref types)
   ↓ imported by
 Instance types (submodules with strict + identity injected)
   ↓ collected into
-Instance registries (attrsOf instance type)
-  ↓ referenced by
-Cross-instance refs (schema.ref)
+Instance registries (attrsOf instance type, ref binding via apply)
+  ↓ referenced by             ↓ introspected by
+Cross-instance refs        _meta (topology, edges, roots, leaves)
+  (schema.ref)                ↓ bridged to
+                        Scope graph (buildKindGraph, buildInstanceGraph)
 ```
 
 **Kinds are pure schema** — options, config, defaults, methods, sidecars. No strict validation or identity hashing at the kind level.
@@ -858,8 +946,10 @@ Cross-instance refs (schema.ref)
 ```
 nix/lib/
   default.nix       — public API surface, wiring (imports gen for primitives)
-  entry-type.nix     — mkSchemaEntryType, mkSchemaOption (sidecar extraction, _meta)
-  instance.nix       — mkInstanceType, mkInstanceRegistry (strict + identity injection)
+  entry-type.nix     — mkSchemaEntryType, mkSchemaOption (sidecar extraction, _meta, topology)
+  instance.nix       — mkInstanceType, mkInstanceRegistry (strict + identity injection, refs)
+  ref.nix            — schema.ref (dual-mode cross-instance references, getRefKind)
+  scope-graph.nix    — buildKindGraph, buildInstanceGraph (scope-engine bridge)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)
   validate.nix       — validateInstances (schema-specific wrapper around gen.runValidators)
   docs.nix           — renderDocs (markdown generation)
