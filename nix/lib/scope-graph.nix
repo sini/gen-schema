@@ -1,4 +1,4 @@
-# Bridge from den-schema topology to scope-engine graph inputs.
+# Bridge from gen-schema topology to scope-engine graph inputs.
 #
 # Converts schema metadata (_meta.topology, _meta.edges) and evaluated
 # instance registries into the { parentGraph, importGraph, decls, types }
@@ -32,10 +32,18 @@ let
 
       # Ref edges from schema declarations: fromKind → toKind
       refEdges = builtins.filter (e: e.type == "ref") edges;
+<<<<<<< Updated upstream
       importEdges = map (e: {
         from = e.from;
         to = e.to;
       }) refEdges;
+||||||| Stash base
+      importEdges = map (e: { from = e.from; to = e.to; }) refEdges;
+=======
+      importEdges = map (e: {
+        inherit (e) from to;
+      }) refEdges;
+>>>>>>> Stashed changes
     in
     {
       parentGraph = {
@@ -119,8 +127,8 @@ let
       importEdges = lib.concatMap (
         refEdge:
         let
+          inherit (refEdge) field;
           fromKind = refEdge.from;
-          field = refEdge.field;
           toKind = refEdge.to;
         in
         lib.concatMap (

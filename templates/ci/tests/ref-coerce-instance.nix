@@ -1,9 +1,19 @@
+<<<<<<< Updated upstream
 {
   lib,
   schemaLib,
   genLib,
   ...
 }:
+||||||| Stash base
+{ lib, schemaLib, genLib, ... }:
+=======
+{
+  lib,
+  schemaLib,
+  ...
+}:
+>>>>>>> Stashed changes
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry ref;
 

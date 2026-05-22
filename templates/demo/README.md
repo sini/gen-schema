@@ -1,6 +1,6 @@
-# den-schema Fleet Demo
+# gen-schema Fleet Demo
 
-A minimal fleet management example using den-schema as a standalone typed record registry. Demonstrates how to define entity kinds, create instance registries, enforce strict validation, and wire cross-instance references — all through flake-parts modules with import-tree.
+A minimal fleet management example using gen-schema as a standalone typed record registry. Demonstrates how to define entity kinds, create instance registries, enforce strict validation, and wire cross-instance references — all through flake-parts modules with import-tree.
 
 ## What This Showcases
 
@@ -35,15 +35,15 @@ Kind definitions live in `modules/schema/` and are plain NixOS-style modules set
 | Either pipeline | `modules/fleet/registries.nix` | `deriveEither` with gen's either computes service endpoints |
 | Doc generation | `modules/outputs.nix` | `renderDocs` produces markdown tables from schema metadata |
 | Introspection | `modules/outputs.nix` | `_meta.kindNames`, `_meta.kindMeta` for programmatic schema access |
-| flake-parts integration | `modules/schema.nix` | Single import of `den-schema.flakeModules.default` |
+| flake-parts integration | `modules/schema.nix` | Single import of `gen-schema.flakeModules.default` |
 | import-tree | `flake.nix` | `inputs.import-tree ./modules` auto-imports all module files |
 
 ## Layout
 
 ```
-flake.nix                         — flake-parts + import-tree + den-schema inputs
+flake.nix                         — flake-parts + import-tree + gen-schema inputs
 modules/
-  schema.nix                      — imports den-schema flakeModule (provides schema option + schemaLib)
+  schema.nix                      — imports gen-schema flakeModule (provides schema option + schemaLib)
   schema/
     host.nix                      — host kind: addr, system, role
     user.nix                      — user kind: userName, shell
@@ -65,9 +65,9 @@ modules/
 ## Running
 
 ```bash
-# Evaluate the fleet summary (from den-schema repo root):
+# Evaluate the fleet summary (from gen-schema repo root):
 cd templates/demo
-nix eval --override-input den-schema ../.. .#fleet
+nix eval --override-input gen-schema ../.. .#fleet
 
 # Expected output:
 # {
@@ -182,7 +182,7 @@ Methods compose across modules — multiple modules can each add methods to the 
 `renderDocs` produces markdown reference documentation from schema metadata. It reflects on all kinds and their options — including extensions from composition and methods:
 
 ```bash
-nix eval --override-input den-schema ../.. .#docs --raw
+nix eval --override-input gen-schema ../.. .#docs --raw
 ```
 
 ```markdown
@@ -277,9 +277,9 @@ fleet.services.postgres.endpoint  → "tcp://10.0.2.1:5432"
 
 Each step in the pipeline receives the previous step's `right` value. If any step returns `left`, the pipeline short-circuits. On success, endpoints are merged onto instances. On failure, the default handler throws — or a custom `onError` handles it.
 
-## Why den-schema Over Bare Submodules
+## Why gen-schema Over Bare Submodules
 
-The NixOS module system gives you `lib.types.submodule` — a typed record with options, defaults, and merge semantics. You can build entity registries with `attrsOf submodule` directly. den-schema is built on top of this, not instead of it. The question is what you get for the extra layer.
+The NixOS module system gives you `lib.types.submodule` — a typed record with options, defaults, and merge semantics. You can build entity registries with `attrsOf submodule` directly. gen-schema is built on top of this, not instead of it. The question is what you get for the extra layer.
 
 ### Bare submodule approach
 
@@ -304,7 +304,7 @@ This works. You get typed fields, defaults, and merge. For a single file or a sm
 
 ### Where it breaks down
 
-**Extension from other modules.** With bare submodules, `hostType` is a closed value — defined in one place, consumed everywhere. If a second flake input wants to add a `vpnAlias` field to every host, it can't. It would need to wrap `hostType` in another submodule and hope the merge works. With den-schema, any module can extend any kind:
+**Extension from other modules.** With bare submodules, `hostType` is a closed value — defined in one place, consumed everywhere. If a second flake input wants to add a `vpnAlias` field to every host, it can't. It would need to wrap `hostType` in another submodule and hope the merge works. With gen-schema, any module can extend any kind:
 
 ```nix
 # In your flake:
@@ -316,17 +316,17 @@ config.schema.host.options.vpnAlias = lib.mkOption { type = str; default = confi
 
 Both contributions merge through `deferredModule` — the kind type is open, not closed.
 
-**Typo detection.** Bare `attrsOf submodule` is freeform by default. Setting `hosts.igloo.addrr = "10.0.1.1"` (typo) silently creates an untyped attribute. You find out at deploy time, or never. den-schema is strict by default — undeclared keys error immediately with a message telling you how to declare them.
+**Typo detection.** Bare `attrsOf submodule` is freeform by default. Setting `hosts.igloo.addrr = "10.0.1.1"` (typo) silently creates an untyped attribute. You find out at deploy time, or never. gen-schema is strict by default — undeclared keys error immediately with a message telling you how to declare them.
 
-**Identity comparison.** Nix's `==` on module system values does deep structural comparison that can diverge or infinitely recurse across different thunks of the same entity. With bare submodules, comparing two references to the same host requires careful workarounds. den-schema auto-computes `id_hash` from primitive options — a cheap string comparison that's safe across module system boundaries.
+**Identity comparison.** Nix's `==` on module system values does deep structural comparison that can diverge or infinitely recurse across different thunks of the same entity. With bare submodules, comparing two references to the same host requires careful workarounds. gen-schema auto-computes `id_hash` from primitive options — a cheap string comparison that's safe across module system boundaries.
 
-**Cross-instance references.** Bare submodules have no notion of references between registries. If a service needs to point at a host, you'd use a string and manually look it up. den-schema's `mkRefType` validates the reference at eval time and resolves it to the target instance — `config.services.nginx.host.addr` works directly.
+**Cross-instance references.** Bare submodules have no notion of references between registries. If a service needs to point at a host, you'd use a string and manually look it up. gen-schema's `mkRefType` validates the reference at eval time and resolves it to the target instance — `config.services.nginx.host.addr` works directly.
 
-**Introspection.** With bare submodules, there's no way to ask "what kinds exist?" or "what options does a host have?" without evaluating an instance. den-schema's `_meta.kindNames` and `_meta.kindMeta` provide this at the schema level — the foundation for documentation generation, tooling, and diag.
+**Introspection.** With bare submodules, there's no way to ask "what kinds exist?" or "what options does a host have?" without evaluating an instance. gen-schema's `_meta.kindNames` and `_meta.kindMeta` provide this at the schema level — the foundation for documentation generation, tooling, and diag.
 
 ### Comparison
 
-| Concern | Bare `attrsOf submodule` | den-schema |
+| Concern | Bare `attrsOf submodule` | gen-schema |
 |---|---|---|
 | Type definition | Closed value in one file | Open — any module can extend via `config.schema.<kind>` |
 | Undeclared keys | Silently accepted (freeform default) | Error with fix guidance (strict default) |
@@ -343,9 +343,9 @@ Both contributions merge through `deferredModule` — the kind type is open, not
 
 **Bare submodule:** single-file projects, internal types that won't be extended, types where freeform is intentional (e.g., arbitrary user-defined metadata).
 
-**den-schema:** multi-module projects, types extended across flake inputs, entity registries where typos matter, anything where you need safe cross-instance references or introspection.
+**gen-schema:** multi-module projects, types extended across flake inputs, entity registries where typos matter, anything where you need safe cross-instance references or introspection.
 
-den-schema doesn't replace the module system — it's a pattern library on top of it. Every `mkSchemaOption`, `mkInstanceType`, and `mkRefType` produces standard module system types. You can mix den-schema kinds with bare submodules in the same project.
+gen-schema doesn't replace the module system — it's a pattern library on top of it. Every `mkSchemaOption`, `mkInstanceType`, and `mkRefType` produces standard module system types. You can mix gen-schema kinds with bare submodules in the same project.
 
 ## Extending
 

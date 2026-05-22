@@ -1,33 +1,21 @@
+<<<<<<< Updated upstream
 {
   lib,
   schemaLib,
   genLib,
   ...
 }:
+||||||| Stash base
+{ lib, schemaLib, genLib, ... }:
+=======
+{
+  lib,
+  schemaLib,
+  ...
+}:
+>>>>>>> Stashed changes
 let
   inherit (schemaLib) mkSchemaOption;
-
-  # Undeclared child kind should throw
-  throwsOnUnknownChild =
-    let
-      result = builtins.tryEval (
-        let
-          eval = lib.evalModules {
-            modules = [
-              {
-                options.schema = mkSchemaOption { };
-                config.schema.host = {
-                  options.addr = lib.mkOption { type = lib.types.str; };
-                };
-                config.schema._topology.host.children = [ "nonexistent" ];
-              }
-            ];
-          };
-        in
-        eval.config.schema._meta.topology
-      );
-    in
-    !result.success;
 
   # Undeclared parent kind should throw
   throwsOnUnknownParent =
@@ -41,7 +29,10 @@ let
                 config.schema.host = {
                   options.addr = lib.mkOption { type = lib.types.str; };
                 };
-                config.schema._topology.ghost.children = [ "host" ];
+                config.schema.user = {
+                  parent = "nonexistent";
+                  options.shell = lib.mkOption { type = lib.types.str; };
+                };
               }
             ];
           };
@@ -51,7 +42,7 @@ let
     in
     !result.success;
 
-  # Multiple parents should throw
+  # Multiple parents should throw (two kinds both claim the same child)
   throwsOnMultipleParents =
     let
       result = builtins.tryEval (
@@ -66,11 +57,15 @@ let
                 config.schema.cluster = {
                   options.name = lib.mkOption { type = lib.types.str; };
                 };
+                # user declares parent = "host" in one module...
                 config.schema.user = {
+                  parent = "host";
                   options.shell = lib.mkOption { type = lib.types.str; };
                 };
-                config.schema._topology.host.children = [ "user" ];
-                config.schema._topology.cluster.children = [ "user" ];
+              }
+              # ...and parent = "cluster" in another module (conflicting)
+              {
+                config.schema.user.parent = "cluster";
               }
             ];
           };
@@ -82,10 +77,6 @@ let
 in
 {
   topology-validation = {
-    test-unknown-child-throws = {
-      expr = throwsOnUnknownChild;
-      expected = true;
-    };
     test-unknown-parent-throws = {
       expr = throwsOnUnknownParent;
       expected = true;

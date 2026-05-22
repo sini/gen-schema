@@ -5,7 +5,7 @@
 let
   # No-flakes import: resolve gen from CI template's flake.lock
   lock = builtins.fromJSON (builtins.readFile ../../templates/ci/flake.lock);
-  locked = lock.nodes.gen.locked;
+  inherit (lock.nodes.gen) locked;
   genSrc = builtins.fetchTarball {
     url = "https://github.com/${locked.owner}/${locked.repo}/archive/${locked.rev}.zip";
     sha256 = locked.narHash;

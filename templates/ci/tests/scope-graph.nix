@@ -1,10 +1,20 @@
 # buildKindGraph / buildInstanceGraph: scope-engine bridge.
+<<<<<<< Updated upstream
 {
   lib,
   schemaLib,
   genLib,
   ...
 }:
+||||||| Stash base
+{ lib, schemaLib, genLib, ... }:
+=======
+{
+  lib,
+  schemaLib,
+  ...
+}:
+>>>>>>> Stashed changes
 let
   inherit (schemaLib)
     mkSchemaOption
@@ -30,6 +40,7 @@ let
           };
         };
         config.schema.user = {
+          parent = "host";
           options.shell = lib.mkOption {
             type = lib.types.str;
             default = "/bin/bash";
@@ -39,7 +50,6 @@ let
           options.port = lib.mkOption { type = lib.types.int; };
           options.host = lib.mkOption { type = ref "host"; };
         };
-        config.schema._topology.host.children = [ "user" ];
 
         config.hosts.igloo = {
           addr = "10.0.1.1";
@@ -60,7 +70,7 @@ let
       }
     ];
   };
-  config = eval.config;
+  inherit (eval) config;
 
   # ─── Kind-level graph ───────────────────────────────────────────
 

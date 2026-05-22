@@ -1,9 +1,19 @@
+<<<<<<< Updated upstream
 {
   lib,
   schemaLib,
   genLib,
   ...
 }:
+||||||| Stash base
+{ lib, schemaLib, genLib, ... }:
+=======
+{
+  lib,
+  schemaLib,
+  ...
+}:
+>>>>>>> Stashed changes
 let
   inherit (schemaLib) mkSchemaOption;
 
@@ -15,12 +25,12 @@ let
           options.addr = lib.mkOption { type = lib.types.str; };
         };
         config.schema.user = {
+          parent = "host";
           options.shell = lib.mkOption { type = lib.types.str; };
         };
         config.schema.network = {
           options.cidr = lib.mkOption { type = lib.types.str; };
         };
-        config.schema._topology.host.children = [ "user" ];
       }
     ];
   };

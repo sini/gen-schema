@@ -1,9 +1,19 @@
+<<<<<<< Updated upstream
 {
   lib,
   schemaLib,
   genLib,
   ...
 }:
+||||||| Stash base
+{ lib, schemaLib, genLib, ... }:
+=======
+{
+  lib,
+  schemaLib,
+  ...
+}:
+>>>>>>> Stashed changes
 let
   inherit (schemaLib) mkSchemaOption ref;
 
@@ -15,18 +25,18 @@ let
           options.addr = lib.mkOption { type = lib.types.str; };
         };
         config.schema.user = {
+          parent = "host";
           options.shell = lib.mkOption { type = lib.types.str; };
         };
         config.schema.service = {
           options.port = lib.mkOption { type = lib.types.int; };
           options.host = lib.mkOption { type = ref "host"; };
         };
-        config.schema._topology.host.children = [ "user" ];
       }
     ];
   };
 
-  edges = eval.config.schema._meta.edges;
+  inherit (eval.config.schema._meta) edges;
   parentEdges = builtins.filter (e: e.type == "parent") edges;
   refEdgesTyped = builtins.filter (e: e.type == "ref") edges;
 in

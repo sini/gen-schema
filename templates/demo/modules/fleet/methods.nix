@@ -17,6 +17,7 @@ in
   config.schema.host.methods = {
     # Check if a named service targets this host.
     # Closes over fleet.services; receives `name` from the host instance.
+<<<<<<< Updated upstream
     hasService =
       schemaFn "Check whether a named service targets this host." (lib.types.functionTo lib.types.bool)
         (
@@ -27,6 +28,28 @@ in
           in
           services ? ${serviceName} && services.${serviceName}.host.name == name
         );
+||||||| Stash base
+    hasService = schemaFn
+      "Check whether a named service targets this host."
+      (lib.types.functionTo lib.types.bool)
+      ({ name, ... }:
+        serviceName:
+        let
+          services = config.fleet.services;
+        in
+        services ? ${serviceName} && services.${serviceName}.host.name == name);
+=======
+    hasService =
+      schemaFn "Check whether a named service targets this host." (lib.types.functionTo lib.types.bool)
+        (
+          { name, ... }:
+          serviceName:
+          let
+            inherit (config.fleet) services;
+          in
+          services ? ${serviceName} && services.${serviceName}.host.name == name
+        );
+>>>>>>> Stashed changes
 
     # Return a description string for this host.
     # All named args (name, role, addr) resolved from instance config.

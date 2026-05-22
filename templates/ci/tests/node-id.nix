@@ -1,10 +1,20 @@
 # nodeId: scope-engine canonical node identifier on instances.
+<<<<<<< Updated upstream
 {
   lib,
   schemaLib,
   genLib,
   ...
 }:
+||||||| Stash base
+{ lib, schemaLib, genLib, ... }:
+=======
+{
+  lib,
+  schemaLib,
+  ...
+}:
+>>>>>>> Stashed changes
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
 
@@ -35,7 +45,7 @@ let
       }
     ];
   };
-  config = eval.config;
+  inherit (eval) config;
 in
 {
   node-id = {

@@ -1,10 +1,10 @@
 {
-  description = "den-schema demo: typed fleet management with schema, refs, and strict validation";
+  description = "gen-schema demo: typed fleet management with schema, refs, and strict validation";
 
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
 
   inputs = {
-    den-schema.url = "github:denful/den-schema";
+    gen-schema.url = "github:sini/gen-schema";
     gen.url = "github:sini/gen";
     import-tree.url = "github:vic/import-tree";
     flake-parts.url = "github:hercules-ci/flake-parts";

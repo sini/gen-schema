@@ -106,6 +106,7 @@ let
   mkEndpoint =
     service:
     either.pipe [
+<<<<<<< Updated upstream
       (
         s:
         either.right {
@@ -122,6 +123,26 @@ let
         }:
         either.right "${protocol}://${addr}:${toString port}"
       )
+||||||| Stash base
+      (s: either.right { addr = s.host.addr; port = s.port; protocol = s.protocol; })
+      ({ addr, port, protocol }: either.right "${protocol}://${addr}:${toString port}")
+=======
+      (
+        s:
+        either.right {
+          addr = s.host.addr;
+          inherit (s) port protocol;
+        }
+      )
+      (
+        {
+          addr,
+          port,
+          protocol,
+        }:
+        either.right "${protocol}://${addr}:${toString port}"
+      )
+>>>>>>> Stashed changes
     ] service;
 in
 {
