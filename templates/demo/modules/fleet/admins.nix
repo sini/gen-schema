@@ -2,8 +2,7 @@
 #
 # Admins inherit all user options (userName, shell) from the base user kind
 # via schema import, and add admin-specific fields (sudoPrivileges, sshKeys).
-{ ... }:
-{
+_: {
   fleet.admins.root = {
     userName = "root";
     shell = "/bin/bash";

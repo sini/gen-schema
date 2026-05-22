@@ -1,6 +1,6 @@
 {
   inputs = {
-    den-schema.url = "github:denful/den-schema";
+    gen-schema.url = "github:sini/gen-schema";
     gen.url = "github:sini/gen";
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
     nix-unit.url = "github:nix-community/nix-unit";
@@ -9,15 +9,15 @@
 
   outputs =
     {
-      den-schema,
+      gen-schema,
       gen,
       nixpkgs,
       nix-unit,
       ...
     }:
     let
-      lib = nixpkgs.lib;
-      schemaLib = den-schema.lib;
+      inherit (nixpkgs) lib;
+      schemaLib = gen-schema.lib;
       genLib = import "${gen}" { inherit lib; };
       forAllSystems = lib.genAttrs lib.systems.flakeExposed;
       testFiles = lib.pipe (builtins.readDir ./tests) [

@@ -23,7 +23,7 @@ in
           { name, ... }:
           serviceName:
           let
-            services = config.fleet.services;
+            inherit (config.fleet) services;
           in
           services ? ${serviceName} && services.${serviceName}.host.name == name
         );

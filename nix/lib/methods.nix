@@ -9,7 +9,7 @@ let
     { config, ... }:
     {
       options = lib.mapAttrs (
-        name: m:
+        _name: m:
         lib.mkOption {
           inherit (m) description type;
           readOnly = true;

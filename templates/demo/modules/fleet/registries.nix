@@ -110,8 +110,7 @@ let
         s:
         either.right {
           addr = s.host.addr;
-          port = s.port;
-          protocol = s.protocol;
+          inherit (s) port protocol;
         }
       )
       (

@@ -1,4 +1,4 @@
-{ lib, schemaLib, ... }:
+{ schemaLib, ... }:
 let
   tryRegistry = builtins.tryEval (
     schemaLib.mkInstanceRegistry

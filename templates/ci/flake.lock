@@ -1,6 +1,6 @@
 {
   "nodes": {
-    "den-schema": {
+    "gen-schema": {
       "inputs": {
         "gen": "gen",
         "nixpkgs": "nixpkgs"
@@ -11,11 +11,11 @@
         "lastModified": 1778719748,
         "narHash": "sha256-N6huW6Uyei7E+h77yoZ+XvmDXj39XQRhPpooTZDSQ+Q=",
         "type": "git",
-        "url": "file:///home/sini/Documents/repos/den-schema"
+        "url": "file:///home/sini/Documents/repos/gen-schema"
       },
       "original": {
         "owner": "denful",
-        "repo": "den-schema",
+        "repo": "gen-schema",
         "type": "github"
       }
     },
@@ -123,7 +123,7 @@
     },
     "root": {
       "inputs": {
-        "den-schema": "den-schema",
+        "gen-schema": "gen-schema",
         "gen": "gen_2",
         "nix-unit": "nix-unit",
         "nixpkgs": "nixpkgs_2"

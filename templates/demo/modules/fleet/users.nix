@@ -1,6 +1,5 @@
 # User instances.
-{ ... }:
-{
+_: {
   fleet.users.tux = {
     userName = "tux";
     shell = "/bin/zsh";

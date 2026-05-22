@@ -16,7 +16,7 @@ let
     ];
   };
 
-  igloo = eval.config.hosts.igloo;
+  inherit (eval.config.hosts) igloo;
 in
 {
   instance-type = {

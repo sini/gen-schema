@@ -9,7 +9,7 @@ let
             default = false;
             merge = _: v: v;
           };
-          computed = _kind: sidecars: _defs: {
+          computed = _sidecars: _defs: {
             # Computed isEntity overrides the sidecar isEntity
             isEntity = true;
           };

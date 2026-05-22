@@ -1,7 +1,7 @@
 # Expose fleet data as flake outputs for demonstration.
 { config, schemaLib, ... }:
 let
-  fleet = config.fleet;
+  inherit (config) fleet;
 in
 {
   flake = {
@@ -68,7 +68,7 @@ in
       hashesDiffer = fleet.admins.root.id_hash != fleet.users.tux.id_hash;
 
       # --- Introspection ---
-      kindNames = config.schema._meta.kindNames;
+      inherit (config.schema._meta) kindNames;
       hostOptionCount = builtins.length (config.schema._meta.kindMeta "host").optionNames;
       adminOptionCount = builtins.length (config.schema._meta.kindMeta "admin-user").optionNames;
 

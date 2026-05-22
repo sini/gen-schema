@@ -1,7 +1,6 @@
 {
   lib,
   schemaLib,
-  genLib,
   ...
 }:
 let
@@ -26,7 +25,7 @@ let
     ];
   };
 
-  edges = eval.config.schema._meta.edges;
+  inherit (eval.config.schema._meta) edges;
   parentEdges = builtins.filter (e: e.type == "parent") edges;
   refEdgesTyped = builtins.filter (e: e.type == "ref") edges;
 in

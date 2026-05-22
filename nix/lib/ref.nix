@@ -4,7 +4,7 @@
 # Direct:   schema.ref config.fleet.hosts → resolved immediately
 #
 # Both modes accept string keys ("igloo") or instance values (config.fleet.hosts.igloo).
-{ lib, mkRefType }:
+{ lib, ... }:
 let
   # Resolved ref type with string/instance coercion.
   mkCoercingRefType =
@@ -50,7 +50,7 @@ let
       type.refKind
     else
       let
-        et = ((type.nestedTypes or { }).elemType or null);
+        et = (type.nestedTypes or { }).elemType or null;
       in
       if et != null then (et.refKind or null) else null;
 in

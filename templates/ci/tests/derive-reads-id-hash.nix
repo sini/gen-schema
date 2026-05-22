@@ -15,8 +15,7 @@ let
             }
           ];
           derive =
-            instances:
-            lib.mapAttrs (name: inst: { hashPrefix = builtins.substring 0 8 inst.id_hash; }) instances;
+            instances: lib.mapAttrs (_: inst: { hashPrefix = builtins.substring 0 8 inst.id_hash; }) instances;
         };
         config.schema.host = {
           options.addr = lib.mkOption { type = lib.types.str; };

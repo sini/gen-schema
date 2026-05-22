@@ -9,7 +9,7 @@ let
           sidecars.tags = {
             default = [ ];
           };
-          computed = _kind: sidecars: _defs: {
+          computed = sidecars: _defs: {
             tagCount = builtins.length sidecars.tags;
           };
         };

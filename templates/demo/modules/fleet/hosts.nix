@@ -1,6 +1,5 @@
 # Host instances.
-{ ... }:
-{
+_: {
   fleet.hosts.igloo = {
     addr = "10.0.1.1";
     role = "web";
