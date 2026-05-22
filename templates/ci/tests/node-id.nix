@@ -2,7 +2,6 @@
 {
   lib,
   schemaLib,
-  genLib,
   ...
 }:
 let
@@ -35,7 +34,7 @@ let
       }
     ];
   };
-  config = eval.config;
+  inherit (eval) config;
 in
 {
   node-id = {

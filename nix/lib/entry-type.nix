@@ -80,7 +80,7 @@ let
 
           # Computed fields from extracted sidecars + raw defs
           # kind (lib.last loc) is passed so computed can produce entry-specific fields
-          computedFields = if computed != null then computed kind extractedSidecars defs else { };
+          computedFields = if computed != null then computed extractedSidecars defs else { };
 
           # Strip all sidecar keys before deferredModule merge
           strippedDefs = map (
@@ -95,11 +95,11 @@ let
           # that generates instance-level options via mkMethodsModule)
           injected =
             lib.optional (baseModule != null) {
-              file = "den-schema/base";
+              file = "gen-schema/base";
               value = if builtins.isFunction baseModule then baseModule kind else baseModule;
             }
             ++ lib.optional (extractedSidecars.methods != { }) {
-              file = "den-schema/methods";
+              file = "gen-schema/methods";
               value = mkMethodsModule kind extractedSidecars.methods;
             };
 
@@ -207,7 +207,7 @@ let
                   in
                   {
                     optionNames = lib.attrNames dummy.options;
-                    options = dummy.options;
+                    inherit (dummy) options;
                     refs = refsFromOptions dummy.options;
                   };
 
@@ -223,9 +223,9 @@ let
                   unknownChildren = lib.filter (k: !(builtins.elem k kindNames)) allDeclaredChildren;
                   _ =
                     if unknownParents != [ ] then
-                      throw "den-schema: _topology references undeclared kind '${builtins.head unknownParents}'"
+                      throw "gen-schema: _topology references undeclared kind '${builtins.head unknownParents}'"
                     else if unknownChildren != [ ] then
-                      throw "den-schema: _topology.*.children references undeclared kind '${builtins.head unknownChildren}'"
+                      throw "gen-schema: _topology.*.children references undeclared kind '${builtins.head unknownChildren}'"
                     else
                       null;
 
@@ -235,7 +235,7 @@ let
                     lib.foldl' (
                       a: child:
                       if a ? ${child} then
-                        throw "den-schema: kind '${child}' has multiple parents ('${a.${child}}' and '${parentKind}') in _topology"
+                        throw "gen-schema: kind '${child}' has multiple parents ('${a.${child}}' and '${parentKind}') in _topology"
                       else
                         a // { ${child} = parentKind; }
                     ) acc declared.${parentKind}.children

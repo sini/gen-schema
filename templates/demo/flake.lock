@@ -15,7 +15,7 @@
         "type": "github"
       }
     },
-    "den-schema": {
+    "gen-schema": {
       "inputs": {
         "nixpkgs": "nixpkgs"
       },
@@ -25,11 +25,11 @@
         "lastModified": 1778711708,
         "narHash": "sha256-ehRgaeh4unJ9tADJS5b5BZfkr3YNGvw+M5GHKoKqIrc=",
         "type": "git",
-        "url": "file:///home/sini/Documents/repos/den-schema"
+        "url": "file:///home/sini/Documents/repos/gen-schema"
       },
       "original": {
         "owner": "denful",
-        "repo": "den-schema",
+        "repo": "gen-schema",
         "type": "github"
       }
     },
@@ -103,7 +103,7 @@
     "root": {
       "inputs": {
         "bend": "bend",
-        "den-schema": "den-schema",
+        "gen-schema": "gen-schema",
         "flake-parts": "flake-parts",
         "import-tree": "import-tree",
         "nixpkgs": "nixpkgs_2"

@@ -2,7 +2,6 @@
 {
   lib,
   schemaLib,
-  genLib,
   ...
 }:
 let
@@ -60,7 +59,7 @@ let
       }
     ];
   };
-  config = eval.config;
+  inherit (eval) config;
 
   # ─── Kind-level graph ───────────────────────────────────────────
 

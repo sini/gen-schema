@@ -41,7 +41,7 @@ in
       expected = "desktop";
     };
     test-names-match-keys = {
-      expr = lib.mapAttrsToList (k: v: v.name) eval.config.hosts;
+      expr = lib.mapAttrsToList (_: v: v.name) eval.config.hosts;
       expected = [
         "igloo"
         "yurt"

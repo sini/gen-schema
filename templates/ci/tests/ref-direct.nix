@@ -1,7 +1,6 @@
 {
   lib,
   schemaLib,
-  genLib,
   ...
 }:
 let
@@ -41,7 +40,7 @@ let
     ];
   };
 
-  nginx = eval.config.services.nginx;
+  inherit (eval.config.services) nginx;
 in
 {
   ref-direct = {

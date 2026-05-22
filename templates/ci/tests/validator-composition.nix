@@ -33,7 +33,7 @@ let
 in
 {
   "validator-compose".test-validators-merged = {
-    expr = lib.length (eval.config.schema.host.validators);
+    expr = lib.length eval.config.schema.host.validators;
     expected = 2;
   };
 }

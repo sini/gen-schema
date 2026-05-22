@@ -1,7 +1,6 @@
 {
   lib,
   schemaLib,
-  genLib,
   ...
 }:
 let
