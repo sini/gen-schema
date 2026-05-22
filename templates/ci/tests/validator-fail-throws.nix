@@ -1,4 +1,9 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
   schemaEval = lib.evalModules {
     modules = [

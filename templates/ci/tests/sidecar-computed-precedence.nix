@@ -2,19 +2,24 @@
 { lib, schemaLib, ... }:
 let
   eval = lib.evalModules {
-    modules = [{
-      options.schema = schemaLib.mkSchemaOption {
-        sidecars.isEntity = { default = false; merge = _: v: v; };
-        computed = _kind: sidecars: _defs: {
-          # Computed isEntity overrides the sidecar isEntity
-          isEntity = true;
+    modules = [
+      {
+        options.schema = schemaLib.mkSchemaOption {
+          sidecars.isEntity = {
+            default = false;
+            merge = _: v: v;
+          };
+          computed = _kind: sidecars: _defs: {
+            # Computed isEntity overrides the sidecar isEntity
+            isEntity = true;
+          };
         };
-      };
-      config.schema.host = {
-        isEntity = false;
-        options.name = lib.mkOption { type = lib.types.str; };
-      };
-    }];
+        config.schema.host = {
+          isEntity = false;
+          options.name = lib.mkOption { type = lib.types.str; };
+        };
+      }
+    ];
   };
 in
 {

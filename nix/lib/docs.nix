@@ -32,15 +32,22 @@ in
             else if opt ? default then
               let
                 d = builtins.tryEval (builtins.deepSeq opt.default opt.default);
-                fmt = v:
-                  if builtins.isBool v then (if v then "true" else "false")
-                  else if builtins.isList v then "[ ... ]"
-                  else toString v;
-              in if d.success then fmt d.value else "—"
+                fmt =
+                  v:
+                  if builtins.isBool v then
+                    (if v then "true" else "false")
+                  else if builtins.isList v then
+                    "[ ... ]"
+                  else
+                    toString v;
+              in
+              if d.success then fmt d.value else "—"
             else
               "—";
         in
-        "| ${escapeMd name} | ${escapeMd (opt.type.name or "?")} | ${escapeMd defaultStr} | ${escapeMd (opt.description or "")} |";
+        "| ${escapeMd name} | ${escapeMd (opt.type.name or "?")} | ${escapeMd defaultStr} | ${
+          escapeMd (opt.description or "")
+        } |";
     in
     lib.concatMapStringsSep "\n\n" renderKind kinds;
 }

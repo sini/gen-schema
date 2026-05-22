@@ -1,5 +1,10 @@
 # nodeId: scope-engine canonical node identifier on instances.
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
 

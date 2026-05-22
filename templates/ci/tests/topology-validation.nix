@@ -1,4 +1,9 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption;
 
