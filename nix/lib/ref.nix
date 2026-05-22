@@ -44,6 +44,7 @@ let
 
   # Extract refKind from a type, traversing nullOr/listOf wrappers safely.
   # Returns the target kind name string, or null if not a ref type.
+  # Recurse through nullOr/listOf wrappers to find the leaf refKind.
   getRefKind =
     type:
     if (type.refKind or null) != null then
@@ -52,7 +53,7 @@ let
       let
         et = (type.nestedTypes or { }).elemType or null;
       in
-      if et != null then (et.refKind or null) else null;
+      if et != null then getRefKind et else null;
 in
 {
   ref = target: if builtins.isString target then mkDeferredRef target else mkCoercingRefType target;
@@ -66,4 +67,16 @@ in
       refFields = lib.filterAttrs (_: opt: (opt ? type) && (getRefKind opt.type) != null) opts;
     in
     lib.mapAttrs (_: opt: getRefKind opt.type) refFields;
+
+  # Like refsFromOptions but preserves the option type for coercion chain construction.
+  # Returns { fieldName = { refKind; type; }; }.
+  refsFromOptionsWithTypes =
+    opts:
+    let
+      refFields = lib.filterAttrs (_: opt: (opt ? type) && (getRefKind opt.type) != null) opts;
+    in
+    lib.mapAttrs (_: opt: {
+      refKind = getRefKind opt.type;
+      type = opt.type;
+    }) refFields;
 }

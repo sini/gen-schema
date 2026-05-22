@@ -13,7 +13,7 @@
   mkIdentityModule,
   runValidators,
   defaultOnError,
-  refsFromOptions,
+  refsFromOptionsWithTypes,
 }:
 let
   mkInstanceType =
@@ -59,7 +59,46 @@ let
     let
       evaled = lib.evalModules { modules = [ schema.${kind} ]; };
     in
-    refsFromOptions evaled.options;
+    refsFromOptionsWithTypes evaled.options;
+
+  # Build a coercion function matching the nesting structure of a ref type.
+  # Walks the type tree at binding time so the runtime dispatch is exact.
+  mkCoerceChain =
+    field: kind: registry: type:
+    let
+      leafCoerce =
+        v:
+        if builtins.isString v then
+          if registry ? ${v} then
+            registry.${v}
+          else
+            throw "ref field '${field}' on kind '${kind}': reference '${v}' not found in instance registry (available: ${builtins.concatStringsSep ", " (builtins.attrNames registry)})"
+        else
+          v;
+
+      go =
+        t:
+        if (t.refKind or null) != null then
+          leafCoerce
+        else
+          let
+            et = (t.nestedTypes or { }).elemType or null;
+            name = t.name or "";
+          in
+          if et == null then
+            # no nested ref — identity (shouldn't happen, but safe fallback)
+            v: v
+          else
+            let
+              inner = go et;
+            in
+            if name == "nullOr" then
+              v: if v == null then null else inner v
+            else
+              # listOf or other collection wrappers
+              v: map inner v;
+    in
+    go type;
 
   # Build extra modules that override deferred ref fields with resolved types.
   mkRefBindingModules =
@@ -75,7 +114,7 @@ let
         if missingBindings != { } then
           let
             missing = builtins.head (lib.attrNames missingBindings);
-            targetKind = missingBindings.${missing};
+            targetKind = missingBindings.${missing}.refKind;
           in
           throw "mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
         else if extraBindings != { } then
@@ -89,28 +128,14 @@ let
     builtins.seq _ (
       lib.mapAttrsToList (
         field: registry:
+        let
+          fieldInfo = refFields.${field};
+          coerceChain = mkCoerceChain field kind registry fieldInfo.type;
+        in
         { ... }:
         {
           options.${field} = lib.mkOption {
-            apply =
-              val:
-              let
-                coerce =
-                  v:
-                  if builtins.isString v then
-                    if registry ? ${v} then
-                      registry.${v}
-                    else
-                      throw "ref field '${field}' on kind '${kind}': reference '${v}' not found in instance registry (available: ${builtins.concatStringsSep ", " (builtins.attrNames registry)})"
-                  else
-                    v;
-              in
-              if builtins.isList val then
-                map coerce val
-              else if val == null then
-                null
-              else
-                coerce val;
+            apply = coerceChain;
           };
         }
       ) refs
@@ -173,7 +198,7 @@ let
             if missingBindings != { } then
               let
                 missing = builtins.head (lib.attrNames missingBindings);
-                targetKind = missingBindings.${missing};
+                targetKind = missingBindings.${missing}.refKind;
               in
               throw "mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
             else
