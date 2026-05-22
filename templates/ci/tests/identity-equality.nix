@@ -6,16 +6,27 @@ let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
 
   eval = lib.evalModules {
-    modules = [{
-      options.schema = mkSchemaOption {};
-      options.hosts = mkInstanceRegistry eval.config.schema "host" {};
-      config.schema.host = {
-        options.addr = lib.mkOption { type = lib.types.str; };
-        options.role = lib.mkOption { type = lib.types.str; default = "worker"; };
-      };
-      config.hosts.igloo = { addr = "10.0.1.1"; role = "web"; };
-      config.hosts.iceberg = { addr = "10.0.2.1"; role = "db"; };
-    }];
+    modules = [
+      {
+        options.schema = mkSchemaOption { };
+        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
+        config.schema.host = {
+          options.addr = lib.mkOption { type = lib.types.str; };
+          options.role = lib.mkOption {
+            type = lib.types.str;
+            default = "worker";
+          };
+        };
+        config.hosts.igloo = {
+          addr = "10.0.1.1";
+          role = "web";
+        };
+        config.hosts.iceberg = {
+          addr = "10.0.2.1";
+          role = "db";
+        };
+      }
+    ];
   };
 
   # Two separate accesses to the same instance
@@ -43,22 +54,27 @@ in
   };
   # Filter pattern: find all hosts that aren't igloo
   "identity-eq".test-filter-by-hash = {
-    expr = lib.attrNames (
-      lib.filterAttrs (_: h: h.id_hash != ref1.id_hash) eval.config.hosts
-    );
+    expr = lib.attrNames (lib.filterAttrs (_: h: h.id_hash != ref1.id_hash) eval.config.hosts);
     expected = [ "iceberg" ];
   };
   # Membership pattern: check if a host is in a set
   "identity-eq".test-membership-by-hash = {
     expr =
-      let targetHashes = map (h: h.id_hash) [ ref1 ];
-      in lib.elem other.id_hash targetHashes;
+      let
+        targetHashes = map (h: h.id_hash) [ ref1 ];
+      in
+      lib.elem other.id_hash targetHashes;
     expected = false;
   };
   "identity-eq".test-membership-positive = {
     expr =
-      let targetHashes = map (h: h.id_hash) [ ref1 other ];
-      in lib.elem ref2.id_hash targetHashes;
+      let
+        targetHashes = map (h: h.id_hash) [
+          ref1
+          other
+        ];
+      in
+      lib.elem ref2.id_hash targetHashes;
     expected = true;
   };
 }

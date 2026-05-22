@@ -24,12 +24,18 @@ let
         let
           t = topology.${k};
         in
-        lib.optional (t.parent != null) { from = k; to = t.parent; }
+        lib.optional (t.parent != null) {
+          from = k;
+          to = t.parent;
+        }
       ) kindNames;
 
       # Ref edges from schema declarations: fromKind → toKind
       refEdges = builtins.filter (e: e.type == "ref") edges;
-      importEdges = map (e: { from = e.from; to = e.to; }) refEdges;
+      importEdges = map (e: {
+        from = e.from;
+        to = e.to;
+      }) refEdges;
     in
     {
       parentGraph = {
@@ -40,18 +46,16 @@ let
         vertices = [ ];
         edges = importEdges;
       };
-      decls = lib.genAttrs kindNames (
-        k: {
-          kind = k;
-          inherit (topology.${k}) parent children;
-          refs = lib.listToAttrs (
-            map (e: {
-              name = e.field;
-              value = e.to;
-            }) (builtins.filter (e: e.from == k) refEdges)
-          );
-        }
-      );
+      decls = lib.genAttrs kindNames (k: {
+        kind = k;
+        inherit (topology.${k}) parent children;
+        refs = lib.listToAttrs (
+          map (e: {
+            name = e.field;
+            value = e.to;
+          }) (builtins.filter (e: e.from == k) refEdges)
+        );
+      });
       types = lib.genAttrs kindNames (_: "kind");
     };
 
@@ -70,8 +74,7 @@ let
 
       # All instance node IDs
       allNodeIds = lib.concatMap (
-        kind:
-        map (name: "${kind}:${name}") (builtins.attrNames (fleet.${kind} or { }))
+        kind: map (name: "${kind}:${name}") (builtins.attrNames (fleet.${kind} or { }))
       ) kindNames;
 
       # Parent edges: for each child kind instance, connect to parent instance.
@@ -127,9 +130,12 @@ let
             refValue = if inst != null then inst.${field} or null else null;
             # Ref resolves to an instance — extract its name
             toName =
-              if refValue == null then null
-              else if builtins.isString refValue then refValue
-              else refValue.name or null;
+              if refValue == null then
+                null
+              else if builtins.isString refValue then
+                refValue
+              else
+                refValue.name or null;
           in
           lib.optional (toName != null) {
             from = "${fromKind}:${fromName}";
@@ -139,24 +145,26 @@ let
       ) refEdges;
 
       # Declarations: instance config data per node
-      decls = lib.listToAttrs (lib.concatMap (
-        kind:
-        lib.mapAttrsToList (
-          name: inst: {
+      decls = lib.listToAttrs (
+        lib.concatMap (
+          kind:
+          lib.mapAttrsToList (name: inst: {
             name = "${kind}:${name}";
             value = inst;
-          }
-        ) (fleet.${kind} or { })
-      ) kindNames);
+          }) (fleet.${kind} or { })
+        ) kindNames
+      );
 
       # Types: kind name per node
-      types = lib.listToAttrs (lib.concatMap (
-        kind:
-        map (name: {
-          name = "${kind}:${name}";
-          value = kind;
-        }) (builtins.attrNames (fleet.${kind} or { }))
-      ) kindNames);
+      types = lib.listToAttrs (
+        lib.concatMap (
+          kind:
+          map (name: {
+            name = "${kind}:${name}";
+            value = kind;
+          }) (builtins.attrNames (fleet.${kind} or { }))
+        ) kindNames
+      );
     in
     {
       parentGraph = {

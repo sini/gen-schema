@@ -1,4 +1,9 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption ref;
 
@@ -29,7 +34,9 @@ in
   ref-introspection = {
     test-service-has-refs = {
       expr = serviceMeta.refs;
-      expected = { host = "host"; };
+      expected = {
+        host = "host";
+      };
     };
     test-host-no-refs = {
       expr = hostMeta.refs;

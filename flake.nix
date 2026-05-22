@@ -5,12 +5,14 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = { nixpkgs, ... }:
+  outputs =
+    { nixpkgs, ... }:
     let
       schemaLib = import ./nix/lib {
         lib = nixpkgs.lib;
       };
-    in {
+    in
+    {
       lib = schemaLib;
       flakeModules.default = ./nix/flakeModule.nix;
     };

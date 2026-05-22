@@ -1,4 +1,9 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption mkInstanceRegistry ref;
 
@@ -9,11 +14,14 @@ let
         options.hosts = mkInstanceRegistry eval.config.schema "host" { };
         options.services = mkInstanceRegistry eval.config.schema "service" {
           extraModules = [
-            ({ ... }: {
-              options.host = lib.mkOption {
-                type = ref eval.config.hosts;
-              };
-            })
+            (
+              { ... }:
+              {
+                options.host = lib.mkOption {
+                  type = ref eval.config.hosts;
+                };
+              }
+            )
           ];
         };
         config.schema.host = {
@@ -22,7 +30,9 @@ let
         config.schema.service = {
           options.port = lib.mkOption { type = lib.types.int; };
         };
-        config.hosts.igloo = { addr = "10.0.1.1"; };
+        config.hosts.igloo = {
+          addr = "10.0.1.1";
+        };
         config.services.nginx = {
           host = "igloo";
           port = 80;

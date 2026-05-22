@@ -7,7 +7,14 @@
     nix-unit.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { den-schema, gen, nixpkgs, nix-unit, ... }:
+  outputs =
+    {
+      den-schema,
+      gen,
+      nixpkgs,
+      nix-unit,
+      ...
+    }:
     let
       lib = nixpkgs.lib;
       schemaLib = den-schema.lib;
@@ -17,14 +24,18 @@
         (lib.filterAttrs (n: v: v == "regular" && lib.hasSuffix ".nix" n))
         builtins.attrNames
       ];
-      tests = lib.foldl' (acc: file:
-        acc // (import ./tests/${file} { inherit lib schemaLib genLib; })
-      ) {} testFiles;
-    in {
+      tests = lib.foldl' (
+        acc: file: acc // (import ./tests/${file} { inherit lib schemaLib genLib; })
+      ) { } testFiles;
+    in
+    {
       inherit tests;
-      devShells = forAllSystems (system:
-        let pkgs = nixpkgs.legacyPackages.${system};
-        in {
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        {
           default = pkgs.mkShell {
             packages = [ nix-unit.packages.${system}.default ];
           };

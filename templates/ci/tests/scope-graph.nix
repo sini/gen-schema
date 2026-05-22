@@ -1,7 +1,18 @@
 # buildKindGraph / buildInstanceGraph: scope-engine bridge.
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry ref buildKindGraph buildInstanceGraph;
+  inherit (schemaLib)
+    mkSchemaOption
+    mkInstanceRegistry
+    ref
+    buildKindGraph
+    buildInstanceGraph
+    ;
 
   eval = lib.evalModules {
     modules = [
@@ -70,7 +81,11 @@ in
 
     test-kind-vertices = {
       expr = builtins.sort builtins.lessThan kindGraph.parentGraph.vertices;
-      expected = [ "host" "service" "user" ];
+      expected = [
+        "host"
+        "service"
+        "user"
+      ];
     };
 
     test-kind-parent-edges = {
@@ -135,7 +150,12 @@ in
 
     test-instance-vertices = {
       expr = builtins.sort builtins.lessThan instanceGraph.parentGraph.vertices;
-      expected = [ "host:iceberg" "host:igloo" "service:nginx" "service:postgres" ];
+      expected = [
+        "host:iceberg"
+        "host:igloo"
+        "service:nginx"
+        "service:postgres"
+      ];
     };
 
     # Ref edges: service instances → host instances

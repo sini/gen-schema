@@ -1,4 +1,9 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption ref;
 
@@ -29,15 +34,25 @@ in
   edges = {
     test-total-edge-count = {
       expr = builtins.length edges;
-      expected = 2;  # 1 parent (user→host) + 1 ref (service→host)
+      expected = 2; # 1 parent (user→host) + 1 ref (service→host)
     };
     test-parent-edge = {
       expr = builtins.head parentEdges;
-      expected = { from = "user"; to = "host"; type = "parent"; field = null; };
+      expected = {
+        from = "user";
+        to = "host";
+        type = "parent";
+        field = null;
+      };
     };
     test-ref-edge = {
       expr = builtins.head refEdgesTyped;
-      expected = { from = "service"; field = "host"; to = "host"; type = "ref"; };
+      expected = {
+        from = "service";
+        field = "host";
+        to = "host";
+        type = "ref";
+      };
     };
   };
 }

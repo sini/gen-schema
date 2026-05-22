@@ -3,18 +3,18 @@
 { config, ... }:
 {
   fleet.services.nginx = {
-    host = "igloo";          # string key → lookup in hosts registry
+    host = "igloo"; # string key → lookup in hosts registry
     port = 80;
   };
 
   fleet.services.postgres = {
-    host = "iceberg";        # string key → lookup
+    host = "iceberg"; # string key → lookup
     port = 5432;
   };
 
   fleet.services.gateway = {
     host = "igloo";
     port = 443;
-    upstream = config.fleet.services.nginx;  # instance value → passthrough
+    upstream = config.fleet.services.nginx; # instance value → passthrough
   };
 }

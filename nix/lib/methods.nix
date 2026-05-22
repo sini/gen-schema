@@ -28,8 +28,10 @@ let
             lib.concatMapStringsSep ", " (a: "'${a}'") missingArgs
           } which are not declared on this kind"
         else
-          let resolved = lib.genAttrs argNames (n: config.${n});
-          in m.fn resolved
+          let
+            resolved = lib.genAttrs argNames (n: config.${n});
+          in
+          m.fn resolved
       ) allMethods;
     };
 in

@@ -1,4 +1,9 @@
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption;
 
@@ -39,15 +44,24 @@ in
     };
     test-network-no-relations = {
       expr = topo.network;
-      expected = { parent = null; children = [ ]; };
+      expected = {
+        parent = null;
+        children = [ ];
+      };
     };
     test-roots = {
       expr = meta.roots;
-      expected = [ "host" "network" ];
+      expected = [
+        "host"
+        "network"
+      ];
     };
     test-leaves = {
       expr = meta.leaves;
-      expected = [ "network" "user" ];
+      expected = [
+        "network"
+        "user"
+      ];
     };
   };
 }

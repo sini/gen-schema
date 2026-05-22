@@ -1,4 +1,7 @@
-{ inputs ? {}, lib }:
+{
+  inputs ? { },
+  lib,
+}:
 let
   # No-flakes import: resolve gen from CI template's flake.lock
   lock = builtins.fromJSON (builtins.readFile ../../templates/ci/flake.lock);
@@ -22,7 +25,12 @@ let
   };
   instance = import ./instance.nix {
     inherit lib;
-    inherit (gen) mkStrictModule mkIdentityModule runValidators defaultOnError;
+    inherit (gen)
+      mkStrictModule
+      mkIdentityModule
+      runValidators
+      defaultOnError
+      ;
     inherit (refLib) refsFromOptions;
   };
   docs = import ./docs.nix { inherit lib; };

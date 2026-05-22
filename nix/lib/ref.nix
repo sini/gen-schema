@@ -38,7 +38,9 @@ let
       check = v: builtins.isString v || builtins.isAttrs v;
       merge = loc: defs: lib.mergeOneOption loc defs;
     }
-    // { refKind = kindName; };
+    // {
+      refKind = kindName;
+    };
 
   # Extract refKind from a type, traversing nullOr/listOf wrappers safely.
   # Returns the target kind name string, or null if not a ref type.
@@ -53,9 +55,7 @@ let
       if et != null then (et.refKind or null) else null;
 in
 {
-  ref =
-    target:
-    if builtins.isString target then mkDeferredRef target else mkCoercingRefType target;
+  ref = target: if builtins.isString target then mkDeferredRef target else mkCoercingRefType target;
 
   inherit getRefKind;
 
@@ -63,9 +63,7 @@ in
   refsFromOptions =
     opts:
     let
-      refFields = lib.filterAttrs (
-        _: opt: (opt ? type) && (getRefKind opt.type) != null
-      ) opts;
+      refFields = lib.filterAttrs (_: opt: (opt ? type) && (getRefKind opt.type) != null) opts;
     in
     lib.mapAttrs (_: opt: getRefKind opt.type) refFields;
 }
