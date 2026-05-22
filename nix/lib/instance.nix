@@ -63,10 +63,11 @@ let
 
   # Build a coercion function matching the nesting structure of a ref type.
   # Walks the type tree at binding time so the runtime dispatch is exact.
+  # Supports optional custom coerce hooks for domain-specific resolution.
   mkCoerceChain =
-    field: kind: registry: type:
+    field: kind: registry: customCoerce: type:
     let
-      leafCoerce =
+      defaultCoerce =
         v:
         if builtins.isString v then
           if registry ? ${v} then
@@ -76,18 +77,37 @@ let
         else
           v;
 
+      # Scalar leaf: custom coerce receives the default result (lazy) and raw value.
+      # Throws if custom coerce returns a list in scalar context.
+      mkLeafCoerce =
+        v:
+        if customCoerce == null then
+          defaultCoerce v
+        else
+          let
+            result = customCoerce (defaultCoerce v) v;
+          in
+          if builtins.isList result then
+            throw "ref field '${field}' on kind '${kind}': custom coerce returned a list in scalar context (use listOf ref for 1-to-many expansion)"
+          else
+            result;
+
+      # List-element leaf: custom coerce receives [ defaultResult ] and raw value.
+      # Returns a list (1→many expansion supported).
+      mkListCoerce =
+        v: if customCoerce == null then [ (defaultCoerce v) ] else customCoerce [ (defaultCoerce v) ] v;
+
       go =
         t:
         if (t.refKind or null) != null then
-          leafCoerce
+          mkLeafCoerce
         else
           let
             et = (t.nestedTypes or { }).elemType or null;
             name = t.name or "";
           in
           if et == null then
-            # no nested ref — identity (shouldn't happen, but safe fallback)
-            v: v
+            mkLeafCoerce
           else
             let
               inner = go et;
@@ -95,8 +115,32 @@ let
             if name == "nullOr" then
               v: if v == null then null else inner v
             else
-              # listOf or other collection wrappers
-              v: map inner v;
+              # listOf: use concatMap with list-producing coerce for 1→many expansion
+              let
+                listInner = goList et;
+              in
+              v: builtins.concatMap listInner v;
+
+      # List-context walker: produces a list per element for concatMap.
+      goList =
+        t:
+        if (t.refKind or null) != null then
+          mkListCoerce
+        else
+          let
+            et = (t.nestedTypes or { }).elemType or null;
+            name = t.name or "";
+          in
+          if et == null then
+            v: [ (mkLeafCoerce v) ]
+          else
+            let
+              inner = go et;
+            in
+            if name == "nullOr" then
+              v: [ (if v == null then null else inner v) ]
+            else
+              v: [ (builtins.concatMap (goList et) v) ];
     in
     go type;
 
@@ -127,10 +171,21 @@ let
     in
     builtins.seq _ (
       lib.mapAttrsToList (
-        field: registry:
+        field: binding:
         let
+          norm =
+            if builtins.isAttrs binding && binding ? coerce then
+              {
+                registry = binding.instances;
+                customCoerce = binding.coerce;
+              }
+            else
+              {
+                registry = binding;
+                customCoerce = null;
+              };
           fieldInfo = refFields.${field};
-          coerceChain = mkCoerceChain field kind registry fieldInfo.type;
+          coerceChain = mkCoerceChain field kind norm.registry norm.customCoerce fieldInfo.type;
         in
         { ... }:
         {
