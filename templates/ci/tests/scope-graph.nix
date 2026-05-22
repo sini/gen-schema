@@ -29,6 +29,7 @@ let
           };
         };
         config.schema.user = {
+          parent = "host";
           options.shell = lib.mkOption {
             type = lib.types.str;
             default = "/bin/bash";
@@ -38,7 +39,6 @@ let
           options.port = lib.mkOption { type = lib.types.int; };
           options.host = lib.mkOption { type = ref "host"; };
         };
-        config.schema._topology.host.children = [ "user" ];
 
         config.hosts.igloo = {
           addr = "10.0.1.1";
