@@ -32,6 +32,10 @@ let
             validators = {
               default = [ ];
             };
+            parent = {
+              default = null;
+              merge = _acc: val: val;
+            };
           }
           // sidecars;
         in
@@ -144,21 +148,6 @@ let
             default = strict;
           };
 
-          options._topology = lib.mkOption {
-            internal = true;
-            type = lib.types.attrsOf (
-              lib.types.submodule {
-                options.children = lib.mkOption {
-                  type = lib.types.listOf lib.types.str;
-                  default = [ ];
-                  description = "Child kind names nested inside this kind.";
-                };
-              }
-            );
-            default = { };
-            description = "Declared parent-child nesting between kinds.";
-          };
-
           options._meta = lib.mkOption {
             readOnly = true;
             internal = true;
@@ -211,44 +200,33 @@ let
                     refs = refsFromOptions dummy.options;
                   };
 
-              # Derive topology: combine declared _topology with inverse parent pointers.
-              # Validates: no undeclared kinds, no multiple parents.
+              # Derive topology from parent sidecars on each kind.
+              # Each kind can declare `parent = "host";` as a sidecar.
               topology =
                 let
-                  declared = config._topology;
-                  allDeclaredChildren = lib.concatMap (pk: declared.${pk}.children) (lib.attrNames declared);
-
-                  # Validate: all topology keys and children must be declared kinds
-                  unknownParents = lib.filter (k: !(builtins.elem k kindNames)) (lib.attrNames declared);
-                  unknownChildren = lib.filter (k: !(builtins.elem k kindNames)) allDeclaredChildren;
-                  _ =
-                    if unknownParents != [ ] then
-                      throw "gen-schema: _topology references undeclared kind '${builtins.head unknownParents}'"
-                    else if unknownChildren != [ ] then
-                      throw "gen-schema: _topology.*.children references undeclared kind '${builtins.head unknownChildren}'"
-                    else
-                      null;
-
-                  # Build parent map, detecting multiple parents
-                  parentMap = lib.foldl' (
-                    acc: parentKind:
-                    lib.foldl' (
-                      a: child:
-                      if a ? ${child} then
-                        throw "gen-schema: kind '${child}' has multiple parents ('${a.${child}}' and '${parentKind}') in _topology"
+                  # Read parent sidecar from each kind
+                  parentMap = lib.foldl' (acc: k:
+                    let p = config.${k}.parent or null;
+                    in if p != null then
+                      if !(builtins.elem p kindNames) then
+                        throw "gen-schema: kind '${k}' declares parent '${p}' which is not a declared kind"
                       else
-                        a // { ${child} = parentKind; }
-                    ) acc declared.${parentKind}.children
-                  ) { } (lib.attrNames declared);
+                        acc // { ${k} = p; }
+                    else acc
+                  ) { } kindNames;
+
+                  # Derive children from parent map (inverse)
+                  childrenMap = lib.foldl' (acc: k:
+                    let p = parentMap.${k} or null;
+                    in if p != null then
+                      acc // { ${p} = (acc.${p} or [ ]) ++ [ k ]; }
+                    else acc
+                  ) { } kindNames;
                 in
-                builtins.seq _ (
-                  builtins.seq parentMap (
-                    lib.genAttrs kindNames (k: {
-                      parent = parentMap.${k} or null;
-                      children = (declared.${k} or { }).children or [ ];
-                    })
-                  )
-                );
+                lib.genAttrs kindNames (k: {
+                  parent = parentMap.${k} or null;
+                  children = childrenMap.${k} or [ ];
+                });
 
               # Materialize all ref edges from kindMeta.refs across all kinds
               refEdges = lib.concatMap (

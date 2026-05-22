@@ -14,13 +14,13 @@ let
           options.addr = lib.mkOption { type = lib.types.str; };
         };
         config.schema.user = {
+          parent = "host";
           options.shell = lib.mkOption { type = lib.types.str; };
         };
         config.schema.service = {
           options.port = lib.mkOption { type = lib.types.int; };
           options.host = lib.mkOption { type = ref "host"; };
         };
-        config.schema._topology.host.children = [ "user" ];
       }
     ];
   };
