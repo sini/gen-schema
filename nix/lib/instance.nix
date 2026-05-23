@@ -384,8 +384,13 @@ let
 
           # Refinement pass: strict refinements throw immediately, lazy refinements
           # wrap values with addErrorContext for deferred checking at access time.
+          # Auto-extract from schema kind if not explicitly provided.
+          effectiveRefinements =
+            if refinements != { } then refinements
+            else schema.${kind}.refinements or { };
+
           refinementChecked =
-            if refinements == { } then
+            if effectiveRefinements == { } then
               coerced
             else
               lib.mapAttrs (
@@ -393,7 +398,7 @@ let
                 builtins.foldl' (
                   inst: fieldName:
                   let
-                    refs' = refinements.${fieldName};
+                    refs' = effectiveRefinements.${fieldName};
                     value = inst.${fieldName} or null;
                   in
                   if value == null then
@@ -439,7 +444,7 @@ let
                       inst // { ${fieldName} = wrapped; }
                     else
                       inst
-                ) instance (builtins.attrNames refinements)
+                ) instance (builtins.attrNames effectiveRefinements)
               ) coerced;
 
           # Validators run on refinement-checked instances — deferred ref fields are resolved,

@@ -104,16 +104,81 @@ let
               d
           ) defs;
 
+          # Resolve baseModule value (may be a function of kind name)
+          resolvedBase =
+            if baseModule == null then null
+            else if builtins.isFunction baseModule then baseModule kind
+            else baseModule;
+
+          # When mixins are present and baseModule is an inline attrset,
+          # apply mixins via the record algebra and emit through the bridge.
+          hasMixins = mixins != [ ] && resolvedBase != null && builtins.isAttrs resolvedBase;
+
+          mixinResult =
+            if hasMixins then
+              let
+                baseRecord = record.fromAttrs resolvedBase;
+                withMixins = builtins.foldl' (
+                  acc: m: applyMixin m acc kind
+                ) baseRecord mixins;
+                emitted = emitModule sidecarKeys withMixins;
+              in
+              emitted
+            else
+              null;
+
+          # Effective base module: bridge output when mixins applied, original otherwise
+          effectiveBase =
+            if mixinResult != null then mixinResult.module
+            else resolvedBase;
+
+          # Refinements extracted from option declarations.
+          # Mixin path: bridge already extracted them.
+          # Non-mixin path: scan all defs for mkOption values with __schema metadata.
+          # Stored on the kind result so mkInstanceRegistry can consume them automatically.
+          extractedRefinements =
+            if mixinResult != null then mixinResult.refinements
+            else
+              let
+                inherit (import ./refined.nix { inherit lib; }) isRefined getRefinements;
+                isOptionDecl = v: builtins.isAttrs v && v ? _type && v._type == "option";
+                # Collect option declarations from all defs (inline attrsets only)
+                allOptionDecls = builtins.foldl' (acc: d:
+                  if builtins.isAttrs d.value then
+                    let
+                      # Look for options.* or direct mkOption values
+                      opts = d.value.options or (lib.filterAttrs (_: isOptionDecl) d.value);
+                    in
+                    acc // (lib.filterAttrs (_: v: isOptionDecl v && v ? type && v.type ? __schema) opts)
+                  else acc
+                ) {} defs;
+              in
+              lib.filterAttrs (_: v: v != []) (
+                lib.mapAttrs (_: v: getRefinements v.type) allOptionDecls
+              );
+
+          # Merge bridge-extracted sidecars into the sidecar results
+          bridgeSidecars =
+            if mixinResult != null then
+              lib.mapAttrs (name: stacks:
+                let merge = inferMerge name allSidecars.${name};
+                in builtins.foldl' merge (extractedSidecars.${name} or allSidecars.${name}.default) stacks
+              ) (lib.filterAttrs (n: _: allSidecars ? ${n}) mixinResult.sidecars)
+            else
+              { };
+
+          finalSidecars = extractedSidecars // bridgeSidecars;
+
           # Inject baseModule + methods module (methods is the only sidecar
           # that generates instance-level options via mkMethodsModule)
           injected =
-            lib.optional (baseModule != null) {
+            lib.optional (effectiveBase != null) {
               file = "gen-schema/base";
-              value = if builtins.isFunction baseModule then baseModule kind else baseModule;
+              value = effectiveBase;
             }
-            ++ lib.optional (extractedSidecars.methods != { }) {
+            ++ lib.optional (finalSidecars.methods != { }) {
               file = "gen-schema/methods";
-              value = mkMethodsModule kind extractedSidecars.methods;
+              value = mkMethodsModule kind finalSidecars.methods;
             };
 
           merged = base.merge loc (strippedDefs ++ injected);
@@ -128,8 +193,9 @@ let
               imports = [ merged ];
             };
           inherit kind mixins;
+          refinements = extractedRefinements;
         }
-        // extractedSidecars
+        // finalSidecars
         // computedFields;
     };
 
