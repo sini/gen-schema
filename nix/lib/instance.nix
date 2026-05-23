@@ -231,6 +231,8 @@ let
             # binding.instances = config.traits (the post-apply value).
             # The custom coerce hook receives `registry` as first arg when deferred,
             # so it can resolve against raw instances instead of capturing config.X.
+            assert (builtins.isAttrs binding && binding ? instances)
+              || throw "gen-schema: deferred ref binding for '${field}' on kind '${kind}' requires 'instances' (got: ${builtins.toJSON (builtins.attrNames binding)})";
             {
               inherit isDeferred;
               rawCustomCoerce = norm.customCoerce;

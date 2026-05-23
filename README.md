@@ -499,6 +499,29 @@ options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
 
 `default` is a lazy thunk of the standard coercion result — only forced if you select it. In `listOf` context, `default` is a single-element list and the hook can return multiple instances (1→many expansion).
 
+### Deferred Coerce (Self-Referential Registries)
+
+When a registry's ref field points back to itself (e.g., a trait's `needs` referencing other traits in the same registry), standard coerce hooks cause infinite recursion — the coerce chain accesses the registry, which triggers `apply`, which runs the coerce chain again.
+
+Set `deferred = true` to defer coercion to the `applyPipeline` (after all instances are evaluated). The coerce hook receives the raw materialized instances as its first argument, breaking the cycle:
+
+```nix
+options.traits = schemaLib.mkInstanceRegistry config.schema "trait" {
+  refs.needs = {
+    instances = config.traits;
+    deferred = true;
+    # 3-arg signature: registry is the raw instances (not config.traits)
+    coerce = registry: default: val:
+      if isSelector val then resolveAgainst registry val
+      else default;
+  };
+};
+```
+
+**Signature difference:** Non-deferred hooks take 2 args (`default: val:`). Deferred hooks take 3 args (`registry: default: val:`), where `registry` is the pre-apply instance attrset. gen-schema pre-applies the registry, so `mkCoerceChain` sees a standard 2-arg function internally.
+
+Deferred coerce runs before validators in `applyPipeline`, so validators see resolved instances and can check properties like `.name` on referenced entries.
+
 ### Deduplicated Sets
 
 `setOf` deduplicates by `id_hash`, preserving first-seen order:
@@ -906,18 +929,27 @@ Returns `lib.mkOption` with `type = attrsOf (mkInstanceType ...)` and an `apply`
 
 `derive` and `deriveEither` are mutually exclusive.
 
-`refs` binds deferred `ref` fields to concrete registries. Two forms:
+`refs` binds deferred `ref` fields to concrete registries. Three forms:
 
 ```nix
 # Simple — registry directly:
 refs.host = config.fleet.hosts;
 
-# Extended — with custom coercion:
+# Extended — with custom coercion (2-arg):
 refs.host = {
   instances = config.fleet.hosts;
   coerce = default: val: ...;  # default is lazy thunk of standard result
 };
+
+# Deferred — for self-referential registries (3-arg):
+refs.needs = {
+  instances = config.traits;
+  deferred = true;
+  coerce = registry: default: val: ...;  # registry = raw pre-apply instances
+};
 ```
+
+`deferred = true` runs coercion inside `applyPipeline` (after instances are materialized) instead of at option-apply time. The custom hook receives the raw instances as `registry` — use this instead of capturing the config value in the closure. Required when the ref field points back to the same registry being defined.
 
 ### `ref`
 
