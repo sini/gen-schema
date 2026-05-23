@@ -51,6 +51,10 @@ let
           }
           mixins;
 
+      # composeMixins [a b c] = c ⋆ (b ⋆ a) via foldl': last-listed provides base,
+      # first-listed runs last and has highest priority (wins on conflict).
+      # This means: list order = priority order (first wins), and later mixins
+      # can access earlier mixins' output via the ⊕ in Bracha's formula.
       composedDelta = builtins.foldl' (acc: m: record.compose m.delta acc) (p: p) mixins;
     in
     {
@@ -74,7 +78,13 @@ let
           null;
       structCheck = record.assertSatisfies kindRecord mixin.requires;
     in
-    builtins.seq kindCheck (builtins.seq structCheck (record.mixin mixin.delta kindRecord));
+    builtins.seq kindCheck (builtins.seq structCheck (
+      if mixin.__direction == "beta"
+      # Beta: kind (parent) controls — kind fields take precedence over mixin's
+      then record.combine kindRecord (mixin.delta kindRecord)
+      # Smalltalk: mixin (child) wins — mixin fields override kind's
+      else record.mixin mixin.delta kindRecord
+    ));
 in
 {
   inherit

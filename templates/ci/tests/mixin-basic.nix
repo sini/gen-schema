@@ -138,4 +138,34 @@ in
       R.has (applyMixin m base "service") "status";
     expected = true;
   };
+
+  # Beta direction: kind's existing field wins over mixin's
+  mixin-basic.test-beta-kind-wins-on-conflict = {
+    expr =
+      let
+        base = R.fromAttrs { port = 8080; display = "base-display"; };
+        m = beta (mkMixin {
+          requires = [ "port" ];
+          provides = [ "display" ];
+          define = _: { display = "mixin-display"; };
+        });
+      in
+      R.select (applyMixin m base "service") "display";
+    expected = "base-display";  # Beta: kind (parent) wins
+  };
+
+  # Smalltalk direction: mixin's field wins over kind's
+  mixin-basic.test-smalltalk-mixin-wins-on-conflict = {
+    expr =
+      let
+        base = R.fromAttrs { port = 8080; display = "base-display"; };
+        m = mkMixin {
+          requires = [ "port" ];
+          provides = [ "display" ];
+          define = _: { display = "mixin-display"; };
+        };
+      in
+      R.select (applyMixin m base "service") "display";
+    expected = "mixin-display";  # Smalltalk: mixin (child) wins
+  };
 }

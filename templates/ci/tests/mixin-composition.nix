@@ -100,4 +100,28 @@ in
       R.select (applyMixin composed base "service") "metrics_port";
     expected = 4000;
   };
+
+  # Shadowing order: composeMixins [a b] = b ⋆ a (via foldl').
+  # Later mixins in the list have HIGHER priority (run last in Bracha's formula).
+  # Earlier mixins run first and PROVIDE base values.
+  # This matches the requires/provides dependency flow: earlier provides, later consumes + overrides.
+  mixin-composition.test-compose-shadowing-order = {
+    expr =
+      let
+        first = mkMixin {
+          provides = [ "status" ];
+          name = "first";
+          define = _: { status = "from-first"; };
+        };
+        second = mkMixin {
+          provides = [ "status" ];
+          name = "second";
+          define = _: { status = "from-second"; };
+        };
+        composed = composeMixins [ first second ];
+        base = R.empty;
+      in
+      R.select (applyMixin composed base "test") "status";
+    expected = "from-second";  # last listed mixin wins (has priority), first provides base
+  };
 }
