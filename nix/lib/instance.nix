@@ -15,6 +15,7 @@
   defaultOnError,
   refsFromOptionsWithTypes,
   dedupByHash,
+  filterValidators,
 }:
 let
   mkInstanceType =
@@ -231,7 +232,8 @@ let
             # binding.instances = config.traits (the post-apply value).
             # The custom coerce hook receives `registry` as first arg when deferred,
             # so it can resolve against raw instances instead of capturing config.X.
-            assert (builtins.isAttrs binding && binding ? instances)
+            assert
+              (builtins.isAttrs binding && binding ? instances)
               || throw "gen-schema: deferred ref binding for '${field}' on kind '${kind}' requires 'instances' (got: ${builtins.toJSON (builtins.attrNames binding)})";
             {
               inherit isDeferred;
@@ -334,7 +336,18 @@ let
             else
               builtins.length refResult.modules; # forces builtins.seq inside mkRefBindingModules
 
-          validators = builtins.seq refValidation (schema.${kind}.validators or [ ]);
+          validators = builtins.seq refValidation (
+            let
+              raw = schema.${kind}.validators or [ ];
+              # Derive option names from any instance — all share the same kind schema.
+              optionNames =
+                if instances == { } then
+                  [ ]
+                else
+                  builtins.attrNames (builtins.head (builtins.attrValues instances));
+            in
+            filterValidators optionNames raw
+          );
 
           # Deferred coerce: rebuild coerce chains using raw instances as registry.
           # This breaks self-referential cycles: the coerce hook accesses `instances`
@@ -359,11 +372,7 @@ let
                     # Wrap custom coerce to inject registry as first arg when deferred:
                     # consumer writes: coerce = registry: default: val: ...
                     # gen-schema calls: wrappedCoerce default val (pre-applies registry)
-                    wrappedCoerce =
-                      if binding.rawCustomCoerce != null then
-                        binding.rawCustomCoerce instances
-                      else
-                        null;
+                    wrappedCoerce = if binding.rawCustomCoerce != null then binding.rawCustomCoerce instances else null;
                     coerceChain = mkCoerceChain field kind instances wrappedCoerce binding.type;
                     rawValue = inst.${field} or null;
                   in

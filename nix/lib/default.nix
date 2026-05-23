@@ -32,6 +32,7 @@ let
       defaultOnError
       ;
     inherit (refLib) refsFromOptionsWithTypes dedupByHash;
+    inherit (validate) filterValidators;
   };
   docs = import ./docs.nix { inherit lib; };
   scopeGraph = import ./scope-graph.nix { inherit lib; };
@@ -42,7 +43,7 @@ in
   inherit (methods) schemaFn;
   inherit (entryType) mkSchemaOption mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;
-  inherit (validate) validateInstances;
+  inherit (validate) validateInstances mkFieldValidator filterValidators;
   inherit (refLib) ref setOf toSet;
   inherit (docs) renderDocs;
   inherit (scopeGraph) buildKindGraph buildInstanceGraph;
