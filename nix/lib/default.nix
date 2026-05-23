@@ -37,7 +37,8 @@ let
   scopeGraph = import ./scope-graph.nix { inherit lib; };
 in
 {
-  # gen-schema's own exports only — no gen re-exports
+  # gen-schema's own exports + validator constructor from gen
+  inherit (gen) mkValidator;
   inherit (methods) schemaFn;
   inherit (entryType) mkSchemaOption mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;
