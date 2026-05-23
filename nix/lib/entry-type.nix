@@ -11,6 +11,9 @@
   lib,
   mkMethodsModule,
   refsFromOptions,
+  record,
+  applyMixin,
+  emitModule,
 }:
 let
   mkSchemaEntryType =
@@ -18,6 +21,7 @@ let
       baseModule ? null,
       sidecars ? { },
       computed ? null,
+      mixins ? [ ],
     }:
     let
       base = lib.types.deferredModule;
@@ -123,7 +127,7 @@ let
             {
               imports = [ merged ];
             };
-          inherit kind;
+          inherit kind mixins;
         }
         // extractedSidecars
         // computedFields;
@@ -135,6 +139,7 @@ let
       baseModule ? null,
       sidecars ? { },
       computed ? null,
+      mixins ? [ ],
     }:
     lib.mkOption {
       description = "Schema — typed record registry with extension points";
@@ -143,7 +148,12 @@ let
         { config, ... }:
         {
           freeformType = lib.types.lazyAttrsOf (mkSchemaEntryType {
-            inherit baseModule sidecars computed;
+            inherit
+              baseModule
+              sidecars
+              computed
+              mixins
+              ;
           });
 
           # Schema-level strict setting — stored for mkInstanceType to read

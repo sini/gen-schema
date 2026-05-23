@@ -11,18 +11,27 @@ let
     sha256 = locked.narHash;
   };
   gen = inputs.gen or (import genSrc { inherit lib; });
+  record = gen.pure.record;
 
   methods = import ./methods.nix { inherit lib; };
-  entryType = import ./entry-type.nix {
-    inherit lib;
-    inherit (methods) mkMethodsModule;
-    inherit (refLib) refsFromOptions;
-  };
   validate = import ./validate.nix { inherit lib gen; };
   refinedLib = import ./refined.nix { inherit lib; };
+  blameLib = import ./blame.nix { inherit lib; };
+  mixinLib = import ./mixin.nix { inherit lib record; };
+  bridgeLib = import ./bridge.nix {
+    inherit lib record;
+    inherit (refinedLib) isRefined getRefinements;
+  };
   refLib = import ./ref.nix {
     inherit lib;
     inherit (gen) mkRefType;
+  };
+  entryType = import ./entry-type.nix {
+    inherit lib record;
+    inherit (methods) mkMethodsModule;
+    inherit (refLib) refsFromOptions;
+    inherit (mixinLib) applyMixin;
+    inherit (bridgeLib) emitModule;
   };
   instance = import ./instance.nix {
     inherit lib;
@@ -47,6 +56,16 @@ in
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (validate) validateInstances mkFieldValidator filterValidators;
   inherit (refLib) ref setOf toSet;
+  inherit (refinedLib) refinements;
+  inherit (refinedLib.types) refined;
+  inherit (blameLib) blame;
+  inherit (mixinLib)
+    mkMixin
+    composeMixins
+    beta
+    applyMixin
+    ;
+  inherit (bridgeLib) emitModule;
   inherit (docs) renderDocs;
   inherit (scopeGraph) buildKindGraph buildInstanceGraph;
 
