@@ -894,7 +894,7 @@ Returns `lib.types.submodule` — the type for a single instance of a kind.
 ```nix
 mkInstanceRegistry schema kind {
   extraModules ? [],
-  refs ? {},             # { fieldName = registry; } — bindings for deferred refs
+  refs ? {},             # bindings for deferred refs (see below)
   strict ? schema._strict or true,
   description ? "${kind} instances",
   derive ? null,         # { name → instance } → { name → attrset } — plain enrichment
@@ -904,7 +904,20 @@ mkInstanceRegistry schema kind {
 
 Returns `lib.mkOption` with `type = attrsOf (mkInstanceType ...)` and an `apply` pipeline that runs validators then derive.
 
-`derive` and `deriveEither` are mutually exclusive. `refs` binds deferred `ref` fields to concrete registries.
+`derive` and `deriveEither` are mutually exclusive.
+
+`refs` binds deferred `ref` fields to concrete registries. Two forms:
+
+```nix
+# Simple — registry directly:
+refs.host = config.fleet.hosts;
+
+# Extended — with custom coercion:
+refs.host = {
+  instances = config.fleet.hosts;
+  coerce = default: val: ...;  # default is lazy thunk of standard result
+};
+```
 
 ### `ref`
 
@@ -913,6 +926,30 @@ ref target
 ```
 
 `target` is a string → deferred ref (kind name, bound via `refs` on `mkInstanceRegistry`). `target` is an attrset → direct ref (resolved immediately). Both modes accept string keys or instance values.
+
+### `setOf`
+
+```nix
+setOf elemType
+```
+
+A list type that deduplicates by `id_hash`, preserving first-seen order. Only meaningful with `ref` element types — `setOf` requires instance refs. Composes with custom coerce hooks: expansion produces duplicates, `setOf` removes them. Uses `nestedTypes.elemType` so `getRefKind` traverses through it like `listOf`.
+
+### `toSet`
+
+```nix
+toSet instances
+```
+
+Converts a list of instances to a set with O(1) membership lookup via attrset backing. Deduplicates by `id_hash` (first-seen wins), so safe to call on any instance list. Returns:
+
+```nix
+{
+  member = x: ...;  # O(1) membership test (à la Data.Set.member)
+  toList = [ ... ];  # deduplicated list, first-seen order
+  length = n;        # number of unique instances
+}
+```
 
 ### `schemaFn`
 
