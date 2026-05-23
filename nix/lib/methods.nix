@@ -24,7 +24,7 @@ let
           missingArgs = lib.filter (n: !(config ? ${n})) argNames;
         in
         if missingArgs != [ ] then
-          throw "method '${name}' on ${kind}: references config keys ${
+          throw "gen-schema: method '${name}' on ${kind}: references config keys ${
             lib.concatMapStringsSep ", " (a: "'${a}'") missingArgs
           } which are not declared on this kind"
         else

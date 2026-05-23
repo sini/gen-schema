@@ -1,20 +1,5 @@
 {
   "nodes": {
-    "gen": {
-      "locked": {
-        "lastModified": 1779298945,
-        "narHash": "sha256-zAUTOrVhtMIY69QVTpSyj6/S/qdLzNf3CRmG8vWZh7c=",
-        "owner": "sini",
-        "repo": "gen",
-        "rev": "193ca974e1b9488734a55cefd35dd155050f9062",
-        "type": "github"
-      },
-      "original": {
-        "owner": "sini",
-        "repo": "gen",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1778869304,
@@ -33,7 +18,6 @@
     },
     "root": {
       "inputs": {
-        "gen": "gen",
         "nixpkgs": "nixpkgs"
       }
     }

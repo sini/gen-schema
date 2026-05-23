@@ -96,19 +96,17 @@ let
             parentName:
             let
               parentInstance = (fleet.${parentKind} or { }).${parentName} or null;
-              # If parent instance has nested children of this kind, extract them.
-              childInstances = builtins.attrNames (
-                if parentInstance != null && parentInstance ? ${childKind} then
-                  parentInstance.${childKind}
-                else
-                  # Fallback: check if fleet has this kind at top level
-                  fleet.${childKind} or { }
-              );
             in
-            map (childName: {
-              from = "${childKind}:${childName}";
-              to = "${parentKind}:${parentName}";
-            }) childInstances
+            # Only emit parent edges when children are actually nested inside the
+            # parent instance. For flat registries (no nesting), omit parent edges
+            # — consumers can provide explicit mappings via parentResolver.
+            if parentInstance != null && parentInstance ? ${childKind} then
+              map (childName: {
+                from = "${childKind}:${childName}";
+                to = "${parentKind}:${parentName}";
+              }) (builtins.attrNames parentInstance.${childKind})
+            else
+              [ ]
           ) (builtins.attrNames (fleet.${parentKind} or { }))
       ) kindNames;
 

@@ -1,6 +1,6 @@
 { lib }:
 let
-  escapeMd = s: builtins.replaceStrings [ "|" ] [ "\\|" ] s;
+  escapeMd = s: builtins.replaceStrings [ "|" "`" "[" "]" "*" ] [ "\\|" "\\`" "\\[" "\\]" "\\*" ] s;
 in
 {
   renderDocs =

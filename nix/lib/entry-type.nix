@@ -34,15 +34,20 @@ let
             };
             parent = {
               default = null;
-              merge = _acc: val: val;
+              merge =
+                acc: val:
+                if acc != null && val != acc then
+                  throw "gen-schema: conflicting parent declarations: '${acc}' vs '${val}'"
+                else
+                  val;
             };
           }
           // sidecars;
         in
         if merged ? __functor then
-          throw "sidecar '__functor' is reserved — cannot be used as a sidecar key"
+          throw "gen-schema: sidecar '__functor' is reserved — cannot be used as a sidecar key"
         else if merged ? kind then
-          throw "sidecar 'kind' is reserved — cannot be used as a sidecar key"
+          throw "gen-schema: sidecar 'kind' is reserved — cannot be used as a sidecar key"
         else
           merged;
 
@@ -56,7 +61,7 @@ let
         else if builtins.isAttrs sidecar.default then
           (acc: val: acc // val)
         else
-          throw "sidecar '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
+          throw "gen-schema: sidecar '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
 
       sidecarKeys = lib.attrNames allSidecars;
     in
@@ -186,41 +191,53 @@ let
             let
               kindNames = lib.sort (a: b: a < b) (lib.filter (n: !(lib.hasPrefix "_" n)) (lib.attrNames config));
 
+              # Memoized as attrset — each kind's evalModules runs at most once.
               kindMeta =
+                let
+                  memo = lib.genAttrs kindNames (
+                    k:
+                    let
+                      dummy = lib.evalModules { modules = [ config.${k} ]; };
+                    in
+                    {
+                      optionNames = lib.attrNames dummy.options;
+                      inherit (dummy) options;
+                      refs = refsFromOptions dummy.options;
+                    }
+                  );
+                in
                 k:
-                if !(config ? ${k}) then
-                  throw "kindMeta: '${k}' is not a declared schema kind"
+                if memo ? ${k} then
+                  memo.${k}
                 else
-                  let
-                    dummy = lib.evalModules { modules = [ config.${k} ]; };
-                  in
-                  {
-                    optionNames = lib.attrNames dummy.options;
-                    inherit (dummy) options;
-                    refs = refsFromOptions dummy.options;
-                  };
+                  throw "gen-schema: kindMeta: '${k}' is not a declared schema kind";
 
               # Derive topology from parent sidecars on each kind.
               # Each kind can declare `parent = "host";` as a sidecar.
               topology =
                 let
                   # Read parent sidecar from each kind
-                  parentMap = lib.foldl' (acc: k:
-                    let p = config.${k}.parent or null;
-                    in if p != null then
+                  parentMap = lib.foldl' (
+                    acc: k:
+                    let
+                      p = config.${k}.parent or null;
+                    in
+                    if p != null then
                       if !(builtins.elem p kindNames) then
                         throw "gen-schema: kind '${k}' declares parent '${p}' which is not a declared kind"
                       else
                         acc // { ${k} = p; }
-                    else acc
+                    else
+                      acc
                   ) { } kindNames;
 
                   # Derive children from parent map (inverse)
-                  childrenMap = lib.foldl' (acc: k:
-                    let p = parentMap.${k} or null;
-                    in if p != null then
-                      acc // { ${p} = (acc.${p} or [ ]) ++ [ k ]; }
-                    else acc
+                  childrenMap = lib.foldl' (
+                    acc: k:
+                    let
+                      p = parentMap.${k} or null;
+                    in
+                    if p != null then acc // { ${p} = (acc.${p} or [ ]) ++ [ k ]; } else acc
                   ) { } kindNames;
                 in
                 lib.genAttrs kindNames (k: {
