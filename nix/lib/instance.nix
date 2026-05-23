@@ -16,6 +16,7 @@
   refsFromOptionsWithTypes,
   dedupByHash,
   filterValidators,
+  checkRefinements,
 }:
 let
   mkInstanceType =
@@ -271,6 +272,7 @@ let
     {
       extraModules ? [ ],
       refs ? { },
+      refinements ? { },
       strict ? schema._strict or true,
       description ? "${kind} instances",
       derive ? null,
@@ -380,25 +382,85 @@ let
                 ) instance deferredFields
               ) instances;
 
-          # Validators run on coerced instances — deferred ref fields are resolved,
+          # Refinement pass: strict refinements throw immediately, lazy refinements
+          # wrap values with addErrorContext for deferred checking at access time.
+          refinementChecked =
+            if refinements == { } then
+              coerced
+            else
+              lib.mapAttrs (
+                instanceName: instance:
+                builtins.foldl' (
+                  inst: fieldName:
+                  let
+                    refs' = refinements.${fieldName};
+                    value = inst.${fieldName} or null;
+                  in
+                  if value == null then
+                    inst
+                  else
+                    let
+                      failures = builtins.concatMap (
+                        r:
+                        if r.check value then
+                          [ ]
+                        else
+                          [
+                            {
+                              inherit (r) message;
+                              lazy = r.lazy or false;
+                              field = "${kind}:${instanceName}.${fieldName}";
+                              inherit value;
+                            }
+                          ]
+                      ) refs';
+                      strictFailures = builtins.filter (f: !f.lazy) failures;
+                      lazyRefs = builtins.filter (r: r.lazy or false) refs';
+                    in
+                    if strictFailures != [ ] then
+                      let
+                        f = builtins.head strictFailures;
+                      in
+                      throw "gen-schema: refinement failed at ${f.field}\n  check: \"${f.message}\"\n  value: ${builtins.toJSON f.value}"
+                    else if lazyRefs != [ ] then
+                      let
+                        wrapped = builtins.foldl' (
+                          v: r:
+                          builtins.addErrorContext
+                            "gen-schema: lazy contract at ${kind}:${instanceName}.${fieldName}: \"${r.message}\""
+                            (
+                              if r.check v then
+                                v
+                              else
+                                throw "gen-schema: lazy contract violated at ${kind}:${instanceName}.${fieldName}: ${r.message}"
+                            )
+                        ) value lazyRefs;
+                      in
+                      inst // { ${fieldName} = wrapped; }
+                    else
+                      inst
+                ) instance (builtins.attrNames refinements)
+              ) coerced;
+
+          # Validators run on refinement-checked instances — deferred ref fields are resolved,
           # so validators can inspect .name, .id_hash etc. on referenced instances.
           vResult =
             if validators == [ ] then
               null
             else
               let
-                r = runValidators kind validators coerced;
+                r = runValidators kind validators refinementChecked;
               in
               if r ? right then null else r.left;
 
           validated =
             if vResult == null then
-              coerced
+              refinementChecked
             else
               let
                 recovery = onError vResult;
               in
-              lib.mapAttrs (name: instance: instance // (recovery.${name} or { })) coerced;
+              lib.mapAttrs (name: instance: instance // (recovery.${name} or { })) refinementChecked;
 
           derived = if deriveFn == null then { } else deriveFn validated;
 

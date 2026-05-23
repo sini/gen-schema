@@ -19,6 +19,7 @@ let
     inherit (refLib) refsFromOptions;
   };
   validate = import ./validate.nix { inherit lib gen; };
+  refinedLib = import ./refined.nix { inherit lib; };
   refLib = import ./ref.nix {
     inherit lib;
     inherit (gen) mkRefType;
@@ -33,6 +34,7 @@ let
       ;
     inherit (refLib) refsFromOptionsWithTypes dedupByHash;
     inherit (validate) filterValidators;
+    inherit (refinedLib) checkRefinements;
   };
   docs = import ./docs.nix { inherit lib; };
   scopeGraph = import ./scope-graph.nix { inherit lib; };
