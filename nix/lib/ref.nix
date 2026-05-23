@@ -66,7 +66,11 @@ let
         else
           let
             h = builtins.head xs;
-            k = h.id_hash;
+            k =
+              if builtins.isAttrs h && h ? id_hash then
+                h.id_hash
+              else
+                throw "dedupByHash: element missing id_hash — expected an instance";
             t = builtins.tail xs;
           in
           if seen ? ${k} then step seen t else [ h ] ++ step (seen // { ${k} = true; }) t;
@@ -103,6 +107,9 @@ in
   # nestedTypes.elemType is set so getRefKind traverses through setOf like listOf.
   setOf =
     elemType:
+    assert
+      (getRefKind elemType != null)
+      || throw "setOf: element type must be a ref type (e.g., setOf (ref \"host\")), got ${elemType.name or "unknown"}";
     let
       listType = lib.types.listOf elemType;
     in
@@ -132,7 +139,12 @@ in
       );
     in
     {
-      member = x: byHash ? ${x.id_hash}; # à la Data.Set.member
+      member = # à la Data.Set.member
+        x:
+        if !(builtins.isAttrs x && x ? id_hash) then
+          throw "toSet.member: expected an instance (with id_hash)"
+        else
+          byHash ? ${x.id_hash};
       toList = deduped;
       length = builtins.length deduped;
     };
