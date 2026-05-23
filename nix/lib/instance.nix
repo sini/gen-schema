@@ -175,6 +175,10 @@ let
     go type;
 
   # Build extra modules that override deferred ref fields with resolved types.
+  # Returns { modules; deferredCoerce; } — immediate modules get the apply-time
+  # coerce chain, deferred bindings (deferred = true) skip option-level apply and
+  # run their coerce in applyPipeline instead. This avoids infinite recursion when
+  # a registry's ref field points back to itself with a custom coerce hook.
   mkRefBindingModules =
     kind: refs: refFields:
     let
@@ -198,33 +202,49 @@ let
           throw "mkInstanceRegistry: refs.${extra} does not match any ref field on kind '${kind}'"
         else
           null;
-    in
-    builtins.seq _ (
-      lib.mapAttrsToList (
-        field: binding:
-        let
-          norm =
-            if builtins.isAttrs binding && binding ? coerce then
-              {
-                registry = binding.instances;
-                customCoerce = binding.coerce;
-              }
-            else
-              {
-                registry = binding;
-                customCoerce = null;
-              };
-          fieldInfo = refFields.${field};
-          coerceChain = mkCoerceChain field kind norm.registry norm.customCoerce fieldInfo.type;
-        in
+
+      bindings = builtins.seq _ (
+        lib.mapAttrs (
+          field: binding:
+          let
+            isDeferred = builtins.isAttrs binding && (binding.deferred or false);
+            norm =
+              if builtins.isAttrs binding && binding ? coerce then
+                {
+                  registry = binding.instances;
+                  customCoerce = binding.coerce;
+                }
+              else
+                {
+                  registry = binding;
+                  customCoerce = null;
+                };
+            fieldInfo = refFields.${field};
+            coerceChain = mkCoerceChain field kind norm.registry norm.customCoerce fieldInfo.type;
+          in
+          {
+            inherit isDeferred coerceChain;
+          }
+        ) refs
+      );
+
+      immediateBindings = lib.filterAttrs (_: b: !b.isDeferred) bindings;
+      deferredBindings = lib.filterAttrs (_: b: b.isDeferred) bindings;
+
+      immediateModules = lib.mapAttrsToList (
+        field: b:
         { ... }:
         {
           options.${field} = lib.mkOption {
-            apply = coerceChain;
+            apply = b.coerceChain;
           };
         }
-      ) refs
-    );
+      ) immediateBindings;
+    in
+    {
+      modules = immediateModules;
+      deferredCoerce = deferredBindings;
+    };
 
   mkInstanceRegistry =
     schema: kind:
@@ -245,8 +265,15 @@ let
       # time (circular), so only call it when refs are provided.  Binding validation for the
       # missing-refs case is deferred to applyPipeline where schema access is safe.
       refFields = if refs == { } then { } else findRefFields schema kind;
-      refModules = if refs == { } then [ ] else mkRefBindingModules kind refs refFields;
-      allExtraModules = extraModules ++ refModules;
+      refResult =
+        if refs == { } then
+          {
+            modules = [ ];
+            deferredCoerce = { };
+          }
+        else
+          mkRefBindingModules kind refs refFields;
+      allExtraModules = extraModules ++ refResult.modules;
 
       onError = if deriveEither != null then deriveEither.onError or defaultOnError else defaultOnError;
 
@@ -287,7 +314,7 @@ let
               in
               throw "mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
             else
-              builtins.length refModules; # forces builtins.seq inside mkRefBindingModules
+              builtins.length refResult.modules; # forces builtins.seq inside mkRefBindingModules
 
           validators = builtins.seq refValidation (schema.${kind}.validators or [ ]);
 
@@ -312,12 +339,33 @@ let
               in
               lib.mapAttrs (name: instance: instance // (recovery.${name} or { })) instances;
 
-          derived = if deriveFn == null then { } else deriveFn validated;
+          # Deferred coerce: apply coerce chains that were skipped at option-level apply.
+          # Runs after instances are fully materialized, safe for self-referential registries.
+          coerced =
+            if refResult.deferredCoerce == { } then
+              validated
+            else
+              let
+                deferredFields = builtins.attrNames refResult.deferredCoerce;
+              in
+              lib.mapAttrs (
+                _name: instance:
+                builtins.foldl' (
+                  inst: field:
+                  let
+                    binding = refResult.deferredCoerce.${field};
+                    rawValue = inst.${field} or null;
+                  in
+                  inst // { ${field} = binding.coerceChain rawValue; }
+                ) instance deferredFields
+              ) validated;
+
+          derived = if deriveFn == null then { } else deriveFn coerced;
         in
         if derived == { } then
-          validated
+          coerced
         else
-          lib.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
+          lib.mapAttrs (name: instance: instance // (derived.${name} or { })) coerced;
     in
     lib.mkOption {
       inherit description;
