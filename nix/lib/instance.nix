@@ -62,6 +62,12 @@ let
     in
     refsFromOptionsWithTypes evaled.options;
 
+  # Type-tree predicates for coercion chain dispatch.
+  isRefLeaf = t: (t.refKind or null) != null;
+  elemTypeOf = t: (t.nestedTypes or { }).elemType or null;
+  isNullOr = t: (t.name or "") == "nullOr";
+  isSetOf = t: t.isSetOf or false;
+
   # Build a coercion function matching the nesting structure of a ref type.
   # Walks the type tree at binding time so the runtime dispatch is exact.
   # Supports optional custom coerce hooks for domain-specific resolution.
@@ -74,7 +80,7 @@ let
         if builtins.isAttrs v && v ? name && v ? id_hash then
           v
         else
-          throw "ref field '${field}' on kind '${kind}': expected an instance (with name and id_hash), got ${builtins.typeOf v}";
+          throw "gen-schema: ref field '${field}' on kind '${kind}': expected an instance (with name and id_hash), got ${builtins.typeOf v}";
 
       defaultCoerce =
         v:
@@ -82,7 +88,7 @@ let
           if registry ? ${v} then
             registry.${v}
           else
-            throw "ref field '${field}' on kind '${kind}': reference '${v}' not found in instance registry (available: ${builtins.concatStringsSep ", " (builtins.attrNames registry)})"
+            throw "gen-schema: ref field '${field}' on kind '${kind}': reference '${v}' not found in instance registry (available: ${builtins.concatStringsSep ", " (builtins.attrNames registry)})"
         else
           assertInstance v;
 
@@ -97,7 +103,7 @@ let
             result = customCoerce (defaultCoerce v) v;
           in
           if builtins.isList result then
-            throw "ref field '${field}' on kind '${kind}': custom coerce returned a list in scalar context (use listOf ref for 1-to-many expansion)"
+            throw "gen-schema: ref field '${field}' on kind '${kind}': custom coerce returned a list in scalar context (use listOf ref for 1-to-many expansion)"
           else
             result;
 
@@ -114,16 +120,15 @@ let
           if builtins.isList result then
             result
           else
-            throw "ref field '${field}' on kind '${kind}': custom coerce must return a list in listOf/setOf context";
+            throw "gen-schema: ref field '${field}' on kind '${kind}': custom coerce must return a list in listOf/setOf context";
 
       go =
         t:
-        if (t.refKind or null) != null then
+        if isRefLeaf t then
           mkLeafCoerce
         else
           let
-            et = (t.nestedTypes or { }).elemType or null;
-            name = t.name or "";
+            et = elemTypeOf t;
           in
           if et == null then
             mkLeafCoerce
@@ -131,10 +136,9 @@ let
             let
               inner = go et;
             in
-            if name == "nullOr" then
+            if isNullOr t then
               v: if v == null then null else inner v
-            else if t.isSetOf or false then
-              # setOf: coerce + expand via concatMap, then deduplicate by id_hash
+            else if isSetOf t then
               let
                 listInner = goList et;
               in
@@ -149,12 +153,11 @@ let
       # List-context walker: produces a list per element for concatMap.
       goList =
         t:
-        if (t.refKind or null) != null then
+        if isRefLeaf t then
           mkListCoerce
         else
           let
-            et = (t.nestedTypes or { }).elemType or null;
-            name = t.name or "";
+            et = elemTypeOf t;
           in
           if et == null then
             v: [ (mkLeafCoerce v) ]
@@ -162,9 +165,9 @@ let
             let
               inner = go et;
             in
-            if name == "nullOr" then
+            if isNullOr t then
               v: [ (if v == null then null else inner v) ]
-            else if t.isSetOf or false then
+            else if isSetOf t then
               let
                 listInner = goList et;
               in
@@ -194,12 +197,12 @@ let
             missing = builtins.head (lib.attrNames missingBindings);
             targetKind = missingBindings.${missing}.refKind;
           in
-          throw "mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
+          throw "gen-schema: mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
         else if extraBindings != { } then
           let
             extra = builtins.head (lib.attrNames extraBindings);
           in
-          throw "mkInstanceRegistry: refs.${extra} does not match any ref field on kind '${kind}'"
+          throw "gen-schema: mkInstanceRegistry: refs.${extra} does not match any ref field on kind '${kind}'"
         else
           null;
 
@@ -258,7 +261,7 @@ let
     }:
     assert
       (derive == null || deriveEither == null)
-      || throw "mkInstanceRegistry: derive and deriveEither are mutually exclusive";
+      || throw "gen-schema: mkInstanceRegistry: derive and deriveEither are mutually exclusive";
     let
       # Resolve deferred refs: scan kind options, validate bindings, build override modules.
       # findRefFields evaluates schema.${kind}, which isn't available at option-declaration
@@ -312,38 +315,18 @@ let
                 missing = builtins.head (lib.attrNames missingBindings);
                 targetKind = missingBindings.${missing}.refKind;
               in
-              throw "mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
+              throw "gen-schema: mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
             else
               builtins.length refResult.modules; # forces builtins.seq inside mkRefBindingModules
 
           validators = builtins.seq refValidation (schema.${kind}.validators or [ ]);
 
-          # null = no validation errors (fast path when validators == []).
-          # This avoids constructing an Either when there are no validators,
-          # which is the common case for registries without validation.
-          vResult =
-            if validators == [ ] then
-              null
-            else
-              let
-                r = runValidators kind validators instances;
-              in
-              if r ? right then null else r.left;
-
-          validated =
-            if vResult == null then
-              instances
-            else
-              let
-                recovery = onError vResult;
-              in
-              lib.mapAttrs (name: instance: instance // (recovery.${name} or { })) instances;
-
           # Deferred coerce: apply coerce chains that were skipped at option-level apply.
-          # Runs after instances are fully materialized, safe for self-referential registries.
+          # Runs BEFORE validators so validators see resolved instances, not raw strings.
+          # Safe for self-referential registries (instances are fully materialized here).
           coerced =
             if refResult.deferredCoerce == { } then
-              validated
+              instances
             else
               let
                 deferredFields = builtins.attrNames refResult.deferredCoerce;
@@ -358,14 +341,39 @@ let
                   in
                   inst // { ${field} = binding.coerceChain rawValue; }
                 ) instance deferredFields
-              ) validated;
+              ) instances;
 
-          derived = if deriveFn == null then { } else deriveFn coerced;
+          # Validators run on coerced instances — deferred ref fields are resolved,
+          # so validators can inspect .name, .id_hash etc. on referenced instances.
+          vResult =
+            if validators == [ ] then
+              null
+            else
+              let
+                r = runValidators kind validators coerced;
+              in
+              if r ? right then null else r.left;
+
+          validated =
+            if vResult == null then
+              coerced
+            else
+              let
+                recovery = onError vResult;
+              in
+              lib.mapAttrs (name: instance: instance // (recovery.${name} or { })) coerced;
+
+          derived = if deriveFn == null then { } else deriveFn validated;
+
+          result =
+            if derived == { } then
+              validated
+            else
+              lib.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
         in
-        if derived == { } then
-          coerced
-        else
-          lib.mapAttrs (name: instance: instance // (derived.${name} or { })) coerced;
+        # Force refValidation explicitly — ensures missing-binding errors throw
+        # even when no validators or deferred coerce are present.
+        builtins.seq refValidation result;
     in
     lib.mkOption {
       inherit description;
