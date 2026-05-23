@@ -1,0 +1,141 @@
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
+let
+  R = genLib.record;
+  record = R;
+  mixinLib = import ../../../nix/lib/mixin.nix { inherit lib record; };
+  inherit (mixinLib)
+    mkMixin
+    beta
+    applyMixin
+    ;
+in
+{
+  mixin-basic.test-mkMixin-creates-mixin = {
+    expr =
+      (mkMixin {
+        requires = [ "port" ];
+        provides = [ "metrics_port" ];
+        define = parent: {
+          metrics_port = (R.select parent "port") + 1000;
+        };
+      }).__isMixin;
+    expected = true;
+  };
+
+  mixin-basic.test-mkMixin-default-direction = {
+    expr =
+      (mkMixin {
+        define = _: { };
+      }).__direction;
+    expected = "smalltalk";
+  };
+
+  mixin-basic.test-beta-changes-direction = {
+    expr =
+      (beta (mkMixin {
+        define = _: { };
+      })).__direction;
+    expected = "beta";
+  };
+
+  mixin-basic.test-apply-mixin-adds-fields = {
+    expr =
+      let
+        base = R.fromAttrs {
+          port = 8080;
+          hostname = "localhost";
+        };
+        m = mkMixin {
+          requires = [ "port" ];
+          provides = [ "metrics_port" ];
+          define = parent: {
+            metrics_port = (R.select parent "port") + 1000;
+          };
+        };
+      in
+      R.select (applyMixin m base "service") "metrics_port";
+    expected = 9080;
+  };
+
+  mixin-basic.test-apply-mixin-preserves-base = {
+    expr =
+      let
+        base = R.fromAttrs {
+          port = 8080;
+          hostname = "localhost";
+        };
+        m = mkMixin {
+          requires = [ "port" ];
+          provides = [ "metrics_port" ];
+          define = parent: {
+            metrics_port = (R.select parent "port") + 1000;
+          };
+        };
+      in
+      R.select (applyMixin m base "service") "hostname";
+    expected = "localhost";
+  };
+
+  mixin-basic.test-apply-mixin-structural-check-fails = {
+    expr = builtins.tryEval (
+      let
+        base = R.fromAttrs { hostname = "localhost"; };
+        m = mkMixin {
+          requires = [ "port" ];
+          define = _: { };
+        };
+      in
+      applyMixin m base "service"
+    );
+    expected = {
+      success = false;
+      value = false;
+    };
+  };
+
+  mixin-basic.test-apply-mixin-kind-constraint-fails = {
+    expr = builtins.tryEval (
+      let
+        base = R.fromAttrs { port = 8080; };
+        m = mkMixin {
+          requires = [ "port" ];
+          kinds = [
+            "service"
+            "gateway"
+          ];
+          define = _: { };
+        };
+      in
+      applyMixin m base "database"
+    );
+    expected = {
+      success = false;
+      value = false;
+    };
+  };
+
+  mixin-basic.test-apply-mixin-kind-constraint-passes = {
+    expr =
+      let
+        base = R.fromAttrs { port = 8080; };
+        m = mkMixin {
+          requires = [ "port" ];
+          kinds = [
+            "service"
+            "gateway"
+          ];
+          provides = [ "status" ];
+          define = _: {
+            status = "ok";
+          };
+        };
+      in
+      R.has (applyMixin m base "service") "status";
+    expected = true;
+  };
+}
