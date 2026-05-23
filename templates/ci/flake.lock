@@ -1,40 +1,6 @@
 {
   "nodes": {
-    "gen-schema": {
-      "inputs": {
-        "gen": "gen",
-        "nixpkgs": "nixpkgs"
-      },
-      "locked": {
-        "dirtyRev": "d233ca618fe3e2cd0674a027d1f3e8f1e0965fcb-dirty",
-        "dirtyShortRev": "d233ca6-dirty",
-        "lastModified": 1778719748,
-        "narHash": "sha256-N6huW6Uyei7E+h77yoZ+XvmDXj39XQRhPpooTZDSQ+Q=",
-        "type": "git",
-        "url": "file:///home/sini/Documents/repos/gen-schema"
-      },
-      "original": {
-        "owner": "denful",
-        "repo": "gen-schema",
-        "type": "github"
-      }
-    },
     "gen": {
-      "locked": {
-        "lastModified": 1779298945,
-        "narHash": "sha256-zAUTOrVhtMIY69QVTpSyj6/S/qdLzNf3CRmG8vWZh7c=",
-        "owner": "sini",
-        "repo": "gen",
-        "rev": "193ca974e1b9488734a55cefd35dd155050f9062",
-        "type": "github"
-      },
-      "original": {
-        "owner": "sini",
-        "repo": "gen",
-        "type": "github"
-      }
-    },
-    "gen_2": {
       "locked": {
         "lastModified": 1779304561,
         "narHash": "sha256-aqLSLakDBxQBZmeIRBQY5BYX/xhx52RQlxEZ/kk0DQs=",
@@ -46,6 +12,24 @@
       "original": {
         "owner": "sini",
         "repo": "gen",
+        "type": "github"
+      }
+    },
+    "gen-schema": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1779417936,
+        "narHash": "sha256-3S6PyiGjkTEUPqqqkElshOZZvedXguAkdIIrmvNCCU8=",
+        "owner": "sini",
+        "repo": "gen-schema",
+        "rev": "25c0e4b6b91abcd22ac769c0e288de7cee008ec5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-schema",
         "type": "github"
       }
     },
@@ -123,8 +107,8 @@
     },
     "root": {
       "inputs": {
+        "gen": "gen",
         "gen-schema": "gen-schema",
-        "gen": "gen_2",
         "nix-unit": "nix-unit",
         "nixpkgs": "nixpkgs_2"
       }

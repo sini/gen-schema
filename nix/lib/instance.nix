@@ -223,11 +223,24 @@ let
                   customCoerce = null;
                 };
             fieldInfo = refFields.${field};
-            coerceChain = mkCoerceChain field kind norm.registry norm.customCoerce fieldInfo.type;
           in
-          {
-            inherit isDeferred coerceChain;
-          }
+          if isDeferred then
+            # Deferred: store raw materials, NOT a pre-built coerceChain.
+            # The chain is rebuilt inside applyPipeline with the raw instances
+            # as registry, breaking self-referential cycles where
+            # binding.instances = config.traits (the post-apply value).
+            # The custom coerce hook receives `registry` as first arg when deferred,
+            # so it can resolve against raw instances instead of capturing config.X.
+            {
+              inherit isDeferred;
+              rawCustomCoerce = norm.customCoerce;
+              type = fieldInfo.type;
+            }
+          else
+            {
+              inherit isDeferred;
+              coerceChain = mkCoerceChain field kind norm.registry norm.customCoerce fieldInfo.type;
+            }
         ) refs
       );
 
@@ -321,9 +334,11 @@ let
 
           validators = builtins.seq refValidation (schema.${kind}.validators or [ ]);
 
-          # Deferred coerce: apply coerce chains that were skipped at option-level apply.
+          # Deferred coerce: rebuild coerce chains using raw instances as registry.
+          # This breaks self-referential cycles: the coerce hook accesses `instances`
+          # (the pre-apply value, already materialized) instead of `config.traits`
+          # (the post-apply value, which would re-enter applyPipeline).
           # Runs BEFORE validators so validators see resolved instances, not raw strings.
-          # Safe for self-referential registries (instances are fully materialized here).
           coerced =
             if refResult.deferredCoerce == { } then
               instances
@@ -337,9 +352,20 @@ let
                   inst: field:
                   let
                     binding = refResult.deferredCoerce.${field};
+                    # Rebuild coerce chain with raw instances as registry —
+                    # NOT the captured binding.instances (which may be config.X, causing cycles).
+                    # Wrap custom coerce to inject registry as first arg when deferred:
+                    # consumer writes: coerce = registry: default: val: ...
+                    # gen-schema calls: wrappedCoerce default val (pre-applies registry)
+                    wrappedCoerce =
+                      if binding.rawCustomCoerce != null then
+                        binding.rawCustomCoerce instances
+                      else
+                        null;
+                    coerceChain = mkCoerceChain field kind instances wrappedCoerce binding.type;
                     rawValue = inst.${field} or null;
                   in
-                  inst // { ${field} = binding.coerceChain rawValue; }
+                  inst // { ${field} = coerceChain rawValue; }
                 ) instance deferredFields
               ) instances;
 

@@ -56,26 +56,25 @@ let
       if et != null then getRefKind et else null;
 
   # First-seen deduplication by id_hash. Shared by setOf (via mkCoerceChain) and toSet.
+  # O(n) via groupBy + sort-by-index, preserving first-seen order.
   dedupByHash =
     vals:
     let
-      step =
-        seen: xs:
-        if xs == [ ] then
-          [ ]
+      indexed = lib.imap0 (
+        i: v:
+        if builtins.isAttrs v && v ? id_hash then
+          {
+            inherit i v;
+            hash = v.id_hash;
+          }
         else
-          let
-            h = builtins.head xs;
-            k =
-              if builtins.isAttrs h && h ? id_hash then
-                h.id_hash
-              else
-                throw "dedupByHash: element missing id_hash — expected an instance";
-            t = builtins.tail xs;
-          in
-          if seen ? ${k} then step seen t else [ h ] ++ step (seen // { ${k} = true; }) t;
+          throw "gen-schema: dedupByHash: element missing id_hash — expected an instance"
+      ) vals;
+      grouped = builtins.groupBy (x: x.hash) indexed;
+      firsts = lib.mapAttrsToList (_: xs: builtins.head xs) grouped;
+      sorted = builtins.sort (a: b: a.i < b.i) firsts;
     in
-    step { } vals;
+    map (x: x.v) sorted;
 in
 {
   ref = target: if builtins.isString target then mkDeferredRef target else mkCoercingRefType target;
@@ -109,7 +108,7 @@ in
     elemType:
     assert
       (getRefKind elemType != null)
-      || throw "setOf: element type must be a ref type (e.g., setOf (ref \"host\")), got ${elemType.name or "unknown"}";
+      || throw "gen-schema: setOf: element type must be a ref type (e.g., setOf (ref \"host\")), got ${elemType.name or "unknown"}";
     let
       listType = lib.types.listOf elemType;
     in
@@ -142,7 +141,7 @@ in
       member = # à la Data.Set.member
         x:
         if !(builtins.isAttrs x && x ? id_hash) then
-          throw "toSet.member: expected an instance (with id_hash)"
+          throw "gen-schema: toSet.member: expected an instance (with id_hash)"
         else
           byHash ? ${x.id_hash};
       toList = deduped;

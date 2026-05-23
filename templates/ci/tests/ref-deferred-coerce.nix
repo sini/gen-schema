@@ -21,7 +21,7 @@ let
         options.traits = mkInstanceRegistry evalSelfRef.config.schema "trait" {
           refs.needs = {
             instances = evalSelfRef.config.traits;
-            coerce = default: val: if builtins.isList default then default else [ default ];
+            coerce = _registry: default: val: if builtins.isList default then default else [ default ];
             deferred = true;
           };
         };
@@ -59,12 +59,12 @@ let
           refs.needs = {
             instances = evalSelector.config.traits;
             coerce =
-              default: val:
+              registry: default: val:
               if builtins.isAttrs val && val ? __selectByPriority then
                 let
                   threshold = val.__selectByPriority;
                 in
-                builtins.filter (t: t.priority <= threshold) (builtins.attrValues evalSelector.config.traits)
+                builtins.filter (t: t.priority <= threshold) (builtins.attrValues registry)
               else if builtins.isList default then
                 default
               else
@@ -104,7 +104,7 @@ let
         options.traits = mkInstanceRegistry evalSetOf.config.schema "trait" {
           refs.deps = {
             instances = evalSetOf.config.traits;
-            coerce = default: val: if builtins.isList default then default else [ default ];
+            coerce = _registry: default: val: if builtins.isList default then default else [ default ];
             deferred = true;
           };
         };
@@ -165,7 +165,7 @@ let
           refs.host = evalMixed.config.hosts;
           refs.depends = {
             instances = evalMixed.config.services;
-            coerce = default: val: if builtins.isList default then default else [ default ];
+            coerce = _registry: default: val: if builtins.isList default then default else [ default ];
             deferred = true;
           };
         };
