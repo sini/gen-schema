@@ -42,7 +42,7 @@ in
   inherit (entryType) mkSchemaOption mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (validate) validateInstances;
-  inherit (refLib) ref setOf;
+  inherit (refLib) ref setOf toSet;
   inherit (docs) renderDocs;
   inherit (scopeGraph) buildKindGraph buildInstanceGraph;
 

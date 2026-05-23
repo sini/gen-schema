@@ -98,4 +98,38 @@ in
       # Dedup is handled by mkCoerceChain's setOf branch in instance.nix instead.
       nestedTypes = { inherit elemType; };
     };
+
+  # Convert a list of instances to a set with O(1) membership by id_hash.
+  # Deduplicates by id_hash (first-seen wins), so safe to call on any instance list.
+  toSet =
+    instances:
+    let
+      # First-seen dedup matching setOf semantics
+      deduped =
+        let
+          step =
+            seen: xs:
+            if xs == [ ] then
+              [ ]
+            else
+              let
+                h = builtins.head xs;
+                k = h.id_hash;
+                t = builtins.tail xs;
+              in
+              if seen ? ${k} then step seen t else [ h ] ++ step (seen // { ${k} = true; }) t;
+        in
+        step { } instances;
+      byHash = builtins.listToAttrs (
+        map (i: {
+          name = i.id_hash;
+          value = i;
+        }) deduped
+      );
+    in
+    {
+      member = x: byHash ? ${x.id_hash}; # à la Data.Set.member
+      toList = deduped;
+      length = builtins.length deduped;
+    };
 }
