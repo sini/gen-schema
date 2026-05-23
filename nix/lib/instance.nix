@@ -97,6 +97,26 @@ let
       mkListCoerce =
         v: if customCoerce == null then [ (defaultCoerce v) ] else customCoerce [ (defaultCoerce v) ] v;
 
+      # Deduplicate by id_hash, preserving first-seen order.
+      dedup =
+        vals:
+        let
+          step =
+            seen: xs:
+            if xs == [ ] then
+              [ ]
+            else
+              let
+                h = builtins.head xs;
+                k =
+                  h.id_hash
+                    or (throw "setOf on kind '${kind}': element missing id_hash — setOf requires instance refs");
+                t = builtins.tail xs;
+              in
+              if seen ? ${k} then step seen t else [ h ] ++ step (seen // { ${k} = true; }) t;
+        in
+        step { } vals;
+
       go =
         t:
         if (t.refKind or null) != null then
@@ -114,6 +134,12 @@ let
             in
             if name == "nullOr" then
               v: if v == null then null else inner v
+            else if lib.hasPrefix "setOf(" name then
+              # setOf: coerce + expand via concatMap, then deduplicate by id_hash
+              let
+                listInner = goList et;
+              in
+              v: dedup (builtins.concatMap listInner v)
             else
               # listOf: use concatMap with list-producing coerce for 1→many expansion
               let
@@ -139,6 +165,11 @@ let
             in
             if name == "nullOr" then
               v: [ (if v == null then null else inner v) ]
+            else if lib.hasPrefix "setOf(" name then
+              let
+                listInner = goList et;
+              in
+              v: [ (dedup (builtins.concatMap listInner v)) ]
             else
               v: [ (builtins.concatMap (goList et) v) ];
     in
