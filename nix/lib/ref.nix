@@ -79,4 +79,23 @@ in
       refKind = getRefKind opt.type;
       type = opt.type;
     }) refFields;
+
+  # Set type: deduplicates by id_hash, preserving first-seen order.
+  # Composes with ref coercion — dedup runs after coercion in the apply chain.
+  # nestedTypes.elemType is set so getRefKind traverses through setOf like listOf.
+  setOf =
+    elemType:
+    let
+      listType = lib.types.listOf elemType;
+    in
+    listType
+    // {
+      name = "setOf(${elemType.name})";
+      description = "deduplicated set of ${elemType.description or elemType.name} (by id_hash)";
+      # Do NOT set apply here — dedup must run AFTER ref coercion, which happens
+      # in mkRefBindingModules' option-level apply. Type-level apply runs before
+      # option apply, so strings wouldn't be resolved yet (no id_hash to dedup by).
+      # Dedup is handled by mkCoerceChain's setOf branch in instance.nix instead.
+      nestedTypes = { inherit elemType; };
+    };
 }
