@@ -68,6 +68,14 @@ let
   mkCoerceChain =
     field: kind: registry: customCoerce: type:
     let
+      # Validate that a coercion result is a plausible instance (has name + id_hash).
+      assertInstance =
+        v:
+        if builtins.isAttrs v && v ? name && v ? id_hash then
+          v
+        else
+          throw "ref field '${field}' on kind '${kind}': expected an instance (with name and id_hash), got ${builtins.typeOf v}";
+
       defaultCoerce =
         v:
         if builtins.isString v then
@@ -76,7 +84,7 @@ let
           else
             throw "ref field '${field}' on kind '${kind}': reference '${v}' not found in instance registry (available: ${builtins.concatStringsSep ", " (builtins.attrNames registry)})"
         else
-          v;
+          assertInstance v;
 
       # Scalar leaf: custom coerce receives the default result (lazy) and raw value.
       # Throws if custom coerce returns a list in scalar context.
@@ -96,7 +104,17 @@ let
       # List-element leaf: custom coerce receives [ defaultResult ] and raw value.
       # Returns a list (1→many expansion supported).
       mkListCoerce =
-        v: if customCoerce == null then [ (defaultCoerce v) ] else customCoerce [ (defaultCoerce v) ] v;
+        v:
+        if customCoerce == null then
+          [ (defaultCoerce v) ]
+        else
+          let
+            result = customCoerce [ (defaultCoerce v) ] v;
+          in
+          if builtins.isList result then
+            result
+          else
+            throw "ref field '${field}' on kind '${kind}': custom coerce must return a list in listOf/setOf context";
 
       go =
         t:
