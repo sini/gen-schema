@@ -5,11 +5,16 @@
   fleet.services.nginx = {
     host = "igloo"; # string key → lookup in hosts registry
     port = 80;
+    replicas = [
+      "igloo"
+      "iceberg"
+    ];
   };
 
   fleet.services.postgres = {
     host = "iceberg"; # string key → lookup
     port = 5432;
+    replicas = [ "iceberg" ];
   };
 
   fleet.services.gateway = {

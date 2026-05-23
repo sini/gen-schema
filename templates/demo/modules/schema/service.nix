@@ -16,6 +16,11 @@
       type = schemaLib.ref "host";
       description = "Host this service runs on (deferred ref, bound at registry).";
     };
+    options.replicas = lib.mkOption {
+      type = lib.types.listOf (schemaLib.ref "host");
+      default = [ ];
+      description = "Hosts this service is replicated to.";
+    };
     config.protocol = lib.mkDefault "tcp";
   };
 }
