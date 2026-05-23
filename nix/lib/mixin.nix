@@ -51,10 +51,10 @@ let
           }
           mixins;
 
-      # composeMixins [a b c] = c ⋆ (b ⋆ a) via foldl': last-listed provides base,
-      # first-listed runs last and has highest priority (wins on conflict).
-      # This means: list order = priority order (first wins), and later mixins
-      # can access earlier mixins' output via the ⊕ in Bracha's formula.
+      # foldl' with (acc: m: compose m.delta acc) builds m_n ⋆ (... ⋆ (m_2 ⋆ m_1)).
+      # Last-listed mixin has highest priority (outermost in ⋆, wins on conflict).
+      # First-listed mixin provides base values (innermost, runs first).
+      # This matches the requires/provides dependency flow: earlier provides, later overrides.
       composedDelta = builtins.foldl' (acc: m: record.compose m.delta acc) (p: p) mixins;
     in
     {

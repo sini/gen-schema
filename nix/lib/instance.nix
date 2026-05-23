@@ -16,7 +16,6 @@
   refsFromOptionsWithTypes,
   dedupByHash,
   filterValidators,
-  checkRefinements,
 }:
 let
   mkInstanceType =

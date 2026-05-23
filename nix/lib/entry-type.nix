@@ -14,6 +14,8 @@
   record,
   applyMixin,
   emitModule,
+  isRefined,
+  getRefinements,
 }:
 let
   mkSchemaEntryType =
@@ -140,13 +142,16 @@ let
             if mixinResult != null then mixinResult.refinements
             else
               let
-                inherit (import ./refined.nix { inherit lib; }) isRefined getRefinements;
                 isOptionDecl = v: builtins.isAttrs v && v ? _type && v._type == "option";
-                # Collect option declarations from all defs (inline attrsets only)
+                # Collect option declarations from all defs (inline attrsets only).
+                # Tries d.value.options first (module-style { options.x = mkOption ...; })
+                # then falls back to scanning d.value for mkOption values directly
+                # (flat-style { x = mkOption ...; }). Assumes a user field named "options"
+                # won't contain mkOption values — this is safe because mkOption produces
+                # attrsets with _type = "option" which user data never has.
                 allOptionDecls = builtins.foldl' (acc: d:
                   if builtins.isAttrs d.value then
                     let
-                      # Look for options.* or direct mkOption values
                       opts = d.value.options or (lib.filterAttrs (_: isOptionDecl) d.value);
                     in
                     acc // (lib.filterAttrs (_: v: isOptionDecl v && v ? type && v.type ? __schema) opts)

@@ -32,6 +32,7 @@ let
     inherit (refLib) refsFromOptions;
     inherit (mixinLib) applyMixin;
     inherit (bridgeLib) emitModule;
+    inherit (refinedLib) isRefined getRefinements;
   };
   instance = import ./instance.nix {
     inherit lib;
@@ -43,7 +44,6 @@ let
       ;
     inherit (refLib) refsFromOptionsWithTypes dedupByHash;
     inherit (validate) filterValidators;
-    inherit (refinedLib) checkRefinements;
   };
   docs = import ./docs.nix { inherit lib; };
   scopeGraph = import ./scope-graph.nix { inherit lib; };
