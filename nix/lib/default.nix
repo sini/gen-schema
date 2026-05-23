@@ -31,7 +31,7 @@ let
       runValidators
       defaultOnError
       ;
-    inherit (refLib) refsFromOptionsWithTypes;
+    inherit (refLib) refsFromOptionsWithTypes dedupByHash;
   };
   docs = import ./docs.nix { inherit lib; };
   scopeGraph = import ./scope-graph.nix { inherit lib; };

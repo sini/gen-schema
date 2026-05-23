@@ -54,11 +54,29 @@ let
         et = (type.nestedTypes or { }).elemType or null;
       in
       if et != null then getRefKind et else null;
+
+  # First-seen deduplication by id_hash. Shared by setOf (via mkCoerceChain) and toSet.
+  dedupByHash =
+    vals:
+    let
+      step =
+        seen: xs:
+        if xs == [ ] then
+          [ ]
+        else
+          let
+            h = builtins.head xs;
+            k = h.id_hash;
+            t = builtins.tail xs;
+          in
+          if seen ? ${k} then step seen t else [ h ] ++ step (seen // { ${k} = true; }) t;
+    in
+    step { } vals;
 in
 {
   ref = target: if builtins.isString target then mkDeferredRef target else mkCoercingRefType target;
 
-  inherit getRefKind;
+  inherit getRefKind dedupByHash;
 
   # Scan evaluated options for deferred ref types. Returns { fieldName = refKind; }.
   refsFromOptions =
@@ -81,7 +99,7 @@ in
     }) refFields;
 
   # Set type: deduplicates by id_hash, preserving first-seen order.
-  # Composes with ref coercion — dedup runs after coercion in the apply chain.
+  # Only meaningful with ref element types — setOf requires instance refs.
   # nestedTypes.elemType is set so getRefKind traverses through setOf like listOf.
   setOf =
     elemType:
@@ -92,6 +110,7 @@ in
     // {
       name = "setOf(${elemType.name})";
       description = "deduplicated set of ${elemType.description or elemType.name} (by id_hash)";
+      isSetOf = true;
       # Do NOT set apply here — dedup must run AFTER ref coercion, which happens
       # in mkRefBindingModules' option-level apply. Type-level apply runs before
       # option apply, so strings wouldn't be resolved yet (no id_hash to dedup by).
@@ -104,22 +123,7 @@ in
   toSet =
     instances:
     let
-      # First-seen dedup matching setOf semantics
-      deduped =
-        let
-          step =
-            seen: xs:
-            if xs == [ ] then
-              [ ]
-            else
-              let
-                h = builtins.head xs;
-                k = h.id_hash;
-                t = builtins.tail xs;
-              in
-              if seen ? ${k} then step seen t else [ h ] ++ step (seen // { ${k} = true; }) t;
-        in
-        step { } instances;
+      deduped = dedupByHash instances;
       byHash = builtins.listToAttrs (
         map (i: {
           name = i.id_hash;
