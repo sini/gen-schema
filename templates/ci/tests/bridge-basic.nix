@@ -1,0 +1,160 @@
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
+let
+  R = genLib.record;
+  record = R;
+  refinedLib = import ../../../nix/lib/refined.nix { inherit lib; };
+  bridgeLib = import ../../../nix/lib/bridge.nix {
+    inherit lib record;
+    inherit (refinedLib) isRefined getRefinements;
+  };
+  inherit (bridgeLib) emitModule isOptionDecl extractRefinements;
+  inherit (refinedLib) types;
+
+  # Build a record with mkOption values (option declarations)
+  optionRecord = R.fromAttrs {
+    port = lib.mkOption {
+      type = lib.types.int;
+      default = 8080;
+    };
+    hostname = lib.mkOption { type = lib.types.str; };
+  };
+
+  # Record with a mix of options and plain config values
+  mixedRecord = R.extend (R.fromAttrs {
+    port = lib.mkOption { type = lib.types.int; };
+    hostname = lib.mkOption { type = lib.types.str; };
+  }) "defaultPort" 8080;
+
+  # Record with refined type
+  refinedRecord = R.fromAttrs {
+    port = lib.mkOption {
+      type = types.refined lib.types.int {
+        check = v: v > 0;
+        message = "must be positive";
+      };
+    };
+    name = lib.mkOption { type = lib.types.str; };
+  };
+
+  # Record with sidecar labels (validators, methods)
+  sidecarRecord =
+    let
+      base = R.fromAttrs {
+        port = lib.mkOption { type = lib.types.int; };
+        validators = [ "validator-a" ];
+      };
+    in
+    R.extend base "validators" [ "validator-b" ];
+in
+{
+  bridge-basic.test-isOptionDecl-true = {
+    expr = isOptionDecl (lib.mkOption { type = lib.types.int; });
+    expected = true;
+  };
+
+  bridge-basic.test-isOptionDecl-false = {
+    expr = isOptionDecl { port = 8080; };
+    expected = false;
+  };
+
+  bridge-basic.test-emit-options-only = {
+    expr =
+      let
+        result = emitModule [ ] optionRecord;
+        eval = lib.evalModules {
+          modules = [
+            result.module
+            {
+              config.port = 9090;
+              config.hostname = "test";
+            }
+          ];
+        };
+      in
+      eval.config.port;
+    expected = 9090;
+  };
+
+  bridge-basic.test-emit-preserves-default = {
+    expr =
+      let
+        result = emitModule [ ] optionRecord;
+        eval = lib.evalModules {
+          modules = [
+            result.module
+            { config.hostname = "test"; }
+          ];
+        };
+      in
+      eval.config.port;
+    expected = 8080;
+  };
+
+  bridge-basic.test-emit-mixed-config = {
+    expr =
+      let
+        result = emitModule [ ] mixedRecord;
+      in
+      result.sidecars == { } && result.refinements == { };
+    expected = true;
+  };
+
+  bridge-basic.test-emit-refined-strips-metadata = {
+    expr =
+      let
+        result = emitModule [ ] refinedRecord;
+        eval = lib.evalModules {
+          modules = [
+            result.module
+            {
+              config.port = 8080;
+              config.name = "test";
+            }
+          ];
+        };
+      in
+      eval.config.port;
+    expected = 8080;
+  };
+
+  bridge-basic.test-emit-refined-extracts-refinements = {
+    expr =
+      let
+        result = emitModule [ ] refinedRecord;
+      in
+      builtins.length (result.refinements.port or [ ]);
+    expected = 1;
+  };
+
+  bridge-basic.test-emit-sidecar-extraction = {
+    expr =
+      let
+        result = emitModule [ "validators" ] sidecarRecord;
+      in
+      result.sidecars.validators;
+    expected = [
+      [ "validator-b" ]
+      [ "validator-a" ]
+    ];
+  };
+
+  bridge-basic.test-emit-sidecar-not-in-module = {
+    expr =
+      let
+        result = emitModule [ "validators" ] sidecarRecord;
+        eval = lib.evalModules {
+          modules = [
+            result.module
+            { config.port = 8080; }
+          ];
+        };
+      in
+      eval.config ? validators;
+    expected = false;
+  };
+}
