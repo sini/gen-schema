@@ -148,6 +148,7 @@ in
     description = "Fleet service instances.";
     # Deferred ref: bind "host" kind-ref to the hosts registry
     refs.host = config.fleet.hosts;
+    refs.replicas = config.fleet.hosts;
     deriveEither = {
       derive =
         services:
@@ -179,5 +180,10 @@ in
         }
       )
     ];
+  };
+
+  options.fleet.groups = mkInstanceRegistry config.schema "group" {
+    description = "Fleet host group instances.";
+    refs.members = config.fleet.hosts;
   };
 }

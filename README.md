@@ -464,6 +464,57 @@ Invalid references throw at eval time:
 ref field 'host' on kind 'service': reference 'nonexistent' not found in instance registry
 ```
 
+### Refs in Collections
+
+`ref` works inside `listOf` and `nullOr` wrappers at any nesting depth:
+
+```nix
+config.schema.service.options.replicas = lib.mkOption {
+  type = lib.types.listOf (schemaLib.ref "host");
+  default = [];
+};
+
+# String keys and instance values both work:
+config.fleet.services.nginx.replicas = [ "igloo" "iceberg" ];
+config.fleet.services.nginx.replicas = [ config.fleet.hosts.igloo "iceberg" ];
+
+# Nullable and nested wrappers:
+type = lib.types.nullOr (lib.types.listOf (schemaLib.ref "host"));
+```
+
+### Custom Ref Coercion
+
+For domain-specific resolution, pass an extended binding with a `coerce` function:
+
+```nix
+options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
+  refs.host = {
+    instances = config.fleet.hosts;
+    coerce = default: val:
+      if val == "primary" then config.fleet.hosts.igloo
+      else default;
+  };
+};
+```
+
+`default` is a lazy thunk of the standard coercion result — only forced if you select it. In `listOf` context, `default` is a single-element list and the hook can return multiple instances (1→many expansion).
+
+### Deduplicated Sets
+
+`setOf` deduplicates by `id_hash`, preserving first-seen order:
+
+```nix
+config.schema.group.options.members = lib.mkOption {
+  type = schemaLib.setOf (schemaLib.ref "host");
+  default = [];
+};
+
+config.fleet.groups.web.members = [ "igloo" "iceberg" "igloo" ];
+# → [ igloo iceberg ] — duplicate removed by identity hash
+```
+
+Composes with custom coerce hooks — expansion produces duplicates, `setOf` removes them.
+
 ### Parent-Child Topology
 
 Kinds can declare their parent kind via the `parent` sidecar. This establishes a schema-level nesting relationship:
