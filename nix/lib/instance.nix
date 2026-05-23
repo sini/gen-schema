@@ -177,6 +177,29 @@ let
     in
     go type;
 
+  # Validate ref bindings: every ref field must have a binding, no extra bindings.
+  # Shared by mkRefBindingModules (eager, when refs != {}) and applyPipeline (deferred,
+  # when refs == {} but schema declares ref fields). Returns null or throws.
+  checkRefBindings =
+    kind: refs: refFields:
+    let
+      missingBindings = lib.filterAttrs (field: _: !(refs ? ${field})) refFields;
+      extraBindings = lib.filterAttrs (field: _: !(refFields ? ${field})) refs;
+    in
+    if missingBindings != { } then
+      let
+        missing = builtins.head (lib.attrNames missingBindings);
+        targetKind = missingBindings.${missing}.refKind;
+      in
+      throw "gen-schema: mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
+    else if extraBindings != { } then
+      let
+        extra = builtins.head (lib.attrNames extraBindings);
+      in
+      throw "gen-schema: mkInstanceRegistry: refs.${extra} does not match any ref field on kind '${kind}'"
+    else
+      null;
+
   # Build extra modules that override deferred ref fields with resolved types.
   # Returns { modules; deferredCoerce; } — immediate modules get the apply-time
   # coerce chain, deferred bindings (deferred = true) skip option-level apply and
@@ -185,28 +208,9 @@ let
   mkRefBindingModules =
     kind: refs: refFields:
     let
-      # Validate: every deferred ref field must have a binding.
-      # N.B. Missing-binding check is duplicated in applyPipeline.refValidation
-      # for the refs == {} case — keep error messages in sync.
-      missingBindings = lib.filterAttrs (field: _: !(refs ? ${field})) refFields;
-      extraBindings = lib.filterAttrs (field: _: !(refFields ? ${field})) refs;
+      _checked = checkRefBindings kind refs refFields;
 
-      _ =
-        if missingBindings != { } then
-          let
-            missing = builtins.head (lib.attrNames missingBindings);
-            targetKind = missingBindings.${missing}.refKind;
-          in
-          throw "gen-schema: mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
-        else if extraBindings != { } then
-          let
-            extra = builtins.head (lib.attrNames extraBindings);
-          in
-          throw "gen-schema: mkInstanceRegistry: refs.${extra} does not match any ref field on kind '${kind}'"
-        else
-          null;
-
-      bindings = builtins.seq _ (
+      bindings = builtins.seq _checked (
         lib.mapAttrs (
           field: binding:
           let
@@ -316,23 +320,14 @@ let
         let
           # Ref binding validation — deferred to apply time so schema.${kind} is safe
           # to evaluate (avoids circular eval at option-declaration time).
-          # Force ref module validation (extra-binding case) and check for missing
-          # bindings (refs == {} but schema declares ref fields).
-          # N.B. The missing-binding check here mirrors mkRefBindingModules (line ~72),
-          # which can't run when refs == {} — keep error messages in sync.
+          # Uses shared checkRefBindings, then forces refResult.modules to trigger
+          # any eager validation from mkRefBindingModules.
           refValidation =
             let
               allRefFields = findRefFields schema kind;
-              missingBindings = lib.filterAttrs (field: _: !(refs ? ${field})) allRefFields;
+              _checked = checkRefBindings kind refs allRefFields;
             in
-            if missingBindings != { } then
-              let
-                missing = builtins.head (lib.attrNames missingBindings);
-                targetKind = missingBindings.${missing}.refKind;
-              in
-              throw "gen-schema: mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
-            else
-              builtins.length refResult.modules; # forces builtins.seq inside mkRefBindingModules
+            builtins.seq _checked (builtins.length refResult.modules);
 
           validators = builtins.seq refValidation (schema.${kind}.validators or [ ]);
 
