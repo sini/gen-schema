@@ -18,23 +18,10 @@ let
       meta = schema._meta;
       inherit (meta) kindNames topology edges;
 
-      # Parent edges from topology: child → parent
-      parentEdges = lib.concatMap (
-        k:
-        let
-          t = topology.${k};
-        in
-        lib.optional (t.parent != null) {
-          from = k;
-          to = t.parent;
-        }
-      ) kindNames;
-
-      # Ref edges from schema declarations: fromKind → toKind
+      # Split unified edges by type — _meta.edges already has both parent and ref
       refEdges = builtins.filter (e: e.type == "ref") edges;
-      importEdges = map (e: {
-        inherit (e) from to;
-      }) refEdges;
+      parentEdges = map (e: { inherit (e) from to; }) (builtins.filter (e: e.type == "parent") edges);
+      importEdges = map (e: { inherit (e) from to; }) refEdges;
     in
     {
       parentGraph = {

@@ -19,10 +19,7 @@ let
     inherit (refLib) refsFromOptions;
   };
   validate = import ./validate.nix { inherit lib gen; };
-  refLib = import ./ref.nix {
-    inherit lib;
-    inherit (gen) mkRefType;
-  };
+  refLib = import ./ref.nix { inherit lib; };
   instance = import ./instance.nix {
     inherit lib;
     inherit (gen)
