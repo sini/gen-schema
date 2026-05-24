@@ -45,14 +45,6 @@ let
           type = lib.types.str;
           default = name;
         };
-        # Scope-engine node ID: canonical "kind:name" format for graph construction.
-        options.nodeId = lib.mkOption {
-          type = lib.types.str;
-          internal = true;
-          readOnly = true;
-          default = "${kind}:${name}";
-          description = "Scope graph node identifier.";
-        };
       }
     );
 

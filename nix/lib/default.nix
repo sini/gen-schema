@@ -46,7 +46,6 @@ let
     inherit (validate) filterValidators;
   };
   docs = import ./docs.nix { inherit lib; };
-  scopeGraph = import ./scope-graph.nix { inherit lib; };
 in
 {
   # gen-schema's own exports + validator constructor from gen
@@ -67,7 +66,6 @@ in
     ;
   inherit (bridgeLib) emitModule;
   inherit (docs) renderDocs;
-  inherit (scopeGraph) buildKindGraph buildInstanceGraph;
 
   _internal = {
     inherit (methods) mkMethodsModule;
