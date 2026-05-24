@@ -11,6 +11,7 @@ let
   inherit (mixinLib)
     mkMixin
     composeMixins
+    beta
     applyMixin
     ;
 
@@ -123,5 +124,49 @@ in
       in
       R.select (applyMixin composed base "test") "status";
     expected = "from-second";  # last listed mixin wins (has priority), first provides base
+  };
+
+  # Per-mixin direction: beta mixin is overridden by what came before
+  mixin-composition.test-compose-mixed-direction = {
+    expr =
+      let
+        provider = mkMixin {
+          provides = [ "status" ];
+          name = "provider";
+          define = _: { status = "from-provider"; };
+        };
+        # Beta: this mixin's "status" should be overridden by provider's
+        betaMixin = beta (mkMixin {
+          provides = [ "status" ];
+          name = "beta-mixin";
+          define = _: { status = "from-beta"; };
+        });
+        composed = composeMixins [ provider betaMixin ];
+        base = R.empty;
+      in
+      R.select (applyMixin composed base "test") "status";
+    # provider is earlier (acc), betaMixin is beta so acc wins
+    expected = "from-provider";
+  };
+
+  # Confirm: without beta, the later mixin would win
+  mixin-composition.test-compose-without-beta-later-wins = {
+    expr =
+      let
+        provider = mkMixin {
+          provides = [ "status" ];
+          name = "provider";
+          define = _: { status = "from-provider"; };
+        };
+        overrider = mkMixin {
+          provides = [ "status" ];
+          name = "overrider";
+          define = _: { status = "from-overrider"; };
+        };
+        composed = composeMixins [ provider overrider ];
+        base = R.empty;
+      in
+      R.select (applyMixin composed base "test") "status";
+    expected = "from-overrider";  # Smalltalk: later wins
   };
 }

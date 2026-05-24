@@ -51,11 +51,16 @@ let
           }
           mixins;
 
-      # foldl' with (acc: m: compose m.delta acc) builds m_n ⋆ (... ⋆ (m_2 ⋆ m_1)).
-      # Last-listed mixin has highest priority (outermost in ⋆, wins on conflict).
-      # First-listed mixin provides base values (innermost, runs first).
-      # This matches the requires/provides dependency flow: earlier provides, later overrides.
-      composedDelta = builtins.foldl' (acc: m: record.compose m.delta acc) (p: p) mixins;
+      # Per-mixin direction: Smalltalk mixins override what came before,
+      # Beta mixins are overridden by what came before.
+      # In foldl', acc = what came before, m = current mixin:
+      #   Smalltalk: compose m.delta acc — m is outer, wins
+      #   Beta:      compose acc m.delta — acc is outer, wins
+      composedDelta = builtins.foldl' (acc: m:
+        if m.__direction == "beta"
+        then record.compose acc m.delta
+        else record.compose m.delta acc
+      ) (p: p) mixins;
     in
     {
       __isMixin = true;
