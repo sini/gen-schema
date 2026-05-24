@@ -1,8 +1,8 @@
 # gen-schema
 
-A typed record registry for Nix with extension points, strict validation, identity hashing, cross-instance references, introspection, and declarative methods. Built on the NixOS module system.
+A typed record registry for Nix with extension points, strict validation, refinement contracts, identity hashing, cross-instance references, first-class mixins, introspection, and declarative methods. Built on the NixOS module system.
 
-gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions that any module can extend, strict-by-default validation that catches typos immediately, stable identity comparison via `id_hash`, cross-registry references that resolve to instances, and auto-generated documentation from your schema.
+gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions that any module can extend, strict-by-default validation that catches typos immediately, refinement contracts co-located with type declarations, stable identity comparison via `id_hash`, cross-registry references that resolve to instances, reusable mixins with structural compatibility, and auto-generated documentation from your schema.
 
 ## Quick Start
 
@@ -1040,6 +1040,131 @@ schemaLib._internal.mkMethodsModule   # methods option/config wiring
 Not part of the public API contract. Available for testing and advanced use.
 
 Identity, strict, validation, and ref primitives are in [gen](https://github.com/sini/gen) — import gen directly if you need them outside of gen-schema.
+
+### `schema.types.refined`
+
+Refinement contracts co-located with type declarations. Predicates validate during `applyPipeline` (strict by default).
+
+```nix
+# Single refinement
+port = mkOption {
+  type = schema.types.refined lib.types.int {
+    check = self: self > 0 && self < 65536;
+    message = "must be valid TCP port";
+  };
+};
+
+# Composed refinements (all must pass)
+port = mkOption {
+  type = schema.types.refined lib.types.int [
+    { check = self: self > 0; message = "must be positive"; }
+    { check = self: self < 65536; message = "must be < 65536"; }
+  ];
+};
+
+# Reusable
+port = mkOption { type = schema.types.refined lib.types.int schema.refinements.tcpPort; };
+```
+
+Set `lazy = true` on a refinement to defer validation to access time via `builtins.addErrorContext`:
+
+```nix
+{ check = self: self > 0; message = "must be positive"; lazy = true; }
+```
+
+### `schema.refinements.*`
+
+Built-in reusable refinements: `tcpPort`, `nonEmpty`, `positive`. Use with `schema.types.refined` to avoid repeating common predicates.
+
+### `schema.blame`
+
+Field-level error attribution for structured contract violations.
+
+```nix
+schema.blame "fieldName" "error message"
+# → { __blame = true; field = "fieldName"; message = "error message"; }
+```
+
+### `schema.mkFieldValidator`
+
+Row-polymorphic validators with automatic field filtering. Validators with `fields` are automatically skipped for kinds that don't have all required fields. Validators without `fields` run unconditionally (backwards compatible).
+
+```nix
+schema.mkFieldValidator {
+  name = "https-port";
+  fields = [ "port" "protocol" ];
+  check = inst: !(inst.protocol == "https" && inst.port == 80);
+  message = "HTTPS should not use port 80";
+}
+```
+
+### `schema.mkMixin`
+
+First-class reusable schema fragments with structural compatibility. `define` receives a record-algebra record and returns a plain attrset.
+
+```nix
+monitorable = schema.mkMixin {
+  requires = [ "port" "hostname" ];
+  provides = [ "metrics_port" ];
+  # kinds = [ "service" ];  # optional kind constraint
+  define = parent: {
+    metrics_port = (record.select parent "port") + 1000;
+  };
+};
+```
+
+### `schema.composeMixins`
+
+Compose multiple mixins into one. Requires propagation: earlier mixins' `provides` satisfy later mixins' `requires`.
+
+```nix
+enhanced = schema.composeMixins [ monitorable loggable healthcheck ];
+
+# Mixed direction: beta mixin is overridden by what came before
+combined = schema.composeMixins [
+  monitorable
+  (schema.beta tlsBase)  # Beta: existing fields win over tlsBase's
+  loggable
+];
+```
+
+### `schema.beta`
+
+Annotates a mixin for Beta direction — parent controls, meaning existing fields take precedence over the mixin's contributions.
+
+### `schema.emitModule`
+
+Bridges record-algebra records to NixOS modules. Strips refinement metadata from types. Extracts sidecars with full shadow stacks.
+
+```nix
+emitted = schema.emitModule [ "validators" "methods" ] recordAlgebraRecord;
+# → { module = <NixOS module>; sidecars = { ... }; refinements = { ... }; }
+```
+
+### `mkSchemaEntryType` `mixins` parameter
+
+Mixins are auto-applied when `baseModule` is an inline attrset:
+
+```nix
+mkSchemaEntryType {
+  mixins = [ monitorable loggable ];
+  baseModule = {
+    port = mkOption { type = types.int; };
+    hostname = mkOption { type = types.str; };
+  };
+}
+```
+
+## Academic Foundations
+
+| Feature | Paper |
+|---------|-------|
+| Refinement contracts | [Findler & Felleisen — *Contracts for Higher-Order Functions* (ICFP 2002)](https://www2.ccs.neu.edu/racket/pubs/icfp2002-ff.pdf), co-location from [Rondon et al. — *Liquid Types* (PLDI 2008)](https://goto.ucsd.edu/~rjhala/liquid/liquid_types.pdf) |
+| Lazy contracts | [Chitil — *Practical Typed Lazy Contracts* (ICFP 2012)](https://kar.kent.ac.uk/30790/1/contacts.pdf) |
+| Record algebra (gen) | [Leijen — *Extensible Records with Scoped Labels* (TFP 2005)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf) |
+| Mixin composition | [Bracha & Cook — *Mixin-Based Inheritance* (OOPSLA 1990)](https://www.bracha.org/oopsla90.pdf) |
+| NixOS module bridge | [Cardelli — *Program Fragments, Linking, and Modularization* (POPL 1997)](http://lucacardelli.name/Papers/Linking.A4.pdf) |
+| Scope graphs | [Néron et al. — *A Theory of Name Resolution* (ESOP 2015)](https://link.springer.com/chapter/10.1007/978-3-662-46669-8_9) |
 
 ## Architecture
 
