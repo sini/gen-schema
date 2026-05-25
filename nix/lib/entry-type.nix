@@ -19,19 +19,13 @@
 }:
 let
   mkSchemaEntryType =
-    args@{
+    {
       baseModule ? null,
       collections ? { },
       computed ? null,
       mixins ? [ ],
-      sidecars ? null,
     }:
     let
-      collections' =
-        if args ? sidecars && args.sidecars != null then
-          lib.warn "gen-schema: 'sidecars' is deprecated, use 'collections'" args.sidecars
-        else
-          collections;
       base = lib.types.deferredModule;
 
       # methods is a built-in collection — user collections are additional
@@ -54,7 +48,7 @@ let
                   val;
             };
           }
-          // collections';
+          // collections;
         in
         if merged ? __functor then
           throw "gen-schema: collection '__functor' is reserved — cannot be used as a collection key"
@@ -214,21 +208,13 @@ let
     };
 
   mkSchemaOption =
-    args@{
+    {
       strict ? true,
       baseModule ? null,
       collections ? { },
       computed ? null,
       mixins ? [ ],
-      sidecars ? null,
     }:
-    let
-      collections' =
-        if args ? sidecars && args.sidecars != null then
-          lib.warn "gen-schema: 'sidecars' is deprecated, use 'collections'" args.sidecars
-        else
-          collections;
-    in
     lib.mkOption {
       description = "Schema — typed record registry with extension points";
       default = { };
@@ -240,8 +226,8 @@ let
               baseModule
               computed
               mixins
+              collections
               ;
-            collections = collections';
           });
 
           # Schema-level strict setting — stored for mkInstanceType to read

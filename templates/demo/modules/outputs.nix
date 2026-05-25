@@ -1,7 +1,15 @@
 # Expose fleet data as flake outputs for demonstration.
-{ config, schemaLib, ... }:
+{
+  lib,
+  config,
+  schemaLib,
+  gen,
+  demoMixins,
+  ...
+}:
 let
   inherit (config) fleet;
+  record = gen.pure.record;
 in
 {
   flake = {
@@ -91,6 +99,76 @@ in
       nginxEndpoint = fleet.services.nginx.endpoint;
       postgresEndpoint = fleet.services.postgres.endpoint;
       gatewayEndpoint = fleet.services.gateway.endpoint;
+
+      # --- Refinement contracts (Findler & Felleisen 2002) ---
+      # Values that pass through refinement predicates co-located with types.
+      managementCidr = fleet.networks.management.cidr;
+      managementVlan = fleet.networks.management.vlan;
+      managementMtu = fleet.networks.management.mtu;
+      productionVlan = fleet.networks.production.vlan;
+      productionMtuDefault = fleet.networks.production.mtu;
+      networkNames = builtins.attrNames fleet.networks;
+
+      # --- Row-polymorphic validators (Leijen 2005) ---
+      # The https-port validator fires only on kinds with both "port" and "protocol".
+      # It silently skips kinds (host, user, network) that lack those fields.
+      serviceValidatorCount = builtins.length config.schema.service.validators;
+
+      # --- Topology introspection ---
+      topologyHost = config.schema._topology.host;
+      topologyNetwork = config.schema._topology.network;
+      networkOptionCount = builtins.length (config.schema._kindMeta "network").optionNames;
+      networkHasNoParent = config.schema._topology.network.parent == null;
+      edgeCount = builtins.length config.schema._edges;
+      schemaRoots = config.schema._roots;
+      schemaLeaves = config.schema._leaves;
+
+      # --- First-class mixins (Bracha & Cook 1990) ---
+      # Exercise mixin primitives directly on record-algebra records.
+      mixinDemo =
+        let
+          # Build a base record with a "port" field (required by monitorable mixin)
+          baseRecord = record.fromAttrs {
+            port = lib.mkOption {
+              type = lib.types.int;
+              default = 8080;
+            };
+            name = lib.mkOption {
+              type = lib.types.str;
+              default = "demo";
+            };
+          };
+
+          # Apply monitorable mixin: adds metricsPort, metricsPath
+          withMonitorable = schemaLib.applyMixin demoMixins.monitorable baseRecord "demo-kind";
+
+          # Apply composed mixin (monitorable + beta(tlsBase))
+          withEnhanced = schemaLib.applyMixin demoMixins.enhanced baseRecord "demo-kind";
+        in
+        {
+          # Mixin metadata
+          monitorableRequires = demoMixins.monitorable.requires;
+          monitorableProvides = demoMixins.monitorable.provides;
+          enhancedRequires = demoMixins.enhanced.requires;
+          enhancedProvides = demoMixins.enhanced.provides;
+
+          # Record labels after mixin application
+          withMonitorableLabels = record.labels withMonitorable;
+          withEnhancedLabels = record.labels withEnhanced;
+        };
+
+      # --- Blame (structured field-level errors) ---
+      blameDemo =
+        let
+          portBlame = schemaLib.blame "port" "invalid port number";
+          addrBlame = schemaLib.blame "addr" "must be a valid IP address";
+        in
+        {
+          portField = portBlame.field;
+          portMessage = portBlame.message;
+          isBlame = portBlame.__blame;
+          addrField = addrBlame.field;
+        };
     };
 
     # --- Documentation generation ---

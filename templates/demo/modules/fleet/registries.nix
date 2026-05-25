@@ -186,4 +186,8 @@ in
     description = "Fleet host group instances.";
     refs.members = config.fleet.hosts;
   };
+
+  options.fleet.networks = mkInstanceRegistry config.schema "network" {
+    description = "Fleet network instances.";
+  };
 }
