@@ -2,11 +2,11 @@
   "nodes": {
     "gen": {
       "locked": {
-        "lastModified": 1779304561,
-        "narHash": "sha256-aqLSLakDBxQBZmeIRBQY5BYX/xhx52RQlxEZ/kk0DQs=",
+        "lastModified": 1779589603,
+        "narHash": "sha256-PQYbcQ029MrQepssntNoJNqcX3G5Adth+2RarWUFkT4=",
         "owner": "sini",
         "repo": "gen",
-        "rev": "40838941209b8f7042f4c2097e1e8d4c98a01a67",
+        "rev": "96b50e0a4cfab8970c4c9b1f101d3cd6b05c9022",
         "type": "github"
       },
       "original": {
@@ -20,12 +20,12 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1779417936,
-        "narHash": "sha256-3S6PyiGjkTEUPqqqkElshOZZvedXguAkdIIrmvNCCU8=",
-        "owner": "sini",
-        "repo": "gen-schema",
-        "rev": "25c0e4b6b91abcd22ac769c0e288de7cee008ec5",
-        "type": "github"
+        "dirtyRev": "ac2dce2daf4bb2ad1aa0f4f6cce385fa0ba32387-dirty",
+        "dirtyShortRev": "ac2dce2-dirty",
+        "lastModified": 1779665495,
+        "narHash": "sha256-5PDa34uHEAvL6/O3B9VY8IaeoxrJ4LKtHzowvpPHiC4=",
+        "type": "git",
+        "url": "file:///home/sini/Documents/repos/gen-schema"
       },
       "original": {
         "owner": "sini",
