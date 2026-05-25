@@ -4,6 +4,25 @@ A typed record registry for Nix with extension points, strict validation, refine
 
 gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions that any module can extend, strict-by-default validation that catches typos immediately, refinement contracts co-located with type declarations, stable identity comparison via `id_hash`, cross-registry references that resolve to instances, reusable mixins with structural compatibility, and auto-generated documentation from your schema.
 
+## Terminology
+
+| Term | Definition |
+|------|-----------|
+| Collections | Named multi-contributor aggregation points with a merge strategy |
+| Nodes | Graph vertices — schema kinds become scope graph nodes |
+| Edges | Labeled relationships: parent (P) nesting, ref (I) imports |
+| Refs | Cross-registry references between kinds |
+
+## Gen Ecosystem
+
+| Library | Role |
+|---------|------|
+| [gen](https://github.com/sini/gen) | Pure primitives (search, record, identity) |
+| [gen-schema](https://github.com/sini/gen-schema) | Typed registries (kinds, instances, collections, refs) |
+| [gen-aspects](https://github.com/sini/gen-aspects) | Aspect types (traits, classification, dispatch) |
+| [gen-graph](https://github.com/sini/gen-graph) | Graph queries (combinators, traversals, fixpoint) |
+| [gen-scope](https://github.com/sini/gen-scope) | Scope graphs (construction, evaluation, resolution) |
+
 ## Quick Start
 
 ### As a flake-parts module
@@ -37,7 +56,7 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
 }
 ```
 
-The flake-parts module provides `schema` and `schemaLib` with default settings (`strict = true`, no `baseModule`). For custom `strict`, `baseModule`, `sidecars`, or `computed` settings, use the programmatic API instead.
+The flake-parts module provides `schema` and `schemaLib` with default settings (`strict = true`, no `baseModule`). For custom `strict`, `baseModule`, `collections`, or `computed` settings, use the programmatic API instead.
 
 ### Programmatic use
 
@@ -222,7 +241,7 @@ config.schema.host = {
 
 Kinds are deferred modules — they define options and config but aren't evaluated until imported by an instance.
 
-Kind names starting with `_` are reserved for internal use (`_meta`, `_strict`). They are excluded from `_meta.kindNames` and `renderDocs`.
+Kind names starting with `_` are reserved for internal use (`_kindNames`, `_strict`). They are excluded from `_kindNames` and `renderDocs`.
 
 ### Extension
 
@@ -540,7 +559,7 @@ Composes with custom coerce hooks — expansion produces duplicates, `setOf` rem
 
 ### Parent-Child Topology
 
-Kinds can declare their parent kind via the `parent` sidecar. This establishes a schema-level nesting relationship:
+Kinds can declare their parent kind via the `parent` collection. This establishes a schema-level nesting relationship:
 
 ```nix
 config.schema.host = {
@@ -553,60 +572,47 @@ config.schema.user = {
 };
 ```
 
-The `parent` sidecar is optional — kinds without it are root kinds. The schema derives both directions:
+The `parent` collection is optional — kinds without it are root kinds. The schema derives both directions:
 
 ```nix
-config.schema._meta.topology.host   # → { parent = null; children = [ "user" ]; }
-config.schema._meta.topology.user   # → { parent = "host"; children = []; }
+config.schema._topology.host   # → { parent = null; children = [ "user" ]; }
+config.schema._topology.user   # → { parent = "host"; children = []; }
 ```
 
 Declaring a parent that doesn't exist as a schema kind throws at eval time.
 
 ### Schema Introspection
 
-Every schema has `_meta` for programmatic access:
+Every schema has flat `_`-prefixed options for programmatic access:
 
 ```nix
-config.schema._meta.kindNames    # → [ "host" "service" "user" ]
-config.schema._meta.roots        # → [ "host" ]  — kinds with no parent
-config.schema._meta.leaves       # → [ "user" ]  — kinds with no children
+config.schema._kindNames    # → [ "host" "service" "user" ]
+config.schema._roots        # → [ "host" ]  — kinds with no parent
+config.schema._leaves       # → [ "user" ]  — kinds with no children
 
 # Per-kind metadata
-meta = config.schema._meta.kindMeta "host";
+meta = config.schema._kindMeta "host";
 meta.optionNames   # → [ "addr" "role" ... ]
 meta.options       # → full option declarations
 meta.refs          # → { }  (ref fields on this kind)
 
 # Unified edge view (Neron scope graph P + I edges)
-config.schema._meta.edges
+config.schema._edges
 # → [
 #   { from = "user"; to = "host"; type = "parent"; field = null; }
 #   { from = "service"; to = "host"; type = "ref"; field = "host"; }
 # ]
 
 # Ref edges only
-config.schema._meta.refEdges
+config.schema._refEdges
 # → [ { from = "service"; field = "host"; to = "host"; } ]
 ```
 
-`_meta.edges` combines parent edges (from topology) and ref edges (from `schema.ref` declarations) into a single typed list. Every edge has `{ from, to, type, field }` — `field` is `null` for parent edges and the option name for ref edges.
+`_edges` combines parent edges (from topology) and ref edges (from `schema.ref` declarations) into a single typed list. Every edge has `{ from, to, type, field }` — `field` is `null` for parent edges and the option name for ref edges.
 
-### Scope Graph Bridge
+### Scope Graph Bridge (Consumer-Side)
 
-`buildKindGraph` and `buildInstanceGraph` convert schema metadata into the `{ parentGraph, importGraph, decls, types }` structure that scope-engine's `buildNodes` expects:
-
-```nix
-# Kind-level graph: kinds as nodes, topology as edges
-kindGraph = schemaLib.buildKindGraph config.schema;
-kindGraph.parentGraph.vertices   # → [ "host" "service" "user" ]
-kindGraph.parentGraph.edges      # → [ { from = "user"; to = "host"; } ]
-
-# Instance-level graph: instances as nodes, resolved refs as edges
-fleet = { host = config.hosts; service = config.services; };
-instanceGraph = schemaLib.buildInstanceGraph config.schema fleet;
-instanceGraph.parentGraph.vertices  # → [ "host:igloo" "host:iceberg" ... ]
-instanceGraph.importGraph.edges     # → [ { from = "service:nginx"; to = "host:igloo"; } ]
-```
+gen-schema provides generic introspection options (`_topology`, `_edges`, `_kindNames`, etc.) that consumers use to build whatever graph format their evaluator needs. The bridge logic lives in consumers (e.g., den's `buildScopeGraphs`), not in gen-schema.
 
 ### Kind Mix-ins
 
@@ -697,15 +703,15 @@ Methods with arguments that don't match any config key produce a clear error:
 method 'bad' on host: references config keys 'nonexistent' which are not declared on this kind
 ```
 
-Methods must be declared via inline attrsets, not path modules. This is a constraint shared with all sidecar fields.
+Methods must be declared via inline attrsets, not path modules. This is a constraint shared with all collection fields.
 
-### Sidecar Fields
+### Collection Fields
 
-Declare custom sidecar fields on kinds — data extracted from definitions before module merge and exposed on the merged result:
+Declare custom collection fields on kinds — data extracted from definitions before module merge and exposed on the merged result:
 
 ```nix
 options.schema = schemaLib.mkSchemaOption {
-  sidecars = {
+  collections = {
     includes = { default = []; };           # list → merged via ++
     excludes = { default = []; };           # list → merged via ++
     metadata = { default = {}; };           # attrset → merged via //
@@ -718,7 +724,7 @@ config.schema.host = {
   options.addr = lib.mkOption { type = str; };
 };
 
-# Read sidecar values directly:
+# Read collection values directly:
 config.schema.host.includes  # → [ policy-a policy-b ]
 ```
 
@@ -732,11 +738,11 @@ config.schema.host.includes  # → [ policy-a policy-b ]
 
 Providing a non-list, non-attrset default without an explicit `merge` function throws at evaluation time.
 
-Sidecar keys are stripped before the deferred module merge — they never leak into the module system. Sidecars must be declared via inline attrsets, not path modules (path defs get the sidecar's default value).
+Collection keys are stripped before the deferred module merge — they never leak into the module system. Collections must be declared via inline attrsets, not path modules (path defs get the collection's default value).
 
-`methods` is a built-in sidecar with `{ default = {}; }`. User-declared sidecars are additional. `__functor` is reserved and cannot be used as a sidecar key.
+`methods` is a built-in collection with `{ default = {}; }`. User-declared collections are additional. `__functor` is reserved and cannot be used as a collection key.
 
-Multiple modules contributing to the same sidecar merge according to the sidecar's strategy:
+Multiple modules contributing to the same collection merge according to the collection's strategy:
 
 ```nix
 # Module A
@@ -750,27 +756,27 @@ config.schema.host.includes = [ policy-b policy-c ];
 
 ### Computed Fields
 
-Derived values computed from sidecar content and raw definitions:
+Derived values computed from collection content and raw definitions:
 
 ```nix
 options.schema = schemaLib.mkSchemaOption {
-  sidecars = {
+  collections = {
     includes = { default = []; };
     excludes = { default = []; };
   };
-  computed = sidecars: defs: {
+  computed = collections: defs: {
     isEntity =
       let
-        sidecarKeys = lib.attrNames sidecars;
+        collectionKeys = lib.attrNames collections;
         hasStructuralContent = lib.any (d:
           let v = d.value;
               stripped = if builtins.isAttrs v
-                then builtins.removeAttrs v sidecarKeys else v;
+                then builtins.removeAttrs v collectionKeys else v;
           in !builtins.isAttrs stripped || stripped != {}
         ) defs;
       in
-      sidecars.includes != []
-      || sidecars.excludes != []
+      collections.includes != []
+      || collections.excludes != []
       || hasStructuralContent;
   };
 };
@@ -779,20 +785,20 @@ config.schema.host.isEntity   # → true (has includes)
 config.schema.conf.isEntity   # → false (empty — shared base only)
 ```
 
-### Introspection
+### Introspection API
 
-Every schema has `_meta` for programmatic access:
+Every schema has flat `_`-prefixed options for programmatic access:
 
 ```nix
-config.schema._meta.kindNames                # → [ "host" "service" "user" ]
+config.schema._kindNames                # → [ "host" "service" "user" ]
 
 # Per-kind metadata — evaluates a throwaway instance to reflect on options
-meta = config.schema._meta.kindMeta "host";
+meta = config.schema._kindMeta "host";
 meta.optionNames   # → [ "addr" "describe" "hasService" "metricsPort" ... ]
 meta.options       # → full option declarations (type, description, default, ...)
 ```
 
-`kindMeta` is lazy — the `lib.evalModules` call only fires when accessed. Querying an undeclared kind throws:
+`_kindMeta` is lazy — the `lib.evalModules` call only fires when accessed. Querying an undeclared kind throws:
 
 ```
 kindMeta: 'nonexistent' is not a declared schema kind
@@ -800,7 +806,7 @@ kindMeta: 'nonexistent' is not a declared schema kind
 
 ### Schema Validators
 
-Declare cross-field validation constraints on kinds. Validators are a built-in sidecar — they travel with the kind and run automatically on every registry of that kind.
+Declare cross-field validation constraints on kinds. Validators are a built-in collection — they travel with the kind and run automatically on every registry of that kind.
 
 ```nix
 config.schema.host.validators = [
@@ -813,7 +819,7 @@ config.schema.host.validators = [
 ];
 ```
 
-Validators compose across modules — multiple modules can contribute validators to the same kind via the sidecar `++` merge:
+Validators compose across modules — multiple modules can contribute validators to the same kind via the collection `++` merge:
 
 ```nix
 # Module A
@@ -892,14 +898,14 @@ Outputs a table per kind with option name, type, default, and description — in
 mkSchemaOption {
   strict ? true,        # strict-by-default validation on instances
   baseModule ? null,     # module imported into every kind
-  sidecars ? {},         # { name = { default; merge? }; } — user-defined sidecar fields
-  computed ? null,       # (sidecars -> defs -> attrset) — derived fields on merged result
+  collections ? {},      # { name = { default; merge? }; } — user-defined collection fields
+  computed ? null,       # (collections -> defs -> attrset) — derived fields on merged result
 }
 ```
 
 Returns `lib.mkOption` — use as `options.schema = mkSchemaOption { ... }`.
 
-`mkSchemaEntryType` is also exported for advanced use — it returns the raw `deferredModule` type used for schema kind values, without wrapping in `mkOption` or adding `_meta`/`_strict`. Most consumers should use `mkSchemaOption`.
+`mkSchemaEntryType` is also exported for advanced use — it returns the raw `deferredModule` type used for schema kind values, without wrapping in `mkOption` or adding introspection options/`_strict`. Most consumers should use `mkSchemaOption`.
 
 ### `mkInstanceType`
 
@@ -1015,22 +1021,6 @@ renderDocs schema
 
 Returns a markdown string with a table per kind.
 
-### `buildKindGraph`
-
-```nix
-buildKindGraph schema
-```
-
-Returns `{ parentGraph, importGraph, decls, types }` — the kind-level scope graph. Kinds are nodes, topology provides parent edges, refs provide import edges. Compatible with scope-engine's `buildNodes`.
-
-### `buildInstanceGraph`
-
-```nix
-buildInstanceGraph schema fleet
-```
-
-Returns `{ parentGraph, importGraph, decls, types }` — the instance-level scope graph. `fleet` is `{ kindName = { instanceName = instanceConfig; }; }`. Instance refs are resolved to import edges.
-
 ### `_internal`
 
 ```nix
@@ -1134,11 +1124,11 @@ Annotates a mixin for Beta direction — parent controls, meaning existing field
 
 ### `schema.emitModule`
 
-Bridges record-algebra records to NixOS modules. Strips refinement metadata from types. Extracts sidecars with full shadow stacks.
+Bridges record-algebra records to NixOS modules. Strips refinement metadata from types. Extracts collections with full shadow stacks.
 
 ```nix
 emitted = schema.emitModule [ "validators" "methods" ] recordAlgebraRecord;
-# → { module = <NixOS module>; sidecars = { ... }; refinements = { ... }; }
+# → { module = <NixOS module>; collections = { ... }; refinements = { ... }; }
 ```
 
 ### `mkSchemaEntryType` `mixins` parameter
@@ -1175,26 +1165,24 @@ Instance types (submodules with strict + identity injected)
   ↓ collected into
 Instance registries (attrsOf instance type, ref binding via apply)
   ↓ referenced by             ↓ introspected by
-Cross-instance refs        _meta (topology, edges, roots, leaves)
-  (schema.ref)                ↓ bridged to
-                        Scope graph (buildKindGraph, buildInstanceGraph)
+Cross-instance refs        _topology, _edges, _roots, _leaves
+  (schema.ref)
 ```
 
-**Kinds are pure schema** — options, config, defaults, methods, sidecars. No strict validation or identity hashing at the kind level.
+**Kinds are pure schema** — options, config, defaults, methods, collections. No strict validation or identity hashing at the kind level.
 
 **Instances add infrastructure** — `mkInstanceType` injects `mkStrictModule` and `mkIdentityModule`. This separation means kind-level composition via `imports` works without duplicate module conflicts.
 
-**Sidecars are extracted before merge** — sidecar keys on kind definitions are folded, merged, and exposed on the result. They never enter the deferred module merge.
+**Collections are extracted before merge** — collection keys on kind definitions are folded, merged, and exposed on the result. They never enter the deferred module merge.
 
 ### File Layout
 
 ```
 nix/lib/
   default.nix       — public API surface, wiring (imports gen for primitives)
-  entry-type.nix     — mkSchemaEntryType, mkSchemaOption (sidecar extraction, _meta, topology)
+  entry-type.nix     — mkSchemaEntryType, mkSchemaOption (collection extraction, introspection, topology)
   instance.nix       — mkInstanceType, mkInstanceRegistry (strict + identity injection, refs)
   ref.nix            — schema.ref (dual-mode cross-instance references, getRefKind)
-  scope-graph.nix    — buildKindGraph, buildInstanceGraph (scope-engine bridge)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)
   validate.nix       — validateInstances (schema-specific wrapper around gen.runValidators)
   docs.nix           — renderDocs (markdown generation)

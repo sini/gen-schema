@@ -34,7 +34,7 @@ Kind definitions live in `modules/schema/` and are plain NixOS-style modules set
 | Derive hooks | `modules/fleet/registries.nix` | Plain `derive` assigns deterministic UIDs from `id_hash` |
 | Either pipeline | `modules/fleet/registries.nix` | `deriveEither` with gen's either computes service endpoints |
 | Doc generation | `modules/outputs.nix` | `renderDocs` produces markdown tables from schema metadata |
-| Introspection | `modules/outputs.nix` | `_meta.kindNames`, `_meta.kindMeta` for programmatic schema access |
+| Introspection | `modules/outputs.nix` | `_kindNames`, `_kindMeta` for programmatic schema access |
 | flake-parts integration | `modules/schema.nix` | Single import of `gen-schema.flakeModules.default` |
 | import-tree | `flake.nix` | `inputs.import-tree ./modules` auto-imports all module files |
 
@@ -322,7 +322,7 @@ Both contributions merge through `deferredModule` — the kind type is open, not
 
 **Cross-instance references.** Bare submodules have no notion of references between registries. If a service needs to point at a host, you'd use a string and manually look it up. gen-schema's `mkRefType` validates the reference at eval time and resolves it to the target instance — `config.services.nginx.host.addr` works directly.
 
-**Introspection.** With bare submodules, there's no way to ask "what kinds exist?" or "what options does a host have?" without evaluating an instance. gen-schema's `_meta.kindNames` and `_meta.kindMeta` provide this at the schema level — the foundation for documentation generation, tooling, and diag.
+**Introspection.** With bare submodules, there's no way to ask "what kinds exist?" or "what options does a host have?" without evaluating an instance. gen-schema's `_kindNames` and `_kindMeta` provide this at the schema level — the foundation for documentation generation, tooling, and diag.
 
 ### Comparison
 
@@ -333,7 +333,7 @@ Both contributions merge through `deferredModule` — the kind type is open, not
 | Entity comparison | `==` (fragile, can diverge) | `id_hash` (cheap, deterministic) |
 | Cross-references | Manual string lookup | `mkRefType` — validated, resolves to instance |
 | Defaults | `config.x = mkDefault val` (same) | Same — deferred module merge preserves this |
-| Introspection | None without evaluating instances | `_meta.kindNames`, `_meta.kindMeta` |
+| Introspection | None without evaluating instances | `_kindNames`, `_kindMeta` |
 | Declarative methods | Manual `functionTo` options + config wiring | `schemaFn` — auto-resolves config args |
 | Documentation | Write it yourself | `renderDocs` generates from schema metadata |
 | Dependencies | None | nixpkgs only |
