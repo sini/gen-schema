@@ -1159,7 +1159,7 @@ mkSchemaEntryType {
 ## Architecture
 
 ```
-Schema kinds (deferred modules, parent sidecar, ref types)
+Schema kinds (deferred modules, parent collection, ref types)
   ↓ imported by
 Instance types (submodules with strict + identity injected)
   ↓ collected into
