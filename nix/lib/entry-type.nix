@@ -1,9 +1,9 @@
 # Schema entry type and mkSchemaOption.
 #
 # A schema kind is a pure declaration — options, config, defaults, methods,
-# and user-defined sidecar fields. Sidecars are extracted from defs before
+# and user-defined collection fields. Collections are extracted from defs before
 # deferred module merge and exposed as attributes on the merged result.
-# Computed fields are derived from extracted sidecars post-merge.
+# Computed fields are derived from extracted collections post-merge.
 #
 # Strict validation and identity hashing are instance-level concerns
 # injected by mkInstanceType, not here.
@@ -19,17 +19,23 @@
 }:
 let
   mkSchemaEntryType =
-    {
+    args@{
       baseModule ? null,
-      sidecars ? { },
+      collections ? { },
       computed ? null,
       mixins ? [ ],
+      sidecars ? null,
     }:
     let
+      collections' =
+        if args ? sidecars && args.sidecars != null then
+          lib.warn "gen-schema: 'sidecars' is deprecated, use 'collections'" args.sidecars
+        else
+          collections;
       base = lib.types.deferredModule;
 
-      # methods is a built-in sidecar — user sidecars are additional
-      allSidecars =
+      # methods is a built-in collection — user collections are additional
+      allCollections =
         let
           merged = {
             methods = {
@@ -48,28 +54,28 @@ let
                   val;
             };
           }
-          // sidecars;
+          // collections';
         in
         if merged ? __functor then
-          throw "gen-schema: sidecar '__functor' is reserved — cannot be used as a sidecar key"
+          throw "gen-schema: collection '__functor' is reserved — cannot be used as a collection key"
         else if merged ? kind then
-          throw "gen-schema: sidecar 'kind' is reserved — cannot be used as a sidecar key"
+          throw "gen-schema: collection 'kind' is reserved — cannot be used as a collection key"
         else
           merged;
 
       # Infer merge strategy from default type
       inferMerge =
-        name: sidecar:
-        if sidecar ? merge then
-          sidecar.merge
-        else if builtins.isList sidecar.default then
+        name: collection:
+        if collection ? merge then
+          collection.merge
+        else if builtins.isList collection.default then
           (acc: val: acc ++ val)
-        else if builtins.isAttrs sidecar.default then
+        else if builtins.isAttrs collection.default then
           (acc: val: acc // val)
         else
-          throw "gen-schema: sidecar '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
+          throw "gen-schema: collection '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
 
-      sidecarKeys = lib.attrNames allSidecars;
+      collectionKeys = lib.attrNames allCollections;
     in
     base
     // {
@@ -78,30 +84,30 @@ let
         let
           kind = lib.last loc;
 
-          # Extract each sidecar from defs, merge with strategy.
-          # NOTE: sidecars must be declared via inline attrsets, not path modules.
+          # Extract each collection from defs, merge with strategy.
+          # NOTE: collections must be declared via inline attrsets, not path modules.
           # Path-based kind declarations pass through as paths — the isAttrs check
-          # skips them. If two modules declare the same sidecar key, they merge
-          # according to the sidecar's merge strategy.
-          extractedSidecars = lib.mapAttrs (
-            name: sidecar:
+          # skips them. If two modules declare the same collection key, they merge
+          # according to the collection's merge strategy.
+          extractedCollections = lib.mapAttrs (
+            name: collection:
             let
-              merge = inferMerge name sidecar;
+              merge = inferMerge name collection;
             in
             lib.foldl' (
               acc: d: if builtins.isAttrs d.value && d.value ? ${name} then merge acc d.value.${name} else acc
-            ) sidecar.default defs
-          ) allSidecars;
+            ) collection.default defs
+          ) allCollections;
 
-          # Computed fields from extracted sidecars + raw defs
+          # Computed fields from extracted collections + raw defs
           # kind (lib.last loc) is passed so computed can produce entry-specific fields
-          computedFields = if computed != null then computed extractedSidecars defs else { };
+          computedFields = if computed != null then computed extractedCollections defs else { };
 
-          # Strip all sidecar keys before deferredModule merge
+          # Strip all collection keys before deferredModule merge
           strippedDefs = map (
             d:
-            if builtins.isAttrs d.value && lib.any (k: d.value ? ${k}) sidecarKeys then
-              d // { value = builtins.removeAttrs d.value sidecarKeys; }
+            if builtins.isAttrs d.value && lib.any (k: d.value ? ${k}) collectionKeys then
+              d // { value = builtins.removeAttrs d.value collectionKeys; }
             else
               d
           ) defs;
@@ -123,7 +129,7 @@ let
                 withMixins = builtins.foldl' (
                   acc: m: applyMixin m acc kind
                 ) baseRecord mixins;
-                emitted = emitModule sidecarKeys withMixins;
+                emitted = emitModule collectionKeys withMixins;
               in
               emitted
             else
@@ -162,34 +168,34 @@ let
                 lib.mapAttrs (_: v: getRefinements v.type) allOptionDecls
               );
 
-          # Merge bridge-extracted sidecars into the sidecar results
-          bridgeSidecars =
+          # Merge bridge-extracted collections into the collection results
+          bridgeCollections =
             if mixinResult != null then
               lib.mapAttrs (name: stacks:
-                let merge = inferMerge name allSidecars.${name};
-                in builtins.foldl' merge (extractedSidecars.${name} or allSidecars.${name}.default) stacks
-              ) (lib.filterAttrs (n: _: allSidecars ? ${n}) mixinResult.sidecars)
+                let merge = inferMerge name allCollections.${name};
+                in builtins.foldl' merge (extractedCollections.${name} or allCollections.${name}.default) stacks
+              ) (lib.filterAttrs (n: _: allCollections ? ${n}) mixinResult.collections)
             else
               { };
 
-          finalSidecars = extractedSidecars // bridgeSidecars;
+          finalCollections = extractedCollections // bridgeCollections;
 
-          # Inject baseModule + methods module (methods is the only sidecar
+          # Inject baseModule + methods module (methods is the only collection
           # that generates instance-level options via mkMethodsModule)
           injected =
             lib.optional (effectiveBase != null) {
               file = "gen-schema/base";
               value = effectiveBase;
             }
-            ++ lib.optional (finalSidecars.methods != { }) {
+            ++ lib.optional (finalCollections.methods != { }) {
               file = "gen-schema/methods";
-              value = mkMethodsModule kind finalSidecars.methods;
+              value = mkMethodsModule kind finalCollections.methods;
             };
 
           merged = base.merge loc (strippedDefs ++ injected);
         in
-        # Precedence: computed overrides sidecars of the same name.
-        # __functor is reserved — sidecars/computed must not use it as a key.
+        # Precedence: computed overrides collections of the same name.
+        # __functor is reserved — collections/computed must not use it as a key.
         {
           __functor =
             _:
@@ -200,18 +206,26 @@ let
           inherit kind mixins;
           refinements = extractedRefinements;
         }
-        // finalSidecars
+        // finalCollections
         // computedFields;
     };
 
   mkSchemaOption =
-    {
+    args@{
       strict ? true,
       baseModule ? null,
-      sidecars ? { },
+      collections ? { },
       computed ? null,
       mixins ? [ ],
+      sidecars ? null,
     }:
+    let
+      collections' =
+        if args ? sidecars && args.sidecars != null then
+          lib.warn "gen-schema: 'sidecars' is deprecated, use 'collections'" args.sidecars
+        else
+          collections;
+    in
     lib.mkOption {
       description = "Schema — typed record registry with extension points";
       default = { };
@@ -221,10 +235,10 @@ let
           freeformType = lib.types.lazyAttrsOf (mkSchemaEntryType {
             inherit
               baseModule
-              sidecars
               computed
               mixins
               ;
+            collections = collections';
           });
 
           # Schema-level strict setting — stored for mkInstanceType to read
@@ -293,11 +307,11 @@ let
                 else
                   throw "gen-schema: kindMeta: '${k}' is not a declared schema kind";
 
-              # Derive topology from parent sidecars on each kind.
-              # Each kind can declare `parent = "host";` as a sidecar.
+              # Derive topology from parent collections on each kind.
+              # Each kind can declare `parent = "host";` as a collection.
               topology =
                 let
-                  # Read parent sidecar from each kind
+                  # Read parent collection from each kind
                   parentMap = lib.foldl' (
                     acc: k:
                     let

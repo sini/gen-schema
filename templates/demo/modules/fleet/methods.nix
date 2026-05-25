@@ -1,6 +1,6 @@
 # Declarative methods on host instances.
 #
-# Methods are declared as sidecars on schema kinds. The function's named
+# Methods are declared as collections on schema kinds. The function's named
 # arguments are automatically resolved from the instance's config. The
 # function body can also close over values from the module scope — here
 # we capture config.fleet.services to implement cross-registry queries.

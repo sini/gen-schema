@@ -1,11 +1,11 @@
-# __functor is reserved — declaring it as a sidecar key should throw.
+# __functor is reserved — declaring it as a collection key should throw.
 { lib, schemaLib, ... }:
 let
   eval = lib.evalModules {
     modules = [
       {
         options.schema = schemaLib.mkSchemaOption {
-          sidecars.__functor = {
+          collections.__functor = {
             default = { };
           };
         };
@@ -17,7 +17,7 @@ let
   result = builtins.tryEval (builtins.deepSeq eval.config.schema.host eval.config.schema.host);
 in
 {
-  "sidecar-functor".test-reserved-key-throws = {
+  "collection-functor".test-reserved-key-throws = {
     expr = result.success;
     expected = false;
   };

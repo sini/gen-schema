@@ -6,29 +6,29 @@ let
     modules = [
       {
         options.schema = mkSchemaOption {
-          sidecars.includes = {
-            default = [ ];
+          collections.metadata = {
+            default = { };
           };
         };
         config.schema.host = {
           options.name = lib.mkOption { type = lib.types.str; };
-          includes = [ "networking" ];
+          metadata.tier = "production";
         };
       }
       {
         config.schema.host = {
-          includes = [ "monitoring" ];
+          metadata.region = "us-east";
         };
       }
     ];
   };
 in
 {
-  sidecar-list.test-merged-includes = {
-    expr = eval.config.schema.host.includes;
-    expected = [
-      "networking"
-      "monitoring"
-    ];
+  collection-attrs.test-merged-metadata = {
+    expr = eval.config.schema.host.metadata;
+    expected = {
+      tier = "production";
+      region = "us-east";
+    };
   };
 }

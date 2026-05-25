@@ -41,8 +41,8 @@ let
     name = lib.mkOption { type = lib.types.str; };
   };
 
-  # Record with sidecar labels (validators, methods)
-  sidecarRecord =
+  # Record with collection labels (validators, methods)
+  collectionRecord =
     let
       base = R.fromAttrs {
         port = lib.mkOption { type = lib.types.int; };
@@ -100,7 +100,7 @@ in
       let
         result = emitModule [ ] mixedRecord;
       in
-      result.sidecars == { } && result.refinements == { };
+      result.collections == { } && result.refinements == { };
     expected = true;
   };
 
@@ -131,22 +131,22 @@ in
     expected = 1;
   };
 
-  bridge-basic.test-emit-sidecar-extraction = {
+  bridge-basic.test-emit-collection-extraction = {
     expr =
       let
-        result = emitModule [ "validators" ] sidecarRecord;
+        result = emitModule [ "validators" ] collectionRecord;
       in
-      result.sidecars.validators;
+      result.collections.validators;
     expected = [
       [ "validator-b" ]
       [ "validator-a" ]
     ];
   };
 
-  bridge-basic.test-emit-sidecar-not-in-module = {
+  bridge-basic.test-emit-collection-not-in-module = {
     expr =
       let
-        result = emitModule [ "validators" ] sidecarRecord;
+        result = emitModule [ "validators" ] collectionRecord;
         eval = lib.evalModules {
           modules = [
             result.module

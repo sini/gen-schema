@@ -1,16 +1,16 @@
-# Computed fields override sidecars of the same name.
+# Computed fields override collections of the same name.
 { lib, schemaLib, ... }:
 let
   eval = lib.evalModules {
     modules = [
       {
         options.schema = schemaLib.mkSchemaOption {
-          sidecars.isEntity = {
+          collections.isEntity = {
             default = false;
             merge = _: v: v;
           };
-          computed = _sidecars: _defs: {
-            # Computed isEntity overrides the sidecar isEntity
+          computed = _collections: _defs: {
+            # Computed isEntity overrides the collection isEntity
             isEntity = true;
           };
         };
@@ -23,7 +23,7 @@ let
   };
 in
 {
-  "sidecar-precedence".test-computed-overrides-sidecar = {
+  "collection-precedence".test-computed-overrides-collection = {
     expr = eval.config.schema.host.isEntity;
     expected = true;
   };

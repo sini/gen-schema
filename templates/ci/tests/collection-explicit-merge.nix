@@ -6,7 +6,7 @@ let
     modules = [
       {
         options.schema = mkSchemaOption {
-          sidecars.priority = {
+          collections.priority = {
             default = 0;
             merge = _acc: val: val;
           };
@@ -25,7 +25,7 @@ let
   };
 in
 {
-  sidecar-explicit.test-last-wins = {
+  collection-explicit.test-last-wins = {
     expr = eval.config.schema.host.priority;
     expected = 50;
   };

@@ -25,13 +25,13 @@ let
     );
 
   # Emit a record-algebra record as a NixOS module
-  # sidecarLabels: which labels to extract with full stacks
+  # collectionLabels: which labels to extract with full stacks
   emitModule =
-    sidecarLabels: record':
+    collectionLabels: record':
     let
-      allAttrs = record.emitAll record' sidecarLabels;
-      sidecars = lib.filterAttrs (n: _: builtins.elem n sidecarLabels) allAttrs;
-      content = builtins.removeAttrs allAttrs sidecarLabels;
+      allAttrs = record.emitAll record' collectionLabels;
+      collections = lib.filterAttrs (n: _: builtins.elem n collectionLabels) allAttrs;
+      content = builtins.removeAttrs allAttrs collectionLabels;
 
       options = lib.filterAttrs (_: isOptionDecl) content;
       config = builtins.removeAttrs content (builtins.attrNames options);
@@ -50,7 +50,7 @@ let
           options = strippedOptions;
           config = config;
         };
-      inherit sidecars refinements;
+      inherit collections refinements;
     };
 in
 {

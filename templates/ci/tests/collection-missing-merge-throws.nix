@@ -8,7 +8,7 @@ let
         modules = [
           {
             options.schema = mkSchemaOption {
-              sidecars.priority = {
+              collections.priority = {
                 default = 0;
               };
             };
@@ -24,7 +24,7 @@ let
   );
 in
 {
-  sidecar-no-merge.test-int-default-throws = {
+  collection-no-merge.test-int-default-throws = {
     expr = result.success;
     expected = false;
   };

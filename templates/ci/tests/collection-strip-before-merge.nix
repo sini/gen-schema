@@ -7,7 +7,7 @@ let
       {
         options.schema = mkSchemaOption {
           strict = true;
-          sidecars.tags = {
+          collections.tags = {
             default = [ ];
           };
         };
@@ -27,7 +27,7 @@ let
   result = builtins.tryEval (builtins.deepSeq eval.config.hosts.igloo eval.config.hosts.igloo);
 in
 {
-  sidecar-strip.test-no-leak-in-strict = {
+  collection-strip.test-no-leak-in-strict = {
     expr = result.success;
     expected = true;
   };

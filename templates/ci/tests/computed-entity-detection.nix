@@ -6,22 +6,22 @@ let
     modules = [
       {
         options.schema = mkSchemaOption {
-          sidecars.includes = {
+          collections.includes = {
             default = [ ];
           };
-          sidecars.excludes = {
+          collections.excludes = {
             default = [ ];
           };
           computed =
-            sidecars: defs:
+            collections: defs:
             let
               hasStructural = lib.any (
                 d: builtins.isAttrs d.value && (d.value ? options || d.value ? config)
               ) defs;
-              hasSidecars = sidecars.includes != [ ] || sidecars.excludes != [ ];
+              hasCollections = collections.includes != [ ] || collections.excludes != [ ];
             in
             {
-              isEntity = hasStructural || hasSidecars;
+              isEntity = hasStructural || hasCollections;
             };
         };
         # Kind with includes (entity)

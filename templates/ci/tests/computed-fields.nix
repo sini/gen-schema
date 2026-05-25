@@ -6,11 +6,11 @@ let
     modules = [
       {
         options.schema = mkSchemaOption {
-          sidecars.tags = {
+          collections.tags = {
             default = [ ];
           };
-          computed = sidecars: _defs: {
-            tagCount = builtins.length sidecars.tags;
+          computed = collections: _defs: {
+            tagCount = builtins.length collections.tags;
           };
         };
         config.schema.host = {

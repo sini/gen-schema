@@ -6,10 +6,10 @@ let
     modules = [
       {
         options.schema = mkSchemaOption {
-          sidecars.includes = {
+          collections.includes = {
             default = [ ];
           };
-          sidecars.excludes = {
+          collections.excludes = {
             default = [ ];
           };
         };
@@ -25,15 +25,15 @@ let
   hostKind = eval.config.schema.host;
 in
 {
-  sidecar-result.test-includes-on-kind = {
+  collection-result.test-includes-on-kind = {
     expr = hostKind.includes;
     expected = [ "networking" ];
   };
-  sidecar-result.test-excludes-on-kind = {
+  collection-result.test-excludes-on-kind = {
     expr = hostKind.excludes;
     expected = [ "desktop" ];
   };
-  sidecar-result.test-still-callable = {
+  collection-result.test-still-callable = {
     expr = builtins.isFunction (hostKind.__functor hostKind);
     expected = true;
   };

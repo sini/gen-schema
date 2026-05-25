@@ -6,20 +6,29 @@ let
     modules = [
       {
         options.schema = mkSchemaOption {
-          sidecars.includes = {
+          collections.includes = {
             default = [ ];
           };
         };
         config.schema.host = {
           options.name = lib.mkOption { type = lib.types.str; };
+          includes = [ "networking" ];
+        };
+      }
+      {
+        config.schema.host = {
+          includes = [ "monitoring" ];
         };
       }
     ];
   };
 in
 {
-  sidecar-default.test-empty-default = {
+  collection-list.test-merged-includes = {
     expr = eval.config.schema.host.includes;
-    expected = [ ];
+    expected = [
+      "networking"
+      "monitoring"
+    ];
   };
 }

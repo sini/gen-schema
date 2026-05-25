@@ -6,7 +6,7 @@ let
     modules = [
       {
         options.schema = mkSchemaOption {
-          sidecars.tags = {
+          collections.tags = {
             default = [ ];
           };
         };
@@ -29,11 +29,11 @@ let
   };
 in
 {
-  sidecar-methods.test-method-works = {
+  collection-methods.test-method-works = {
     expr = instance.config.label;
     expected = "host:igloo";
   };
-  sidecar-methods.test-sidecar-on-kind = {
+  collection-methods.test-collection-on-kind = {
     expr = hostKind.tags;
     expected = [ "server" ];
   };
