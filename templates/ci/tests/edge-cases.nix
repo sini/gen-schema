@@ -77,7 +77,7 @@ let
 in
 {
   "edge-cases".test-empty-schema-kind-names = {
-    expr = emptyEval.config.schema._meta.kindNames;
+    expr = emptyEval.config.schema._kindNames;
     expected = [ ];
   };
   "edge-cases".test-empty-schema-docs = {

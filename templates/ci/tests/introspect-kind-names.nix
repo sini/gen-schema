@@ -18,14 +18,14 @@ let
 in
 {
   introspect-names.test-kind-names = {
-    expr = eval.config.schema._meta.kindNames;
+    expr = eval.config.schema._kindNames;
     expected = [
       "host"
       "user"
     ];
   };
   introspect-names.test-excludes-underscore-prefixed = {
-    expr = builtins.elem "_meta" eval.config.schema._meta.kindNames;
+    expr = builtins.elem "_meta" eval.config.schema._kindNames;
     expected = false;
   };
 }

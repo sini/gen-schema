@@ -24,7 +24,7 @@ let
     ];
   };
 
-  edges = eval.config.schema._meta.refEdges;
+  edges = eval.config.schema._refEdges;
 in
 {
   ref-edges = {

@@ -68,9 +68,9 @@ in
       hashesDiffer = fleet.admins.root.id_hash != fleet.users.tux.id_hash;
 
       # --- Introspection ---
-      inherit (config.schema._meta) kindNames;
-      hostOptionCount = builtins.length (config.schema._meta.kindMeta "host").optionNames;
-      adminOptionCount = builtins.length (config.schema._meta.kindMeta "admin-user").optionNames;
+      inherit (config.schema) _kindNames;
+      hostOptionCount = builtins.length (config.schema._kindMeta "host").optionNames;
+      adminOptionCount = builtins.length (config.schema._kindMeta "admin-user").optionNames;
 
       # --- Derive hooks ---
       # Deterministic UIDs from id_hash (auto-assigned)

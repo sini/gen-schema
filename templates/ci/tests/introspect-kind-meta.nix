@@ -14,7 +14,7 @@ let
     ];
   };
 
-  meta = eval.config.schema._meta.kindMeta "host";
+  meta = eval.config.schema._kindMeta "host";
 
   # Filter out internal options for assertions
   userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") meta.optionNames;

@@ -25,9 +25,9 @@ let
     ];
   };
 
-  serviceMeta = eval.config.schema._meta.kindMeta "service";
-  hostMeta = eval.config.schema._meta.kindMeta "host";
-  networkMeta = eval.config.schema._meta.kindMeta "network";
+  serviceMeta = eval.config.schema._kindMeta "service";
+  hostMeta = eval.config.schema._kindMeta "host";
+  networkMeta = eval.config.schema._kindMeta "network";
 in
 {
   ref-introspection = {

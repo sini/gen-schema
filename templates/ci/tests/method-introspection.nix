@@ -14,7 +14,7 @@ let
     ];
   };
 
-  meta = eval.config.schema._meta.kindMeta "host";
+  meta = eval.config.schema._kindMeta "host";
 in
 {
   method-intro.test-method-in-option-names = {

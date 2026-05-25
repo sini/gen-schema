@@ -24,8 +24,8 @@ let
     ];
   };
 
-  meta = eval.config.schema._meta;
-  topo = meta.topology;
+  schema = eval.config.schema;
+  topo = schema._topology;
 in
 {
   topology = {
@@ -49,14 +49,14 @@ in
       };
     };
     test-roots = {
-      expr = meta.roots;
+      expr = schema._roots;
       expected = [
         "host"
         "network"
       ];
     };
     test-leaves = {
-      expr = meta.leaves;
+      expr = schema._leaves;
       expected = [
         "network"
         "user"

@@ -26,7 +26,7 @@ let
             ];
           };
         in
-        builtins.deepSeq eval.config.schema._meta.topology eval.config.schema._meta.topology
+        builtins.deepSeq eval.config.schema._topology eval.config.schema._topology
       );
     in
     !result.success;

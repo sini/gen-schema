@@ -114,9 +114,12 @@ let
 
           # Resolve baseModule value (may be a function of kind name)
           resolvedBase =
-            if baseModule == null then null
-            else if builtins.isFunction baseModule then baseModule kind
-            else baseModule;
+            if baseModule == null then
+              null
+            else if builtins.isFunction baseModule then
+              baseModule kind
+            else
+              baseModule;
 
           # When mixins are present and baseModule is an inline attrset,
           # apply mixins via the record algebra and emit through the bridge.
@@ -126,9 +129,7 @@ let
             if hasMixins then
               let
                 baseRecord = record.fromAttrs resolvedBase;
-                withMixins = builtins.foldl' (
-                  acc: m: applyMixin m acc kind
-                ) baseRecord mixins;
+                withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
                 emitted = emitModule collectionKeys withMixins;
               in
               emitted
@@ -136,16 +137,15 @@ let
               null;
 
           # Effective base module: bridge output when mixins applied, original otherwise
-          effectiveBase =
-            if mixinResult != null then mixinResult.module
-            else resolvedBase;
+          effectiveBase = if mixinResult != null then mixinResult.module else resolvedBase;
 
           # Refinements extracted from option declarations.
           # Mixin path: bridge already extracted them.
           # Non-mixin path: scan all defs for mkOption values with __schema metadata.
           # Stored on the kind result so mkInstanceRegistry can consume them automatically.
           extractedRefinements =
-            if mixinResult != null then mixinResult.refinements
+            if mixinResult != null then
+              mixinResult.refinements
             else
               let
                 isOptionDecl = v: builtins.isAttrs v && v ? _type && v._type == "option";
@@ -155,25 +155,28 @@ let
                 # (flat-style { x = mkOption ...; }). Assumes a user field named "options"
                 # won't contain mkOption values — this is safe because mkOption produces
                 # attrsets with _type = "option" which user data never has.
-                allOptionDecls = builtins.foldl' (acc: d:
+                allOptionDecls = builtins.foldl' (
+                  acc: d:
                   if builtins.isAttrs d.value then
                     let
                       opts = d.value.options or (lib.filterAttrs (_: isOptionDecl) d.value);
                     in
                     acc // (lib.filterAttrs (_: v: isOptionDecl v && v ? type && v.type ? __schema) opts)
-                  else acc
-                ) {} defs;
+                  else
+                    acc
+                ) { } defs;
               in
-              lib.filterAttrs (_: v: v != []) (
-                lib.mapAttrs (_: v: getRefinements v.type) allOptionDecls
-              );
+              lib.filterAttrs (_: v: v != [ ]) (lib.mapAttrs (_: v: getRefinements v.type) allOptionDecls);
 
           # Merge bridge-extracted collections into the collection results
           bridgeCollections =
             if mixinResult != null then
-              lib.mapAttrs (name: stacks:
-                let merge = inferMerge name allCollections.${name};
-                in builtins.foldl' merge (extractedCollections.${name} or allCollections.${name}.default) stacks
+              lib.mapAttrs (
+                name: stacks:
+                let
+                  merge = inferMerge name allCollections.${name};
+                in
+                builtins.foldl' merge (extractedCollections.${name} or allCollections.${name}.default) stacks
               ) (lib.filterAttrs (n: _: allCollections ? ${n}) mixinResult.collections)
             else
               { };
@@ -248,41 +251,49 @@ let
             default = strict;
           };
 
-          options._meta = lib.mkOption {
-            readOnly = true;
+          options._kindNames = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
             internal = true;
-            type = lib.types.submodule {
-              options.kindNames = lib.mkOption {
-                type = lib.types.listOf lib.types.str;
-                description = "All kind names in the schema";
-              };
-              options.kindMeta = lib.mkOption {
-                type = lib.types.functionTo lib.types.raw;
-                description = "Per-kind introspection: options, types, identity keys, refs";
-              };
-              options.topology = lib.mkOption {
-                type = lib.types.raw;
-                description = "Parent-child nesting: { kind = { parent, children }; }";
-              };
-              options.refEdges = lib.mkOption {
-                type = lib.types.listOf lib.types.raw;
-                description = "All ref edges: [ { from, field, to } ]";
-              };
-              options.edges = lib.mkOption {
-                type = lib.types.listOf lib.types.raw;
-                description = "Unified edge view: parent (Neron P) + ref (Neron I) edges";
-              };
-              options.roots = lib.mkOption {
-                type = lib.types.listOf lib.types.str;
-                description = "Kinds with no parent in the topology";
-              };
-              options.leaves = lib.mkOption {
-                type = lib.types.listOf lib.types.str;
-                description = "Kinds with no children in the topology";
-              };
-            };
+            readOnly = true;
+            description = "All kind names in the schema";
           };
-          config._meta =
+          options._kindMeta = lib.mkOption {
+            type = lib.types.functionTo lib.types.raw;
+            internal = true;
+            readOnly = true;
+            description = "Per-kind introspection: options, types, identity keys, refs";
+          };
+          options._topology = lib.mkOption {
+            type = lib.types.raw;
+            internal = true;
+            readOnly = true;
+            description = "Parent-child nesting: { kind = { parent, children }; }";
+          };
+          options._refEdges = lib.mkOption {
+            type = lib.types.listOf lib.types.raw;
+            internal = true;
+            readOnly = true;
+            description = "All ref edges: [ { from, field, to } ]";
+          };
+          options._edges = lib.mkOption {
+            type = lib.types.listOf lib.types.raw;
+            internal = true;
+            readOnly = true;
+            description = "Unified edge view: parent (Neron P) + ref (Neron I) edges";
+          };
+          options._roots = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            internal = true;
+            readOnly = true;
+            description = "Kinds with no parent in the topology";
+          };
+          options._leaves = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            internal = true;
+            readOnly = true;
+            description = "Kinds with no children in the topology";
+          };
+          config =
             let
               kindNames = lib.sort (a: b: a < b) (lib.filter (n: !(lib.hasPrefix "_" n)) (lib.attrNames config));
 
@@ -372,15 +383,13 @@ let
               leaves = builtins.filter (k: topology.${k}.children == [ ]) kindNames;
             in
             {
-              inherit
-                kindNames
-                kindMeta
-                topology
-                refEdges
-                edges
-                roots
-                leaves
-                ;
+              _kindNames = kindNames;
+              _kindMeta = kindMeta;
+              _topology = topology;
+              _refEdges = refEdges;
+              _edges = edges;
+              _roots = roots;
+              _leaves = leaves;
             };
         }
       );

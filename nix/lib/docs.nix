@@ -6,11 +6,11 @@ in
   renderDocs =
     schema:
     let
-      kinds = schema._meta.kindNames;
+      kinds = schema._kindNames;
       renderKind =
         kind:
         let
-          meta = schema._meta.kindMeta kind;
+          meta = schema._kindMeta kind;
           userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") meta.optionNames;
         in
         lib.concatStringsSep "\n" (

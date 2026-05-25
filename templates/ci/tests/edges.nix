@@ -25,7 +25,7 @@ let
     ];
   };
 
-  inherit (eval.config.schema._meta) edges;
+  edges = eval.config.schema._edges;
   parentEdges = builtins.filter (e: e.type == "parent") edges;
   refEdgesTyped = builtins.filter (e: e.type == "ref") edges;
 in
