@@ -22,16 +22,13 @@ let
     inherit lib record;
     inherit (refinedLib) isRefined getRefinements;
   };
-  refLib = import ./ref.nix {
-    inherit lib;
-    inherit (gen) mkRefType;
-  };
+  refLib = import ./ref.nix { inherit lib; };
   entryType = import ./entry-type.nix {
     inherit lib record;
     inherit (methods) mkMethodsModule;
     inherit (refLib) refsFromOptions;
     inherit (mixinLib) applyMixin;
-    inherit (bridgeLib) emitModule;
+    inherit (bridgeLib) emitModule isOptionDecl;
     inherit (refinedLib) isRefined getRefinements;
   };
   instance = import ./instance.nix {

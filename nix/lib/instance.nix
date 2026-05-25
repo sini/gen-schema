@@ -313,7 +313,7 @@ let
           # to evaluate (avoids circular eval at option-declaration time).
           # Force ref module validation (extra-binding case) and check for missing
           # bindings (refs == {} but schema declares ref fields).
-          # N.B. The missing-binding check here mirrors mkRefBindingModules (line ~72),
+          # N.B. The missing-binding check here mirrors mkRefBindingModules,
           # which can't run when refs == {} — keep error messages in sync.
           refValidation =
             let

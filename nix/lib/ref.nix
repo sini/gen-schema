@@ -4,7 +4,7 @@
 # Direct:   schema.ref config.fleet.hosts → resolved immediately
 #
 # Both modes accept string keys ("igloo") or instance values (config.fleet.hosts.igloo).
-{ lib, ... }:
+{ lib }:
 let
   # Resolved ref type with string/instance coercion.
   mkCoercingRefType =

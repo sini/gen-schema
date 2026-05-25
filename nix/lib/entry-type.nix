@@ -14,6 +14,7 @@
   record,
   applyMixin,
   emitModule,
+  isOptionDecl,
   isRefined,
   getRefinements,
 }:
@@ -142,7 +143,6 @@ let
               mixinResult.refinements
             else
               let
-                isOptionDecl = v: builtins.isAttrs v && v ? _type && v._type == "option";
                 # Collect option declarations from all defs (inline attrsets only).
                 # Tries d.value.options first (module-style { options.x = mkOption ...; })
                 # then falls back to scanning d.value for mkOption values directly

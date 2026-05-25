@@ -29,6 +29,6 @@ in
 
   # Filter validators by kind's option names.
   # Validators with __fields: skip if any required field is missing from optionNames.
-  # Validators without __fields: always included (backwards compatible).
+  # Validators without __fields: always included.
   inherit filterValidators;
 }

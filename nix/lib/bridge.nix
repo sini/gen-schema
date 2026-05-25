@@ -54,10 +54,5 @@ let
     };
 in
 {
-  inherit
-    emitModule
-    isOptionDecl
-    extractRefinements
-    stripRefinements
-    ;
+  inherit emitModule isOptionDecl;
 }
