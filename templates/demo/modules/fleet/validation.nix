@@ -1,8 +1,8 @@
 # Schema-level validators — travel with the kind, run automatically.
 # Validators declared here fire on every registry of that kind.
-{ lib, gen, ... }:
+{ lib, genAlgebra, ... }:
 let
-  inherit (gen) mkValidator;
+  inherit (genAlgebra) mkValidator;
 in
 {
   config.schema.host.validators = [

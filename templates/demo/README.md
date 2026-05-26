@@ -32,7 +32,7 @@ Kind definitions live in `modules/schema/` and are plain NixOS-style modules set
 | Declarative methods | `modules/fleet/methods.nix` | `hasService` closes over services registry; `describe` resolves all args from config |
 | Schema validators | `modules/fleet/validation.nix` | Host addr/role + service port validators declared on kinds, fire automatically |
 | Derive hooks | `modules/fleet/registries.nix` | Plain `derive` assigns deterministic UIDs from `id_hash` |
-| Either pipeline | `modules/fleet/registries.nix` | `deriveEither` with gen's either computes service endpoints |
+| Either pipeline | `modules/fleet/registries.nix` | `deriveEither` with gen-algebra's either computes service endpoints |
 | Doc generation | `modules/outputs.nix` | `renderDocs` produces markdown tables from schema metadata |
 | Introspection | `modules/outputs.nix` | `_kindNames`, `_kindMeta` for programmatic schema access |
 | flake-parts integration | `modules/schema.nix` | Single import of `gen-schema.flakeModules.default` |

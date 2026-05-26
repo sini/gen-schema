@@ -10,7 +10,7 @@
 let
   validateLib = import ../../../nix/lib/validate.nix {
     inherit lib;
-    gen = genLib;
+    genAlgebra = genLib;
   };
   inherit (validateLib) mkFieldValidator filterValidators;
   inherit (genLib) mkValidator;

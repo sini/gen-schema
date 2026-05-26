@@ -1,6 +1,6 @@
-{ gen, lib, ... }:
+{ genAlgebra, lib, ... }:
 let
-  inherit (gen) runValidators;
+  inherit (genAlgebra) runValidators;
 
   filterValidators =
     optionNames: validators:
@@ -16,7 +16,7 @@ in
     in
     runValidators kind validators instances;
 
-  # Wrap gen's mkValidator with field requirements.
+  # Wrap gen-algebra's mkValidator with field requirements.
   # Validators with __fields are skipped when any required field is absent from the kind.
   mkFieldValidator =
     {
@@ -25,7 +25,7 @@ in
       check,
       message,
     }:
-    (gen.mkValidator name check message) // { __fields = fields; };
+    (genAlgebra.mkValidator name check message) // { __fields = fields; };
 
   # Filter validators by kind's option names.
   # Validators with __fields: skip if any required field is missing from optionNames.

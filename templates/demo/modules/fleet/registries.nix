@@ -8,12 +8,12 @@
   lib,
   config,
   schemaLib,
-  gen,
+  genAlgebra,
   ...
 }:
 let
   inherit (schemaLib) mkInstanceRegistry ref;
-  inherit (gen) either;
+  inherit (genAlgebra) either;
 
   # --- UID assignment helpers ---
 

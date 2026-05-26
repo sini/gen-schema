@@ -3,18 +3,18 @@
   lib,
 }:
 let
-  # No-flakes import: resolve gen from CI template's flake.lock
+  # No-flakes import: resolve gen-algebra from CI template's flake.lock
   lock = builtins.fromJSON (builtins.readFile ../../templates/ci/flake.lock);
   inherit (lock.nodes.gen-algebra) locked;
   genSrc = builtins.fetchTarball {
     url = "https://github.com/${locked.owner}/${locked.repo}/archive/${locked.rev}.zip";
     sha256 = locked.narHash;
   };
-  gen = inputs.gen-algebra or (import genSrc { inherit lib; });
-  record = gen.pure.record;
+  genAlgebra = inputs.gen-algebra or (import genSrc { inherit lib; });
+  record = genAlgebra.pure.record;
 
   methods = import ./methods.nix { inherit lib; };
-  validate = import ./validate.nix { inherit lib gen; };
+  validate = import ./validate.nix { inherit lib genAlgebra; };
   refinedLib = import ./refined.nix { inherit lib; };
   blameLib = import ./blame.nix { inherit lib; };
   mixinLib = import ./mixin.nix { inherit lib record; };
@@ -33,7 +33,7 @@ let
   };
   instance = import ./instance.nix {
     inherit lib;
-    inherit (gen)
+    inherit (genAlgebra)
       mkStrictModule
       mkIdentityModule
       runValidators
@@ -45,8 +45,8 @@ let
   docs = import ./docs.nix { inherit lib; };
 in
 {
-  # gen-schema's own exports + validator constructor from gen
-  inherit (gen) mkValidator;
+  # gen-schema's own exports + validator constructor from gen-algebra
+  inherit (genAlgebra) mkValidator;
   inherit (methods) schemaFn;
   inherit (entryType) mkSchemaOption mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;

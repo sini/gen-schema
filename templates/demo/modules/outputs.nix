@@ -3,13 +3,13 @@
   lib,
   config,
   schemaLib,
-  gen,
+  genAlgebra,
   demoMixins,
   ...
 }:
 let
   inherit (config) fleet;
-  record = gen.pure.record;
+  record = genAlgebra.pure.record;
 in
 {
   flake = {

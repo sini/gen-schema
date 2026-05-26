@@ -997,7 +997,7 @@ schemaFn description type fn
 
 Declares a method on a kind. `fn` receives an attrset of config values matching its named arguments. Declare via `schema.<kind>.methods.<name> = schemaFn ...`.
 
-### `mkValidator` (from gen)
+### `mkValidator` (from gen-algebra)
 
 ```nix
 gen.mkValidator name pred message
@@ -1151,7 +1151,7 @@ mkSchemaEntryType {
 |---------|-------|
 | Refinement contracts | [Findler & Felleisen — *Contracts for Higher-Order Functions* (ICFP 2002)](https://www2.ccs.neu.edu/racket/pubs/icfp2002-ff.pdf), co-location from [Rondon et al. — *Liquid Types* (PLDI 2008)](https://goto.ucsd.edu/~rjhala/liquid/liquid_types.pdf) |
 | Lazy contracts | [Chitil — *Practical Typed Lazy Contracts* (ICFP 2012)](https://kar.kent.ac.uk/30790/1/contacts.pdf) |
-| Record algebra (gen) | [Leijen — *Extensible Records with Scoped Labels* (TFP 2005)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf) |
+| Record algebra (gen-algebra) | [Leijen — *Extensible Records with Scoped Labels* (TFP 2005)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf) |
 | Mixin composition | [Bracha & Cook — *Mixin-Based Inheritance* (OOPSLA 1990)](https://www.bracha.org/oopsla90.pdf) |
 | NixOS module bridge | [Cardelli — *Program Fragments, Linking, and Modularization* (POPL 1997)](http://lucacardelli.name/Papers/Linking.A4.pdf) |
 | Scope graphs | [Néron et al. — *A Theory of Name Resolution* (ESOP 2015)](https://link.springer.com/chapter/10.1007/978-3-662-46669-8_9) |
@@ -1179,12 +1179,12 @@ Cross-instance refs        _topology, _edges, _roots, _leaves
 
 ```
 nix/lib/
-  default.nix       — public API surface, wiring (imports gen for primitives)
+  default.nix       — public API surface, wiring (imports gen-algebra for primitives)
   entry-type.nix     — mkSchemaEntryType, mkSchemaOption (collection extraction, introspection, topology)
   instance.nix       — mkInstanceType, mkInstanceRegistry (strict + identity injection, refs)
   ref.nix            — schema.ref (dual-mode cross-instance references, getRefKind)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)
-  validate.nix       — validateInstances (schema-specific wrapper around gen.runValidators)
+  validate.nix       — validateInstances (schema-specific wrapper around gen-algebra.runValidators)
   docs.nix           — renderDocs (markdown generation)
 nix/flakeModule.nix  — flake-parts integration (provides schema option + schemaLib)
 ```
