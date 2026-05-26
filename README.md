@@ -1,5 +1,7 @@
 # gen-schema
 
+[![CI](https://github.com/sini/gen-schema/actions/workflows/ci.yml/badge.svg)](https://github.com/sini/gen-schema/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
 A typed record registry for Nix with extension points, strict validation, refinement contracts, identity hashing, cross-instance references, first-class mixins, introspection, and declarative methods. Built on the NixOS module system.
 
 gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions that any module can extend, strict-by-default validation that catches typos immediately, refinement contracts co-located with type declarations, stable identity comparison via `id_hash`, cross-registry references that resolve to instances, reusable mixins with structural compatibility, and auto-generated documentation from your schema.
