@@ -45,7 +45,6 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
 - [Demo](#demo)
 - [Testing](#testing)
 - [Theoretical Foundations](#theoretical-foundations)
-- [License](#license)
 
 ## Terminology
 
@@ -1287,7 +1286,3 @@ gen-schema draws on seven papers. Four are directly implemented in the codebase;
 | Record algebra | § Leijen -- *Extensible Records with Scoped Labels* (TFP 2005) | gen-schema consumes gen-algebra's `record.compose`, `record.select`, `record.mixin` etc. The record algebra itself lives in gen-algebra; gen-schema uses it for mixin application and module bridging |
 | Module linking | § Cardelli -- *Program Fragments, Linking, and Modularization* (POPL 1997) | `bridge.nix`: `emitModule` translates record-algebra records into NixOS modules (one-directional). Cardelli's linkset model -- separately compiled fragments linked via type-compatible substitution -- informs the design, though gen-schema doesn't implement the full linking calculus |
 | Scope graph edge model | § Neron, Tolmach, Visser & Wachsmuth -- *A Theory of Name Resolution* (ESOP 2015) | `entry-type.nix`: `_edges` introspection uses Neron's P (parent) and I (import/ref) edge vocabulary to expose schema topology. gen-schema doesn't implement scope graphs or the resolution calculus -- that lives in gen-scope |
-
-## License
-
-MIT
