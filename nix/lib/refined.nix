@@ -1,4 +1,4 @@
-# Refinement contracts (Findler & Felleisen 2002, co-location from Rondon 2008).
+# Refinement contracts (§ Findler 2002, co-location from § Rondon 2008).
 # Predicate metadata stored in __schema attr on NixOS types.
 { lib }:
 let

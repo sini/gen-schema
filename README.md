@@ -4,6 +4,49 @@ A typed record registry for Nix with extension points, strict validation, refine
 
 gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions that any module can extend, strict-by-default validation that catches typos immediately, refinement contracts co-located with type declarations, stable identity comparison via `id_hash`, cross-registry references that resolve to instances, reusable mixins with structural compatibility, and auto-generated documentation from your schema.
 
+## Table of Contents
+
+- [Terminology](#terminology)
+- [Gen Ecosystem](#gen-ecosystem)
+- [Quick Start](#quick-start)
+- [Use Cases](#use-cases)
+- [Core Concepts](#core-concepts)
+  - [Kinds](#kinds)
+  - [Extension](#extension)
+  - [Base Module](#base-module)
+  - [Default Propagation](#default-propagation)
+  - [Strict Validation](#strict-validation)
+  - [Instances](#instances)
+  - [Nested Registries](#nested-registries)
+  - [Per-Kind Strict Override](#per-kind-strict-override)
+  - [Identity Hashing](#identity-hashing)
+  - [Cross-Instance References](#cross-instance-references)
+  - [Refs in Collections](#refs-in-collections)
+  - [Custom Ref Coercion](#custom-ref-coercion)
+  - [Deferred Coerce](#deferred-coerce-self-referential-registries)
+  - [Deduplicated Sets](#deduplicated-sets)
+  - [Parent-Child Topology](#parent-child-topology)
+  - [Schema Introspection](#schema-introspection)
+  - [Scope Graph Bridge](#scope-graph-bridge-consumer-side)
+  - [Kind Mix-ins](#kind-mix-ins)
+  - [Declarative Methods](#declarative-methods)
+  - [Collection Fields](#collection-fields)
+  - [Computed Fields](#computed-fields)
+  - [Introspection API](#introspection-api)
+  - [Schema Validators](#schema-validators)
+  - [Derive Hooks](#derive-hooks)
+  - [Documentation Generation](#documentation-generation)
+  - [Refinement Contracts](#schematypesrefined)
+  - [Blame](#schemablame)
+  - [Field Validators](#schemamkfieldvalidator)
+  - [Mixins](#schemamkmixin)
+- [API Reference](#api-reference)
+- [Architecture](#architecture)
+- [Demo](#demo)
+- [Testing](#testing)
+- [Theoretical Foundations](#theoretical-foundations)
+- [License](#license)
+
 ## Terminology
 
 | Term | Definition |
@@ -520,7 +563,7 @@ options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
 };
 ```
 
-`default` is a lazy thunk of the standard coercion result — only forced if you select it. In `listOf` context, `default` is a single-element list and the hook can return multiple instances (1→many expansion).
+`default` is a lazy thunk of the standard coercion result — only forced if you select it. In `listOf` context, `default` is a single-element list and the hook can return multiple instances (1->many expansion).
 
 ### Deferred Coerce (Self-Referential Registries)
 
@@ -600,7 +643,7 @@ meta.optionNames   # → [ "addr" "role" ... ]
 meta.options       # → full option declarations
 meta.refs          # → { }  (ref fields on this kind)
 
-# Unified edge view (Neron scope graph P + I edges)
+# Unified edge view (§ Neron 2015 scope graph P + I edges)
 config.schema._edges
 # → [
 #   { from = "user"; to = "host"; type = "parent"; field = null; }
@@ -850,7 +893,7 @@ result = schemaLib.validateInstances config.schema "host" config.fleet.hosts;
 
 ### Derive Hooks
 
-`derive` and `deriveEither` on `mkInstanceRegistry` compute values from the full evaluated registry and merge them back at high priority. The pipeline is: **validate → derive → apply**.
+`derive` and `deriveEither` on `mkInstanceRegistry` compute values from the full evaluated registry and merge them back at high priority. The pipeline is: **validate -> derive -> apply**.
 
 **Plain derive** — attrset in, attrset out:
 
@@ -967,7 +1010,7 @@ refs.needs = {
 ref target
 ```
 
-`target` is a string → deferred ref (kind name, bound via `refs` on `mkInstanceRegistry`). `target` is an attrset → direct ref (resolved immediately). Both modes accept string keys or instance values.
+`target` is a string -> deferred ref (kind name, bound via `refs` on `mkInstanceRegistry`). `target` is an attrset -> direct ref (resolved immediately). Both modes accept string keys or instance values.
 
 ### `setOf`
 
@@ -987,7 +1030,7 @@ Converts a list of instances to a set with O(1) membership lookup via attrset ba
 
 ```nix
 {
-  member = x: ...;  # O(1) membership test (à la Data.Set.member)
+  member = x: ...;  # O(1) membership test
   toList = [ ... ];  # deduplicated list, first-seen order
   length = n;        # number of unique instances
 }
@@ -1017,6 +1060,27 @@ validateInstances schema kind instances
 
 Runs the kind's validators against instances. Returns `{ right = instances; }` on success or `{ left = [ { name; validator; message; } ]; }` on failure. Does not throw — returns Either for consumer-controlled handling.
 
+### `mkFieldValidator`
+
+```nix
+mkFieldValidator {
+  name = "validator-name";
+  fields = [ "field1" "field2" ];  # optional — auto-skip kinds missing these fields
+  check = inst: ...;               # predicate over instance config
+  message = "error description";
+}
+```
+
+Row-polymorphic validators with automatic field filtering. Validators with `fields` are automatically skipped for kinds that don't have all required fields. Validators without `fields` run unconditionally (backwards compatible).
+
+### `filterValidators`
+
+```nix
+filterValidators validators kindOptionNames
+```
+
+Filters a list of validators to only those whose `fields` (if declared) are all present in `kindOptionNames`. Used internally by `mkInstanceRegistry` to skip inapplicable field validators. Exported for consumers building custom validation pipelines.
+
 ### `renderDocs`
 
 ```nix
@@ -1025,19 +1089,9 @@ renderDocs schema
 
 Returns a markdown string with a table per kind.
 
-### `_internal`
-
-```nix
-schemaLib._internal.mkMethodsModule   # methods option/config wiring
-```
-
-Not part of the public API contract. Available for testing and advanced use.
-
-Identity, strict, validation, and ref primitives are in [gen-algebra](https://github.com/sini/gen-algebra) — import gen-algebra directly if you need them outside of gen-schema.
-
 ### `schema.types.refined`
 
-Refinement contracts co-located with type declarations. Predicates validate during `applyPipeline` (strict by default).
+Refinement contracts co-located with type declarations (§ Findler 2002, § Rondon 2008). Predicates validate during `applyPipeline` (strict by default).
 
 ```nix
 # Single refinement
@@ -1060,7 +1114,7 @@ port = mkOption {
 port = mkOption { type = schema.types.refined lib.types.int schema.refinements.tcpPort; };
 ```
 
-Set `lazy = true` on a refinement to defer validation to access time via `builtins.addErrorContext`:
+Set `lazy = true` on a refinement to defer validation to access time via `builtins.addErrorContext` (§ Chitil 2012):
 
 ```nix
 { check = self: self > 0; message = "must be positive"; lazy = true; }
@@ -1072,29 +1126,16 @@ Built-in reusable refinements: `tcpPort`, `nonEmpty`, `positive`. Use with `sche
 
 ### `schema.blame`
 
-Field-level error attribution for structured contract violations.
+Field-level error attribution for structured contract violations (§ Findler 2002).
 
 ```nix
 schema.blame "fieldName" "error message"
 # → { __blame = true; field = "fieldName"; message = "error message"; }
 ```
 
-### `schema.mkFieldValidator`
-
-Row-polymorphic validators with automatic field filtering. Validators with `fields` are automatically skipped for kinds that don't have all required fields. Validators without `fields` run unconditionally (backwards compatible).
-
-```nix
-schema.mkFieldValidator {
-  name = "https-port";
-  fields = [ "port" "protocol" ];
-  check = inst: !(inst.protocol == "https" && inst.port == 80);
-  message = "HTTPS should not use port 80";
-}
-```
-
 ### `schema.mkMixin`
 
-First-class reusable schema fragments with structural compatibility. `define` receives a record-algebra record and returns a plain attrset.
+First-class reusable schema fragments with structural compatibility (§ Bracha 1990). `define` receives a record-algebra record and returns a plain attrset.
 
 ```nix
 monitorable = schema.mkMixin {
@@ -1124,11 +1165,19 @@ combined = schema.composeMixins [
 
 ### `schema.beta`
 
-Annotates a mixin for Beta direction — parent controls, meaning existing fields take precedence over the mixin's contributions.
+Annotates a mixin for Beta direction (§ Bracha 1990) — parent controls, meaning existing fields take precedence over the mixin's contributions.
+
+### `schema.applyMixin`
+
+```nix
+applyMixin mixin kindRecord kindName
+```
+
+Applies a single mixin to a record-algebra record. Validates structural compatibility (`requires`) and optional kind constraint (`kinds`). Respects Smalltalk/Beta direction.
 
 ### `schema.emitModule`
 
-Bridges record-algebra records to NixOS modules. Strips refinement metadata from types. Extracts collections with full shadow stacks.
+Bridges record-algebra records to NixOS modules (§ Cardelli 1997). Strips refinement metadata from types. Extracts collections with full shadow stacks.
 
 ```nix
 emitted = schema.emitModule [ "validators" "methods" ] recordAlgebraRecord;
@@ -1149,16 +1198,15 @@ mkSchemaEntryType {
 }
 ```
 
-## Theoretical Foundations
+### `_internal`
 
-| Feature | Paper |
-|---------|-------|
-| Refinement contracts | [Findler & Felleisen — *Contracts for Higher-Order Functions* (ICFP 2002)](https://www2.ccs.neu.edu/racket/pubs/icfp2002-ff.pdf), co-location from [Rondon et al. — *Liquid Types* (PLDI 2008)](https://goto.ucsd.edu/~rjhala/liquid/liquid_types.pdf) |
-| Lazy contracts | [Chitil — *Practical Typed Lazy Contracts* (ICFP 2012)](https://kar.kent.ac.uk/30790/1/contacts.pdf) |
-| Record algebra (gen-algebra) | [Leijen — *Extensible Records with Scoped Labels* (TFP 2005)](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/scopedlabels.pdf) |
-| Mixin composition | [Bracha & Cook — *Mixin-Based Inheritance* (OOPSLA 1990)](https://www.bracha.org/oopsla90.pdf) |
-| NixOS module bridge | [Cardelli — *Program Fragments, Linking, and Modularization* (POPL 1997)](http://lucacardelli.name/Papers/Linking.A4.pdf) |
-| Scope graphs | [Néron et al. — *A Theory of Name Resolution* (ESOP 2015)](https://link.springer.com/chapter/10.1007/978-3-662-46669-8_9) |
+```nix
+schemaLib._internal.mkMethodsModule   # methods option/config wiring
+```
+
+Not part of the public API contract. Available for testing and advanced use.
+
+Identity, strict, validation, and ref primitives are in [gen-algebra](https://github.com/sini/gen-algebra) — import gen-algebra directly if you need them outside of gen-schema.
 
 ## Architecture
 
@@ -1188,7 +1236,11 @@ nix/lib/
   instance.nix       — mkInstanceType, mkInstanceRegistry (strict + identity injection, refs)
   ref.nix            — schema.ref (dual-mode cross-instance references, getRefKind)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)
-  validate.nix       — validateInstances (schema-specific wrapper around gen-algebra.runValidators)
+  validate.nix       — validateInstances, mkFieldValidator, filterValidators (schema-specific validation)
+  refined.nix        — schema.types.refined (refinement contracts, § Findler 2002 / § Rondon 2008)
+  blame.nix          — schema.blame (field-level error attribution)
+  mixin.nix          — mkMixin, composeMixins, beta, applyMixin (§ Bracha 1990)
+  bridge.nix         — emitModule (record-algebra → NixOS module bridge, § Cardelli 1997)
   docs.nix           — renderDocs (markdown generation)
 nix/flakeModule.nix  — flake-parts integration (provides schema option + schemaLib)
 ```
@@ -1214,6 +1266,27 @@ cd templates/ci
 nix develop --override-input gen-schema ../.. -c nix-unit \
   --override-input gen-schema ../.. --flake .#.tests
 ```
+
+## Theoretical Foundations
+
+gen-schema draws on seven papers. Four are directly implemented in the codebase; three inform the design without direct implementation.
+
+### Implements
+
+| Feature | Paper | Where |
+|---------|-------|-------|
+| Refinement contracts with blame tracking | § Findler & Felleisen -- *Contracts for Higher-Order Functions* (ICFP 2002) | `refined.nix`: predicate contracts co-located with NixOS type declarations; `blame.nix`: field-level error attribution with `{ field, message }` blame records; `instance.nix`: strict contract checking in `applyPipeline` |
+| Lazy contracts with deferred validation | § Chitil -- *Practical Typed Lazy Contracts* (ICFP 2012) | `instance.nix`: `lazy = true` refinements wrap values with `builtins.addErrorContext`, deferring validation to access time -- matching Chitil's partial-identity semantics where unevaluated parts never trigger violations |
+| Mixin composition | § Bracha & Cook -- *Mixin-Based Inheritance* (OOPSLA 1990) | `mixin.nix`: `mkMixin`/`composeMixins` implement Bracha's `M1 * M2 = fun(i) M1(M2(i) + i) + M2(i)` formula; `beta` reverses direction so parent controls; `applyMixin` validates structural requires |
+| Refinement types | § Rondon, Kawaguchi & Jhala -- *Liquid Types* (PLDI 2008) | `refined.nix`: `schema.types.refined` attaches predicate refinements to base NixOS types via `__schema` metadata, following Rondon's model of `{v:B \| e}` base refinements co-located with type declarations |
+
+### Informed by
+
+| Concept | Paper | Influence |
+|---------|-------|-----------|
+| Record algebra | § Leijen -- *Extensible Records with Scoped Labels* (TFP 2005) | gen-schema consumes gen-algebra's `record.compose`, `record.select`, `record.mixin` etc. The record algebra itself lives in gen-algebra; gen-schema uses it for mixin application and module bridging |
+| Module linking | § Cardelli -- *Program Fragments, Linking, and Modularization* (POPL 1997) | `bridge.nix`: `emitModule` translates record-algebra records into NixOS modules (one-directional). Cardelli's linkset model -- separately compiled fragments linked via type-compatible substitution -- informs the design, though gen-schema doesn't implement the full linking calculus |
+| Scope graph edge model | § Neron, Tolmach, Visser & Wachsmuth -- *A Theory of Name Resolution* (ESOP 2015) | `entry-type.nix`: `_edges` introspection uses Neron's P (parent) and I (import/ref) edge vocabulary to expose schema topology. gen-schema doesn't implement scope graphs or the resolution calculus -- that lives in gen-scope |
 
 ## License
 

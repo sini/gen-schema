@@ -1,7 +1,7 @@
 # Structured blame error constructor for field-level attribution.
 # This is producer-side error reporting (which field, which predicate),
-# not Chitil's higher-order lazy blame. See lazy contracts in instance.nix
-# for the Chitil-inspired deferred validation mechanism.
+# not § Chitil 2012 higher-order lazy blame. See lazy contracts in instance.nix
+# for the § Chitil 2012 deferred validation mechanism.
 { lib }:
 {
   blame = field: message: {

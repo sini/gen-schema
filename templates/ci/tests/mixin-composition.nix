@@ -103,7 +103,7 @@ in
   };
 
   # Shadowing order: composeMixins [a b] = b ⋆ a (via foldl').
-  # Later mixins in the list have HIGHER priority (run last in Bracha's formula).
+  # Later mixins in the list have HIGHER priority (run last in § Bracha 1990 formula).
   # Earlier mixins run first and PROVIDE base values.
   # This matches the requires/provides dependency flow: earlier provides, later consumes + overrides.
   mixin-composition.test-compose-shadowing-order = {

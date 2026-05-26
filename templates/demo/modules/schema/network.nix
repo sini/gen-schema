@@ -1,5 +1,5 @@
-# Network kind: demonstrates refinement contracts (Findler & Felleisen 2002).
-# Inline predicates co-located with type declarations (Rondon 2008).
+# Network kind: demonstrates refinement contracts (§ Findler 2002).
+# Inline predicates co-located with type declarations (§ Rondon 2008).
 { lib, schemaLib, ... }:
 {
   config.schema.network = {

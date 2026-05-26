@@ -1,4 +1,4 @@
-# NixOS module bridge (Cardelli 1997).
+# NixOS module bridge (§ Cardelli 1997).
 # Translates record-algebra records into NixOS modules.
 # One-directional: algebra → modules. Information does not flow back.
 {

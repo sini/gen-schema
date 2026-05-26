@@ -265,7 +265,7 @@ let
             type = lib.types.listOf lib.types.raw;
             internal = true;
             readOnly = true;
-            description = "Unified edge view: parent (Neron P) + ref (Neron I) edges";
+            description = "Unified edge view: parent (§ Neron 2015 P) + ref (§ Neron 2015 I) edges";
           };
           options._roots = lib.mkOption {
             type = lib.types.listOf lib.types.str;
@@ -349,7 +349,7 @@ let
                   to = toKind;
                 }) refs
               ) kindNames;
-              # Unified edge view: Neron P (parent) + I (ref/import) edges
+              # Unified edge view: § Neron 2015 P (parent) + I (ref/import) edges
               parentEdges = lib.concatMap (
                 k:
                 let

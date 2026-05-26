@@ -100,7 +100,7 @@ in
       postgresEndpoint = fleet.services.postgres.endpoint;
       gatewayEndpoint = fleet.services.gateway.endpoint;
 
-      # --- Refinement contracts (Findler & Felleisen 2002) ---
+      # --- Refinement contracts (§ Findler 2002) ---
       # Values that pass through refinement predicates co-located with types.
       managementCidr = fleet.networks.management.cidr;
       managementVlan = fleet.networks.management.vlan;
@@ -109,7 +109,7 @@ in
       productionMtuDefault = fleet.networks.production.mtu;
       networkNames = builtins.attrNames fleet.networks;
 
-      # --- Row-polymorphic validators (Leijen 2005) ---
+      # --- Row-polymorphic validators (§ Leijen 2005) ---
       # The https-port validator fires only on kinds with both "port" and "protocol".
       # It silently skips kinds (host, user, network) that lack those fields.
       serviceValidatorCount = builtins.length config.schema.service.validators;
@@ -123,7 +123,7 @@ in
       schemaRoots = config.schema._roots;
       schemaLeaves = config.schema._leaves;
 
-      # --- First-class mixins (Bracha & Cook 1990) ---
+      # --- First-class mixins (§ Bracha 1990) ---
       # Exercise mixin primitives directly on record-algebra records.
       mixinDemo =
         let
