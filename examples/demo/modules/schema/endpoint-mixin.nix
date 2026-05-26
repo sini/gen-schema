@@ -1,7 +1,12 @@
 # First-class mixins (§ Bracha 1990).
 # Reusable schema fragments with structural compatibility checks.
 # Mixins are stored in _module.args so registries and outputs can reference them.
-{ lib, schemaLib, genAlgebra, ... }:
+{
+  lib,
+  schemaLib,
+  genAlgebra,
+  ...
+}:
 let
   inherit (schemaLib) mkMixin beta composeMixins;
   record = genAlgebra.pure.record;

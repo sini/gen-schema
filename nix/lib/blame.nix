@@ -11,6 +11,5 @@
 
   isBlame = v: builtins.isAttrs v && v ? __blame;
 
-  collectBlame = results:
-    builtins.filter (r: r != null && builtins.isAttrs r && r ? __blame) results;
+  collectBlame = results: builtins.filter (r: r != null && builtins.isAttrs r && r ? __blame) results;
 }

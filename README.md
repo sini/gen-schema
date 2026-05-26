@@ -383,6 +383,7 @@ config.fleet.hosts.iceberg = {
 ```
 
 Each instance:
+
 - Gets a `name` option defaulting to the attrset key
 - Gets `_module.args.<kind> = config` for self-reference
 - Gets `id_hash` — a stable SHA-256 for safe comparison
@@ -458,8 +459,8 @@ The hash is computed from all non-internal primitive options (str, int, bool), p
 **Three-layer precedence for key selection:**
 
 1. **Explicit `_identity.keys`** — list the exact keys. Multiple modules can contribute via `mkMerge`.
-2. **`identity = false`** — exclude individual options from reflection.
-3. **Auto-reflection** — all non-internal primitives included (default).
+1. **`identity = false`** — exclude individual options from reflection.
+1. **Auto-reflection** — all non-internal primitives included (default).
 
 ```nix
 # Layer 1: explicit keys — composable across modules

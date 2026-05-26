@@ -56,10 +56,8 @@ let
       # In foldl', acc = what came before, m = current mixin:
       #   Smalltalk: compose m.delta acc — m is outer, wins
       #   Beta:      compose acc m.delta — acc is outer, wins
-      composedDelta = builtins.foldl' (acc: m:
-        if m.__direction == "beta"
-        then record.compose acc m.delta
-        else record.compose m.delta acc
+      composedDelta = builtins.foldl' (
+        acc: m: if m.__direction == "beta" then record.compose acc m.delta else record.compose m.delta acc
       ) (p: p) mixins;
     in
     {
@@ -83,13 +81,18 @@ let
           null;
       structCheck = record.assertSatisfies kindRecord mixin.requires;
     in
-    builtins.seq kindCheck (builtins.seq structCheck (
-      if mixin.__direction == "beta"
-      # Beta: kind (parent) controls — kind fields take precedence over mixin's
-      then record.combine kindRecord (mixin.delta kindRecord)
-      # Smalltalk: mixin (child) wins — mixin fields override kind's
-      else record.mixin mixin.delta kindRecord
-    ));
+    builtins.seq kindCheck (
+      builtins.seq structCheck (
+        if
+          mixin.__direction == "beta"
+        # Beta: kind (parent) controls — kind fields take precedence over mixin's
+        then
+          record.combine kindRecord (mixin.delta kindRecord)
+        # Smalltalk: mixin (child) wins — mixin fields override kind's
+        else
+          record.mixin mixin.delta kindRecord
+      )
+    );
 in
 {
   inherit

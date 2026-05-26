@@ -20,7 +20,9 @@ let
           options.port = lib.mkOption { type = lib.types.int; };
           options.host = lib.mkOption { type = ref "host"; };
         };
-        config.hosts.igloo = { addr = "10.0.1.1"; };
+        config.hosts.igloo = {
+          addr = "10.0.1.1";
+        };
         config.services.web = {
           port = 80;
           host = "igloo";

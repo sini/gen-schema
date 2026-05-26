@@ -2,7 +2,12 @@
 # These verify the spec's promise: refinements co-located with types are extracted
 # automatically, and mkSchemaEntryType { mixins = [...] } applies them without manual
 # applyMixin + emitModule calls.
-{ lib, schemaLib, genLib, ... }:
+{
+  lib,
+  schemaLib,
+  genLib,
+  ...
+}:
 let
   inherit (schemaLib) mkSchemaOption mkSchemaEntryType mkInstanceRegistry;
   R = genLib.record;

@@ -143,7 +143,10 @@ in
   mixin-basic.test-beta-kind-wins-on-conflict = {
     expr =
       let
-        base = R.fromAttrs { port = 8080; display = "base-display"; };
+        base = R.fromAttrs {
+          port = 8080;
+          display = "base-display";
+        };
         m = beta (mkMixin {
           requires = [ "port" ];
           provides = [ "display" ];
@@ -151,14 +154,17 @@ in
         });
       in
       R.select (applyMixin m base "service") "display";
-    expected = "base-display";  # Beta: kind (parent) wins
+    expected = "base-display"; # Beta: kind (parent) wins
   };
 
   # Smalltalk direction: mixin's field wins over kind's
   mixin-basic.test-smalltalk-mixin-wins-on-conflict = {
     expr =
       let
-        base = R.fromAttrs { port = 8080; display = "base-display"; };
+        base = R.fromAttrs {
+          port = 8080;
+          display = "base-display";
+        };
         m = mkMixin {
           requires = [ "port" ];
           provides = [ "display" ];
@@ -166,6 +172,6 @@ in
         };
       in
       R.select (applyMixin m base "service") "display";
-    expected = "mixin-display";  # Smalltalk: mixin (child) wins
+    expected = "mixin-display"; # Smalltalk: mixin (child) wins
   };
 }

@@ -377,8 +377,7 @@ let
           # wrap values with addErrorContext for deferred checking at access time.
           # Auto-extract from schema kind if not explicitly provided.
           effectiveRefinements =
-            if refinements != { } then refinements
-            else schema.${kind}.refinements or { };
+            if refinements != { } then refinements else schema.${kind}.refinements or { };
 
           refinementChecked =
             if effectiveRefinements == { } then

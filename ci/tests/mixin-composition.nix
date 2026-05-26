@@ -119,11 +119,14 @@ in
           name = "second";
           define = _: { status = "from-second"; };
         };
-        composed = composeMixins [ first second ];
+        composed = composeMixins [
+          first
+          second
+        ];
         base = R.empty;
       in
       R.select (applyMixin composed base "test") "status";
-    expected = "from-second";  # last listed mixin wins (has priority), first provides base
+    expected = "from-second"; # last listed mixin wins (has priority), first provides base
   };
 
   # Per-mixin direction: beta mixin is overridden by what came before
@@ -141,7 +144,10 @@ in
           name = "beta-mixin";
           define = _: { status = "from-beta"; };
         });
-        composed = composeMixins [ provider betaMixin ];
+        composed = composeMixins [
+          provider
+          betaMixin
+        ];
         base = R.empty;
       in
       R.select (applyMixin composed base "test") "status";
@@ -163,10 +169,13 @@ in
           name = "overrider";
           define = _: { status = "from-overrider"; };
         };
-        composed = composeMixins [ provider overrider ];
+        composed = composeMixins [
+          provider
+          overrider
+        ];
         base = R.empty;
       in
       R.select (applyMixin composed base "test") "status";
-    expected = "from-overrider";  # Smalltalk: later wins
+    expected = "from-overrider"; # Smalltalk: later wins
   };
 }

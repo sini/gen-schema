@@ -6,7 +6,11 @@ in
 {
   blame-basic.test-blame-constructor = {
     expr = blame "port" "invalid value";
-    expected = { __blame = true; field = "port"; message = "invalid value"; };
+    expected = {
+      __blame = true;
+      field = "port";
+      message = "invalid value";
+    };
   };
 
   blame-basic.test-isBlame-true = {
@@ -32,13 +36,24 @@ in
       (blame "host" "bad host")
     ];
     expected = [
-      { __blame = true; field = "port"; message = "bad port"; }
-      { __blame = true; field = "host"; message = "bad host"; }
+      {
+        __blame = true;
+        field = "port";
+        message = "bad port";
+      }
+      {
+        __blame = true;
+        field = "host";
+        message = "bad host";
+      }
     ];
   };
 
   blame-basic.test-collectBlame-empty = {
-    expr = collectBlame [ null { x = 1; } ];
-    expected = [];
+    expr = collectBlame [
+      null
+      { x = 1; }
+    ];
+    expected = [ ];
   };
 }
