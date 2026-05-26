@@ -5,12 +5,12 @@
 let
   # No-flakes import: resolve gen from CI template's flake.lock
   lock = builtins.fromJSON (builtins.readFile ../../templates/ci/flake.lock);
-  inherit (lock.nodes.gen) locked;
+  inherit (lock.nodes.gen-algebra) locked;
   genSrc = builtins.fetchTarball {
     url = "https://github.com/${locked.owner}/${locked.repo}/archive/${locked.rev}.zip";
     sha256 = locked.narHash;
   };
-  gen = inputs.gen or (import genSrc { inherit lib; });
+  gen = inputs.gen-algebra or (import genSrc { inherit lib; });
   record = gen.pure.record;
 
   methods = import ./methods.nix { inherit lib; };

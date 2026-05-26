@@ -5,7 +5,7 @@
 
   inputs = {
     gen-schema.url = "github:sini/gen-schema";
-    gen.url = "github:sini/gen";
+    gen-algebra.url = "github:sini/gen-algebra";
     import-tree.url = "github:vic/import-tree";
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";

@@ -1,6 +1,6 @@
 {
   "nodes": {
-    "gen": {
+    "gen-algebra": {
       "locked": {
         "lastModified": 1779682607,
         "narHash": "sha256-AOKtTVMsEuF327yAuf0gIgoBLNmxCP0RjvmdkNcp2t8=",
@@ -107,7 +107,7 @@
     },
     "root": {
       "inputs": {
-        "gen": "gen",
+        "gen-algebra": "gen-algebra",
         "gen-schema": "gen-schema",
         "nix-unit": "nix-unit",
         "nixpkgs": "nixpkgs_2"

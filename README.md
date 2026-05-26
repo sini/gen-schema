@@ -17,7 +17,7 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
 
 | Library | Role |
 |---------|------|
-| [gen](https://github.com/sini/gen) | Pure primitives (search, record, identity) |
+| [gen-algebra](https://github.com/sini/gen-algebra) | Pure primitives (search, record, identity) |
 | [gen-schema](https://github.com/sini/gen-schema) | Typed registries (kinds, instances, collections, refs) |
 | [gen-aspects](https://github.com/sini/gen-aspects) | Aspect types (traits, classification, dispatch) |
 | [gen-graph](https://github.com/sini/gen-graph) | Graph queries (combinators, traversals, fixpoint) |
@@ -1003,7 +1003,7 @@ Declares a method on a kind. `fn` receives an attrset of config values matching 
 gen.mkValidator name pred message
 ```
 
-Creates a validator record. `pred` receives the instance config and returns bool. Declare via `schema.<kind>.validators = [ (gen.mkValidator ...) ]`. Provided by [gen](https://github.com/sini/gen), not gen-schema.
+Creates a validator record. `pred` receives the instance config and returns bool. Declare via `schema.<kind>.validators = [ (gen.mkValidator ...) ]`. Provided by [gen-algebra](https://github.com/sini/gen-algebra), not gen-schema.
 
 ### `validateInstances`
 
@@ -1029,7 +1029,7 @@ schemaLib._internal.mkMethodsModule   # methods option/config wiring
 
 Not part of the public API contract. Available for testing and advanced use.
 
-Identity, strict, validation, and ref primitives are in [gen](https://github.com/sini/gen) — import gen directly if you need them outside of gen-schema.
+Identity, strict, validation, and ref primitives are in [gen-algebra](https://github.com/sini/gen-algebra) — import gen-algebra directly if you need them outside of gen-schema.
 
 ### `schema.types.refined`
 
@@ -1189,7 +1189,7 @@ nix/lib/
 nix/flakeModule.nix  — flake-parts integration (provides schema option + schemaLib)
 ```
 
-Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), validators (`mkValidator`, `runValidators`), and cross-instance references (`mkRefType`) are provided by [gen](https://github.com/sini/gen) and consumed internally.
+Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), validators (`mkValidator`, `runValidators`), and cross-instance references (`mkRefType`) are provided by [gen-algebra](https://github.com/sini/gen-algebra) and consumed internally.
 
 ## Demo
 

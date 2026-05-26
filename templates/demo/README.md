@@ -247,7 +247,7 @@ Derive reads `id_hash` from each instance to compute collision-free UIDs. Derive
 
 ## Either Pipeline
 
-The `deriveEither` hook supports Either-based enrichment using [gen](https://github.com/sini/gen)'s either combinators — short-circuit pipelines where each step returns `{ right = ...; }` or `{ left = ...; }`.
+The `deriveEither` hook supports Either-based enrichment using [gen-algebra](https://github.com/sini/gen-algebra)'s either combinators — short-circuit pipelines where each step returns `{ right = ...; }` or `{ left = ...; }`.
 
 ```nix
 # modules/fleet/registries.nix
