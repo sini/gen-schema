@@ -1248,20 +1248,20 @@ Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), val
 
 ## Demo
 
-See [`templates/demo/`](templates/demo/) for a complete fleet management example using flake-parts + import-tree. The demo exercises all features: kinds, instances, strict validation, identity hashing, cross-instance references, schema composition, kind mix-ins, declarative methods, and documentation generation.
+See [`examples/demo/`](examples/demo/) for a complete fleet management example using flake-parts + import-tree. The demo exercises all features: kinds, instances, strict validation, identity hashing, cross-instance references, schema composition, kind mix-ins, declarative methods, and documentation generation.
 
 ```bash
-cd templates/demo
+cd examples/demo
 nix eval --override-input gen-schema ../.. .#fleet
 nix eval --override-input gen-schema ../.. .#docs --raw
 ```
 
 ## Testing
 
-Tests use nix-unit in `templates/ci/`:
+Tests use nix-unit in `ci/`:
 
 ```bash
-cd templates/ci
+cd ci
 nix develop --override-input gen-schema ../.. -c nix-unit \
   --override-input gen-schema ../.. --flake .#.tests
 ```

@@ -7,7 +7,7 @@
 let
   R = genLib.record;
   record = R;
-  mixinLib = import ../../../nix/lib/mixin.nix { inherit lib record; };
+  mixinLib = import ../../nix/lib/mixin.nix { inherit lib record; };
   inherit (mixinLib)
     mkMixin
     composeMixins

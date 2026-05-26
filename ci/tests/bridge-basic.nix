@@ -7,8 +7,8 @@
 let
   R = genLib.record;
   record = R;
-  refinedLib = import ../../../nix/lib/refined.nix { inherit lib; };
-  bridgeLib = import ../../../nix/lib/bridge.nix {
+  refinedLib = import ../../nix/lib/refined.nix { inherit lib; };
+  bridgeLib = import ../../nix/lib/bridge.nix {
     inherit lib record;
     inherit (refinedLib) isRefined getRefinements;
   };

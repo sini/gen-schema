@@ -6,7 +6,7 @@
 let
   inherit (schemaLib) mkSchemaOption mkSchemaEntryType mkInstanceRegistry;
   R = genLib.record;
-  refinedLib = import ../../../nix/lib/refined.nix { inherit lib; };
+  refinedLib = import ../../nix/lib/refined.nix { inherit lib; };
 
   # --- Test 1: Auto-extracted refinements from inline type declarations ---
 
