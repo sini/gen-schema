@@ -8,10 +8,11 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
 
 | Term | Definition |
 |------|-----------|
+| Kinds | Schema-level type declarations (deferred modules defining options and config) |
+| Instances | Concrete values of a kind, evaluated through registries |
 | Collections | Named multi-contributor aggregation points with a merge strategy |
-| Nodes | Graph vertices — schema kinds become scope graph nodes |
-| Edges | Labeled relationships: parent (P) nesting, ref (I) imports |
-| Refs | Cross-registry references between kinds |
+| Refs | Cross-registry references between kinds (deferred or direct) |
+| Edges | Parent (P) nesting and ref (I) import relationships, exposed via `_edges` introspection |
 
 ## Gen Ecosystem
 
@@ -22,6 +23,9 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
 | [gen-aspects](https://github.com/sini/gen-aspects) | Aspect types (traits, classification, dispatch) |
 | [gen-graph](https://github.com/sini/gen-graph) | Graph queries (combinators, traversals, fixpoint) |
 | [gen-scope](https://github.com/sini/gen-scope) | Scope graphs (construction, evaluation, resolution) |
+| [gen-select](https://github.com/sini/gen-select) | Selector algebra (pattern matching over graph positions) |
+| [gen-bind](https://github.com/sini/gen-bind) | Module binding (inject args into NixOS modules) |
+| [gen-derive](https://github.com/sini/gen-derive) | Rule dispatch (stratified phases, fixpoint, conflict resolution) |
 
 ## Quick Start
 
@@ -1145,7 +1149,7 @@ mkSchemaEntryType {
 }
 ```
 
-## Academic Foundations
+## Theoretical Foundations
 
 | Feature | Paper |
 |---------|-------|
