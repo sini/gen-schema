@@ -81,16 +81,8 @@ in
 
   inherit getRefKind dedupByHash;
 
-  # Scan evaluated options for deferred ref types. Returns { fieldName = refKind; }.
-  refsFromOptions =
-    opts:
-    let
-      refFields = lib.filterAttrs (_: opt: (opt ? type) && (getRefKind opt.type) != null) opts;
-    in
-    lib.mapAttrs (_: opt: getRefKind opt.type) refFields;
-
-  # Like refsFromOptions but preserves the option type for coercion chain construction.
-  # Returns { fieldName = { refKind; type; }; }.
+  # Scan evaluated options for deferred ref types, preserving the option type
+  # for coercion chain construction. Returns { fieldName = { refKind; type; }; }.
   refsFromOptionsWithTypes =
     opts:
     let

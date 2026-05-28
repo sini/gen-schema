@@ -261,7 +261,14 @@ let
   mkInstanceRegistry =
     kindValue:
     let
-      kind = kindValue.kind;
+      # Deferred guard — forced when kind is accessed, avoids infinite recursion
+      # at option-declaration time when kindValue = eval.config.schema.host
+      _guard =
+        assert
+          (kindValue ? kind && kindValue ? options)
+          || throw "gen-schema: mkInstanceRegistry: expected a kind value (e.g., schema.host), got an attrset without 'kind' or 'options'";
+        null;
+      kind = builtins.seq _guard kindValue.kind;
     in
     {
       extraModules ? [ ],

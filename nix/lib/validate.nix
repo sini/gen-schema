@@ -10,11 +10,16 @@ let
 in
 {
   validateInstances =
-    schema: kind: instances:
+    kindValue: instances:
     let
-      validators = schema.${kind}.validators or [ ];
+      _guard =
+        assert
+          (kindValue ? kind && kindValue ? options)
+          || throw "gen-schema: validateInstances: expected a kind value (e.g., schema.host), got an attrset without 'kind' or 'options'";
+        null;
+      validators = kindValue.validators or [ ];
     in
-    runValidators kind validators instances;
+    runValidators (builtins.seq _guard kindValue.kind) validators instances;
 
   # Wrap gen-algebra's mkValidator with field requirements.
   # Validators with __fields are skipped when any required field is absent from the kind.

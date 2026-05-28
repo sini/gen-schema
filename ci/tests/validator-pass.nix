@@ -34,7 +34,7 @@ let
       }
     ];
   };
-  result = schemaLib.validateInstances schemaEval.config.schema "host" instanceEval.config.hosts;
+  result = schemaLib.validateInstances schemaEval.config.schema.host instanceEval.config.hosts;
 in
 {
   flake.tests."validator-pass".test-right-returned = {

@@ -41,7 +41,7 @@ let
       }
     ];
   };
-  result = schemaLib.validateInstances schemaEval.config.schema "host" instanceEval.config.hosts;
+  result = schemaLib.validateInstances schemaEval.config.schema.host instanceEval.config.hosts;
   failedNames = lib.sort (a: b: a < b) (map (f: f.name) result.left);
 in
 {
