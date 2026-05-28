@@ -30,6 +30,7 @@ let
       schema,
       kind,
       fields ? { },
+      types ? { },
       collections ? [ ],
     }:
     let
@@ -52,26 +53,68 @@ let
           null
       ) fields) null;
 
-      # Walk a type tree to build ref encoder (mirrors mkCoerceChain in instance.nix)
-      mkRefEncoder =
-        type:
+      # Walk a type tree to build encoder/decoder.
+      # Handles: ref auto-detect, type-registered codecs, wrapper traversal.
+      mkTypeEncoder =
+        name: type:
+        let
+          typeName = type.name or "";
+          et = (type.nestedTypes or { }).elemType or null;
+        in
+        # Ref leaf — always takes priority
         if (type.refKind or null) != null then
-          (v: v.name)
-        else
+          {
+            encode = v: v.name;
+            decode = v: v;
+          }
+        # Type-registered codec — direct match
+        else if types ? ${typeName} then
+          {
+            encode = types.${typeName}.encode;
+            decode = types.${typeName}.decode or (v: v);
+          }
+        # nullOr wrapper — recurse into elemType
+        else if typeName == "nullOr" && et != null then
           let
-            et = (type.nestedTypes or { }).elemType or null;
+            inner = mkTypeEncoder name et;
           in
-          if et == null then
-            throw "gen-schema: codec: mkRefEncoder: unexpected non-ref type '${type.name or "unknown"}' with no elemType"
-          else
-            let
-              inner = mkRefEncoder et;
-            in
-            if (type.name or "") == "nullOr" then
-              (v: if v == null then null else inner v)
-            else
-              # listOf or setOf — map
-              (v: map inner v);
+          {
+            encode = v: if v == null then null else inner.encode v;
+            decode = v: if v == null then null else inner.decode v;
+          }
+        # listOf wrapper — map over elemType
+        else if typeName == "listOf" && et != null then
+          let
+            inner = mkTypeEncoder name et;
+          in
+          {
+            encode = v: map inner.encode v;
+            decode = v: map inner.decode v;
+          }
+        # attrsOf wrapper — mapAttrs over elemType
+        else if typeName == "attrsOf" && et != null then
+          let
+            inner = mkTypeEncoder name et;
+          in
+          {
+            encode = v: lib.mapAttrs (_: inner.encode) v;
+            decode = v: lib.mapAttrs (_: inner.decode) v;
+          }
+        # setOf wrapper — map (setOf is a list at value level)
+        else if (type.isSetOf or false) && et != null then
+          let
+            inner = mkTypeEncoder name et;
+          in
+          {
+            encode = v: map inner.encode v;
+            decode = v: map inner.decode v;
+          }
+        # No match — identity
+        else
+          {
+            encode = v: v;
+            decode = v: v;
+          };
 
       mkFieldCodec =
         name:
@@ -122,16 +165,12 @@ let
               ) { } subFieldNames;
           }
         else
-          # Check for ref type via schema introspection
+          # Walk the type tree for ref auto-detect, type-registered codecs, and wrappers
           let
             opt = meta.options.${name} or null;
-            refKind = if opt != null && opt ? type then getRefKind opt.type else null;
           in
-          if refKind != null then
-            {
-              encode = mkRefEncoder opt.type;
-              decode = v: v;
-            }
+          if opt != null && opt ? type then
+            mkTypeEncoder name opt.type
           else
             {
               encode = v: v;
