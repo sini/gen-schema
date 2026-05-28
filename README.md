@@ -92,7 +92,7 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
     };
 
     # Create a registry and instances
-    options.hosts = schemaLib.mkInstanceRegistry config.schema "host" {};
+    options.hosts = schemaLib.mkInstanceRegistry config.schema.host {};
     hosts.igloo = { addr = "10.0.1.1"; role = "web"; };
     hosts.iceberg = { addr = "10.0.2.1"; };  # role defaults to "worker"
 
@@ -173,7 +173,7 @@ config.schema.service = {
 };
 
 # Services can reference each other (direct ref — registry in scope)
-options.services = schemaLib.mkInstanceRegistry config.schema "service" {
+options.services = schemaLib.mkInstanceRegistry config.schema.service {
   extraModules = [({ ... }: {
     options.upstream = lib.mkOption {
       type = lib.types.nullOr (schemaLib.ref config.services);
@@ -212,7 +212,7 @@ config.schema.service = {
 config.schema.deployment.options.namespace = lib.mkOption {
   type = schemaLib.ref "namespace";
 };
-options.deployments = schemaLib.mkInstanceRegistry config.schema "deployment" {
+options.deployments = schemaLib.mkInstanceRegistry config.schema.deployment {
   refs.namespace = config.namespaces;
 };
 
@@ -256,10 +256,10 @@ config.schema.network = {
 config.schema.host.options.network = lib.mkOption {
   type = schemaLib.ref "network";
 };
-options.hosts = schemaLib.mkInstanceRegistry config.schema "host" {
+options.hosts = schemaLib.mkInstanceRegistry config.schema.host {
   refs.network = config.networks;
 };
-options.networks = schemaLib.mkInstanceRegistry config.schema "network" {};
+options.networks = schemaLib.mkInstanceRegistry config.schema.network {};
 
 config.networks.lan = { cidr = "10.0.1.0/24"; gateway = "10.0.1.1"; };
 config.hosts.nas = {
@@ -290,7 +290,7 @@ config.schema.host = {
 
 Kinds are deferred modules — they define options and config but aren't evaluated until imported by an instance.
 
-Kind names starting with `_` are reserved for internal use (`_kindNames`, `_strict`). They are excluded from `_kindNames` and `renderDocs`.
+Kind names starting with `_` are reserved for internal use (`_kindNames`, `_topology`, etc.). They are excluded from `_kindNames` and `renderDocs`.
 
 ### Extension
 
@@ -371,7 +371,7 @@ options.schema = schemaLib.mkSchemaOption { strict = false; };
 **Instances** are concrete values of a kind. Create them with `mkInstanceRegistry`:
 
 ```nix
-options.fleet.hosts = schemaLib.mkInstanceRegistry config.schema "host" {};
+options.fleet.hosts = schemaLib.mkInstanceRegistry config.schema.host {};
 
 config.fleet.hosts.igloo = {
   addr = "10.0.1.1";
@@ -400,11 +400,11 @@ Registries can nest inside instances via `extraModules`. This establishes parent
 # Capture the top-level schema before entering extraModules closures
 let schema = config.schema;
 in {
-  options.fleet.hosts = schemaLib.mkInstanceRegistry schema "host" {
+  options.fleet.hosts = schemaLib.mkInstanceRegistry schema.host {
     extraModules = [({ config, ... }:
       let hostConfig = config;  # capture the host instance's config
       in {
-        options.users = schemaLib.mkInstanceRegistry schema "user" {
+        options.users = schemaLib.mkInstanceRegistry schema.user {
           extraModules = [
             # Inject parent host into child user's module args
             ({ ... }: { config._module.args.host = hostConfig; })
@@ -438,7 +438,7 @@ Individual registries can override the schema-level strict setting:
 options.schema = schemaLib.mkSchemaOption { strict = true; };
 
 # But this specific registry allows freeform
-options.fleet.configs = schemaLib.mkInstanceRegistry config.schema "config" {
+options.fleet.configs = schemaLib.mkInstanceRegistry config.schema.config {
   strict = false;
 };
 ```
@@ -499,7 +499,7 @@ config.schema.service.options.host = lib.mkOption {
 };
 
 # Registry binds the ref to a concrete registry
-options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
+options.fleet.services = schemaLib.mkInstanceRegistry config.schema.service {
   refs.host = config.fleet.hosts;
 };
 ```
@@ -507,7 +507,7 @@ options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
 **Direct ref** — resolve immediately when the registry is in scope:
 
 ```nix
-options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
+options.fleet.services = schemaLib.mkInstanceRegistry config.schema.service {
   extraModules = [({ ... }: {
     options.upstream = lib.mkOption {
       type = lib.types.nullOr (schemaLib.ref config.fleet.services);
@@ -556,7 +556,7 @@ type = lib.types.nullOr (lib.types.listOf (schemaLib.ref "host"));
 For domain-specific resolution, pass an extended binding with a `coerce` function:
 
 ```nix
-options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
+options.fleet.services = schemaLib.mkInstanceRegistry config.schema.service {
   refs.host = {
     instances = config.fleet.hosts;
     coerce = default: val:
@@ -575,7 +575,7 @@ When a registry's ref field points back to itself (e.g., a trait's `needs` refer
 Set `deferred = true` to defer coercion to the `applyPipeline` (after all instances are evaluated). The coerce hook receives the raw materialized instances as its first argument, breaking the cycle:
 
 ```nix
-options.traits = schemaLib.mkInstanceRegistry config.schema "trait" {
+options.traits = schemaLib.mkInstanceRegistry config.schema.trait {
   refs.needs = {
     instances = config.traits;
     deferred = true;
@@ -640,11 +640,11 @@ config.schema._kindNames    # → [ "host" "service" "user" ]
 config.schema._roots        # → [ "host" ]  — kinds with no parent
 config.schema._leaves       # → [ "user" ]  — kinds with no children
 
-# Per-kind metadata
-meta = config.schema._kindMeta "host";
-meta.optionNames   # → [ "addr" "role" ... ]
-meta.options       # → full option declarations
-meta.refs          # → { }  (ref fields on this kind)
+# Per-kind introspection
+config.schema.host.options          # → full option declarations (filtered, no _module.*)
+config.schema.host.refs             # → { }  (ref fields on this kind)
+config.schema.host.strict           # → true
+builtins.attrNames config.schema.host.options  # → [ "addr" "role" ... ]
 
 # Unified edge view (§ Neron 2015 scope graph P + I edges)
 config.schema._edges
@@ -842,16 +842,11 @@ Every schema has flat `_`-prefixed options for programmatic access:
 ```nix
 config.schema._kindNames                # → [ "host" "service" "user" ]
 
-# Per-kind metadata — evaluates a throwaway instance to reflect on options
-meta = config.schema._kindMeta "host";
-meta.optionNames   # → [ "addr" "describe" "hasService" "metricsPort" ... ]
-meta.options       # → full option declarations (type, description, default, ...)
-```
-
-`_kindMeta` is lazy — the `lib.evalModules` call only fires when accessed. Querying an undeclared kind throws:
-
-```
-kindMeta: 'nonexistent' is not a declared schema kind
+# Per-kind introspection — available on each kind value
+config.schema.host.options          # → full option declarations (filtered, no _module.*)
+config.schema.host.refs             # → { field = { refKind = "targetKind"; type = ...; }; }
+config.schema.host.strict           # → true
+builtins.attrNames config.schema.host.options  # → [ "addr" "describe" "hasService" "metricsPort" ... ]
 ```
 
 ### Schema Validators
@@ -890,7 +885,7 @@ schema validation failed:
 For standalone validation without throwing, use `validateInstances`:
 
 ```nix
-result = schemaLib.validateInstances config.schema "host" config.fleet.hosts;
+result = schemaLib.validateInstances config.schema.host config.fleet.hosts;
 # → { right = instances; } or { left = [ { name; validator; message; } ]; }
 ```
 
@@ -901,7 +896,7 @@ result = schemaLib.validateInstances config.schema "host" config.fleet.hosts;
 **Plain derive** — attrset in, attrset out:
 
 ```nix
-options.fleet.users = schemaLib.mkInstanceRegistry config.schema "user" {
+options.fleet.users = schemaLib.mkInstanceRegistry config.schema.user {
   derive = users:
     let uids = assignIds { min = 1000; max = 60000; } users;
     in lib.mapAttrs (name: _: { uid = uids.${name}; }) users;
@@ -918,7 +913,7 @@ Derive can read `id_hash` and all instance config — it runs after full module 
 **`deriveEither`** — returns Either with configurable error handling:
 
 ```nix
-options.fleet.services = schemaLib.mkInstanceRegistry config.schema "service" {
+options.fleet.services = schemaLib.mkInstanceRegistry config.schema.service {
   deriveEither = {
     derive = services: someEitherPipeline services;
     onError = left: lib.warn "enrichment failed" {};  # optional, default throws
@@ -945,9 +940,7 @@ Outputs a table per kind with option name, type, default, and description — in
 `mkCodec` creates a standalone codec for serializing/deserializing kind instances. The codec is format-agnostic at its core, with a pluggable format layer and built-in JSON convenience.
 
 ```nix
-codec = schemaLib.mkCodec {
-  schema = config.schema;
-  kind = "host";
+codec = schemaLib.mkCodec config.schema.host {
   # Optional: per-field overrides
   fields = {
     secret = { exclude = true; };
@@ -1022,7 +1015,7 @@ mkSchemaOption {
 
 Returns `lib.mkOption` — use as `options.schema = mkSchemaOption { ... }`.
 
-`mkSchemaEntryType` is also exported for advanced use — it returns the raw `deferredModule` type used for schema kind values, without wrapping in `mkOption` or adding introspection options/`_strict`. Most consumers should use `mkSchemaOption`.
+`mkSchemaEntryType` is also exported for advanced use — it returns the raw `deferredModule` type used for schema kind values, without wrapping in `mkOption` or adding introspection options. Most consumers should use `mkSchemaOption`.
 
 #### `mkSchemaEntryType` `mkType` parameter
 
@@ -1060,9 +1053,9 @@ mkSchemaOption {
 ### `mkInstanceType`
 
 ```nix
-mkInstanceType schema kind {
+mkInstanceType kindValue {
   extraModules ? [],     # additional modules (cross-entity bindings, den-specific options)
-  strict ? schema._strict or true,
+  strict ? kindValue.strict,
 }
 ```
 
@@ -1071,10 +1064,10 @@ Returns `lib.types.submodule` — the type for a single instance of a kind.
 ### `mkInstanceRegistry`
 
 ```nix
-mkInstanceRegistry schema kind {
+mkInstanceRegistry kindValue {
   extraModules ? [],
   refs ? {},             # bindings for deferred refs (see below)
-  strict ? schema._strict or true,
+  strict ? kindValue.strict,
   description ? "${kind} instances",
   derive ? null,         # { name → instance } → { name → attrset } — plain enrichment
   deriveEither ? null,   # { derive; onError? } — Either-based enrichment
@@ -1158,7 +1151,7 @@ Creates a validator record. `pred` receives the instance config and returns bool
 ### `validateInstances`
 
 ```nix
-validateInstances schema kind instances
+validateInstances kindValue instances
 ```
 
 Runs the kind's validators against instances. Returns `{ right = instances; }` on success or `{ left = [ { name; validator; message; } ]; }` on failure. Does not throw — returns Either for consumer-controlled handling.
@@ -1195,10 +1188,9 @@ Returns a markdown string with a table per kind.
 ### `mkCodec`
 
 ```nix
-mkCodec {
-  schema,                # schema with introspection (_kindMeta)
-  kind,                  # kind name (string)
+mkCodec kindValue {
   fields ? {},           # per-field overrides: { name = { encode?; decode?; exclude?; fields?; }; }
+  types ? {},            # codecs by NixOS type name — auto-wrapped through nullOr/listOf/attrsOf/setOf
   excludeFields ? [],    # additional field names to exclude from serialization
 }
 ```
