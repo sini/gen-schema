@@ -62,7 +62,7 @@ let
             et = (type.nestedTypes or { }).elemType or null;
           in
           if et == null then
-            (v: v.name)
+            throw "gen-schema: codec: mkRefEncoder: unexpected non-ref type '${type.name or "unknown"}' with no elemType"
           else
             let
               inner = mkRefEncoder et;
@@ -86,7 +86,9 @@ let
             decode = spec.decode or (v: v);
           }
         else if spec ? fields then
-          # Recursive: build sub-codec for nested submodule
+          # Recursive: build sub-codec for nested submodule.
+          # NOTE: ref auto-detection is NOT applied to sub-fields — only custom
+          # encode/decode and exclude. If a sub-field is a ref, provide an explicit encoder.
           let
             subFields = spec.fields;
             subFieldNames = builtins.filter (
