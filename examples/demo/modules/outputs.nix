@@ -157,6 +157,59 @@ in
           withEnhancedLabels = record.labels withEnhanced;
         };
 
+      # --- Codec (serialization) ---
+      codecDemo =
+        let
+          hostCodec = schemaLib.mkCodec {
+            schema = config.schema;
+            kind = "host";
+            fields = {
+              # Exclude metricsPort from serialization
+              metricsPort = {
+                exclude = true;
+              };
+              monitored = {
+                exclude = true;
+              };
+            };
+          };
+          serviceCodec = schemaLib.mkCodec {
+            schema = config.schema;
+            kind = "service";
+          };
+
+          # Encode a single instance
+          encodedIgloo = hostCodec.encode fleet.hosts.igloo;
+
+          # JSON round-trip
+          jsonStr = hostCodec.json.serialize fleet.hosts.igloo;
+          roundTripped = hostCodec.json.deserialize jsonStr;
+
+          # Encode all instances
+          allHosts = hostCodec.encodeAll fleet.hosts;
+
+          # Service codec: ref fields auto-encode to name strings
+          encodedNginx = serviceCodec.encode fleet.services.nginx;
+        in
+        {
+          # Basic encode strips internals (name, id_hash, methods)
+          encodedIglooKeys = builtins.attrNames encodedIgloo;
+          iglooHasName = encodedIgloo ? name;
+          iglooHasIdHash = encodedIgloo ? id_hash;
+
+          # Excluded fields are absent
+          iglooHasMetricsPort = encodedIgloo ? metricsPort;
+
+          # JSON round-trip produces registry-compatible attrset
+          roundTrippedAddr = roundTripped.addr;
+
+          # Encode all
+          allHostNames = builtins.attrNames allHosts;
+
+          # Ref fields encode to name strings
+          nginxHostRef = encodedNginx.host;
+        };
+
       # --- Blame (structured field-level errors) ---
       blameDemo =
         let

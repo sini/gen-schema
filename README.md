@@ -38,6 +38,7 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
   - [Schema Validators](#schema-validators)
   - [Derive Hooks](#derive-hooks)
   - [Documentation Generation](#documentation-generation)
+  - [Codec (Serialization)](#codec-serialization)
   - [Refinement Contracts](#schematypesrefined)
   - [Blame](#schemablame)
   - [Field Validators](#schemamkfieldvalidator)
@@ -939,6 +940,71 @@ schemaLib.renderDocs config.schema
 
 Outputs a table per kind with option name, type, default, and description — including extensions from composition and methods.
 
+### Codec (Serialization)
+
+`mkCodec` creates a standalone codec for serializing/deserializing kind instances. The codec is format-agnostic at its core, with a pluggable format layer and built-in JSON convenience.
+
+```nix
+codec = schemaLib.mkCodec {
+  schema = config.schema;
+  kind = "host";
+  # Optional: per-field overrides
+  fields = {
+    secret = { exclude = true; };
+    cluster = { encode = v: v.name; decode = v: v; };
+    meta = {
+      fields = {
+        region = {};
+        internal = { exclude = true; };
+      };
+    };
+  };
+  # Optional: user-defined collection keys to exclude
+  collections = [ "tags" ];
+};
+```
+
+The codec returns:
+
+```nix
+{
+  encode        # instance → attrset (strips internals, encodes refs to names)
+  decode        # attrset → attrset (drops unknown fields, passes through known)
+  encodeAll     # registry → attrsOf attrset
+  decodeAll     # attrsOf attrset → attrsOf attrset
+  serialize     # format → instance → value
+  deserialize   # format → value → attrset
+  serializeAll  # format → registry → value
+  deserializeAll # format → value → attrsOf attrset
+  json          # { serialize, deserialize, serializeAll, deserializeAll }
+}
+```
+
+Usage:
+
+```nix
+# JSON export
+jsonStr = codec.json.serialize config.hosts.igloo;
+# → "{\"addr\":\"10.0.1.1\",\"role\":\"web\",\"cluster\":\"prod\"}"
+
+# JSON import (produces registry-compatible attrset)
+imported = codec.json.deserialize (builtins.readFile ./host.json);
+
+# Custom format
+toml = { encode = tomlLib.encode; decode = tomlLib.decode; };
+codec.serialize toml config.hosts.igloo;
+```
+
+**Field resolution:**
+
+- Internals (`name`, `id_hash`, methods, collections) are always excluded
+- Ref fields auto-encode to `v.name` (scalar), `map (v: v.name)` (listOf/setOf), with null-guard for nullOr
+- Custom `encode`/`decode` in `fields` overrides auto-detection
+- `fields.x = { fields = { ... }; }` recurses into submodule structure
+- `fields.x = { exclude = true; }` removes a field
+
+**Round-trip:** `decode` produces plain attrsets — ref fields return as strings. Resolution occurs when the decoded attrset enters an `mkInstanceRegistry` and passes through the existing ref coerce pipeline.
+
 ## API Reference
 
 ### `mkSchemaOption`
@@ -1124,6 +1190,19 @@ renderDocs schema
 
 Returns a markdown string with a table per kind.
 
+### `mkCodec`
+
+```nix
+mkCodec {
+  schema,                # schema with introspection (_kindMeta)
+  kind,                  # kind name (string)
+  fields ? {},           # per-field overrides: { name = { encode?; decode?; exclude?; fields?; }; }
+  collections ? [],      # user-defined collection keys to exclude
+}
+```
+
+Returns a codec record with `encode`/`decode` (attrset ↔ attrset), format-parameterized `serialize`/`deserialize`, and curried `json.*` convenience. See [Codec (Serialization)](#codec-serialization) for full usage.
+
 ### `schema.types.refined`
 
 Refinement contracts co-located with type declarations (§ Findler 2002, § Rondon 2008). Predicates validate during `applyPipeline` (strict by default).
@@ -1284,7 +1363,7 @@ Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), val
 
 ## Demo
 
-See [`examples/demo/`](examples/demo/) for a complete fleet management example using flake-parts + import-tree. The demo exercises all features: kinds, instances, strict validation, identity hashing, cross-instance references, schema composition, kind mix-ins, declarative methods, and documentation generation.
+See [`examples/demo/`](examples/demo/) for a complete fleet management example using flake-parts + import-tree. The demo exercises all features: kinds, instances, strict validation, identity hashing, cross-instance references, schema composition, kind mix-ins, declarative methods, codec serialization, and documentation generation.
 
 ```bash
 cd examples/demo
@@ -1294,7 +1373,7 @@ nix eval --override-input gen-schema ../.. .#docs --raw
 
 ## Testing
 
-304 tests via nix-unit in `ci/`:
+337 tests via nix-unit in `ci/`:
 
 ```bash
 cd ci
