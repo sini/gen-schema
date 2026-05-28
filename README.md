@@ -956,6 +956,39 @@ Returns `lib.mkOption` — use as `options.schema = mkSchemaOption { ... }`.
 
 `mkSchemaEntryType` is also exported for advanced use — it returns the raw `deferredModule` type used for schema kind values, without wrapping in `mkOption` or adding introspection options/`_strict`. Most consumers should use `mkSchemaOption`.
 
+#### `mkSchemaEntryType` `mkType` parameter
+
+`mkType` replaces the standard deferredModule merge with a custom entry type constructor. When `null` (the default), kinds produce the standard deferred module with `__functor` wrapping, mixin pipeline, and refinement extraction. When provided, collection extraction still runs first, but `mkType` controls the merged result — the mixin pipeline, `__functor` wrapping, and refinement extraction are all skipped.
+
+```nix
+mkSchemaEntryType {
+  mkType ? null,  # optional: { kindModule, collections, defs, kind } -> attrset
+}
+```
+
+`mkType` receives four arguments in an attrset:
+
+| Argument | Description |
+|----------|-------------|
+| `kindModule` | The resolved `baseModule` (after applying kind-name function, if any), or `null` |
+| `collections` | Extracted collection values (methods, validators, parent, plus user-defined) |
+| `defs` | Stripped definitions (collection keys removed) for wiring into the custom type |
+| `kind` | The kind name (last element of the option path) |
+
+The return value is merged with `computedFields` (computed wins for same-named keys), so topology and introspection fields remain authoritative.
+
+**Use case:** gen-aspects provides its recursive `aspectType` as a custom entry type, replacing gen-schema's deferred module with its own classification and dispatch system while reusing gen-schema's collection extraction and topology.
+
+```nix
+mkSchemaOption {
+  mkType = { kindModule, collections, defs, kind }:
+    myCustomType {
+      inherit kind defs;
+      inherit (collections) validators;
+    };
+}
+```
+
 ### `mkInstanceType`
 
 ```nix
@@ -1186,7 +1219,7 @@ emitted = schema.emitModule [ "validators" "methods" ] recordAlgebraRecord;
 # → { module = <NixOS module>; collections = { ... }; refinements = { ... }; }
 ```
 
-### `mkSchemaEntryType` `mixins` parameter
+#### `mkSchemaEntryType` `mixins` parameter
 
 Mixins are auto-applied when `baseModule` is an inline attrset:
 
@@ -1261,7 +1294,7 @@ nix eval --override-input gen-schema ../.. .#docs --raw
 
 ## Testing
 
-Tests use nix-unit in `ci/`:
+304 tests via nix-unit in `ci/`:
 
 ```bash
 cd ci

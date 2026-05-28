@@ -25,6 +25,7 @@ let
       collections ? { },
       computed ? null,
       mixins ? [ ],
+      mkType ? null,
     }:
     let
       base = lib.types.deferredModule;
@@ -115,96 +116,113 @@ let
               baseModule kind
             else
               baseModule;
-
-          # When mixins are present and baseModule is an inline attrset,
-          # apply mixins via the record algebra and emit through the bridge.
-          hasMixins = mixins != [ ] && resolvedBase != null && builtins.isAttrs resolvedBase;
-
-          mixinResult =
-            if hasMixins then
-              let
-                baseRecord = record.fromAttrs resolvedBase;
-                withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
-                emitted = emitModule collectionKeys withMixins;
-              in
-              emitted
-            else
-              null;
-
-          # Effective base module: bridge output when mixins applied, original otherwise
-          effectiveBase = if mixinResult != null then mixinResult.module else resolvedBase;
-
-          # Refinements extracted from option declarations.
-          # Mixin path: bridge already extracted them.
-          # Non-mixin path: scan all defs for mkOption values with __schema metadata.
-          # Stored on the kind result so mkInstanceRegistry can consume them automatically.
-          extractedRefinements =
-            if mixinResult != null then
-              mixinResult.refinements
-            else
-              let
-                # Collect option declarations from all defs (inline attrsets only).
-                # Tries d.value.options first (module-style { options.x = mkOption ...; })
-                # then falls back to scanning d.value for mkOption values directly
-                # (flat-style { x = mkOption ...; }). Assumes a user field named "options"
-                # won't contain mkOption values — this is safe because mkOption produces
-                # attrsets with _type = "option" which user data never has.
-                allOptionDecls = builtins.foldl' (
-                  acc: d:
-                  if builtins.isAttrs d.value then
-                    let
-                      opts = d.value.options or (lib.filterAttrs (_: isOptionDecl) d.value);
-                    in
-                    acc // (lib.filterAttrs (_: v: isOptionDecl v && v ? type && v.type ? __schema) opts)
-                  else
-                    acc
-                ) { } defs;
-              in
-              lib.filterAttrs (_: v: v != [ ]) (lib.mapAttrs (_: v: getRefinements v.type) allOptionDecls);
-
-          # Merge bridge-extracted collections into the collection results
-          bridgeCollections =
-            if mixinResult != null then
-              lib.mapAttrs (
-                name: stacks:
-                let
-                  merge = inferMerge name allCollections.${name};
-                in
-                builtins.foldl' merge (extractedCollections.${name} or allCollections.${name}.default) stacks
-              ) (lib.filterAttrs (n: _: allCollections ? ${n}) mixinResult.collections)
-            else
-              { };
-
-          finalCollections = extractedCollections // bridgeCollections;
-
-          # Inject baseModule + methods module (methods is the only collection
-          # that generates instance-level options via mkMethodsModule)
-          injected =
-            lib.optional (effectiveBase != null) {
-              file = "gen-schema/base";
-              value = effectiveBase;
-            }
-            ++ lib.optional (finalCollections.methods != { }) {
-              file = "gen-schema/methods";
-              value = mkMethodsModule kind finalCollections.methods;
-            };
-
-          merged = base.merge loc (strippedDefs ++ injected);
         in
-        # Precedence: computed overrides collections of the same name.
-        # __functor is reserved — collections/computed must not use it as a key.
-        {
-          __functor =
-            _:
-            { ... }:
-            {
-              imports = [ merged ];
-            };
-          inherit kind mixins;
-          refinements = extractedRefinements;
-        }
-        // finalCollections
-        // computedFields;
+        if mkType != null then
+          # Custom entry type: collection extraction runs first (above),
+          # then mkType controls the result. Mixin pipeline, __functor
+          # wrapping, and extractedRefinements are all skipped.
+          # Precedence: computedFields wins over mkType result for same-named keys,
+          # so computed topology/meta fields remain authoritative.
+          # strippedDefs are passed so mkType implementations can wire user-declared
+          # options/config from the schema kind entry into their own type systems.
+          mkType {
+            kindModule = resolvedBase;
+            collections = extractedCollections;
+            defs = strippedDefs;
+            inherit kind;
+          }
+          // computedFields
+        else
+          let
+            # When mixins are present and baseModule is an inline attrset,
+            # apply mixins via the record algebra and emit through the bridge.
+            hasMixins = mixins != [ ] && resolvedBase != null && builtins.isAttrs resolvedBase;
+
+            mixinResult =
+              if hasMixins then
+                let
+                  baseRecord = record.fromAttrs resolvedBase;
+                  withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
+                  emitted = emitModule collectionKeys withMixins;
+                in
+                emitted
+              else
+                null;
+
+            # Effective base module: bridge output when mixins applied, original otherwise
+            effectiveBase = if mixinResult != null then mixinResult.module else resolvedBase;
+
+            # Refinements extracted from option declarations.
+            # Mixin path: bridge already extracted them.
+            # Non-mixin path: scan all defs for mkOption values with __schema metadata.
+            # Stored on the kind result so mkInstanceRegistry can consume them automatically.
+            extractedRefinements =
+              if mixinResult != null then
+                mixinResult.refinements
+              else
+                let
+                  # Collect option declarations from all defs (inline attrsets only).
+                  # Tries d.value.options first (module-style { options.x = mkOption ...; })
+                  # then falls back to scanning d.value for mkOption values directly
+                  # (flat-style { x = mkOption ...; }). Assumes a user field named "options"
+                  # won't contain mkOption values — this is safe because mkOption produces
+                  # attrsets with _type = "option" which user data never has.
+                  allOptionDecls = builtins.foldl' (
+                    acc: d:
+                    if builtins.isAttrs d.value then
+                      let
+                        opts = d.value.options or (lib.filterAttrs (_: isOptionDecl) d.value);
+                      in
+                      acc // (lib.filterAttrs (_: v: isOptionDecl v && v ? type && v.type ? __schema) opts)
+                    else
+                      acc
+                  ) { } defs;
+                in
+                lib.filterAttrs (_: v: v != [ ]) (lib.mapAttrs (_: v: getRefinements v.type) allOptionDecls);
+
+            # Merge bridge-extracted collections into the collection results
+            bridgeCollections =
+              if mixinResult != null then
+                lib.mapAttrs (
+                  name: stacks:
+                  let
+                    merge = inferMerge name allCollections.${name};
+                  in
+                  builtins.foldl' merge (extractedCollections.${name} or allCollections.${name}.default) stacks
+                ) (lib.filterAttrs (n: _: allCollections ? ${n}) mixinResult.collections)
+              else
+                { };
+
+            finalCollections = extractedCollections // bridgeCollections;
+
+            # Inject baseModule + methods module (methods is the only collection
+            # that generates instance-level options via mkMethodsModule)
+            injected =
+              lib.optional (effectiveBase != null) {
+                file = "gen-schema/base";
+                value = effectiveBase;
+              }
+              ++ lib.optional (finalCollections.methods != { }) {
+                file = "gen-schema/methods";
+                value = mkMethodsModule kind finalCollections.methods;
+              };
+
+            merged = base.merge loc (strippedDefs ++ injected);
+          in
+          # Precedence: computed overrides collections of the same name.
+          # __functor is reserved — collections/computed must not use it as a key.
+          {
+            __functor =
+              _:
+              { ... }:
+              {
+                imports = [ merged ];
+              };
+            inherit kind mixins;
+            refinements = extractedRefinements;
+          }
+          // finalCollections
+          // computedFields;
     };
 
   mkSchemaOption =
@@ -214,6 +232,7 @@ let
       collections ? { },
       computed ? null,
       mixins ? [ ],
+      mkType ? null,
     }:
     lib.mkOption {
       description = "Schema — typed record registry with extension points";
@@ -227,6 +246,7 @@ let
               computed
               mixins
               collections
+              mkType
               ;
           });
 
