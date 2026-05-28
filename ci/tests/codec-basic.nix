@@ -43,7 +43,7 @@ let
   codec = mkCodec {
     schema = eval.config.schema;
     kind = "host";
-    collections = [ "tags" ];
+    excludeFields = [ "tags" ];
   };
 
   encoded = codec.encode eval.config.hosts.igloo;

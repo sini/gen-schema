@@ -959,8 +959,8 @@ codec = schemaLib.mkCodec {
       };
     };
   };
-  # Optional: user-defined collection keys to exclude
-  collections = [ "tags" ];
+  # Optional: additional fields to exclude by name
+  excludeFields = [ "tags" ];
 };
 ```
 
@@ -1199,7 +1199,7 @@ mkCodec {
   schema,                # schema with introspection (_kindMeta)
   kind,                  # kind name (string)
   fields ? {},           # per-field overrides: { name = { encode?; decode?; exclude?; fields?; }; }
-  collections ? [],      # user-defined collection keys to exclude
+  excludeFields ? [],    # additional field names to exclude from serialization
 }
 ```
 

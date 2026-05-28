@@ -2,9 +2,9 @@
 #
 # mkCodec builds per-field encoders/decoders from schema introspection.
 # Built-in internals (name, id_hash) and collection keys (methods, validators,
-# parent, kind, mixins, refinements) are excluded automatically. User-specified
-# collection keys are also excluded. Remaining fields get identity transforms
-# unless overridden via the fields spec.
+# parent, kind, mixins, refinements) are excluded automatically. Additional
+# fields can be excluded via excludeFields. Remaining fields get identity
+# transforms unless overridden via the fields spec or types registry.
 { lib, getRefKind }:
 let
   builtinCollections = [
@@ -31,14 +31,14 @@ let
       kind,
       fields ? { },
       types ? { },
-      collections ? [ ],
+      excludeFields ? [ ],
     }:
     let
       meta = schema._kindMeta kind;
       kindResult = schema.${kind};
 
       methodNames = builtins.attrNames (kindResult.methods or { });
-      allExcluded = builtinInternals ++ methodNames ++ builtinCollections ++ collections;
+      allExcluded = builtinInternals ++ methodNames ++ builtinCollections ++ excludeFields;
 
       resolvedFields = builtins.filter (n: !(builtins.elem n allExcluded)) meta.optionNames;
 
