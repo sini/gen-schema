@@ -39,7 +39,7 @@ let
       runValidators
       defaultOnError
       ;
-    inherit (refLib) refsFromOptionsWithTypes dedupByHash;
+    inherit (refLib) dedupByHash;
     inherit (validate) filterValidators;
   };
   docs = import ./docs.nix { inherit lib; };

@@ -13,22 +13,27 @@
   mkIdentityModule,
   runValidators,
   defaultOnError,
-  refsFromOptionsWithTypes,
   dedupByHash,
   filterValidators,
 }:
 let
   mkInstanceType =
-    schema: kind:
+    kindValue:
+    assert
+      (kindValue ? kind && kindValue ? options)
+      || throw "gen-schema: mkInstanceType: expected a kind value with 'kind' and 'options' attributes";
+    let
+      kind = kindValue.kind;
+    in
     {
       extraModules ? [ ],
-      strict ? schema._strict or true,
+      strict ? kindValue.strict,
     }:
     lib.types.submodule (
       { name, config, ... }:
       {
         imports = [
-          schema.${kind}
+          kindValue
         ]
         ++ [
           (
@@ -47,13 +52,6 @@ let
         };
       }
     );
-
-  findRefFields =
-    schema: kind:
-    let
-      evaled = lib.evalModules { modules = [ schema.${kind} ]; };
-    in
-    refsFromOptionsWithTypes evaled.options;
 
   # Type-tree predicates for coercion chain dispatch.
   isRefLeaf = t: (t.refKind or null) != null;
@@ -259,12 +257,18 @@ let
     };
 
   mkInstanceRegistry =
-    schema: kind:
+    kindValue:
+    assert
+      (kindValue ? kind && kindValue ? options)
+      || throw "gen-schema: mkInstanceRegistry: expected a kind value with 'kind' and 'options' attributes";
+    let
+      kind = kindValue.kind;
+    in
     {
       extraModules ? [ ],
       refs ? { },
       refinements ? { },
-      strict ? schema._strict or true,
+      strict ? kindValue.strict,
       description ? "${kind} instances",
       derive ? null,
       deriveEither ? null,
@@ -273,11 +277,9 @@ let
       (derive == null || deriveEither == null)
       || throw "gen-schema: mkInstanceRegistry: derive and deriveEither are mutually exclusive";
     let
-      # Resolve deferred refs: scan kind options, validate bindings, build override modules.
-      # findRefFields evaluates schema.${kind}, which isn't available at option-declaration
-      # time (circular), so only call it when refs are provided.  Binding validation for the
-      # missing-refs case is deferred to applyPipeline where schema access is safe.
-      refFields = if refs == { } then { } else findRefFields schema kind;
+      # Resolve refs from kindValue — no need to evaluate schema options,
+      # the kind value carries pre-computed ref field metadata.
+      refFields = if refs == { } then { } else kindValue.refs;
       refResult =
         if refs == { } then
           {
@@ -303,21 +305,14 @@ let
           null;
 
       # The apply pipeline: validate → derive → overlay.
-      # Validators are read lazily inside apply — schema.${kind}.validators
-      # is only forced when instances are actually evaluated, not at
-      # mkInstanceRegistry call time (avoids circular eval in self-referential patterns).
       applyPipeline =
         instances:
         let
-          # Ref binding validation — deferred to apply time so schema.${kind} is safe
-          # to evaluate (avoids circular eval at option-declaration time).
-          # Force ref module validation (extra-binding case) and check for missing
-          # bindings (refs == {} but schema declares ref fields).
-          # N.B. The missing-binding check here mirrors mkRefBindingModules,
-          # which can't run when refs == {} — keep error messages in sync.
+          # Ref binding validation — check for missing bindings (refs == {} but
+          # kind declares ref fields). Mirrors mkRefBindingModules error messages.
           refValidation =
             let
-              allRefFields = findRefFields schema kind;
+              allRefFields = kindValue.refs;
               missingBindings = lib.filterAttrs (field: _: !(refs ? ${field})) allRefFields;
             in
             if missingBindings != { } then
@@ -331,7 +326,7 @@ let
 
           validators = builtins.seq refValidation (
             let
-              raw = schema.${kind}.validators or [ ];
+              raw = kindValue.validators;
               # Derive option names from any instance — all share the same kind schema.
               optionNames =
                 if instances == { } then
@@ -375,9 +370,7 @@ let
 
           # Refinement pass: strict refinements throw immediately, lazy refinements
           # wrap values with addErrorContext for deferred checking at access time.
-          # Auto-extract from schema kind if not explicitly provided.
-          effectiveRefinements =
-            if refinements != { } then refinements else schema.${kind}.refinements or { };
+          effectiveRefinements = if refinements != { } then refinements else kindValue.refinements;
 
           refinementChecked =
             if effectiveRefinements == { } then
@@ -473,7 +466,7 @@ let
       inherit description;
       default = { };
       type = lib.types.attrsOf (
-        mkInstanceType schema kind {
+        mkInstanceType kindValue {
           extraModules = allExtraModules;
           inherit strict;
         }
