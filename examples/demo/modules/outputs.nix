@@ -190,6 +190,18 @@ in
 
           # Service codec: ref fields auto-encode to name strings
           encodedNginx = serviceCodec.encode fleet.services.nginx;
+
+          # Type-registered codec with either dispatch
+          typeCodec = schemaLib.mkCodec {
+            schema = config.schema;
+            kind = "host";
+            types = {
+              unsignedInt16 = {
+                encode = v: "port:${toString v}";
+              };
+            };
+          };
+          typeEncodedPort = (typeCodec.encode fleet.hosts.igloo).port;
         in
         {
           # Basic encode strips internals (name, id_hash, methods)
@@ -208,6 +220,9 @@ in
 
           # Ref fields encode to name strings
           nginxHostRef = encodedNginx.host;
+
+          # Type-registered codec
+          iglooPortEncoded = typeEncodedPort;
         };
 
       # --- Blame (structured field-level errors) ---

@@ -999,6 +999,8 @@ codec.serialize toml config.hosts.igloo;
 
 - Internals (`name`, `id_hash`, methods, collections) are always excluded
 - Ref fields auto-encode to `v.name` (scalar), `map (v: v.name)` (listOf/setOf), with null-guard for nullOr
+- `types` parameter registers codecs by NixOS type name — auto-wrapped through `nullOr`/`listOf`/`attrsOf`/`setOf`
+- `either`/`oneOf` fields dispatch to the matching branch's codec via `.check` (left-biased)
 - Custom `encode`/`decode` in `fields` overrides auto-detection
 - `fields.x = { fields = { ... }; }` recurses into submodule structure
 - `fields.x = { exclude = true; }` removes a field

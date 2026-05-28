@@ -109,6 +109,32 @@ let
             encode = v: map inner.encode v;
             decode = v: map inner.decode v;
           }
+        # either / oneOf — check-based dispatch, left-biased
+        else if typeName == "either" then
+          let
+            left = (type.nestedTypes or { }).left or null;
+            right = (type.nestedTypes or { }).right or null;
+            leftCodec = if left != null then mkTypeEncoder name left else null;
+            rightCodec = if right != null then mkTypeEncoder name right else null;
+          in
+          {
+            encode =
+              v:
+              if left != null && left.check v then
+                leftCodec.encode v
+              else if right != null && right.check v then
+                rightCodec.encode v
+              else
+                throw "gen-schema: codec: no matching branch for either/oneOf on field '${name}'";
+            decode =
+              v:
+              if left != null && left.check v then
+                leftCodec.decode v
+              else if right != null && right.check v then
+                rightCodec.decode v
+              else
+                v; # decode is lenient
+          }
         # No match — identity
         else
           {
