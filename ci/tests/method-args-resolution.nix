@@ -30,7 +30,7 @@ let
   };
 in
 {
-  method-args.test-describe-resolves-name = {
+  flake.tests.method-args.test-describe-resolves-name = {
     expr = instance.config.describe;
     expected = "igloo is a webserver";
   };

@@ -28,7 +28,7 @@ let
   };
 in
 {
-  "derive-either-custom" = {
+  flake.tests."derive-either-custom" = {
     test-no-throw = {
       expr =
         (builtins.tryEval (builtins.deepSeq eval.config.hosts.igloo.addr eval.config.hosts.igloo.addr))

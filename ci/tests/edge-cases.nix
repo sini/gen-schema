@@ -76,24 +76,24 @@ let
   );
 in
 {
-  "edge-cases".test-empty-schema-kind-names = {
+  flake.tests."edge-cases".test-empty-schema-kind-names = {
     expr = emptyEval.config.schema._kindNames;
     expected = [ ];
   };
-  "edge-cases".test-empty-schema-docs = {
+  flake.tests."edge-cases".test-empty-schema-docs = {
     expr = renderDocs emptyEval.config.schema;
     expected = "";
   };
-  "edge-cases".test-docs-shows-default-value = {
+  flake.tests."edge-cases".test-docs-shows-default-value = {
     expr = lib.hasInfix "worker" docs;
     expected = true;
   };
-  "edge-cases".test-docs-shows-int-default = {
+  flake.tests."edge-cases".test-docs-shows-int-default = {
     expr = lib.hasInfix "80" docs;
     expected = true;
   };
   # mergeOneOption should reject conflicting ref defs
-  "edge-cases".test-ref-conflict-throws = {
+  flake.tests."edge-cases".test-ref-conflict-throws = {
     expr = refConflict.success;
     expected = false;
   };

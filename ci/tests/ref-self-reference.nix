@@ -38,7 +38,7 @@ let
   };
 in
 {
-  ref-self-reference = {
+  flake.tests.ref-self-reference = {
     test-self-ref-resolves = {
       expr = eval.config.services.gateway.upstream.port;
       expected = 8080;

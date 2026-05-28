@@ -33,37 +33,37 @@ let
   ];
 in
 {
-  refined-basic.test-is-refined = {
+  flake.tests.refined-basic.test-is-refined = {
     expr = isRefined refinedPort;
     expected = true;
   };
 
-  refined-basic.test-plain-type-not-refined = {
+  flake.tests.refined-basic.test-plain-type-not-refined = {
     expr = isRefined lib.types.int;
     expected = false;
   };
 
-  refined-basic.test-get-refinements-count = {
+  flake.tests.refined-basic.test-get-refinements-count = {
     expr = builtins.length (getRefinements refinedPort);
     expected = 1;
   };
 
-  refined-basic.test-composed-refinements-count = {
+  flake.tests.refined-basic.test-composed-refinements-count = {
     expr = builtins.length (getRefinements strictPort);
     expected = 2;
   };
 
-  refined-basic.test-check-valid-value = {
+  flake.tests.refined-basic.test-check-valid-value = {
     expr = checkRefinements "port" refinedPort 8080;
     expected = [ ];
   };
 
-  refined-basic.test-check-invalid-value = {
+  flake.tests.refined-basic.test-check-invalid-value = {
     expr = builtins.length (checkRefinements "port" refinedPort (-1));
     expected = 1;
   };
 
-  refined-basic.test-check-failure-structure = {
+  flake.tests.refined-basic.test-check-failure-structure = {
     expr =
       let
         failures = checkRefinements "port" refinedPort (-1);
@@ -83,7 +83,7 @@ in
   # Use 70000 and add a value that fails both: impossible with these bounds (any int either >= 1024 or not, either < 65536 or not)
   # A value > 65535 fails the second; a value < 1024 fails the first. Can't fail both simultaneously with disjoint ranges.
   # Redesign: use two overlapping upper bounds so a large value fails both.
-  refined-basic.test-composed-both-fail = {
+  flake.tests.refined-basic.test-composed-both-fail = {
     expr =
       let
         bothFail = types.refined lib.types.int [
@@ -101,12 +101,12 @@ in
     expected = 2;
   };
 
-  refined-basic.test-composed-one-fails = {
+  flake.tests.refined-basic.test-composed-one-fails = {
     expr = builtins.length (checkRefinements "port" strictPort 70000);
     expected = 1;
   };
 
-  refined-basic.test-reusable-refinement = {
+  flake.tests.refined-basic.test-reusable-refinement = {
     expr =
       let
         portType = types.refined lib.types.int refinements.tcpPort;
@@ -115,7 +115,7 @@ in
     expected = [ ];
   };
 
-  refined-basic.test-reusable-refinement-invalid = {
+  flake.tests.refined-basic.test-reusable-refinement-invalid = {
     expr =
       let
         portType = types.refined lib.types.int refinements.tcpPort;
@@ -125,7 +125,7 @@ in
   };
 
   # Refined type preserves base NixOS type behavior
-  refined-basic.test-evalmodules-with-refined-type = {
+  flake.tests.refined-basic.test-evalmodules-with-refined-type = {
     expr =
       let
         eval = lib.evalModules {
@@ -141,12 +141,12 @@ in
     expected = 8080;
   };
 
-  refined-basic.test-base-type-preserved = {
+  flake.tests.refined-basic.test-base-type-preserved = {
     expr = refinedPort.name;
     expected = lib.types.int.name;
   };
 
-  refined-basic.test-lazy-refinement-flag = {
+  flake.tests.refined-basic.test-lazy-refinement-flag = {
     expr =
       let
         lazyType = types.refined lib.types.int {

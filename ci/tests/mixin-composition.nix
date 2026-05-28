@@ -34,7 +34,7 @@ let
   };
 in
 {
-  mixin-composition.test-compose-effective-requires = {
+  flake.tests.mixin-composition.test-compose-effective-requires = {
     expr =
       (composeMixins [
         a
@@ -43,7 +43,7 @@ in
     expected = [ "port" ];
   };
 
-  mixin-composition.test-compose-effective-provides = {
+  flake.tests.mixin-composition.test-compose-effective-provides = {
     expr =
       (composeMixins [
         a
@@ -55,7 +55,7 @@ in
     ];
   };
 
-  mixin-composition.test-compose-apply = {
+  flake.tests.mixin-composition.test-compose-apply = {
     expr =
       let
         composed = composeMixins [
@@ -68,7 +68,7 @@ in
     expected = "http://localhost:9080";
   };
 
-  mixin-composition.test-compose-wrong-order-unsatisfied = {
+  flake.tests.mixin-composition.test-compose-wrong-order-unsatisfied = {
     expr =
       let
         composed = composeMixins [
@@ -83,7 +83,7 @@ in
     ];
   };
 
-  mixin-composition.test-is-composed = {
+  flake.tests.mixin-composition.test-is-composed = {
     expr =
       (composeMixins [
         a
@@ -92,7 +92,7 @@ in
     expected = true;
   };
 
-  mixin-composition.test-compose-single = {
+  flake.tests.mixin-composition.test-compose-single = {
     expr =
       let
         composed = composeMixins [ a ];
@@ -106,7 +106,7 @@ in
   # Later mixins in the list have HIGHER priority (run last in § Bracha 1990 formula).
   # Earlier mixins run first and PROVIDE base values.
   # This matches the requires/provides dependency flow: earlier provides, later consumes + overrides.
-  mixin-composition.test-compose-shadowing-order = {
+  flake.tests.mixin-composition.test-compose-shadowing-order = {
     expr =
       let
         first = mkMixin {
@@ -130,7 +130,7 @@ in
   };
 
   # Per-mixin direction: beta mixin is overridden by what came before
-  mixin-composition.test-compose-mixed-direction = {
+  flake.tests.mixin-composition.test-compose-mixed-direction = {
     expr =
       let
         provider = mkMixin {
@@ -156,7 +156,7 @@ in
   };
 
   # Confirm: without beta, the later mixin would win
-  mixin-composition.test-compose-without-beta-later-wins = {
+  flake.tests.mixin-composition.test-compose-without-beta-later-wins = {
     expr =
       let
         provider = mkMixin {

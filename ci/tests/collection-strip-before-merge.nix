@@ -27,7 +27,7 @@ let
   result = builtins.tryEval (builtins.deepSeq eval.config.hosts.igloo eval.config.hosts.igloo);
 in
 {
-  collection-strip.test-no-leak-in-strict = {
+  flake.tests.collection-strip.test-no-leak-in-strict = {
     expr = result.success;
     expected = true;
   };

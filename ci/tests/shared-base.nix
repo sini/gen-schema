@@ -44,19 +44,19 @@ let
   };
 in
 {
-  base.test-host-has-base-option = {
+  flake.tests.base.test-host-has-base-option = {
     expr = hostInstance.config.description;
     expected = "a frosty host";
   };
-  base.test-user-has-base-default = {
+  flake.tests.base.test-user-has-base-default = {
     expr = userInstance.config.description;
     expected = "no description";
   };
-  base.test-host-own-option = {
+  flake.tests.base.test-host-own-option = {
     expr = hostInstance.config.name;
     expected = "igloo";
   };
-  base.test-user-own-option = {
+  flake.tests.base.test-user-own-option = {
     expr = userInstance.config.email;
     expected = "yeti@snow.land";
   };

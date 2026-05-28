@@ -54,7 +54,7 @@ let
   };
 in
 {
-  ref-nullable = {
+  flake.tests.ref-nullable = {
     test-nullable-ref-resolves = {
       expr = eval.config.services.gateway.upstream.port;
       expected = 8080;

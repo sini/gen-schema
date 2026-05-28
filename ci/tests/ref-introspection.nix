@@ -30,7 +30,7 @@ let
   networkMeta = eval.config.schema._kindMeta "network";
 in
 {
-  ref-introspection = {
+  flake.tests.ref-introspection = {
     test-service-has-refs = {
       expr = serviceMeta.refs;
       expected = {

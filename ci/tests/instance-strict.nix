@@ -21,7 +21,7 @@ let
   result = builtins.tryEval (builtins.deepSeq eval.config.hosts.igloo eval.config.hosts.igloo);
 in
 {
-  instance-strict = {
+  flake.tests.instance-strict = {
     test-strict-rejects-undeclared = {
       expr = result.success;
       expected = false;

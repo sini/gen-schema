@@ -23,7 +23,7 @@ let
   };
 in
 {
-  "collection-precedence".test-computed-overrides-collection = {
+  flake.tests."collection-precedence".test-computed-overrides-collection = {
     expr = eval.config.schema.host.isEntity;
     expected = true;
   };

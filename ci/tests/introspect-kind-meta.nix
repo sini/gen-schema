@@ -20,15 +20,15 @@ let
   userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") meta.optionNames;
 in
 {
-  introspect-meta.test-option-names-contain-name = {
+  flake.tests.introspect-meta.test-option-names-contain-name = {
     expr = builtins.elem "name" meta.optionNames;
     expected = true;
   };
-  introspect-meta.test-option-names-contain-addr = {
+  flake.tests.introspect-meta.test-option-names-contain-addr = {
     expr = builtins.elem "addr" meta.optionNames;
     expected = true;
   };
-  introspect-meta.test-user-opts = {
+  flake.tests.introspect-meta.test-user-opts = {
     expr = lib.sort (a: b: a < b) userOpts;
     expected = [
       "addr"

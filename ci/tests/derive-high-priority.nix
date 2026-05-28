@@ -31,7 +31,7 @@ let
   };
 in
 {
-  "derive-priority" = {
+  flake.tests."derive-priority" = {
     test-derive-wins = {
       expr = eval.config.hosts.igloo.computed;
       expected = "from-derive";

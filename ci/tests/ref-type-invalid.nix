@@ -43,7 +43,7 @@ let
   };
 in
 {
-  ref-invalid = {
+  flake.tests.ref-invalid = {
     test-bad-ref-throws = {
       expr = !(builtins.tryEval (builtins.deepSeq eval.config.services.badref.host.addr "ok")).success;
       expected = true;

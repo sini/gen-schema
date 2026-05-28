@@ -45,18 +45,18 @@ let
   failedNames = lib.sort (a: b: a < b) (map (f: f.name) result.left);
 in
 {
-  "validator-instances".test-left-returned = {
+  flake.tests."validator-instances".test-left-returned = {
     expr = result ? left;
     expected = true;
   };
-  "validator-instances".test-only-failing-instances = {
+  flake.tests."validator-instances".test-only-failing-instances = {
     expr = failedNames;
     expected = [
       "bad-a"
       "bad-b"
     ];
   };
-  "validator-instances".test-error-count = {
+  flake.tests."validator-instances".test-error-count = {
     expr = lib.length result.left;
     expected = 2;
   };

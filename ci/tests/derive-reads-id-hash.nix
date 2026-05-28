@@ -26,7 +26,7 @@ let
   };
 in
 {
-  "derive-hash" = {
+  flake.tests."derive-hash" = {
     test-hash-prefix-length = {
       expr = builtins.stringLength eval.config.hosts.igloo.hashPrefix;
       expected = 8;

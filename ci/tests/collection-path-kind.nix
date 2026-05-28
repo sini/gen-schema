@@ -18,11 +18,11 @@ let
   };
 in
 {
-  "collection-path".test-path-kind-gets-default = {
+  flake.tests."collection-path".test-path-kind-gets-default = {
     expr = eval.config.schema.host.includes;
     expected = [ ];
   };
-  "collection-path".test-path-kind-still-callable = {
+  flake.tests."collection-path".test-path-kind-still-callable = {
     expr = builtins.isFunction (eval.config.schema.host.__functor eval.config.schema.host);
     expected = true;
   };

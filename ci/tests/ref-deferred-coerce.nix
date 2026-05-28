@@ -201,7 +201,7 @@ let
   };
 in
 {
-  ref-deferred-coerce = {
+  flake.tests.ref-deferred-coerce = {
     # Self-referential registry: string refs resolve to instances
     test-self-ref-resolves = {
       expr = (builtins.head evalSelfRef.config.traits.network.needs).name;

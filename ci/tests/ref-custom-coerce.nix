@@ -130,7 +130,7 @@ let
   };
 in
 {
-  ref-custom-coerce = {
+  flake.tests.ref-custom-coerce = {
     test-scalar-coerce-custom = {
       expr = evalScalar.config.services.web.host.addr;
       expected = "10.0.1.1";

@@ -4,7 +4,7 @@ let
   inherit (blameLib) blame isBlame collectBlame;
 in
 {
-  blame-basic.test-blame-constructor = {
+  flake.tests.blame-basic.test-blame-constructor = {
     expr = blame "port" "invalid value";
     expected = {
       __blame = true;
@@ -13,22 +13,22 @@ in
     };
   };
 
-  blame-basic.test-isBlame-true = {
+  flake.tests.blame-basic.test-isBlame-true = {
     expr = isBlame (blame "port" "bad");
     expected = true;
   };
 
-  blame-basic.test-isBlame-false-plain-attrset = {
+  flake.tests.blame-basic.test-isBlame-false-plain-attrset = {
     expr = isBlame { field = "port"; };
     expected = false;
   };
 
-  blame-basic.test-isBlame-false-non-attrset = {
+  flake.tests.blame-basic.test-isBlame-false-non-attrset = {
     expr = isBlame "not an attrset";
     expected = false;
   };
 
-  blame-basic.test-collectBlame-filters = {
+  flake.tests.blame-basic.test-collectBlame-filters = {
     expr = collectBlame [
       (blame "port" "bad port")
       null
@@ -49,7 +49,7 @@ in
     ];
   };
 
-  blame-basic.test-collectBlame-empty = {
+  flake.tests.blame-basic.test-collectBlame-empty = {
     expr = collectBlame [
       null
       { x = 1; }

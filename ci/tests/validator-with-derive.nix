@@ -33,7 +33,7 @@ let
   };
 in
 {
-  "validator-derive" = {
+  flake.tests."validator-derive" = {
     test-tag-applied = {
       expr = eval.config.hosts.igloo.tag;
       expected = "valid-igloo";

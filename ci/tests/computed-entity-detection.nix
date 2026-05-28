@@ -40,15 +40,15 @@ let
   };
 in
 {
-  entity-detect.test-host-is-entity = {
+  flake.tests.entity-detect.test-host-is-entity = {
     expr = eval.config.schema.host.isEntity;
     expected = true;
   };
-  entity-detect.test-tag-not-entity = {
+  flake.tests.entity-detect.test-tag-not-entity = {
     expr = eval.config.schema.tag.isEntity;
     expected = false;
   };
-  entity-detect.test-app-is-entity = {
+  flake.tests.entity-detect.test-app-is-entity = {
     expr = eval.config.schema.app.isEntity;
     expected = true;
   };

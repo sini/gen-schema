@@ -40,7 +40,7 @@ let
     !result.success;
 in
 {
-  ref-invalid-key = {
+  flake.tests.ref-invalid-key = {
     test-invalid-key-throws = {
       expr = throwsOnInvalidKey;
       expected = true;

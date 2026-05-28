@@ -64,7 +64,7 @@ let
   inherit (eval.config.services) nginx solo mixed;
 in
 {
-  ref-listof = {
+  flake.tests.ref-listof = {
     test-listof-ref-string-coercion = {
       expr = map (h: h.addr) nginx.hosts;
       expected = [

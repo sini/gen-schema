@@ -18,7 +18,7 @@ let
   };
 in
 {
-  "derive-either-left" = {
+  flake.tests."derive-either-left" = {
     test-throws-on-left = {
       expr =
         (builtins.tryEval (builtins.deepSeq eval.config.hosts.igloo.addr eval.config.hosts.igloo.addr))

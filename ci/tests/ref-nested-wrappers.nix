@@ -71,7 +71,7 @@ let
   instance-vals = eval.config.services.instance-vals;
 in
 {
-  ref-nested-wrappers = {
+  flake.tests.ref-nested-wrappers = {
     test-nullor-listof-ref-strings = {
       expr = map (h: h.addr) web.hosts;
       expected = [

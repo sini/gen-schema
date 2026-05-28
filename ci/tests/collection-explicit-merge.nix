@@ -25,7 +25,7 @@ let
   };
 in
 {
-  collection-explicit.test-last-wins = {
+  flake.tests.collection-explicit.test-last-wins = {
     expr = eval.config.schema.host.priority;
     expected = 50;
   };

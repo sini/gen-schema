@@ -19,7 +19,7 @@ let
   inherit (eval.config.hosts) igloo;
 in
 {
-  instance-type = {
+  flake.tests.instance-type = {
     test-name-from-key = {
       expr = igloo.name;
       expected = "igloo";

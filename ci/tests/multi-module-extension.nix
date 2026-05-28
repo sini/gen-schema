@@ -40,20 +40,20 @@ let
   };
 in
 {
-  kind-extend.test-name-from-first-module = {
+  flake.tests.kind-extend.test-name-from-first-module = {
     expr = instance.config.name;
     expected = "igloo";
   };
-  kind-extend.test-addr-from-second-module = {
+  flake.tests.kind-extend.test-addr-from-second-module = {
     expr = instance.config.addr;
     expected = "10.0.0.1";
   };
-  kind-extend.test-port-default-from-third-module = {
+  flake.tests.kind-extend.test-port-default-from-third-module = {
     expr = instance.config.port;
     expected = 22;
   };
   # Bare schema kinds don't have id_hash — see instance-identity.nix
-  kind-extend.test-bare-kind-no-id-hash = {
+  flake.tests.kind-extend.test-bare-kind-no-id-hash = {
     expr = instance.config ? id_hash;
     expected = false;
   };

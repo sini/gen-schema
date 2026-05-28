@@ -30,11 +30,11 @@ let
   };
 in
 {
-  method-decl.test-greeting-value = {
+  flake.tests.method-decl.test-greeting-value = {
     expr = instance.config.greeting;
     expected = "Hello from igloo at 10.0.1.1";
   };
-  method-decl.test-greeting-option-is-readonly = {
+  flake.tests.method-decl.test-greeting-option-is-readonly = {
     expr = instance.options.greeting.readOnly;
     expected = true;
   };

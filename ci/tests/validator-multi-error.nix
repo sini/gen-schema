@@ -49,11 +49,11 @@ let
   result = schemaLib.validateInstances schemaEval.config.schema "host" instanceEval.config.hosts;
 in
 {
-  "validator-multi".test-accumulates-errors = {
+  flake.tests."validator-multi".test-accumulates-errors = {
     expr = lib.length result.left;
     expected = 2;
   };
-  "validator-multi".test-only-bad-instance = {
+  flake.tests."validator-multi".test-only-bad-instance = {
     expr = lib.all (f: f.name == "bad") result.left;
     expected = true;
   };

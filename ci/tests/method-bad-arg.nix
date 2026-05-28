@@ -26,7 +26,7 @@ let
   result = builtins.tryEval (builtins.deepSeq instance.config.broken instance.config.broken);
 in
 {
-  method-bad.test-bad-arg-throws = {
+  flake.tests.method-bad.test-bad-arg-throws = {
     expr = result.success;
     expected = false;
   };

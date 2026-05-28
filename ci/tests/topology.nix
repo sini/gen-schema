@@ -28,7 +28,7 @@ let
   topo = schema._topology;
 in
 {
-  topology = {
+  flake.tests.topology = {
     test-host-has-children = {
       expr = topo.host.children;
       expected = [ "user" ];

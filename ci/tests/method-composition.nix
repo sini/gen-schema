@@ -33,11 +33,11 @@ let
   };
 in
 {
-  method-compose.test-ping-from-module-a = {
+  flake.tests.method-compose.test-ping-from-module-a = {
     expr = instance.config.ping;
     expected = "ping 10.0.0.1";
   };
-  method-compose.test-ssh-from-module-b = {
+  flake.tests.method-compose.test-ssh-from-module-b = {
     expr = instance.config.ssh;
     expected = "ssh igloo";
   };

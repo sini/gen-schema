@@ -36,7 +36,7 @@ let
   };
 in
 {
-  nesting = {
+  flake.tests.nesting = {
     test-nested-user-name = {
       expr = eval.config.hosts.igloo.users.tux.name;
       expected = "tux";

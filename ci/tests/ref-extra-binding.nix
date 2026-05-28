@@ -41,7 +41,7 @@ let
     !result.success;
 in
 {
-  ref-extra-binding = {
+  flake.tests.ref-extra-binding = {
     test-extra-binding-throws = {
       expr = throwsOnExtraBinding;
       expected = true;

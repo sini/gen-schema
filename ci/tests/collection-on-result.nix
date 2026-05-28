@@ -25,15 +25,15 @@ let
   hostKind = eval.config.schema.host;
 in
 {
-  collection-result.test-includes-on-kind = {
+  flake.tests.collection-result.test-includes-on-kind = {
     expr = hostKind.includes;
     expected = [ "networking" ];
   };
-  collection-result.test-excludes-on-kind = {
+  flake.tests.collection-result.test-excludes-on-kind = {
     expr = hostKind.excludes;
     expected = [ "desktop" ];
   };
-  collection-result.test-still-callable = {
+  flake.tests.collection-result.test-still-callable = {
     expr = builtins.isFunction (hostKind.__functor hostKind);
     expected = true;
   };

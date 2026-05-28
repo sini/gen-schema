@@ -35,15 +35,15 @@ let
   result = schemaLib.validateInstances schemaEval.config.schema "host" instanceEval.config.hosts;
 in
 {
-  "validator-fail".test-left-returned = {
+  flake.tests."validator-fail".test-left-returned = {
     expr = result ? left;
     expected = true;
   };
-  "validator-fail".test-error-has-instance-name = {
+  flake.tests."validator-fail".test-error-has-instance-name = {
     expr = (lib.head result.left).name;
     expected = "bad";
   };
-  "validator-fail".test-error-has-validator-name = {
+  flake.tests."validator-fail".test-error-has-validator-name = {
     expr = (lib.head result.left).validator;
     expected = "has-addr";
   };

@@ -24,7 +24,7 @@ let
   };
 in
 {
-  collection-attrs.test-merged-metadata = {
+  flake.tests.collection-attrs.test-merged-metadata = {
     expr = eval.config.schema.host.metadata;
     expected = {
       tier = "production";

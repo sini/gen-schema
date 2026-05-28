@@ -60,7 +60,7 @@ let
   };
 in
 {
-  ref-coerce-instance = {
+  flake.tests.ref-coerce-instance = {
     test-deferred-instance-coercion = {
       expr = eval.config.services.nginx.host.addr;
       expected = "10.0.1.1";

@@ -43,7 +43,7 @@ let
   inherit (eval.config.services) nginx;
 in
 {
-  ref-direct = {
+  flake.tests.ref-direct = {
     test-direct-ref-resolves-addr = {
       expr = nginx.host.addr;
       expected = "10.0.1.1";

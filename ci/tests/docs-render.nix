@@ -23,19 +23,19 @@ let
   rendered = renderDocs eval.config.schema;
 in
 {
-  docs.test-contains-kind-heading = {
+  flake.tests.docs.test-contains-kind-heading = {
     expr = lib.hasInfix "## host" rendered;
     expected = true;
   };
-  docs.test-contains-option-name = {
+  flake.tests.docs.test-contains-option-name = {
     expr = lib.hasInfix "name" rendered;
     expected = true;
   };
-  docs.test-contains-table-header = {
+  flake.tests.docs.test-contains-table-header = {
     expr = lib.hasInfix "| Option | Type |" rendered;
     expected = true;
   };
-  docs.test-is-string = {
+  flake.tests.docs.test-is-string = {
     expr = builtins.isString rendered;
     expected = true;
   };

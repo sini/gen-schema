@@ -24,7 +24,7 @@ let
   );
 in
 {
-  collection-no-merge.test-int-default-throws = {
+  flake.tests.collection-no-merge.test-int-default-throws = {
     expr = result.success;
     expected = false;
   };

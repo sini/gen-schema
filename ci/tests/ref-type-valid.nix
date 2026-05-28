@@ -51,7 +51,7 @@ let
   inherit (eval.config.services) nginx;
 in
 {
-  ref-valid = {
+  flake.tests.ref-valid = {
     test-ref-resolves-to-addr = {
       expr = nginx.host.addr;
       expected = "10.0.1.1";

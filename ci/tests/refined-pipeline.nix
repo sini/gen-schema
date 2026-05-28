@@ -68,12 +68,12 @@ let
   };
 in
 {
-  refined-pipeline.test-valid-instance-passes = {
+  flake.tests.refined-pipeline.test-valid-instance-passes = {
     expr = validEval.config.services.web.port;
     expected = 8080;
   };
 
-  refined-pipeline.test-invalid-instance-throws = {
+  flake.tests.refined-pipeline.test-invalid-instance-throws = {
     expr = builtins.tryEval (builtins.deepSeq invalidEval.config.services { });
     expected = {
       success = false;
@@ -81,7 +81,7 @@ in
     };
   };
 
-  refined-pipeline.test-no-refinements-passthrough = {
+  flake.tests.refined-pipeline.test-no-refinements-passthrough = {
     expr =
       let
         noRefRegistry = mkInstanceRegistry schema "service" { };
@@ -101,7 +101,7 @@ in
     expected = -1;
   };
 
-  refined-pipeline.test-multiple-refinements-on-field = {
+  flake.tests.refined-pipeline.test-multiple-refinements-on-field = {
     expr =
       let
         multiRegistry = mkInstanceRegistry schema "service" {
@@ -134,7 +134,7 @@ in
     expected = 8080;
   };
 
-  refined-pipeline.test-multiple-fields-refined = {
+  flake.tests.refined-pipeline.test-multiple-fields-refined = {
     expr =
       let
         multiFieldRegistry = mkInstanceRegistry schema "service" {

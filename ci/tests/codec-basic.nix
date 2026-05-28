@@ -65,7 +65,7 @@ let
   allRoundTripped = codec.json.deserializeAll allJson;
 in
 {
-  codec-basic = {
+  flake.tests.codec-basic = {
     test-encode-has-user-fields = {
       expr = encoded;
       expected = {

@@ -25,7 +25,7 @@ let
   result = builtins.tryEval (builtins.deepSeq eval.config.hosts eval.config.hosts);
 in
 {
-  "validator-pipeline".test-default-throws = {
+  flake.tests."validator-pipeline".test-default-throws = {
     expr = result.success;
     expected = false;
   };

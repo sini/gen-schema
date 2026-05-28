@@ -17,7 +17,7 @@ let
   );
 in
 {
-  "derive-exclusive" = {
+  flake.tests."derive-exclusive" = {
     test-throws = {
       expr = tryRegistry.success;
       expected = false;

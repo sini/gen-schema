@@ -17,7 +17,7 @@ let
   result = builtins.tryEval (builtins.deepSeq eval.config.schema.host eval.config.schema.host);
 in
 {
-  "collection-functor".test-reserved-key-throws = {
+  flake.tests."collection-functor".test-reserved-key-throws = {
     expr = result.success;
     expected = false;
   };

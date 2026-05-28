@@ -48,7 +48,7 @@ let
   };
 in
 {
-  ref-compose = {
+  flake.tests.ref-compose = {
     test-cross-module-ref-resolves = {
       expr = eval.config.services.nginx.host.addr;
       expected = "10.0.1.1";

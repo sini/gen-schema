@@ -29,11 +29,11 @@ let
   };
 in
 {
-  computed.test-tag-count-populated = {
+  flake.tests.computed.test-tag-count-populated = {
     expr = eval.config.schema.host.tagCount;
     expected = 3;
   };
-  computed.test-tag-count-empty = {
+  flake.tests.computed.test-tag-count-empty = {
     expr = eval.config.schema.app.tagCount;
     expected = 0;
   };

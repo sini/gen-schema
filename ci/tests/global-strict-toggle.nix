@@ -20,11 +20,11 @@ let
   result = builtins.tryEval (builtins.deepSeq eval.config.hosts.igloo eval.config.hosts.igloo);
 in
 {
-  strict-toggle.test-non-strict-accepts-undeclared = {
+  flake.tests.strict-toggle.test-non-strict-accepts-undeclared = {
     expr = result.success;
     expected = true;
   };
-  strict-toggle.test-non-strict-declared-key-works = {
+  flake.tests.strict-toggle.test-non-strict-declared-key-works = {
     expr = result.value.name;
     expected = "igloo";
   };

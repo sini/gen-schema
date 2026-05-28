@@ -27,18 +27,18 @@ let
   };
 in
 {
-  "collection-base".test-base-option-on-instance = {
+  flake.tests."collection-base".test-base-option-on-instance = {
     expr = eval.config.hosts.igloo.description;
     expected = "";
   };
-  "collection-base".test-collection-on-kind = {
+  flake.tests."collection-base".test-collection-on-kind = {
     expr = eval.config.schema.host.tags;
     expected = [
       "web"
       "prod"
     ];
   };
-  "collection-base".test-both-coexist = {
+  flake.tests."collection-base".test-both-coexist = {
     expr = eval.config.hosts.igloo.addr;
     expected = "10.0.1.1";
   };

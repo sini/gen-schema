@@ -81,7 +81,7 @@ let
   encodedSolo = codec.encode eval.config.services.solo;
 in
 {
-  codec-refs = {
+  flake.tests.codec-refs = {
     test-scalar-ref-encodes-name = {
       expr = encoded.host;
       expected = "igloo";

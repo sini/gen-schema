@@ -15,11 +15,11 @@ let
   };
 in
 {
-  "instance-identity".test-instance-has-id-hash = {
+  flake.tests."instance-identity".test-instance-has-id-hash = {
     expr = builtins.isString eval.config.hosts.igloo.id_hash;
     expected = true;
   };
-  "instance-identity".test-instance-has-identity-keys = {
+  flake.tests."instance-identity".test-instance-has-identity-keys = {
     expr = eval.config.hosts.igloo._identity.keys;
     expected = [ ];
   };

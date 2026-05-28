@@ -24,7 +24,7 @@ let
   };
 in
 {
-  collection-list.test-merged-includes = {
+  flake.tests.collection-list.test-merged-includes = {
     expr = eval.config.schema.host.includes;
     expected = [
       "networking"

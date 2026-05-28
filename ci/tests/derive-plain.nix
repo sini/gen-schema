@@ -26,7 +26,7 @@ let
   };
 in
 {
-  "derive-plain" = {
+  flake.tests."derive-plain" = {
     test-igloo-tag = {
       expr = eval.config.hosts.igloo.tag;
       expected = "derived-igloo";

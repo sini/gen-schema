@@ -30,7 +30,7 @@ let
   refEdgesTyped = builtins.filter (e: e.type == "ref") edges;
 in
 {
-  edges = {
+  flake.tests.edges = {
     test-total-edge-count = {
       expr = builtins.length edges;
       expected = 2; # 1 parent (user→host) + 1 ref (service→host)

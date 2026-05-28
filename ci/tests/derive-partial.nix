@@ -30,7 +30,7 @@ let
   };
 in
 {
-  "derive-partial" = {
+  flake.tests."derive-partial" = {
     test-igloo-gets-tag = {
       expr = eval.config.hosts.igloo.tag;
       expected = "tagged";

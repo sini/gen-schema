@@ -27,11 +27,11 @@ let
   result = schemaLib.validateInstances schemaEval.config.schema "host" instanceEval.config.hosts;
 in
 {
-  "validator-none".test-right-when-no-validators = {
+  flake.tests."validator-none".test-right-when-no-validators = {
     expr = result ? right;
     expected = true;
   };
-  "validator-none".test-instances-pass-through = {
+  flake.tests."validator-none".test-instances-pass-through = {
     expr = result.right.igloo.addr;
     expected = "10.0.1.1";
   };

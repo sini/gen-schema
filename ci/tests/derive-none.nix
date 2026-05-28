@@ -14,7 +14,7 @@ let
   };
 in
 {
-  "derive-none" = {
+  flake.tests."derive-none" = {
     test-basic-access = {
       expr = eval.config.hosts.igloo.addr;
       expected = "10.0.1.1";

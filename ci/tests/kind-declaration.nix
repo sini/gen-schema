@@ -29,21 +29,21 @@ let
   };
 in
 {
-  kind.test-kind-is-callable = {
+  flake.tests.kind.test-kind-is-callable = {
     expr = builtins.isFunction (hostKind.__functor hostKind);
     expected = true;
   };
-  kind.test-instance-name = {
+  flake.tests.kind.test-instance-name = {
     expr = instance.config.name;
     expected = "igloo";
   };
-  kind.test-instance-addr = {
+  flake.tests.kind.test-instance-addr = {
     expr = instance.config.addr;
     expected = "192.168.1.1";
   };
   # Bare schema kinds don't have id_hash — that's an instance-level concern.
   # See instance-identity.nix for instance-level identity tests.
-  kind.test-bare-kind-no-id-hash = {
+  flake.tests.kind.test-bare-kind-no-id-hash = {
     expr = instance.config ? id_hash;
     expected = false;
   };

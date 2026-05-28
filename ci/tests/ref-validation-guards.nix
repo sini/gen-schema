@@ -52,7 +52,7 @@ let
   goodSet = toSet (builtins.attrValues evalGood.config.hosts);
 in
 {
-  ref-validation-guards = {
+  flake.tests.ref-validation-guards = {
     # #1: non-instance attrset in ref field
     test-non-instance-attrset-throws = {
       expr = builtins.tryEval (builtins.seq evalBadAttrset.config.services.bad.host null);

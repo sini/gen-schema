@@ -42,7 +42,7 @@ let
     !result.success;
 in
 {
-  ref-missing-binding = {
+  flake.tests.ref-missing-binding = {
     test-missing-binding-throws = {
       expr = throwsOnMissing;
       expected = true;

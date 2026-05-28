@@ -24,7 +24,7 @@ let
   };
 in
 {
-  instance-registry = {
+  flake.tests.instance-registry = {
     test-registry-keys = {
       expr = builtins.attrNames eval.config.hosts;
       expected = [

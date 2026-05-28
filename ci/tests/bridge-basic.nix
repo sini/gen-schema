@@ -52,17 +52,17 @@ let
     R.extend base "validators" [ "validator-b" ];
 in
 {
-  bridge-basic.test-isOptionDecl-true = {
+  flake.tests.bridge-basic.test-isOptionDecl-true = {
     expr = isOptionDecl (lib.mkOption { type = lib.types.int; });
     expected = true;
   };
 
-  bridge-basic.test-isOptionDecl-false = {
+  flake.tests.bridge-basic.test-isOptionDecl-false = {
     expr = isOptionDecl { port = 8080; };
     expected = false;
   };
 
-  bridge-basic.test-emit-options-only = {
+  flake.tests.bridge-basic.test-emit-options-only = {
     expr =
       let
         result = emitModule [ ] optionRecord;
@@ -80,7 +80,7 @@ in
     expected = 9090;
   };
 
-  bridge-basic.test-emit-preserves-default = {
+  flake.tests.bridge-basic.test-emit-preserves-default = {
     expr =
       let
         result = emitModule [ ] optionRecord;
@@ -95,7 +95,7 @@ in
     expected = 8080;
   };
 
-  bridge-basic.test-emit-mixed-config = {
+  flake.tests.bridge-basic.test-emit-mixed-config = {
     expr =
       let
         result = emitModule [ ] mixedRecord;
@@ -104,7 +104,7 @@ in
     expected = true;
   };
 
-  bridge-basic.test-emit-refined-strips-metadata = {
+  flake.tests.bridge-basic.test-emit-refined-strips-metadata = {
     expr =
       let
         result = emitModule [ ] refinedRecord;
@@ -122,7 +122,7 @@ in
     expected = 8080;
   };
 
-  bridge-basic.test-emit-refined-extracts-refinements = {
+  flake.tests.bridge-basic.test-emit-refined-extracts-refinements = {
     expr =
       let
         result = emitModule [ ] refinedRecord;
@@ -131,7 +131,7 @@ in
     expected = 1;
   };
 
-  bridge-basic.test-emit-collection-extraction = {
+  flake.tests.bridge-basic.test-emit-collection-extraction = {
     expr =
       let
         result = emitModule [ "validators" ] collectionRecord;
@@ -143,7 +143,7 @@ in
     ];
   };
 
-  bridge-basic.test-emit-collection-not-in-module = {
+  flake.tests.bridge-basic.test-emit-collection-not-in-module = {
     expr =
       let
         result = emitModule [ "validators" ] collectionRecord;

@@ -230,64 +230,64 @@ let
 
 in
 {
-  custom-entry-type.test-custom-marker-present = {
+  flake.tests.custom-entry-type.test-custom-marker-present = {
     expr = hostKind._customMarker;
     expected = true;
   };
-  custom-entry-type.test-kind-on-result = {
+  flake.tests.custom-entry-type.test-kind-on-result = {
     expr = hostKind.kind;
     expected = "host";
   };
-  custom-entry-type.test-collections-extracted = {
+  flake.tests.custom-entry-type.test-collections-extracted = {
     expr = collectionHost.tags;
     expected = [
       "server"
       "prod"
     ];
   };
-  custom-entry-type.test-custom-type-works-with-registry = {
+  flake.tests.custom-entry-type.test-custom-type-works-with-registry = {
     # End-to-end: custom mkType + mkInstanceRegistry resolves an instance correctly.
     # Collection keys are stripped before the custom type sees defs, so strict eval succeeds.
     expr = stripResult.success;
     expected = true;
   };
-  custom-entry-type.test-introspect-kind-names = {
+  flake.tests.custom-entry-type.test-introspect-kind-names = {
     expr = introEval.config.schema._kindNames;
     expected = [
       "host"
       "user"
     ];
   };
-  custom-entry-type.test-introspect-kind-meta = {
+  flake.tests.custom-entry-type.test-introspect-kind-meta = {
     expr = builtins.elem "name" (introEval.config.schema._kindMeta "host").optionNames;
     expected = true;
   };
-  custom-entry-type.test-mixin-skipped = {
+  flake.tests.custom-entry-type.test-mixin-skipped = {
     expr = !(mixinSkipHost ? extraField);
     expected = true;
   };
-  custom-entry-type.test-basemodule-passed-as-kindmodule = {
+  flake.tests.custom-entry-type.test-basemodule-passed-as-kindmodule = {
     # Proves baseModule was forwarded as kindModule: the __functor imports it,
     # so evaluating the type as a module exposes base-field in options.
     expr = baseModInnerEval.options ? base-field && baseModInnerEval.config.base-field == "from-base";
     expected = true;
   };
-  custom-entry-type.test-basemodule-fn-resolved = {
+  flake.tests.custom-entry-type.test-basemodule-fn-resolved = {
     expr = baseModFnEval.config.schema.host.kind;
     expected = "host";
   };
-  custom-entry-type.test-topology-with-custom-type = {
+  flake.tests.custom-entry-type.test-topology-with-custom-type = {
     expr = topoSchema._topology.user.parent;
     expected = "host";
   };
-  custom-entry-type.test-edges-with-custom-type = {
+  flake.tests.custom-entry-type.test-edges-with-custom-type = {
     expr = builtins.any (e: e.from == "user" && e.to == "host" && e.type == "parent") topoSchema._edges;
     expected = true;
   };
   # The custom mkType controls the result structure entirely: its __functor is
   # present but the standard gen-schema wrapper fields (mixins, refinements) are
   # absent — proving the default deferredModule wrapping path was skipped.
-  custom-entry-type.test-custom-functor-not-default-wrapper = {
+  flake.tests.custom-entry-type.test-custom-functor-not-default-wrapper = {
     expr = hostKind ? __functor && !(hostKind ? mixins) && !(hostKind ? refinements);
     expected = true;
   };

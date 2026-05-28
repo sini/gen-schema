@@ -47,29 +47,29 @@ let
   };
 in
 {
-  "kind-imports".test-host-gets-base-option = {
+  flake.tests."kind-imports".test-host-gets-base-option = {
     expr = eval.config.hosts.igloo.description;
     expected = "main server";
   };
-  "kind-imports".test-user-gets-base-default = {
+  flake.tests."kind-imports".test-user-gets-base-default = {
     expr = eval.config.users.tux.description;
     expected = "";
   };
-  "kind-imports".test-host-own-option = {
+  flake.tests."kind-imports".test-host-own-option = {
     expr = eval.config.hosts.igloo.addr;
     expected = "10.0.1.1";
   };
-  "kind-imports".test-user-own-option = {
+  flake.tests."kind-imports".test-user-own-option = {
     expr = eval.config.users.tux.shell;
     expected = "/bin/zsh";
   };
-  "kind-imports".test-both-have-id-hash = {
+  flake.tests."kind-imports".test-both-have-id-hash = {
     expr =
       (builtins.isString eval.config.hosts.igloo.id_hash)
       && (builtins.isString eval.config.users.tux.id_hash);
     expected = true;
   };
-  "kind-imports".test-cross-kind-hashes-differ = {
+  flake.tests."kind-imports".test-cross-kind-hashes-differ = {
     expr = eval.config.hosts.igloo.id_hash != eval.config.users.tux.id_hash;
     expected = true;
   };

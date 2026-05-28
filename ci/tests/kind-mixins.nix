@@ -78,32 +78,32 @@ let
   };
 in
 {
-  kind-mixins.test-mixin-adds-option = {
+  flake.tests.kind-mixins.test-mixin-adds-option = {
     expr = eval.config.services.web ? metrics_port;
     expected = true;
   };
 
-  kind-mixins.test-mixin-default-value = {
+  flake.tests.kind-mixins.test-mixin-default-value = {
     expr = eval.config.services.web.metrics_port;
     expected = 9090;
   };
 
-  kind-mixins.test-base-fields-preserved = {
+  flake.tests.kind-mixins.test-base-fields-preserved = {
     expr = eval.config.services.web.hostname;
     expected = "localhost";
   };
 
-  kind-mixins.test-base-port-preserved = {
+  flake.tests.kind-mixins.test-base-port-preserved = {
     expr = eval.config.services.web.port;
     expected = 8080;
   };
 
-  kind-mixins.test-entry-type-stores-mixins = {
+  flake.tests.kind-mixins.test-entry-type-stores-mixins = {
     expr = builtins.length entryWithMixins.config.schema.svc.mixins;
     expected = 1;
   };
 
-  kind-mixins.test-entry-type-empty-mixins-default = {
+  flake.tests.kind-mixins.test-entry-type-empty-mixins-default = {
     expr =
       let
         e = lib.evalModules {
@@ -122,47 +122,47 @@ in
   };
 
   # Export presence tests
-  kind-mixins.test-exports-mkMixin = {
+  flake.tests.kind-mixins.test-exports-mkMixin = {
     expr = schemaLib ? mkMixin;
     expected = true;
   };
 
-  kind-mixins.test-exports-composeMixins = {
+  flake.tests.kind-mixins.test-exports-composeMixins = {
     expr = schemaLib ? composeMixins;
     expected = true;
   };
 
-  kind-mixins.test-exports-beta = {
+  flake.tests.kind-mixins.test-exports-beta = {
     expr = schemaLib ? beta;
     expected = true;
   };
 
-  kind-mixins.test-exports-applyMixin = {
+  flake.tests.kind-mixins.test-exports-applyMixin = {
     expr = schemaLib ? applyMixin;
     expected = true;
   };
 
-  kind-mixins.test-exports-blame = {
+  flake.tests.kind-mixins.test-exports-blame = {
     expr = schemaLib ? blame;
     expected = true;
   };
 
-  kind-mixins.test-exports-refined = {
+  flake.tests.kind-mixins.test-exports-refined = {
     expr = schemaLib ? refined;
     expected = true;
   };
 
-  kind-mixins.test-exports-emitModule = {
+  flake.tests.kind-mixins.test-exports-emitModule = {
     expr = schemaLib ? emitModule;
     expected = true;
   };
 
-  kind-mixins.test-exports-refinements = {
+  flake.tests.kind-mixins.test-exports-refinements = {
     expr = schemaLib ? refinements;
     expected = true;
   };
 
-  kind-mixins.test-exports-mkFieldValidator = {
+  flake.tests.kind-mixins.test-exports-mkFieldValidator = {
     expr = schemaLib ? mkFieldValidator;
     expected = true;
   };

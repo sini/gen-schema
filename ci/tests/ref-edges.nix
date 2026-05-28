@@ -27,7 +27,7 @@ let
   edges = eval.config.schema._refEdges;
 in
 {
-  ref-edges = {
+  flake.tests.ref-edges = {
     test-one-edge-found = {
       expr = builtins.length edges;
       expected = 1;

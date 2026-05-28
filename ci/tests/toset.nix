@@ -53,7 +53,7 @@ let
   iceberg = eval.config.hosts.iceberg;
 in
 {
-  toset = {
+  flake.tests.toset = {
     test-member-true = {
       expr = set.member igloo;
       expected = true;

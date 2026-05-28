@@ -41,15 +41,15 @@ let
   result = schemaLib.validateInstances schemaEval.config.schema "host" instanceEval.config.hosts;
 in
 {
-  "validate-standalone".test-returns-either = {
+  flake.tests."validate-standalone".test-returns-either = {
     expr = result ? left || result ? right;
     expected = true;
   };
-  "validate-standalone".test-has-errors = {
+  flake.tests."validate-standalone".test-has-errors = {
     expr = result ? left;
     expected = true;
   };
-  "validate-standalone".test-does-not-throw = {
+  flake.tests."validate-standalone".test-does-not-throw = {
     expr = (builtins.tryEval result).success;
     expected = true;
   };

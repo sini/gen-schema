@@ -37,7 +37,7 @@ let
   result = schemaLib.validateInstances schemaEval.config.schema "host" instanceEval.config.hosts;
 in
 {
-  "validator-pass".test-right-returned = {
+  flake.tests."validator-pass".test-right-returned = {
     expr = result ? right;
     expected = true;
   };

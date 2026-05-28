@@ -17,7 +17,7 @@ let
   meta = eval.config.schema._kindMeta "host";
 in
 {
-  method-intro.test-method-in-option-names = {
+  flake.tests.method-intro.test-method-in-option-names = {
     expr = builtins.elem "greet" meta.optionNames;
     expected = true;
   };

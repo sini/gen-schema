@@ -47,13 +47,13 @@ let
 in
 {
   # Lazy contract: non-refined fields remain accessible without triggering the contract
-  lazy-contract.test-instance-accessible = {
+  flake.tests.lazy-contract.test-instance-accessible = {
     expr = eval.config.services.web.name;
     expected = "web";
   };
 
   # Lazy contract: accessing the refined field triggers the contract violation
-  lazy-contract.test-lazy-field-throws-on-access = {
+  flake.tests.lazy-contract.test-lazy-field-throws-on-access = {
     expr = builtins.tryEval (builtins.deepSeq eval.config.services.web.port "ok");
     expected = {
       success = false;
@@ -62,7 +62,7 @@ in
   };
 
   # Lazy contract with valid value: no throw
-  lazy-contract.test-lazy-valid-passes = {
+  flake.tests.lazy-contract.test-lazy-valid-passes = {
     expr =
       let
         validEval = lib.evalModules {
@@ -82,7 +82,7 @@ in
   };
 
   # Mixed: strict and lazy refinements on different fields
-  lazy-contract.test-mixed-strict-and-lazy = {
+  flake.tests.lazy-contract.test-mixed-strict-and-lazy = {
     expr =
       let
         mixedRegistry = mkInstanceRegistry schema "service" {

@@ -134,7 +134,7 @@ let
   };
 in
 {
-  codec-fields = {
+  flake.tests.codec-fields = {
     test-exclude-removes-field = {
       expr = (codecExclude.encode igloo) ? secret;
       expected = false;

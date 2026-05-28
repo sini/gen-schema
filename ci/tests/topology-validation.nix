@@ -32,7 +32,7 @@ let
     !result.success;
 in
 {
-  topology-validation = {
+  flake.tests.topology-validation = {
     test-unknown-parent-throws = {
       expr = throwsOnUnknownParent;
       expected = true;

@@ -36,7 +36,7 @@ let
   };
 in
 {
-  "validator-custom-error" = {
+  flake.tests."validator-custom-error" = {
     test-no-throw = {
       expr =
         (builtins.tryEval (builtins.deepSeq eval.config.hosts.igloo.addr eval.config.hosts.igloo.addr))

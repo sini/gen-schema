@@ -59,12 +59,12 @@ let
   ];
 in
 {
-  "validator-fields".test-field-validator-has-fields = {
+  flake.tests."validator-fields".test-field-validator-has-fields = {
     expr = portProtocolValidator ? __fields;
     expected = true;
   };
 
-  "validator-fields".test-field-validator-preserves-pred = {
+  flake.tests."validator-fields".test-field-validator-preserves-pred = {
     expr = portProtocolValidator.pred {
       port = 443;
       protocol = "https";
@@ -72,30 +72,30 @@ in
     expected = true;
   };
 
-  "validator-fields".test-plain-validator-no-fields = {
+  flake.tests."validator-fields".test-plain-validator-no-fields = {
     expr = plainValidator ? __fields;
     expected = false;
   };
 
-  "validator-fields".test-filter-service-kind = {
+  flake.tests."validator-fields".test-filter-service-kind = {
     # plain + portProtocol pass; metrics excluded (metrics_port absent)
     expr = builtins.length (filterValidators serviceOptionNames allValidators);
     expected = 2;
   };
 
-  "validator-fields".test-filter-monitored-kind = {
+  flake.tests."validator-fields".test-filter-monitored-kind = {
     # all three pass — monitored kind has metrics_port
     expr = builtins.length (filterValidators monitoredOptionNames allValidators);
     expected = 3;
   };
 
-  "validator-fields".test-filter-empty-kind = {
+  flake.tests."validator-fields".test-filter-empty-kind = {
     # only plain validator (no __fields) passes an empty option set
     expr = builtins.length (filterValidators [ ] allValidators);
     expected = 1;
   };
 
-  "validator-fields".test-filter-plain-always-passes = {
+  flake.tests."validator-fields".test-filter-plain-always-passes = {
     expr = builtins.length (filterValidators [ ] [ plainValidator ]);
     expected = 1;
   };

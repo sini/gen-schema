@@ -27,7 +27,7 @@ let
   };
 in
 {
-  "derive-either-right" = {
+  flake.tests."derive-either-right" = {
     test-tag-applied = {
       expr = eval.config.hosts.igloo.tag;
       expected = "either-igloo";

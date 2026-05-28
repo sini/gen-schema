@@ -38,27 +38,27 @@ let
 in
 {
   # Same instance, two references — hashes match
-  "identity-eq".test-same-instance-same-hash = {
+  flake.tests."identity-eq".test-same-instance-same-hash = {
     expr = ref1.id_hash == ref2.id_hash;
     expected = true;
   };
   # Same instance — string equality works as entity comparison
-  "identity-eq".test-hash-string-comparison = {
+  flake.tests."identity-eq".test-hash-string-comparison = {
     expr = ref1.id_hash;
     expected = ref2.id_hash;
   };
   # Different instances — hashes differ
-  "identity-eq".test-different-instance-different-hash = {
+  flake.tests."identity-eq".test-different-instance-different-hash = {
     expr = ref1.id_hash == other.id_hash;
     expected = false;
   };
   # Filter pattern: find all hosts that aren't igloo
-  "identity-eq".test-filter-by-hash = {
+  flake.tests."identity-eq".test-filter-by-hash = {
     expr = lib.attrNames (lib.filterAttrs (_: h: h.id_hash != ref1.id_hash) eval.config.hosts);
     expected = [ "iceberg" ];
   };
   # Membership pattern: check if a host is in a set
-  "identity-eq".test-membership-by-hash = {
+  flake.tests."identity-eq".test-membership-by-hash = {
     expr =
       let
         targetHashes = map (h: h.id_hash) [ ref1 ];
@@ -66,7 +66,7 @@ in
       lib.elem other.id_hash targetHashes;
     expected = false;
   };
-  "identity-eq".test-membership-positive = {
+  flake.tests."identity-eq".test-membership-positive = {
     expr =
       let
         targetHashes = map (h: h.id_hash) [

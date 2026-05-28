@@ -18,7 +18,7 @@ let
   };
 in
 {
-  collection-default.test-empty-default = {
+  flake.tests.collection-default.test-empty-default = {
     expr = eval.config.schema.host.includes;
     expected = [ ];
   };

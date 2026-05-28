@@ -29,11 +29,11 @@ let
   };
 in
 {
-  collection-methods.test-method-works = {
+  flake.tests.collection-methods.test-method-works = {
     expr = instance.config.label;
     expected = "host:igloo";
   };
-  collection-methods.test-collection-on-kind = {
+  flake.tests.collection-methods.test-collection-on-kind = {
     expr = hostKind.tags;
     expected = [ "server" ];
   };

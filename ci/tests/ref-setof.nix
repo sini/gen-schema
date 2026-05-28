@@ -137,7 +137,7 @@ let
   };
 in
 {
-  ref-setof = {
+  flake.tests.ref-setof = {
     test-setof-dedup = {
       expr = builtins.length evalBasic.config.groups.web.members;
       expected = 2;

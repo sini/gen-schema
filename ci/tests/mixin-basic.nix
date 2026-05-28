@@ -15,7 +15,7 @@ let
     ;
 in
 {
-  mixin-basic.test-mkMixin-creates-mixin = {
+  flake.tests.mixin-basic.test-mkMixin-creates-mixin = {
     expr =
       (mkMixin {
         requires = [ "port" ];
@@ -27,7 +27,7 @@ in
     expected = true;
   };
 
-  mixin-basic.test-mkMixin-default-direction = {
+  flake.tests.mixin-basic.test-mkMixin-default-direction = {
     expr =
       (mkMixin {
         define = _: { };
@@ -35,7 +35,7 @@ in
     expected = "smalltalk";
   };
 
-  mixin-basic.test-beta-changes-direction = {
+  flake.tests.mixin-basic.test-beta-changes-direction = {
     expr =
       (beta (mkMixin {
         define = _: { };
@@ -43,7 +43,7 @@ in
     expected = "beta";
   };
 
-  mixin-basic.test-apply-mixin-adds-fields = {
+  flake.tests.mixin-basic.test-apply-mixin-adds-fields = {
     expr =
       let
         base = R.fromAttrs {
@@ -62,7 +62,7 @@ in
     expected = 9080;
   };
 
-  mixin-basic.test-apply-mixin-preserves-base = {
+  flake.tests.mixin-basic.test-apply-mixin-preserves-base = {
     expr =
       let
         base = R.fromAttrs {
@@ -81,7 +81,7 @@ in
     expected = "localhost";
   };
 
-  mixin-basic.test-apply-mixin-structural-check-fails = {
+  flake.tests.mixin-basic.test-apply-mixin-structural-check-fails = {
     expr = builtins.tryEval (
       let
         base = R.fromAttrs { hostname = "localhost"; };
@@ -98,7 +98,7 @@ in
     };
   };
 
-  mixin-basic.test-apply-mixin-kind-constraint-fails = {
+  flake.tests.mixin-basic.test-apply-mixin-kind-constraint-fails = {
     expr = builtins.tryEval (
       let
         base = R.fromAttrs { port = 8080; };
@@ -119,7 +119,7 @@ in
     };
   };
 
-  mixin-basic.test-apply-mixin-kind-constraint-passes = {
+  flake.tests.mixin-basic.test-apply-mixin-kind-constraint-passes = {
     expr =
       let
         base = R.fromAttrs { port = 8080; };
@@ -140,7 +140,7 @@ in
   };
 
   # Beta direction: kind's existing field wins over mixin's
-  mixin-basic.test-beta-kind-wins-on-conflict = {
+  flake.tests.mixin-basic.test-beta-kind-wins-on-conflict = {
     expr =
       let
         base = R.fromAttrs {
@@ -158,7 +158,7 @@ in
   };
 
   # Smalltalk direction: mixin's field wins over kind's
-  mixin-basic.test-smalltalk-mixin-wins-on-conflict = {
+  flake.tests.mixin-basic.test-smalltalk-mixin-wins-on-conflict = {
     expr =
       let
         base = R.fromAttrs {

@@ -37,7 +37,7 @@ let
   inherit (eval.config.services) nginx;
 in
 {
-  ref-deferred = {
+  flake.tests.ref-deferred = {
     test-deferred-ref-resolves-addr = {
       expr = nginx.host.addr;
       expected = "10.0.1.1";

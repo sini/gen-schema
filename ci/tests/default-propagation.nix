@@ -22,7 +22,7 @@ let
   };
 in
 {
-  defaults = {
+  flake.tests.defaults = {
     test-default-propagates = {
       expr = eval.config.hosts.igloo.system;
       expected = "x86_64-linux";
