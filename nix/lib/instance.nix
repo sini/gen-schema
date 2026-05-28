@@ -19,21 +19,23 @@
 let
   mkInstanceType =
     kindValue:
-    assert
-      (kindValue ? kind && kindValue ? options)
-      || throw "gen-schema: mkInstanceType: expected a kind value with 'kind' and 'options' attributes";
-    let
-      kind = kindValue.kind;
-    in
     {
       extraModules ? [ ],
       strict ? kindValue.strict,
     }:
+    let
+      _ =
+        assert
+          (kindValue ? kind && kindValue ? options)
+          || throw "gen-schema: mkInstanceType: expected a kind value with 'kind' and 'options' attributes";
+        null;
+      kind = kindValue.kind;
+    in
     lib.types.submodule (
       { name, config, ... }:
       {
         imports = [
-          kindValue
+          (builtins.seq _ kindValue)
         ]
         ++ [
           (
@@ -258,9 +260,6 @@ let
 
   mkInstanceRegistry =
     kindValue:
-    assert
-      (kindValue ? kind && kindValue ? options)
-      || throw "gen-schema: mkInstanceRegistry: expected a kind value with 'kind' and 'options' attributes";
     let
       kind = kindValue.kind;
     in
@@ -326,7 +325,7 @@ let
 
           validators = builtins.seq refValidation (
             let
-              raw = kindValue.validators;
+              raw = kindValue.validators or [ ];
               # Derive option names from any instance — all share the same kind schema.
               optionNames =
                 if instances == { } then
@@ -370,7 +369,7 @@ let
 
           # Refinement pass: strict refinements throw immediately, lazy refinements
           # wrap values with addErrorContext for deferred checking at access time.
-          effectiveRefinements = if refinements != { } then refinements else kindValue.refinements;
+          effectiveRefinements = if refinements != { } then refinements else kindValue.refinements or { };
 
           refinementChecked =
             if effectiveRefinements == { } then

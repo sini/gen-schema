@@ -14,7 +14,7 @@ let
       # Module 1: schema + hosts
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
+        options.hosts = mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           options.addr = lib.mkOption { type = lib.types.str; };
         };
@@ -27,7 +27,7 @@ let
       }
       # Module 2: services with ref to hosts
       {
-        options.services = mkInstanceRegistry eval.config.schema "service" {
+        options.services = mkInstanceRegistry eval.config.schema.service {
           extraModules = [
             (
               { ... }:

@@ -10,8 +10,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
-        options.services = mkInstanceRegistry eval.config.schema "service" {
+        options.hosts = mkInstanceRegistry eval.config.schema.host { };
+        options.services = mkInstanceRegistry eval.config.schema.service {
           refs.hosts = eval.config.hosts;
           refs.primary = eval.config.hosts;
         };

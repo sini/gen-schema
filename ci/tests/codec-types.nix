@@ -12,8 +12,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
-        options.services = mkInstanceRegistry eval.config.schema "service" {
+        options.hosts = mkInstanceRegistry eval.config.schema.host { };
+        options.services = mkInstanceRegistry eval.config.schema.service {
           refs.host = eval.config.hosts;
         };
         config.schema.host = {
@@ -65,9 +65,7 @@ let
   };
 
   # Codec with type-registered encoder for port
-  portCodec = mkCodec {
-    schema = eval.config.schema;
-    kind = "host";
+  portCodec = mkCodec eval.config.schema.host {
     types = {
       unsignedInt16 = {
         encode = v: "port:${toString v}";
@@ -77,9 +75,7 @@ let
   };
 
   # Codec with unused type (no fields of this type exist on host)
-  unusedCodec = mkCodec {
-    schema = eval.config.schema;
-    kind = "host";
+  unusedCodec = mkCodec eval.config.schema.host {
     types = {
       nonexistentType = {
         encode = v: v;
@@ -88,9 +84,7 @@ let
   };
 
   # Codec with per-field override suppressing type codec
-  overrideCodec = mkCodec {
-    schema = eval.config.schema;
-    kind = "host";
+  overrideCodec = mkCodec eval.config.schema.host {
     types = {
       unsignedInt16 = {
         encode = v: "port:${toString v}";
@@ -104,9 +98,7 @@ let
   };
 
   # Codec for service to test ref priority over types
-  serviceCodec = mkCodec {
-    schema = eval.config.schema;
-    kind = "service";
+  serviceCodec = mkCodec eval.config.schema.service {
     types = {
       # This should NOT apply to the host ref field
       str = {

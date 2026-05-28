@@ -14,11 +14,11 @@ let
     ];
   };
 
-  meta = eval.config.schema._kindMeta "host";
+  hostKind = eval.config.schema.host;
 in
 {
   flake.tests.method-intro.test-method-in-option-names = {
-    expr = builtins.elem "greet" meta.optionNames;
+    expr = hostKind.options ? greet;
     expected = true;
   };
 }

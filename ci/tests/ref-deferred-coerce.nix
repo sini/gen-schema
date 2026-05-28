@@ -18,7 +18,7 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.traits = mkInstanceRegistry evalSelfRef.config.schema "trait" {
+        options.traits = mkInstanceRegistry evalSelfRef.config.schema.trait {
           refs.needs = {
             instances = evalSelfRef.config.traits;
             coerce =
@@ -57,7 +57,7 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.traits = mkInstanceRegistry evalSelector.config.schema "trait" {
+        options.traits = mkInstanceRegistry evalSelector.config.schema.trait {
           refs.needs = {
             instances = evalSelector.config.traits;
             coerce =
@@ -103,7 +103,7 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.traits = mkInstanceRegistry evalSetOf.config.schema "trait" {
+        options.traits = mkInstanceRegistry evalSetOf.config.schema.trait {
           refs.deps = {
             instances = evalSetOf.config.traits;
             coerce =
@@ -134,8 +134,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalNonDeferred.config.schema "host" { };
-        options.services = mkInstanceRegistry evalNonDeferred.config.schema "service" {
+        options.hosts = mkInstanceRegistry evalNonDeferred.config.schema.host { };
+        options.services = mkInstanceRegistry evalNonDeferred.config.schema.service {
           refs.host = {
             instances = evalNonDeferred.config.hosts;
             coerce =
@@ -164,8 +164,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalMixed.config.schema "host" { };
-        options.services = mkInstanceRegistry evalMixed.config.schema "service" {
+        options.hosts = mkInstanceRegistry evalMixed.config.schema.host { };
+        options.services = mkInstanceRegistry evalMixed.config.schema.service {
           refs.host = evalMixed.config.hosts;
           refs.depends = {
             instances = evalMixed.config.services;

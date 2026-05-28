@@ -35,7 +35,7 @@ let
   schemaR = schemaWithRefinedTypes.config.schema;
 
   # mkInstanceRegistry without explicit refinements — should auto-extract
-  autoRegistry = mkInstanceRegistry schemaR "service" { };
+  autoRegistry = mkInstanceRegistry schemaR.service { };
 
   validEval = lib.evalModules {
     modules = [
@@ -93,7 +93,7 @@ let
   };
 
   schemaM = schemaWithMixins.config.schema;
-  mixinRegistry = mkInstanceRegistry schemaM "service" { };
+  mixinRegistry = mkInstanceRegistry schemaM.service { };
 
   mixinEval = lib.evalModules {
     modules = [

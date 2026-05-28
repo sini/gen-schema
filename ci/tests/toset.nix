@@ -16,8 +16,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
-        options.groups = mkInstanceRegistry eval.config.schema "group" {
+        options.hosts = mkInstanceRegistry eval.config.schema.host { };
+        options.groups = mkInstanceRegistry eval.config.schema.group {
           refs.members = eval.config.hosts;
         };
         config.schema.host = {
@@ -65,7 +65,7 @@ in
             modules = [
               {
                 options.schema = mkSchemaOption { };
-                options.hosts = mkInstanceRegistry eval2.config.schema "host" { };
+                options.hosts = mkInstanceRegistry eval2.config.schema.host { };
                 config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
                 config.hosts.other = {
                   addr = "10.0.1.3";

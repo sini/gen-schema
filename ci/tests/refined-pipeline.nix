@@ -21,7 +21,7 @@ let
 
   schema = schemaEval.config.schema;
 
-  validRegistry = mkInstanceRegistry schema "service" {
+  validRegistry = mkInstanceRegistry schema.service {
     refinements = {
       port = [
         {
@@ -32,7 +32,7 @@ let
     };
   };
 
-  invalidRegistry = mkInstanceRegistry schema "service" {
+  invalidRegistry = mkInstanceRegistry schema.service {
     refinements = {
       port = [
         {
@@ -84,7 +84,7 @@ in
   flake.tests.refined-pipeline.test-no-refinements-passthrough = {
     expr =
       let
-        noRefRegistry = mkInstanceRegistry schema "service" { };
+        noRefRegistry = mkInstanceRegistry schema.service { };
         eval = lib.evalModules {
           modules = [
             {
@@ -104,7 +104,7 @@ in
   flake.tests.refined-pipeline.test-multiple-refinements-on-field = {
     expr =
       let
-        multiRegistry = mkInstanceRegistry schema "service" {
+        multiRegistry = mkInstanceRegistry schema.service {
           refinements = {
             port = [
               {
@@ -137,7 +137,7 @@ in
   flake.tests.refined-pipeline.test-multiple-fields-refined = {
     expr =
       let
-        multiFieldRegistry = mkInstanceRegistry schema "service" {
+        multiFieldRegistry = mkInstanceRegistry schema.service {
           refinements = {
             port = [
               {

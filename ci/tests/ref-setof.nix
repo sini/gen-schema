@@ -16,8 +16,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalBasic.config.schema "host" { };
-        options.groups = mkInstanceRegistry evalBasic.config.schema "group" {
+        options.hosts = mkInstanceRegistry evalBasic.config.schema.host { };
+        options.groups = mkInstanceRegistry evalBasic.config.schema.group {
           refs.members = evalBasic.config.hosts;
         };
         config.schema.host = {
@@ -61,8 +61,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalCoerce.config.schema "host" { };
-        options.groups = mkInstanceRegistry evalCoerce.config.schema "group" {
+        options.hosts = mkInstanceRegistry evalCoerce.config.schema.host { };
+        options.groups = mkInstanceRegistry evalCoerce.config.schema.group {
           refs.members = {
             instances = evalCoerce.config.hosts;
             coerce =
@@ -105,8 +105,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalNullable.config.schema "host" { };
-        options.services = mkInstanceRegistry evalNullable.config.schema "service" {
+        options.hosts = mkInstanceRegistry evalNullable.config.schema.host { };
+        options.services = mkInstanceRegistry evalNullable.config.schema.service {
           refs.hosts = evalNullable.config.hosts;
         };
         config.schema.host = {

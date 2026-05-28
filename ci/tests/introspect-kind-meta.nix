@@ -14,18 +14,19 @@ let
     ];
   };
 
-  meta = eval.config.schema._kindMeta "host";
+  hostKind = eval.config.schema.host;
+  optionNames = builtins.attrNames hostKind.options;
 
   # Filter out internal options for assertions
-  userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") meta.optionNames;
+  userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") optionNames;
 in
 {
   flake.tests.introspect-meta.test-option-names-contain-name = {
-    expr = builtins.elem "name" meta.optionNames;
+    expr = hostKind.options ? name;
     expected = true;
   };
   flake.tests.introspect-meta.test-option-names-contain-addr = {
-    expr = builtins.elem "addr" meta.optionNames;
+    expr = hostKind.options ? addr;
     expected = true;
   };
   flake.tests.introspect-meta.test-user-opts = {

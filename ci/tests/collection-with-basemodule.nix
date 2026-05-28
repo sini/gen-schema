@@ -13,7 +13,7 @@ let
             default = [ ];
           };
         };
-        options.hosts = schemaLib.mkInstanceRegistry eval.config.schema "host" { };
+        options.hosts = schemaLib.mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           tags = [
             "web"

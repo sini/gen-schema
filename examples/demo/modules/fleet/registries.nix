@@ -124,11 +124,11 @@ let
     ] service;
 in
 {
-  options.fleet.hosts = mkInstanceRegistry config.schema "host" {
+  options.fleet.hosts = mkInstanceRegistry config.schema.host {
     description = "Fleet host instances.";
   };
 
-  options.fleet.users = mkInstanceRegistry config.schema "user" {
+  options.fleet.users = mkInstanceRegistry config.schema.user {
     description = "Fleet user instances.";
     derive = deriveUids {
       min = 1000;
@@ -136,7 +136,7 @@ in
     };
   };
 
-  options.fleet.admins = mkInstanceRegistry config.schema "admin-user" {
+  options.fleet.admins = mkInstanceRegistry config.schema.admin-user {
     description = "Fleet admin user instances (inherits user kind).";
     derive = deriveUids {
       min = 60001;
@@ -144,7 +144,7 @@ in
     };
   };
 
-  options.fleet.services = mkInstanceRegistry config.schema "service" {
+  options.fleet.services = mkInstanceRegistry config.schema.service {
     description = "Fleet service instances.";
     # Deferred ref: bind "host" kind-ref to the hosts registry
     refs.host = config.fleet.hosts;
@@ -182,12 +182,12 @@ in
     ];
   };
 
-  options.fleet.groups = mkInstanceRegistry config.schema "group" {
+  options.fleet.groups = mkInstanceRegistry config.schema.group {
     description = "Fleet host group instances.";
     refs.members = config.fleet.hosts;
   };
 
-  options.fleet.networks = mkInstanceRegistry config.schema "network" {
+  options.fleet.networks = mkInstanceRegistry config.schema.network {
     description = "Fleet network instances.";
   };
 }

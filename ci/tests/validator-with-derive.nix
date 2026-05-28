@@ -9,7 +9,7 @@ let
     modules = [
       {
         options.schema = schemaLib.mkSchemaOption { };
-        options.hosts = schemaLib.mkInstanceRegistry eval.config.schema "host" {
+        options.hosts = schemaLib.mkInstanceRegistry eval.config.schema.host {
           extraModules = [
             {
               options.tag = lib.mkOption {

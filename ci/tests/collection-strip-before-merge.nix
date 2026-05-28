@@ -11,7 +11,7 @@ let
             default = [ ];
           };
         };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
+        options.hosts = mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           options.name = lib.mkOption { type = lib.types.str; };
           tags = [ "server" ];

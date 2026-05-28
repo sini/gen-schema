@@ -11,8 +11,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalSimple.config.schema "host" { };
-        options.services = mkInstanceRegistry evalSimple.config.schema "service" {
+        options.hosts = mkInstanceRegistry evalSimple.config.schema.host { };
+        options.services = mkInstanceRegistry evalSimple.config.schema.service {
           refs.host = evalSimple.config.hosts;
         };
         config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
@@ -36,8 +36,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalScalar.config.schema "host" { };
-        options.services = mkInstanceRegistry evalScalar.config.schema "service" {
+        options.hosts = mkInstanceRegistry evalScalar.config.schema.host { };
+        options.services = mkInstanceRegistry evalScalar.config.schema.service {
           refs.host = {
             instances = evalScalar.config.hosts;
             coerce =
@@ -79,8 +79,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalList.config.schema "host" { };
-        options.groups = mkInstanceRegistry evalList.config.schema "group" {
+        options.hosts = mkInstanceRegistry evalList.config.schema.host { };
+        options.groups = mkInstanceRegistry evalList.config.schema.group {
           refs.members = {
             instances = evalList.config.hosts;
             coerce =
@@ -172,8 +172,8 @@ in
             modules = [
               {
                 options.schema = mkSchemaOption { };
-                options.hosts = mkInstanceRegistry evalBad.config.schema "host" { };
-                options.things = mkInstanceRegistry evalBad.config.schema "thing" {
+                options.hosts = mkInstanceRegistry evalBad.config.schema.host { };
+                options.things = mkInstanceRegistry evalBad.config.schema.thing {
                   refs.host = {
                     instances = evalBad.config.hosts;
                     coerce = _default: _val: [

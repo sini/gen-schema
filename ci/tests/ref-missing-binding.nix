@@ -16,9 +16,9 @@ let
             modules = [
               {
                 options.schema = mkSchemaOption { };
-                options.hosts = mkInstanceRegistry eval.config.schema "host" { };
+                options.hosts = mkInstanceRegistry eval.config.schema.host { };
                 # No refs.host — should throw when service instances are evaluated
-                options.services = mkInstanceRegistry eval.config.schema "service" { };
+                options.services = mkInstanceRegistry eval.config.schema.service { };
                 config.schema.host = {
                   options.addr = lib.mkOption { type = lib.types.str; };
                 };

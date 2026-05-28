@@ -21,7 +21,7 @@ let
 
   schema = schemaEval.config.schema;
 
-  lazyRegistry = mkInstanceRegistry schema "service" {
+  lazyRegistry = mkInstanceRegistry schema.service {
     refinements = {
       port = [
         {
@@ -85,7 +85,7 @@ in
   flake.tests.lazy-contract.test-mixed-strict-and-lazy = {
     expr =
       let
-        mixedRegistry = mkInstanceRegistry schema "service" {
+        mixedRegistry = mkInstanceRegistry schema.service {
           refinements = {
             port = [
               {

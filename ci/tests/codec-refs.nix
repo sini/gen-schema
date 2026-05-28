@@ -16,8 +16,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
-        options.services = mkInstanceRegistry eval.config.schema "service" {
+        options.hosts = mkInstanceRegistry eval.config.schema.host { };
+        options.services = mkInstanceRegistry eval.config.schema.service {
           refs.host = eval.config.hosts;
           refs.replicas = eval.config.hosts;
           refs.primary = eval.config.hosts;
@@ -72,10 +72,7 @@ let
     ];
   };
 
-  codec = mkCodec {
-    schema = eval.config.schema;
-    kind = "service";
-  };
+  codec = mkCodec eval.config.schema.service { };
 
   encoded = codec.encode eval.config.services.nginx;
   encodedSolo = codec.encode eval.config.services.solo;

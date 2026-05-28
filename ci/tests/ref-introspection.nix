@@ -25,24 +25,30 @@ let
     ];
   };
 
-  serviceMeta = eval.config.schema._kindMeta "service";
-  hostMeta = eval.config.schema._kindMeta "host";
-  networkMeta = eval.config.schema._kindMeta "network";
+  serviceKind = eval.config.schema.service;
+  hostKind = eval.config.schema.host;
+  networkKind = eval.config.schema.network;
 in
 {
   flake.tests.ref-introspection = {
     test-service-has-refs = {
-      expr = serviceMeta.refs;
-      expected = {
-        host = "host";
-      };
+      expr = serviceKind.refs ? host;
+      expected = true;
+    };
+    test-service-ref-kind = {
+      expr = serviceKind.refs.host.refKind;
+      expected = "host";
+    };
+    test-service-ref-has-type = {
+      expr = serviceKind.refs.host ? type;
+      expected = true;
     };
     test-host-no-refs = {
-      expr = hostMeta.refs;
+      expr = hostKind.refs;
       expected = { };
     };
     test-network-no-refs = {
-      expr = networkMeta.refs;
+      expr = networkKind.refs;
       expected = { };
     };
   };

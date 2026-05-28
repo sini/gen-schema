@@ -18,7 +18,7 @@ let
       }
     ];
   };
-  hostType = schemaLib.mkInstanceType schemaEval.config.schema "host" { };
+  hostType = schemaLib.mkInstanceType schemaEval.config.schema.host { };
   instanceEval = lib.evalModules {
     modules = [
       {

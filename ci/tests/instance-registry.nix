@@ -6,7 +6,7 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
+        options.hosts = mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           options.addr = lib.mkOption { type = lib.types.str; };
           options.role = lib.mkOption { type = lib.types.str; };

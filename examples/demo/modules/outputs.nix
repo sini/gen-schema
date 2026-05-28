@@ -77,8 +77,8 @@ in
 
       # --- Introspection ---
       inherit (config.schema) _kindNames;
-      hostOptionCount = builtins.length (config.schema._kindMeta "host").optionNames;
-      adminOptionCount = builtins.length (config.schema._kindMeta "admin-user").optionNames;
+      hostOptionCount = builtins.length (builtins.attrNames config.schema.host.options);
+      adminOptionCount = builtins.length (builtins.attrNames config.schema.admin-user.options);
 
       # --- Derive hooks ---
       # Deterministic UIDs from id_hash (auto-assigned)
@@ -117,7 +117,7 @@ in
       # --- Topology introspection ---
       topologyHost = config.schema._topology.host;
       topologyNetwork = config.schema._topology.network;
-      networkOptionCount = builtins.length (config.schema._kindMeta "network").optionNames;
+      networkOptionCount = builtins.length (builtins.attrNames config.schema.network.options);
       networkHasNoParent = config.schema._topology.network.parent == null;
       edgeCount = builtins.length config.schema._edges;
       schemaRoots = config.schema._roots;
@@ -160,9 +160,7 @@ in
       # --- Codec (serialization) ---
       codecDemo =
         let
-          hostCodec = schemaLib.mkCodec {
-            schema = config.schema;
-            kind = "host";
+          hostCodec = schemaLib.mkCodec config.schema.host {
             fields = {
               # Exclude metricsPort from serialization
               metricsPort = {
@@ -173,10 +171,7 @@ in
               };
             };
           };
-          serviceCodec = schemaLib.mkCodec {
-            schema = config.schema;
-            kind = "service";
-          };
+          serviceCodec = schemaLib.mkCodec config.schema.service { };
 
           # Encode a single instance
           encodedIgloo = hostCodec.encode fleet.hosts.igloo;
@@ -192,9 +187,7 @@ in
           encodedNginx = serviceCodec.encode fleet.services.nginx;
 
           # Type-registered codec with either dispatch
-          typeCodec = schemaLib.mkCodec {
-            schema = config.schema;
-            kind = "host";
+          typeCodec = schemaLib.mkCodec config.schema.host {
             types = {
               unsignedInt16 = {
                 encode = v: "port:${toString v}";

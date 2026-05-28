@@ -32,8 +32,8 @@ let
         };
 
         # Instantiate both — should not conflict
-        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
-        options.users = mkInstanceRegistry eval.config.schema "user" { };
+        options.hosts = mkInstanceRegistry eval.config.schema.host { };
+        options.users = mkInstanceRegistry eval.config.schema.user { };
 
         config.hosts.igloo = {
           addr = "10.0.1.1";

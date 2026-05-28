@@ -136,6 +136,7 @@ let
             inherit strict;
             options = { };
             refs = { };
+            refinements = { };
           }
           // computedFields
         else

@@ -52,7 +52,7 @@ let
   schema = schemaEval.config.schema;
 
   # Create instances
-  registry = mkInstanceRegistry schema "service" { };
+  registry = mkInstanceRegistry schema.service { };
   eval = lib.evalModules {
     modules = [
       {

@@ -11,15 +11,15 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
+        options.hosts = mkInstanceRegistry eval.config.schema.host { };
 
         # Deferred mode with instance value
-        options.services = mkInstanceRegistry eval.config.schema "service" {
+        options.services = mkInstanceRegistry eval.config.schema.service {
           refs.host = eval.config.hosts;
         };
 
         # Direct mode with instance value
-        options.links = mkInstanceRegistry eval.config.schema "link" {
+        options.links = mkInstanceRegistry eval.config.schema.link {
           extraModules = [
             (
               { ... }:

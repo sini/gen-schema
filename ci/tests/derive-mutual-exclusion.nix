@@ -3,11 +3,11 @@ let
   tryRegistry = builtins.tryEval (
     schemaLib.mkInstanceRegistry
       {
-        host = {
-          options = { };
-        };
+        kind = "host";
+        options = { };
+        refs = { };
+        strict = true;
       }
-      "host"
       {
         derive = _: { };
         deriveEither = {

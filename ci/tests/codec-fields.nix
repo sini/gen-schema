@@ -15,8 +15,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.peers = mkInstanceRegistry eval.config.schema "peer" { };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" {
+        options.peers = mkInstanceRegistry eval.config.schema.peer { };
+        options.hosts = mkInstanceRegistry eval.config.schema.host {
           refs.peer = eval.config.peers;
         };
         config.schema.peer = {
@@ -73,9 +73,7 @@ let
   igloo = eval.config.hosts.igloo;
 
   # Codec with exclusion
-  codecExclude = mkCodec {
-    schema = eval.config.schema;
-    kind = "host";
+  codecExclude = mkCodec eval.config.schema.host {
     fields = {
       secret = {
         exclude = true;
@@ -84,9 +82,7 @@ let
   };
 
   # Codec with custom encode/decode
-  codecCustom = mkCodec {
-    schema = eval.config.schema;
-    kind = "host";
+  codecCustom = mkCodec eval.config.schema.host {
     fields = {
       secret = {
         exclude = true;
@@ -99,9 +95,7 @@ let
   };
 
   # Codec with recursive fields
-  codecNested = mkCodec {
-    schema = eval.config.schema;
-    kind = "host";
+  codecNested = mkCodec eval.config.schema.host {
     fields = {
       secret = {
         exclude = true;
@@ -119,9 +113,7 @@ let
   };
 
   # Codec with custom encoder suppressing ref auto-encode
-  codecCustomRef = mkCodec {
-    schema = eval.config.schema;
-    kind = "host";
+  codecCustomRef = mkCodec eval.config.schema.host {
     fields = {
       secret = {
         exclude = true;
@@ -197,9 +189,7 @@ in
     test-exclude-nonexistent-silent = {
       expr =
         let
-          c = mkCodec {
-            schema = eval.config.schema;
-            kind = "host";
+          c = mkCodec eval.config.schema.host {
             fields = {
               nonexistent = {
                 exclude = true;
@@ -211,15 +201,15 @@ in
       expected = "10.0.1.1";
     };
     test-encode-nonexistent-throws = {
-      expr = builtins.tryEval (mkCodec {
-        schema = eval.config.schema;
-        kind = "host";
-        fields = {
-          nonexistent = {
-            encode = v: v;
+      expr = builtins.tryEval (
+        mkCodec eval.config.schema.host {
+          fields = {
+            nonexistent = {
+              encode = v: v;
+            };
           };
-        };
-      });
+        }
+      );
       expected = {
         success = false;
         value = false;

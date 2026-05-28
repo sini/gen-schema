@@ -10,7 +10,7 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.services = mkInstanceRegistry eval.config.schema "service" {
+        options.services = mkInstanceRegistry eval.config.schema.service {
           extraModules = [
             (
               { ... }:

@@ -6,12 +6,12 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" {
+        options.hosts = mkInstanceRegistry eval.config.schema.host {
           extraModules = [
             (
               { ... }:
               {
-                options.users = mkInstanceRegistry eval.config.schema "user" { };
+                options.users = mkInstanceRegistry eval.config.schema.user { };
               }
             )
           ];

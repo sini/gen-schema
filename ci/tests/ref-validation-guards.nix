@@ -17,8 +17,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalBadAttrset.config.schema "host" { };
-        options.services = mkInstanceRegistry evalBadAttrset.config.schema "service" {
+        options.hosts = mkInstanceRegistry evalBadAttrset.config.schema.host { };
+        options.services = mkInstanceRegistry evalBadAttrset.config.schema.service {
           refs.host = evalBadAttrset.config.hosts;
         };
         config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
@@ -40,7 +40,7 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalGood.config.schema "host" { };
+        options.hosts = mkInstanceRegistry evalGood.config.schema.host { };
         config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
         config.hosts.igloo = {
           addr = "10.0.1.1";

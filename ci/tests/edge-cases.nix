@@ -43,8 +43,8 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry refConflictEval.config.schema "host" { };
-        options.services = mkInstanceRegistry refConflictEval.config.schema "service" {
+        options.hosts = mkInstanceRegistry refConflictEval.config.schema.host { };
+        options.services = mkInstanceRegistry refConflictEval.config.schema.service {
           extraModules = [
             (
               { ... }:

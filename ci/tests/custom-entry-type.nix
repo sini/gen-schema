@@ -79,7 +79,7 @@ let
           };
           strict = true;
         };
-        options.hosts = mkInstanceRegistry collectionStripEval.config.schema "host" { };
+        options.hosts = mkInstanceRegistry collectionStripEval.config.schema.host { };
         config.schema.host = {
           options.name = lib.mkOption { type = lib.types.str; };
           tags = [ "server" ];
@@ -258,9 +258,10 @@ in
       "user"
     ];
   };
-  flake.tests.custom-entry-type.test-introspect-kind-meta = {
-    expr = builtins.elem "name" (introEval.config.schema._kindMeta "host").optionNames;
-    expected = true;
+  # Custom mkType kinds have empty .options (introspection is skipped for custom types)
+  flake.tests.custom-entry-type.test-custom-type-no-introspection = {
+    expr = introEval.config.schema.host.options;
+    expected = { };
   };
   flake.tests.custom-entry-type.test-mixin-skipped = {
     expr = !(mixinSkipHost ? extraField);
@@ -285,10 +286,11 @@ in
     expected = true;
   };
   # The custom mkType controls the result structure entirely: its __functor is
-  # present but the standard gen-schema wrapper fields (mixins, refinements) are
+  # present but the standard gen-schema wrapper field (mixins) is
   # absent — proving the default deferredModule wrapping path was skipped.
+  # refinements, options, refs, strict are always injected for API consistency.
   flake.tests.custom-entry-type.test-custom-functor-not-default-wrapper = {
-    expr = hostKind ? __functor && !(hostKind ? mixins) && !(hostKind ? refinements);
+    expr = hostKind ? __functor && !(hostKind ? mixins);
     expected = true;
   };
 }

@@ -19,7 +19,7 @@ let
             default = [ ];
           };
         };
-        options.hosts = mkInstanceRegistry eval.config.schema "host" { };
+        options.hosts = mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           options.addr = lib.mkOption { type = lib.types.str; };
           options.role = lib.mkOption {
@@ -40,9 +40,7 @@ let
     ];
   };
 
-  codec = mkCodec {
-    schema = eval.config.schema;
-    kind = "host";
+  codec = mkCodec eval.config.schema.host {
     excludeFields = [ "tags" ];
   };
 

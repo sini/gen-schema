@@ -7,7 +7,7 @@ let
     modules = [
       {
         options.schema = mkSchemaOption { };
-        options.items = mkInstanceRegistry eval.config.schema "item" { };
+        options.items = mkInstanceRegistry eval.config.schema.item { };
         config.schema.item = {
           # either str int — distinguishable by isString / isInt
           options.value = lib.mkOption {
@@ -56,9 +56,7 @@ let
   };
 
   # Register a codec for int type
-  codec = mkCodec {
-    schema = eval.config.schema;
-    kind = "item";
+  codec = mkCodec eval.config.schema.item {
     types = {
       int = {
         encode = v: "n:${toString v}";
@@ -68,10 +66,7 @@ let
   };
 
   # No type registrations — identity for all branches
-  identityCodec = mkCodec {
-    schema = eval.config.schema;
-    kind = "item";
-  };
+  identityCodec = mkCodec eval.config.schema.item { };
 in
 {
   flake.tests.codec-either = {
