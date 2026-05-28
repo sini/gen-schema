@@ -215,17 +215,16 @@ let
 
             merged = base.merge loc (strippedDefs ++ injected);
 
-            # Lazy introspection — evaluated only when .options or .refs is accessed.
+            # Lazy introspection — evaluated on first access of .options or .refs.
             # Uses the locally-built merged module, not config.${k}, to avoid circularity.
             introspect =
               let
                 dummy = lib.evalModules { modules = [ merged ]; };
+                userOptions = lib.filterAttrs (n: _: !(lib.hasPrefix "_module" n)) dummy.options;
               in
               {
-                options = lib.filterAttrs (n: _: !(lib.hasPrefix "_module" n)) dummy.options;
-                refs = refsFromOptionsWithTypes (
-                  lib.filterAttrs (n: _: !(lib.hasPrefix "_module" n)) dummy.options
-                );
+                options = userOptions;
+                refs = refsFromOptionsWithTypes userOptions;
               };
           in
           # Precedence: computed overrides collections of the same name.
