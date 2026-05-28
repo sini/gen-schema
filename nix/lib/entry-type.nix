@@ -10,7 +10,7 @@
 {
   lib,
   mkMethodsModule,
-  refsFromOptions,
+  refsFromOptionsWithTypes,
   record,
   applyMixin,
   emitModule,
@@ -26,6 +26,7 @@ let
       computed ? null,
       mixins ? [ ],
       mkType ? null,
+      strict ? true,
     }:
     let
       base = lib.types.deferredModule;
@@ -131,6 +132,11 @@ let
             defs = strippedDefs;
             inherit kind;
           }
+          // {
+            inherit strict;
+            options = { };
+            refs = { };
+          }
           // computedFields
         else
           let
@@ -208,6 +214,19 @@ let
               };
 
             merged = base.merge loc (strippedDefs ++ injected);
+
+            # Lazy introspection — evaluated only when .options or .refs is accessed.
+            # Uses the locally-built merged module, not config.${k}, to avoid circularity.
+            introspect =
+              let
+                dummy = lib.evalModules { modules = [ merged ]; };
+              in
+              {
+                options = lib.filterAttrs (n: _: !(lib.hasPrefix "_module" n)) dummy.options;
+                refs = refsFromOptionsWithTypes (
+                  lib.filterAttrs (n: _: !(lib.hasPrefix "_module" n)) dummy.options
+                );
+              };
           in
           # Precedence: computed overrides collections of the same name.
           # __functor is reserved — collections/computed must not use it as a key.
@@ -218,7 +237,8 @@ let
               {
                 imports = [ merged ];
               };
-            inherit kind mixins;
+            inherit kind mixins strict;
+            inherit (introspect) options refs;
             refinements = extractedRefinements;
           }
           // finalCollections
@@ -247,27 +267,15 @@ let
               mixins
               collections
               mkType
+              strict
               ;
           });
-
-          # Schema-level strict setting — stored for mkInstanceType to read
-          options._strict = lib.mkOption {
-            internal = true;
-            type = lib.types.bool;
-            default = strict;
-          };
 
           options._kindNames = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             internal = true;
             readOnly = true;
             description = "All kind names in the schema";
-          };
-          options._kindMeta = lib.mkOption {
-            type = lib.types.functionTo lib.types.raw;
-            internal = true;
-            readOnly = true;
-            description = "Per-kind introspection: options, types, identity keys, refs";
           };
           options._topology = lib.mkOption {
             type = lib.types.raw;
@@ -303,27 +311,6 @@ let
             let
               kindNames = lib.sort (a: b: a < b) (lib.filter (n: !(lib.hasPrefix "_" n)) (lib.attrNames config));
 
-              # Memoized as attrset — each kind's evalModules runs at most once.
-              kindMeta =
-                let
-                  memo = lib.genAttrs kindNames (
-                    k:
-                    let
-                      dummy = lib.evalModules { modules = [ config.${k} ]; };
-                    in
-                    {
-                      optionNames = lib.attrNames dummy.options;
-                      inherit (dummy) options;
-                      refs = refsFromOptions dummy.options;
-                    }
-                  );
-                in
-                k:
-                if memo ? ${k} then
-                  memo.${k}
-                else
-                  throw "gen-schema: kindMeta: '${k}' is not a declared schema kind";
-
               # Derive topology from parent collections on each kind.
               # Each kind can declare `parent = "host";` as a collection.
               topology =
@@ -357,16 +344,16 @@ let
                   children = childrenMap.${k} or [ ];
                 });
 
-              # Materialize all ref edges from kindMeta.refs across all kinds
+              # Materialize all ref edges from kind.refs across all kinds
               refEdges = lib.concatMap (
                 fromKind:
                 let
-                  refs = (kindMeta fromKind).refs;
+                  refs = config.${fromKind}.refs;
                 in
-                lib.mapAttrsToList (field: toKind: {
+                lib.mapAttrsToList (field: refEntry: {
                   from = fromKind;
                   inherit field;
-                  to = toKind;
+                  to = refEntry.refKind;
                 }) refs
               ) kindNames;
               # Unified edge view: § Neron 2015 P (parent) + I (ref/import) edges
@@ -387,10 +374,10 @@ let
 
               roots = builtins.filter (k: topology.${k}.parent == null) kindNames;
               leaves = builtins.filter (k: topology.${k}.children == [ ]) kindNames;
+
             in
             {
               _kindNames = kindNames;
-              _kindMeta = kindMeta;
               _topology = topology;
               _refEdges = refEdges;
               _edges = edges;

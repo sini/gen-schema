@@ -26,7 +26,7 @@ let
   entryType = import ./entry-type.nix {
     inherit lib record;
     inherit (methods) mkMethodsModule;
-    inherit (refLib) refsFromOptions;
+    inherit (refLib) refsFromOptionsWithTypes;
     inherit (mixinLib) applyMixin;
     inherit (bridgeLib) emitModule isOptionDecl;
     inherit (refinedLib) isRefined getRefinements;
