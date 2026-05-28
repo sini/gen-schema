@@ -42,7 +42,7 @@ let
       resolvedFields = builtins.filter (n: !(builtins.elem n allExcluded)) meta.optionNames;
 
       # Validate fields spec — force evaluation to surface errors early
-      _ = lib.mapAttrs (
+      _ = builtins.deepSeq (lib.mapAttrsToList (
         name: spec:
         if (spec.exclude or false) then
           null
@@ -50,7 +50,28 @@ let
           throw "gen-schema: codec: field '${name}' in fields spec is not a declared option on kind '${kind}'"
         else
           null
-      ) fields;
+      ) fields) null;
+
+      # Walk a type tree to build ref encoder (mirrors mkCoerceChain in instance.nix)
+      mkRefEncoder =
+        type:
+        if (type.refKind or null) != null then
+          (v: v.name)
+        else
+          let
+            et = (type.nestedTypes or { }).elemType or null;
+          in
+          if et == null then
+            (v: v.name)
+          else
+            let
+              inner = mkRefEncoder et;
+            in
+            if (type.name or "") == "nullOr" then
+              (v: if v == null then null else inner v)
+            else
+              # listOf or setOf — map
+              (v: map inner v);
 
       mkFieldCodec =
         name:
@@ -64,12 +85,56 @@ let
             encode = spec.encode;
             decode = spec.decode or (v: v);
           }
-        else
-          # Identity transform — no ref detection in Task 1
+        else if spec ? fields then
+          # Recursive: build sub-codec for nested submodule
+          let
+            subFields = spec.fields;
+            subFieldNames = builtins.filter (
+              n:
+              let
+                s = subFields.${n} or { };
+              in
+              !(s.exclude or false)
+            ) (builtins.attrNames subFields);
+          in
           {
-            encode = v: v;
-            decode = v: v;
-          };
+            encode =
+              v:
+              lib.foldl' (
+                acc: n:
+                let
+                  subSpec = subFields.${n} or { };
+                  encoder = if subSpec ? encode then subSpec.encode else (x: x);
+                in
+                if v ? ${n} then acc // { ${n} = encoder v.${n}; } else acc
+              ) { } subFieldNames;
+            decode =
+              v:
+              lib.foldl' (
+                acc: n:
+                let
+                  subSpec = subFields.${n} or { };
+                  decoder = if subSpec ? decode then subSpec.decode else (x: x);
+                in
+                if v ? ${n} then acc // { ${n} = decoder v.${n}; } else acc
+              ) { } subFieldNames;
+          }
+        else
+          # Check for ref type via schema introspection
+          let
+            opt = meta.options.${name} or null;
+            refKind = if opt != null && opt ? type then getRefKind opt.type else null;
+          in
+          if refKind != null then
+            {
+              encode = mkRefEncoder opt.type;
+              decode = v: v;
+            }
+          else
+            {
+              encode = v: v;
+              decode = v: v;
+            };
 
       fieldCodecs = builtins.listToAttrs (
         builtins.concatMap (
