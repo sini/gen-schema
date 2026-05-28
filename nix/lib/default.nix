@@ -43,10 +43,7 @@ let
     inherit (validate) filterValidators;
   };
   docs = import ./docs.nix { inherit lib; };
-  codecLib = import ./codec.nix {
-    inherit lib;
-    inherit (refLib) getRefKind;
-  };
+  codecLib = import ./codec.nix { inherit lib; };
 in
 {
   # gen-schema's own exports + validator constructor from gen-algebra

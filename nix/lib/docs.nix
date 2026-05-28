@@ -10,8 +10,8 @@ in
       renderKind =
         kind:
         let
-          meta = schema._kindMeta kind;
-          userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") meta.optionNames;
+          opts = schema.${kind}.options;
+          userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") (builtins.attrNames opts);
         in
         lib.concatStringsSep "\n" (
           [
@@ -20,7 +20,7 @@ in
             "| Option | Type | Default | Description |"
             "|--------|------|---------|-------------|"
           ]
-          ++ map (renderOption meta.options) userOpts
+          ++ map (renderOption opts) userOpts
         );
       renderOption =
         options: name:

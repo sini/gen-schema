@@ -5,7 +5,7 @@
 # parent, kind, mixins, refinements) are excluded automatically. Additional
 # fields can be excluded via excludeFields. Remaining fields get identity
 # transforms unless overridden via the fields spec or types registry.
-{ lib, getRefKind }:
+{ lib }:
 let
   builtinCollections = [
     "methods"
@@ -26,21 +26,25 @@ let
   };
 
   mkCodec =
+    kindValue:
     {
-      schema,
-      kind,
       fields ? { },
       types ? { },
       excludeFields ? [ ],
     }:
+    assert
+      (kindValue ? kind && kindValue ? options)
+      || throw "gen-schema: mkCodec: expected a kind value (e.g., schema.host), got an attrset without 'kind' or 'options'";
     let
-      meta = schema._kindMeta kind;
-      kindResult = schema.${kind};
+      kind = kindValue.kind;
+      kindOptions = kindValue.options;
 
-      methodNames = builtins.attrNames (kindResult.methods or { });
+      methodNames = builtins.attrNames (kindValue.methods or { });
       allExcluded = builtinInternals ++ methodNames ++ builtinCollections ++ excludeFields;
 
-      resolvedFields = builtins.filter (n: !(builtins.elem n allExcluded)) meta.optionNames;
+      resolvedFields = builtins.filter (n: !(builtins.elem n allExcluded)) (
+        builtins.attrNames kindOptions
+      );
 
       # Validate fields spec — force evaluation to surface errors early
       _ = builtins.deepSeq (lib.mapAttrsToList (
@@ -193,7 +197,7 @@ let
         else
           # Walk the type tree for ref auto-detect, type-registered codecs, and wrappers
           let
-            opt = meta.options.${name} or null;
+            opt = kindOptions.${name} or null;
           in
           if opt != null && opt ? type then
             mkTypeEncoder name opt.type
