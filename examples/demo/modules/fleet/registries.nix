@@ -7,12 +7,12 @@
 {
   lib,
   config,
-  schemaLib,
+  genSchema,
   genAlgebra,
   ...
 }:
 let
-  inherit (schemaLib) mkInstanceRegistry ref;
+  inherit (genSchema) mkInstanceRegistry ref;
   inherit (genAlgebra) either;
 
   # --- UID assignment helpers ---

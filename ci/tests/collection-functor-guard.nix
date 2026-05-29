@@ -1,10 +1,10 @@
 # __functor is reserved — declaring it as a collection key should throw.
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
   eval = lib.evalModules {
     modules = [
       {
-        options.schema = schemaLib.mkSchemaOption {
+        options.schema = genSchema.mkSchemaOption {
           collections.__functor = {
             default = { };
           };

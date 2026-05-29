@@ -1,10 +1,10 @@
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
   eval = lib.evalModules {
     modules = [
       {
-        options.schema = schemaLib.mkSchemaOption { };
-        options.hosts = schemaLib.mkInstanceRegistry eval.config.schema.host {
+        options.schema = genSchema.mkSchemaOption { };
+        options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host {
           extraModules = [
             {
               options.hashPrefix = lib.mkOption {

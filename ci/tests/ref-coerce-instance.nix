@@ -1,10 +1,10 @@
 {
   lib,
-  schemaLib,
+  genSchema,
   ...
 }:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry ref;
+  inherit (genSchema) mkSchemaOption mkInstanceRegistry ref;
 
   # Test both deferred and direct modes with instance-value coercion.
   eval = lib.evalModules {

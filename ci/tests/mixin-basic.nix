@@ -1,11 +1,11 @@
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
-  R = genLib.record;
+  R = genAlgebra.record;
   record = R;
   mixinLib = import ../../nix/lib/mixin.nix { inherit lib record; };
   inherit (mixinLib)

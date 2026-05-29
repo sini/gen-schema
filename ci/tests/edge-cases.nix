@@ -1,12 +1,12 @@
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry renderDocs;
-  inherit (genLib) mkRefType;
+  inherit (genSchema) mkSchemaOption mkInstanceRegistry renderDocs;
+  inherit (genAlgebra) mkRefType;
 
   # Empty schema — zero kinds
   emptyEval = lib.evalModules {

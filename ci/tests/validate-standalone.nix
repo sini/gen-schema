@@ -2,8 +2,8 @@
 # It operates independently of the registry pipeline.
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
@@ -12,11 +12,11 @@ let
   schemaEval = lib.evalModules {
     modules = [
       {
-        options.schema = schemaLib.mkSchemaOption { };
+        options.schema = genSchema.mkSchemaOption { };
         config.schema.host = {
           options.addr = lib.mkOption { type = lib.types.str; };
           validators = [
-            (genLib.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
+            (genAlgebra.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
           ];
         };
       }
@@ -24,7 +24,7 @@ let
   };
 
   # Create instances directly via mkInstanceType (no apply pipeline)
-  hostType = schemaLib.mkInstanceType schemaEval.config.schema.host { };
+  hostType = genSchema.mkInstanceType schemaEval.config.schema.host { };
   instanceEval = lib.evalModules {
     modules = [
       {
@@ -38,7 +38,7 @@ let
     ];
   };
 
-  result = schemaLib.validateInstances schemaEval.config.schema.host instanceEval.config.hosts;
+  result = genSchema.validateInstances schemaEval.config.schema.host instanceEval.config.hosts;
 in
 {
   flake.tests."validate-standalone".test-returns-either = {

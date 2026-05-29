@@ -1,6 +1,6 @@
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
   # Custom mkType that produces a simple attrset with a `modules` list
   # instead of the default deferredModule __functor wrapping.

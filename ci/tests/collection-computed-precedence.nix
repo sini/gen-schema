@@ -1,10 +1,10 @@
 # Computed fields override collections of the same name.
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
   eval = lib.evalModules {
     modules = [
       {
-        options.schema = schemaLib.mkSchemaOption {
+        options.schema = genSchema.mkSchemaOption {
           collections.isEntity = {
             default = false;
             merge = _: v: v;

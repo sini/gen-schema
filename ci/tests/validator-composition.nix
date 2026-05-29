@@ -1,25 +1,25 @@
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
   eval = lib.evalModules {
     modules = [
-      { options.schema = schemaLib.mkSchemaOption { }; }
+      { options.schema = genSchema.mkSchemaOption { }; }
       # Module A adds a validator
       {
         config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
         config.schema.host.validators = [
-          (genLib.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
+          (genAlgebra.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
         ];
       }
       # Module B adds another validator
       {
         config.schema.host.options.role = lib.mkOption { type = lib.types.str; };
         config.schema.host.validators = [
-          (genLib.mkValidator "valid-role" (
+          (genAlgebra.mkValidator "valid-role" (
             { role, ... }:
             lib.elem role [
               "web"

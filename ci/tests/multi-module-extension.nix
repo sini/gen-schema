@@ -1,6 +1,6 @@
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
-  inherit (schemaLib) mkSchemaOption;
+  inherit (genSchema) mkSchemaOption;
 
   # Three separate modules each extending schema.host with different options
   schemaEval = lib.evalModules {

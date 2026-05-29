@@ -2,11 +2,11 @@
 # _kindMeta and _strict are removed from schema root.
 {
   lib,
-  schemaLib,
+  genSchema,
   ...
 }:
 let
-  inherit (schemaLib) mkSchemaOption ref;
+  inherit (genSchema) mkSchemaOption ref;
 
   eval = lib.evalModules {
     modules = [

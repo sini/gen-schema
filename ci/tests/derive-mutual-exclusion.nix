@@ -1,7 +1,7 @@
-{ schemaLib, ... }:
+{ genSchema, ... }:
 let
   tryRegistry = builtins.tryEval (
-    schemaLib.mkInstanceRegistry
+    genSchema.mkInstanceRegistry
       {
         kind = "host";
         options = { };

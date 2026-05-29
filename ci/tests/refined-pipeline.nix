@@ -1,11 +1,11 @@
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
   schemaEval = lib.evalModules {
     modules = [

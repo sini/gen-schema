@@ -3,17 +3,17 @@
 # Plain validators (no __fields) always run regardless of kind options.
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
   validateLib = import ../../nix/lib/validate.nix {
     inherit lib;
-    genAlgebra = genLib;
+    genAlgebra = genAlgebra;
   };
   inherit (validateLib) mkFieldValidator filterValidators;
-  inherit (genLib) mkValidator;
+  inherit (genAlgebra) mkValidator;
 
   # A plain validator (no fields) — always runs
   plainValidator = mkValidator "always-run" (inst: inst ? name) "must have name";

@@ -1,7 +1,7 @@
 # Codec — type-registered codecs with automatic wrapper traversal.
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
-  inherit (schemaLib)
+  inherit (genSchema)
     mkSchemaOption
     mkInstanceRegistry
     mkCodec

@@ -1,5 +1,5 @@
 # Wiring: import gen-schema's flake-parts module.
-# This provides options.schema and _module.args.schemaLib.
+# This provides options.schema and _module.args.genSchema.
 { lib, inputs, ... }:
 {
   imports = [

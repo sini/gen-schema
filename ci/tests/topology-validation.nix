@@ -1,10 +1,10 @@
 {
   lib,
-  schemaLib,
+  genSchema,
   ...
 }:
 let
-  inherit (schemaLib) mkSchemaOption;
+  inherit (genSchema) mkSchemaOption;
 
   # Declaring parent = "nonexistent" should throw
   throwsOnUnknownParent =

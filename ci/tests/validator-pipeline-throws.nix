@@ -2,20 +2,20 @@
 # This tests the pipeline's default error path, not the standalone validateInstances API.
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
   eval = lib.evalModules {
     modules = [
       {
-        options.schema = schemaLib.mkSchemaOption { };
-        options.hosts = schemaLib.mkInstanceRegistry eval.config.schema.host { };
+        options.schema = genSchema.mkSchemaOption { };
+        options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           options.addr = lib.mkOption { type = lib.types.str; };
           validators = [
-            (genLib.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr required")
+            (genAlgebra.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr required")
           ];
         };
         config.hosts.bad.addr = "";

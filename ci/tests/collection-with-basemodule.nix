@@ -1,10 +1,10 @@
 # baseModule options coexist correctly with collection extraction.
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
   eval = lib.evalModules {
     modules = [
       {
-        options.schema = schemaLib.mkSchemaOption {
+        options.schema = genSchema.mkSchemaOption {
           baseModule.options.description = lib.mkOption {
             type = lib.types.str;
             default = "";
@@ -13,7 +13,7 @@ let
             default = [ ];
           };
         };
-        options.hosts = schemaLib.mkInstanceRegistry eval.config.schema.host { };
+        options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           tags = [
             "web"

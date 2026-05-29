@@ -1,4 +1,4 @@
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
   blameLib = import ../../nix/lib/blame.nix { inherit lib; };
   inherit (blameLib) blame isBlame collectBlame;

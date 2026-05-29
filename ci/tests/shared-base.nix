@@ -1,6 +1,6 @@
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
-  inherit (schemaLib) mkSchemaOption;
+  inherit (genSchema) mkSchemaOption;
 
   # mkSchemaOption with a baseModule that adds a description option
   schemaEval = lib.evalModules {

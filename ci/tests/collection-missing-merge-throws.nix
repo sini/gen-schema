@@ -1,6 +1,6 @@
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
-  inherit (schemaLib) mkSchemaOption;
+  inherit (genSchema) mkSchemaOption;
 
   result = builtins.tryEval (
     let

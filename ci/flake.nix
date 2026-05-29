@@ -9,8 +9,8 @@
     inputs@{ gen, nixpkgs, ... }:
     let
       inherit (nixpkgs) lib;
-      genLib = import "${inputs.gen-algebra}" { inherit lib; };
-      schemaLib = import ../nix/lib {
+      genAlgebra = import "${inputs.gen-algebra}" { inherit lib; };
+      genSchema = import ../nix/lib {
         inherit lib;
         inputs = {
           gen-algebra = inputs.gen-algebra { inherit lib; };
@@ -21,6 +21,6 @@
       inherit inputs;
       name = "gen-schema";
       testModules = ./tests;
-      specialArgs = { inherit schemaLib genLib; };
+      specialArgs = { inherit genSchema genAlgebra; };
     };
 }

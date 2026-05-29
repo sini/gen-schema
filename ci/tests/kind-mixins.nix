@@ -1,11 +1,11 @@
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
-  R = genLib.record;
+  R = genAlgebra.record;
   record = R;
   mixinLib = import ../../nix/lib/mixin.nix { inherit lib record; };
   refinedLib = import ../../nix/lib/refined.nix { inherit lib; };
@@ -15,7 +15,7 @@ let
   };
   inherit (mixinLib) mkMixin composeMixins applyMixin;
   inherit (bridgeLib) emitModule;
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
   # A mixin that adds a metrics_port option
   monitorable = mkMixin {
@@ -123,47 +123,47 @@ in
 
   # Export presence tests
   flake.tests.kind-mixins.test-exports-mkMixin = {
-    expr = schemaLib ? mkMixin;
+    expr = genSchema ? mkMixin;
     expected = true;
   };
 
   flake.tests.kind-mixins.test-exports-composeMixins = {
-    expr = schemaLib ? composeMixins;
+    expr = genSchema ? composeMixins;
     expected = true;
   };
 
   flake.tests.kind-mixins.test-exports-beta = {
-    expr = schemaLib ? beta;
+    expr = genSchema ? beta;
     expected = true;
   };
 
   flake.tests.kind-mixins.test-exports-applyMixin = {
-    expr = schemaLib ? applyMixin;
+    expr = genSchema ? applyMixin;
     expected = true;
   };
 
   flake.tests.kind-mixins.test-exports-blame = {
-    expr = schemaLib ? blame;
+    expr = genSchema ? blame;
     expected = true;
   };
 
   flake.tests.kind-mixins.test-exports-refined = {
-    expr = schemaLib ? refined;
+    expr = genSchema ? refined;
     expected = true;
   };
 
   flake.tests.kind-mixins.test-exports-emitModule = {
-    expr = schemaLib ? emitModule;
+    expr = genSchema ? emitModule;
     expected = true;
   };
 
   flake.tests.kind-mixins.test-exports-refinements = {
-    expr = schemaLib ? refinements;
+    expr = genSchema ? refinements;
     expected = true;
   };
 
   flake.tests.kind-mixins.test-exports-mkFieldValidator = {
-    expr = schemaLib ? mkFieldValidator;
+    expr = genSchema ? mkFieldValidator;
     expected = true;
   };
 }

@@ -7,11 +7,11 @@
 {
   lib,
   config,
-  schemaLib,
+  genSchema,
   ...
 }:
 let
-  inherit (schemaLib) schemaFn;
+  inherit (genSchema) schemaFn;
 in
 {
   config.schema.host.methods = {

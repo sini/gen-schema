@@ -1,10 +1,10 @@
 {
   lib,
-  schemaLib,
+  genSchema,
   ...
 }:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry ref;
+  inherit (genSchema) mkSchemaOption mkInstanceRegistry ref;
 
   # Missing refs binding should throw during evaluation.
   # We force evaluation of an instance to trigger the ref scan.

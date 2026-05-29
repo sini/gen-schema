@@ -1,15 +1,15 @@
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
   eval = lib.evalModules {
     modules = [
       {
-        options.schema = schemaLib.mkSchemaOption { };
-        options.hosts = schemaLib.mkInstanceRegistry eval.config.schema.host {
+        options.schema = genSchema.mkSchemaOption { };
+        options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host {
           extraModules = [
             {
               options.tag = lib.mkOption {
@@ -27,7 +27,7 @@ let
         config.schema.host = {
           options.addr = lib.mkOption { type = lib.types.str; };
           validators = [
-            (genLib.mkValidator "always-fail" (_: false) "always fails")
+            (genAlgebra.mkValidator "always-fail" (_: false) "always fails")
           ];
         };
         config.hosts.igloo.addr = "10.0.1.1";

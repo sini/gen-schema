@@ -1,10 +1,10 @@
 # Row-polymorphic validators (§ Leijen 2005 S3.1).
 # Validators with `fields` auto-skip for kinds missing those fields.
 # This validator fires only on kinds that have both "port" and "protocol".
-{ schemaLib, ... }:
+{ genSchema, ... }:
 {
   config.schema.service.validators = [
-    (schemaLib.mkFieldValidator {
+    (genSchema.mkFieldValidator {
       name = "https-port";
       fields = [
         "port"

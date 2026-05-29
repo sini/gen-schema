@@ -3,12 +3,12 @@
 # Mixins are stored in _module.args so registries and outputs can reference them.
 {
   lib,
-  schemaLib,
+  genSchema,
   genAlgebra,
   ...
 }:
 let
-  inherit (schemaLib) mkMixin beta composeMixins;
+  inherit (genSchema) mkMixin beta composeMixins;
   record = genAlgebra.pure.record;
 in
 {

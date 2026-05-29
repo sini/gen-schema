@@ -2,7 +2,7 @@
 {
   lib,
   config,
-  schemaLib,
+  genSchema,
   genAlgebra,
   demoMixins,
   ...
@@ -140,10 +140,10 @@ in
           };
 
           # Apply monitorable mixin: adds metricsPort, metricsPath
-          withMonitorable = schemaLib.applyMixin demoMixins.monitorable baseRecord "demo-kind";
+          withMonitorable = genSchema.applyMixin demoMixins.monitorable baseRecord "demo-kind";
 
           # Apply composed mixin (monitorable + beta(tlsBase))
-          withEnhanced = schemaLib.applyMixin demoMixins.enhanced baseRecord "demo-kind";
+          withEnhanced = genSchema.applyMixin demoMixins.enhanced baseRecord "demo-kind";
         in
         {
           # Mixin metadata
@@ -160,7 +160,7 @@ in
       # --- Codec (serialization) ---
       codecDemo =
         let
-          hostCodec = schemaLib.mkCodec config.schema.host {
+          hostCodec = genSchema.mkCodec config.schema.host {
             fields = {
               # Exclude metricsPort from serialization
               metricsPort = {
@@ -171,7 +171,7 @@ in
               };
             };
           };
-          serviceCodec = schemaLib.mkCodec config.schema.service { };
+          serviceCodec = genSchema.mkCodec config.schema.service { };
 
           # Encode a single instance
           encodedIgloo = hostCodec.encode fleet.hosts.igloo;
@@ -187,7 +187,7 @@ in
           encodedNginx = serviceCodec.encode fleet.services.nginx;
 
           # Type-registered codec with either dispatch
-          typeCodec = schemaLib.mkCodec config.schema.host {
+          typeCodec = genSchema.mkCodec config.schema.host {
             types = {
               unsignedInt16 = {
                 encode = v: "port:${toString v}";
@@ -221,8 +221,8 @@ in
       # --- Blame (structured field-level errors) ---
       blameDemo =
         let
-          portBlame = schemaLib.blame "port" "invalid port number";
-          addrBlame = schemaLib.blame "addr" "must be a valid IP address";
+          portBlame = genSchema.blame "port" "invalid port number";
+          addrBlame = genSchema.blame "addr" "must be a valid IP address";
         in
         {
           portField = portBlame.field;
@@ -233,6 +233,6 @@ in
     };
 
     # --- Documentation generation ---
-    docs = schemaLib.renderDocs config.schema;
+    docs = genSchema.renderDocs config.schema;
   };
 }

@@ -2,6 +2,6 @@
 let
   nixpkgs = import (builtins.getFlake "nixpkgs") { };
   inherit (nixpkgs) lib;
-  schemaLib = import ../nix/lib { inherit lib; };
+  genSchema = import ../nix/lib { inherit lib; };
 in
-{ inherit lib schemaLib; } // schemaLib
+{ inherit lib genSchema; } // genSchema

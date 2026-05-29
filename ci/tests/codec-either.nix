@@ -1,7 +1,7 @@
 # Codec either/oneOf dispatch — check-based branch selection, left-biased.
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry mkCodec;
+  inherit (genSchema) mkSchemaOption mkInstanceRegistry mkCodec;
 
   eval = lib.evalModules {
     modules = [

@@ -1,11 +1,11 @@
 # Kind-level strict: strict = false propagates to each kind result.
 {
   lib,
-  schemaLib,
+  genSchema,
   ...
 }:
 let
-  inherit (schemaLib) mkSchemaOption;
+  inherit (genSchema) mkSchemaOption;
 
   eval = lib.evalModules {
     modules = [

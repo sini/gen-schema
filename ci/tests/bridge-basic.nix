@@ -1,11 +1,11 @@
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
-  R = genLib.record;
+  R = genAlgebra.record;
   record = R;
   refinedLib = import ../../nix/lib/refined.nix { inherit lib; };
   bridgeLib = import ../../nix/lib/bridge.nix {

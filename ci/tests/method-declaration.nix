@@ -1,6 +1,6 @@
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
-  inherit (schemaLib) mkSchemaOption schemaFn;
+  inherit (genSchema) mkSchemaOption schemaFn;
 
   eval = lib.evalModules {
     modules = [

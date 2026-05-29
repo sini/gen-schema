@@ -1,9 +1,9 @@
 # Identity equality: instances with the same primitive values should produce
 # the same id_hash. Two references to the same instance should be equal
 # via id_hash even when structural == might diverge.
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
   eval = lib.evalModules {
     modules = [

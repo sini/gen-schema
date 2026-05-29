@@ -1,10 +1,10 @@
 {
   lib,
-  schemaLib,
+  genSchema,
   ...
 }:
 let
-  inherit (schemaLib)
+  inherit (genSchema)
     mkSchemaOption
     mkInstanceRegistry
     mkCodec

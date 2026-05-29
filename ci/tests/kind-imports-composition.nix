@@ -1,9 +1,9 @@
 # Kind-to-kind imports composition: the motivating case for moving
 # strict/identity to instance level. Multiple kinds importing a shared
 # base kind should not cause duplicate module conflicts when instantiated.
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
   eval = lib.evalModules {
     modules = [

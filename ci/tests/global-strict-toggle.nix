@@ -1,7 +1,7 @@
 # Strict toggle: strict = false on mkSchemaOption flows to instances via mkInstanceRegistry.
-{ lib, schemaLib, ... }:
+{ lib, genSchema, ... }:
 let
-  inherit (schemaLib) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
   eval = lib.evalModules {
     modules = [

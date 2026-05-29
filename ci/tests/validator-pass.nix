@@ -1,25 +1,25 @@
 {
   lib,
-  schemaLib,
-  genLib,
+  genSchema,
+  genAlgebra,
   ...
 }:
 let
   schemaEval = lib.evalModules {
     modules = [
       {
-        options.schema = schemaLib.mkSchemaOption { };
+        options.schema = genSchema.mkSchemaOption { };
         config.schema.host = {
           options.addr = lib.mkOption { type = lib.types.str; };
           options.role = lib.mkOption { type = lib.types.str; };
           validators = [
-            (genLib.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
+            (genAlgebra.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
           ];
         };
       }
     ];
   };
-  hostType = schemaLib.mkInstanceType schemaEval.config.schema.host { };
+  hostType = genSchema.mkInstanceType schemaEval.config.schema.host { };
   instanceEval = lib.evalModules {
     modules = [
       {
@@ -34,7 +34,7 @@ let
       }
     ];
   };
-  result = schemaLib.validateInstances schemaEval.config.schema.host instanceEval.config.hosts;
+  result = genSchema.validateInstances schemaEval.config.schema.host instanceEval.config.hosts;
 in
 {
   flake.tests."validator-pass".test-right-returned = {
