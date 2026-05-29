@@ -43,7 +43,7 @@ Kind definitions live in `modules/schema/` and are plain NixOS-style modules set
 ```
 flake.nix                         — flake-parts + import-tree + gen-schema inputs
 modules/
-  schema.nix                      — imports gen-schema flakeModule (provides schema option + schemaLib)
+  schema.nix                      — imports gen-schema flakeModule (provides schema option + genSchema)
   schema/
     host.nix                      — host kind: addr, system, role
     user.nix                      — user kind: userName, shell
@@ -208,16 +208,16 @@ Validators are cross-field constraints declared on schema kinds. They travel wit
 ```nix
 # modules/fleet/validation.nix
 config.schema.host.validators = [
-  (schemaLib.mkValidator "has-addr"
+  (genSchema.mkValidator "has-addr"
     ({ addr, ... }: addr != "")
     "host must have a non-empty addr")
-  (schemaLib.mkValidator "valid-role"
+  (genSchema.mkValidator "valid-role"
     ({ role, ... }: lib.elem role [ "web" "db" "worker" "lb" ])
     "role must be one of: web, db, worker, lb")
 ];
 
 config.schema.service.validators = [
-  (schemaLib.mkValidator "valid-port"
+  (genSchema.mkValidator "valid-port"
     ({ port, ... }: port > 0 && port < 65536)
     "port must be between 1 and 65535")
 ];

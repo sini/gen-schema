@@ -92,7 +92,7 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
     };
 
     # Create a registry and instances
-    options.hosts = schemaLib.mkInstanceRegistry config.schema.host {};
+    options.hosts = genSchema.mkInstanceRegistry config.schema.host {};
     hosts.igloo = { addr = "10.0.1.1"; role = "web"; };
     hosts.iceberg = { addr = "10.0.2.1"; };  # role defaults to "worker"
 
@@ -105,19 +105,19 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
 }
 ```
 
-The flake-parts module provides `schema` and `schemaLib` with default settings (`strict = true`, no `baseModule`). For custom `strict`, `baseModule`, `collections`, or `computed` settings, use the programmatic API instead.
+The flake-parts module provides `schema` and `genSchema` with default settings (`strict = true`, no `baseModule`). For custom `strict`, `baseModule`, `collections`, or `computed` settings, use the programmatic API instead.
 
 ### Programmatic use
 
 ```nix
 # Without flake-parts — call the library directly
 let
-  schemaLib = gen-schema.lib;
-  # or: schemaLib = import ./path/to/gen-schema/nix/lib { inherit lib; };
+  genSchema = gen-schema.lib;
+  # or: genSchema = import ./path/to/gen-schema/nix/lib { inherit lib; };
 in
 lib.evalModules {
   modules = [{
-    options.schema = schemaLib.mkSchemaOption {};
+    options.schema = genSchema.mkSchemaOption {};
     config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
   }];
 }
@@ -127,9 +127,9 @@ lib.evalModules {
 
 ```nix
 let
-  schemaLib = import ./path/to/gen-schema/nix/lib { inherit lib; };
+  genSchema = import ./path/to/gen-schema/nix/lib { inherit lib; };
 in
-# use schemaLib.mkSchemaOption, schemaLib.mkInstanceRegistry, etc.
+# use genSchema.mkSchemaOption, genSchema.mkInstanceRegistry, etc.
 ```
 
 ## Use Cases
@@ -173,10 +173,10 @@ config.schema.service = {
 };
 
 # Services can reference each other (direct ref — registry in scope)
-options.services = schemaLib.mkInstanceRegistry config.schema.service {
+options.services = genSchema.mkInstanceRegistry config.schema.service {
   extraModules = [({ ... }: {
     options.upstream = lib.mkOption {
-      type = lib.types.nullOr (schemaLib.ref config.services);
+      type = lib.types.nullOr (genSchema.ref config.services);
       default = null;
       description = "Upstream service this proxies to";
     };
@@ -210,9 +210,9 @@ config.schema.service = {
 
 # Deployments reference their namespace (deferred ref on kind + binding)
 config.schema.deployment.options.namespace = lib.mkOption {
-  type = schemaLib.ref "namespace";
+  type = genSchema.ref "namespace";
 };
-options.deployments = schemaLib.mkInstanceRegistry config.schema.deployment {
+options.deployments = genSchema.mkInstanceRegistry config.schema.deployment {
   refs.namespace = config.namespaces;
 };
 
@@ -231,7 +231,7 @@ config.deployments.api.namespace.labels.env  # → "prod"
 
 ```nix
 # Shared base for all entity types
-options.schema = schemaLib.mkSchemaOption {
+options.schema = genSchema.mkSchemaOption {
   baseModule.options.tags = lib.mkOption {
     type = lib.types.listOf lib.types.str;
     default = [];
@@ -241,7 +241,7 @@ options.schema = schemaLib.mkSchemaOption {
 config.schema.host = {
   options.ip = lib.mkOption { type = lib.types.str; };
   options.os = lib.mkOption { type = lib.types.str; default = "nixos"; };
-  methods.sshCmd = schemaLib.schemaFn
+  methods.sshCmd = genSchema.schemaFn
     "SSH command for this host"
     lib.types.str
     ({ name, ip, ... }: "ssh root@${ip} # ${name}");
@@ -254,12 +254,12 @@ config.schema.network = {
 
 # Hosts reference their network (deferred ref)
 config.schema.host.options.network = lib.mkOption {
-  type = schemaLib.ref "network";
+  type = genSchema.ref "network";
 };
-options.hosts = schemaLib.mkInstanceRegistry config.schema.host {
+options.hosts = genSchema.mkInstanceRegistry config.schema.host {
   refs.network = config.networks;
 };
-options.networks = schemaLib.mkInstanceRegistry config.schema.network {};
+options.networks = genSchema.mkInstanceRegistry config.schema.network {};
 
 config.networks.lan = { cidr = "10.0.1.0/24"; gateway = "10.0.1.1"; };
 config.hosts.nas = {
@@ -312,7 +312,7 @@ Both contributions merge cleanly. Neither module needs to know about the other.
 A module injected into every kind automatically. Use it for options shared across all kinds without manual `imports`:
 
 ```nix
-options.schema = schemaLib.mkSchemaOption {
+options.schema = genSchema.mkSchemaOption {
   baseModule = {
     options.description = lib.mkOption {
       type = lib.types.str;
@@ -363,7 +363,7 @@ config.schema.host._module.freeformType = lib.types.attrsOf lib.types.anything;
 Or globally:
 
 ```nix
-options.schema = schemaLib.mkSchemaOption { strict = false; };
+options.schema = genSchema.mkSchemaOption { strict = false; };
 ```
 
 ### Instances
@@ -371,7 +371,7 @@ options.schema = schemaLib.mkSchemaOption { strict = false; };
 **Instances** are concrete values of a kind. Create them with `mkInstanceRegistry`:
 
 ```nix
-options.fleet.hosts = schemaLib.mkInstanceRegistry config.schema.host {};
+options.fleet.hosts = genSchema.mkInstanceRegistry config.schema.host {};
 
 config.fleet.hosts.igloo = {
   addr = "10.0.1.1";
@@ -400,11 +400,11 @@ Registries can nest inside instances via `extraModules`. This establishes parent
 # Capture the top-level schema before entering extraModules closures
 let schema = config.schema;
 in {
-  options.fleet.hosts = schemaLib.mkInstanceRegistry schema.host {
+  options.fleet.hosts = genSchema.mkInstanceRegistry schema.host {
     extraModules = [({ config, ... }:
       let hostConfig = config;  # capture the host instance's config
       in {
-        options.users = schemaLib.mkInstanceRegistry schema.user {
+        options.users = genSchema.mkInstanceRegistry schema.user {
           extraModules = [
             # Inject parent host into child user's module args
             ({ ... }: { config._module.args.host = hostConfig; })
@@ -435,10 +435,10 @@ Individual registries can override the schema-level strict setting:
 
 ```nix
 # Schema is strict by default
-options.schema = schemaLib.mkSchemaOption { strict = true; };
+options.schema = genSchema.mkSchemaOption { strict = true; };
 
 # But this specific registry allows freeform
-options.fleet.configs = schemaLib.mkInstanceRegistry config.schema.config {
+options.fleet.configs = genSchema.mkInstanceRegistry config.schema.config {
   strict = false;
 };
 ```
@@ -495,11 +495,11 @@ _identity.keys: 'tags' on kind 'host' is not a primitive type (str/int/bool)
 ```nix
 # Kind declares referential intent
 config.schema.service.options.host = lib.mkOption {
-  type = schemaLib.ref "host";
+  type = genSchema.ref "host";
 };
 
 # Registry binds the ref to a concrete registry
-options.fleet.services = schemaLib.mkInstanceRegistry config.schema.service {
+options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
   refs.host = config.fleet.hosts;
 };
 ```
@@ -507,10 +507,10 @@ options.fleet.services = schemaLib.mkInstanceRegistry config.schema.service {
 **Direct ref** — resolve immediately when the registry is in scope:
 
 ```nix
-options.fleet.services = schemaLib.mkInstanceRegistry config.schema.service {
+options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
   extraModules = [({ ... }: {
     options.upstream = lib.mkOption {
-      type = lib.types.nullOr (schemaLib.ref config.fleet.services);
+      type = lib.types.nullOr (genSchema.ref config.fleet.services);
       default = null;
     };
   })];
@@ -539,7 +539,7 @@ ref field 'host' on kind 'service': reference 'nonexistent' not found in instanc
 
 ```nix
 config.schema.service.options.replicas = lib.mkOption {
-  type = lib.types.listOf (schemaLib.ref "host");
+  type = lib.types.listOf (genSchema.ref "host");
   default = [];
 };
 
@@ -548,7 +548,7 @@ config.fleet.services.nginx.replicas = [ "igloo" "iceberg" ];
 config.fleet.services.nginx.replicas = [ config.fleet.hosts.igloo "iceberg" ];
 
 # Nullable and nested wrappers:
-type = lib.types.nullOr (lib.types.listOf (schemaLib.ref "host"));
+type = lib.types.nullOr (lib.types.listOf (genSchema.ref "host"));
 ```
 
 ### Custom Ref Coercion
@@ -556,7 +556,7 @@ type = lib.types.nullOr (lib.types.listOf (schemaLib.ref "host"));
 For domain-specific resolution, pass an extended binding with a `coerce` function:
 
 ```nix
-options.fleet.services = schemaLib.mkInstanceRegistry config.schema.service {
+options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
   refs.host = {
     instances = config.fleet.hosts;
     coerce = default: val:
@@ -575,7 +575,7 @@ When a registry's ref field points back to itself (e.g., a trait's `needs` refer
 Set `deferred = true` to defer coercion to the `applyPipeline` (after all instances are evaluated). The coerce hook receives the raw materialized instances as its first argument, breaking the cycle:
 
 ```nix
-options.traits = schemaLib.mkInstanceRegistry config.schema.trait {
+options.traits = genSchema.mkInstanceRegistry config.schema.trait {
   refs.needs = {
     instances = config.traits;
     deferred = true;
@@ -597,7 +597,7 @@ Deferred coerce runs before validators in `applyPipeline`, so validators see res
 
 ```nix
 config.schema.group.options.members = lib.mkOption {
-  type = schemaLib.setOf (schemaLib.ref "host");
+  type = genSchema.setOf (genSchema.ref "host");
   default = [];
 };
 
@@ -700,7 +700,7 @@ config.schema.deploy-user = {
 `schemaFn` declares functions on entity instances. Named arguments are automatically resolved from the instance's config:
 
 ```nix
-config.schema.host.methods.describe = schemaLib.schemaFn
+config.schema.host.methods.describe = genSchema.schemaFn
   "Human-readable summary"
   lib.types.str
   ({ name, role, addr, ... }: "${name} (${role}) at ${addr}");
@@ -714,7 +714,7 @@ Methods can close over values from the declaring module's scope:
 ```nix
 # hasService captures config.fleet.services from the module;
 # name comes from the host instance's config
-config.schema.host.methods.hasService = schemaLib.schemaFn
+config.schema.host.methods.hasService = genSchema.schemaFn
   "Check if a service targets this host"
   (lib.types.functionTo lib.types.bool)
   ({ name, ... }:
@@ -731,12 +731,12 @@ Methods compose across modules — multiple modules can each add methods to the 
 
 ```nix
 # Module A
-config.schema.host.methods.ping = schemaLib.schemaFn
+config.schema.host.methods.ping = genSchema.schemaFn
   "Ping command" lib.types.str
   ({ addr, ... }: "ping ${addr}");
 
 # Module B (separate file, separate flake input — doesn't matter)
-config.schema.host.methods.ssh = schemaLib.schemaFn
+config.schema.host.methods.ssh = genSchema.schemaFn
   "SSH command" lib.types.str
   ({ name, ... }: "ssh ${name}");
 
@@ -760,7 +760,7 @@ Methods must be declared via inline attrsets, not path modules. This is a constr
 Declare custom collection fields on kinds — data extracted from definitions before module merge and exposed on the merged result:
 
 ```nix
-options.schema = schemaLib.mkSchemaOption {
+options.schema = genSchema.mkSchemaOption {
   collections = {
     includes = { default = []; };           # list → merged via ++
     excludes = { default = []; };           # list → merged via ++
@@ -809,7 +809,7 @@ config.schema.host.includes = [ policy-b policy-c ];
 Derived values computed from collection content and raw definitions:
 
 ```nix
-options.schema = schemaLib.mkSchemaOption {
+options.schema = genSchema.mkSchemaOption {
   collections = {
     includes = { default = []; };
     excludes = { default = []; };
@@ -885,7 +885,7 @@ schema validation failed:
 For standalone validation without throwing, use `validateInstances`:
 
 ```nix
-result = schemaLib.validateInstances config.schema.host config.fleet.hosts;
+result = genSchema.validateInstances config.schema.host config.fleet.hosts;
 # → { right = instances; } or { left = [ { name; validator; message; } ]; }
 ```
 
@@ -896,7 +896,7 @@ result = schemaLib.validateInstances config.schema.host config.fleet.hosts;
 **Plain derive** — attrset in, attrset out:
 
 ```nix
-options.fleet.users = schemaLib.mkInstanceRegistry config.schema.user {
+options.fleet.users = genSchema.mkInstanceRegistry config.schema.user {
   derive = users:
     let uids = assignIds { min = 1000; max = 60000; } users;
     in lib.mapAttrs (name: _: { uid = uids.${name}; }) users;
@@ -913,7 +913,7 @@ Derive can read `id_hash` and all instance config — it runs after full module 
 **`deriveEither`** — returns Either with configurable error handling:
 
 ```nix
-options.fleet.services = schemaLib.mkInstanceRegistry config.schema.service {
+options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
   deriveEither = {
     derive = services: someEitherPipeline services;
     onError = left: lib.warn "enrichment failed" {};  # optional, default throws
@@ -930,7 +930,7 @@ Validator errors flow through the same `onError` handler — a custom `onError` 
 `renderDocs` produces markdown reference from schema metadata:
 
 ```nix
-schemaLib.renderDocs config.schema
+genSchema.renderDocs config.schema
 ```
 
 Outputs a table per kind with option name, type, default, and description — including extensions from composition and methods.
@@ -940,7 +940,7 @@ Outputs a table per kind with option name, type, default, and description — in
 `mkCodec` creates a standalone codec for serializing/deserializing kind instances. The codec is format-agnostic at its core, with a pluggable format layer and built-in JSON convenience.
 
 ```nix
-codec = schemaLib.mkCodec config.schema.host {
+codec = genSchema.mkCodec config.schema.host {
   # Optional: per-field overrides
   fields = {
     secret = { exclude = true; };
@@ -1309,7 +1309,7 @@ mkSchemaEntryType {
 ### `_internal`
 
 ```nix
-schemaLib._internal.mkMethodsModule   # methods option/config wiring
+genSchema._internal.mkMethodsModule   # methods option/config wiring
 ```
 
 Not part of the public API contract. Available for testing and advanced use.
@@ -1350,7 +1350,7 @@ nix/lib/
   mixin.nix          — mkMixin, composeMixins, beta, applyMixin (§ Bracha 1990)
   bridge.nix         — emitModule (record-algebra → NixOS module bridge, § Cardelli 1997)
   docs.nix           — renderDocs (markdown generation)
-nix/flakeModule.nix  — flake-parts integration (provides schema option + schemaLib)
+nix/flakeModule.nix  — flake-parts integration (provides schema option + genSchema)
 ```
 
 Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), validators (`mkValidator`, `runValidators`), and cross-instance references (`mkRefType`) are provided by [gen-algebra](https://github.com/sini/gen-algebra) and consumed internally.
