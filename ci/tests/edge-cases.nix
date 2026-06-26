@@ -6,7 +6,7 @@
 }:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry renderDocs;
-  inherit (genAlgebra) mkRefType;
+  inherit (genSchema) ref;
 
   # Empty schema — zero kinds
   emptyEval = lib.evalModules {
@@ -38,7 +38,7 @@ let
   };
   docs = renderDocs docsEval.config.schema;
 
-  # mkRefType with two modules setting same ref to different values
+  # ref with two modules setting same ref to different values
   refConflictEval = lib.evalModules {
     modules = [
       {
@@ -50,7 +50,7 @@ let
               { ... }:
               {
                 options.host = lib.mkOption {
-                  type = mkRefType refConflictEval.config.hosts;
+                  type = ref refConflictEval.config.hosts;
                 };
               }
             )

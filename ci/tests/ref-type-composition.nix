@@ -6,7 +6,7 @@
 }:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
-  inherit (genAlgebra) mkRefType;
+  inherit (genSchema) ref;
 
   # Two separate modules: one defines hosts, another defines services with refs
   eval = lib.evalModules {
@@ -33,7 +33,7 @@ let
               { ... }:
               {
                 options.host = lib.mkOption {
-                  type = mkRefType eval.config.hosts;
+                  type = ref eval.config.hosts;
                 };
               }
             )

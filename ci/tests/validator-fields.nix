@@ -13,7 +13,7 @@ let
     genAlgebra = genAlgebra;
   };
   inherit (validateLib) mkFieldValidator filterValidators;
-  inherit (genAlgebra) mkValidator;
+  inherit (genSchema) mkValidator;
 
   # A plain validator (no fields) — always runs
   plainValidator = mkValidator "always-run" (inst: inst ? name) "must have name";

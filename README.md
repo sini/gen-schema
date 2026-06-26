@@ -1140,13 +1140,25 @@ schemaFn description type fn
 
 Declares a method on a kind. `fn` receives an attrset of config values matching its named arguments. Declare via `schema.<kind>.methods.<name> = schemaFn ...`.
 
-### `mkValidator` (from gen-algebra)
+### `mkValidator` / `runValidators` / `formatErrors` / `defaultOnError`
 
 ```nix
-gen.mkValidator name pred message
+genSchema.mkValidator name pred message              # → { name; pred; message; }
+genSchema.runValidators kind validators instances    # → { right = instances; } | { left = [failure]; }
+genSchema.formatErrors failures                      # → human-readable string
+genSchema.defaultOnError left                        # throws with formatted errors
 ```
 
-Creates a validator record. `pred` receives the instance config and returns bool. Declare via `schema.<kind>.validators = [ (gen.mkValidator ...) ]`. Provided by [gen-algebra](https://github.com/sini/gen-algebra), not gen-schema.
+The base validator constructors, **gen-schema-owned** (relocated from [gen-algebra](https://github.com/sini/gen-algebra) on 2026-06-26). `mkValidator`'s `pred` receives the instance config and returns bool; declare via `schema.<kind>.validators = [ (genSchema.mkValidator ...) ]`. `runValidators` evaluates them across a registry into an Either; `validateInstances` (below) is the kind-driven wrapper most consumers use.
+
+### `mkIdentityModule` / `mkStrictModule`
+
+```nix
+genSchema.mkIdentityModule kind   # NixOS module: injects id_hash + _identity.keys
+genSchema.mkStrictModule kind     # NixOS module: rejects undeclared keys (closed-world)
+```
+
+The module-system constructors `mkInstanceType` injects into every instance (relocated from gen-algebra on 2026-06-26). `mkIdentityModule` derives a content-addressed `id_hash` by reflecting over a kind's primitive options (str/int/bool); `_identity.keys` pins the identifying fields explicitly. `mkStrictModule` sets a freeform type that throws on any key not declared as an option.
 
 ### `validateInstances`
 
@@ -1339,12 +1351,14 @@ Cross-instance refs        _topology, _edges, _roots, _leaves
 
 ```
 nix/lib/
-  default.nix       — public API surface, wiring (imports gen-algebra for primitives)
+  default.nix       — public API surface, wiring (imports gen-algebra's pure record algebra)
   entry-type.nix     — mkSchemaEntryType, mkSchemaOption (collection extraction, introspection, topology)
   instance.nix       — mkInstanceType, mkInstanceRegistry (strict + identity injection, refs)
+  identity.nix       — mkIdentityModule (content-addressed id_hash via primitive-option reflection)
+  strict.nix         — mkStrictModule (closed-world freeform rejection)
   ref.nix            — schema.ref (dual-mode cross-instance references, getRefKind)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)
-  validate.nix       — validateInstances, mkFieldValidator, filterValidators (schema-specific validation)
+  validate.nix       — mkValidator, runValidators, formatErrors, defaultOnError (base) + validateInstances, mkFieldValidator, filterValidators (schema-specific)
   refined.nix        — schema.types.refined (refinement contracts, § Findler 2002 / § Rondon 2008)
   blame.nix          — schema.blame (field-level error attribution)
   mixin.nix          — mkMixin, composeMixins, beta, applyMixin (§ Bracha 1990)
@@ -1353,7 +1367,7 @@ nix/lib/
 nix/flakeModule.nix  — flake-parts integration (provides schema option + genSchema)
 ```
 
-Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), validators (`mkValidator`, `runValidators`), and cross-instance references (`mkRefType`) are provided by [gen-algebra](https://github.com/sini/gen-algebra) and consumed internally.
+Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), and validators (`mkValidator`, `runValidators`, `formatErrors`, `defaultOnError`) are **gen-schema-owned** module-system constructors — they relocated here from [gen-algebra](https://github.com/sini/gen-algebra) on 2026-06-26 (which is now fully pure). They are exported on the public API and consumed internally by `instance.nix`. Cross-instance references use `schema.ref` (see [`ref.nix`](nix/lib/ref.nix)); the older `mkRefType` was retired in favor of `ref`'s direct mode, which is a behavioral superset. gen-schema imports only gen-algebra's pure `record` algebra.
 
 ## Demo
 
@@ -1367,7 +1381,7 @@ nix eval --override-input gen-schema ../.. .#docs --raw
 
 ## Testing
 
-337 tests via nix-unit in `ci/`:
+379 tests via nix-unit in `ci/`:
 
 ```bash
 cd ci

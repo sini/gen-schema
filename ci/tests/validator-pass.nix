@@ -13,7 +13,7 @@ let
           options.addr = lib.mkOption { type = lib.types.str; };
           options.role = lib.mkOption { type = lib.types.str; };
           validators = [
-            (genAlgebra.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
+            (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
           ];
         };
       }

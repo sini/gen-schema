@@ -14,7 +14,9 @@ let
   record = genAlgebra.pure.record;
 
   methods = import ./methods.nix { inherit lib; };
-  validate = import ./validate.nix { inherit lib genAlgebra; };
+  validate = import ./validate.nix { inherit lib; };
+  identityLib = import ./identity.nix { inherit lib; };
+  strictLib = import ./strict.nix { inherit lib; };
   refinedLib = import ./refined.nix { inherit lib; };
   blameLib = import ./blame.nix { inherit lib; };
   mixinLib = import ./mixin.nix { inherit lib record; };
@@ -33,21 +35,28 @@ let
   };
   instance = import ./instance.nix {
     inherit lib;
-    inherit (genAlgebra)
-      mkStrictModule
-      mkIdentityModule
+    inherit (strictLib) mkStrictModule;
+    inherit (identityLib) mkIdentityModule;
+    inherit (validate)
       runValidators
       defaultOnError
+      filterValidators
       ;
     inherit (refLib) dedupByHash;
-    inherit (validate) filterValidators;
   };
   docs = import ./docs.nix { inherit lib; };
   codecLib = import ./codec.nix { inherit lib; };
 in
 {
-  # gen-schema's own exports + validator constructor from gen-algebra
-  inherit (genAlgebra) mkValidator;
+  # Module-system constructors (gen-schema-owned; relocated from gen-algebra).
+  inherit (identityLib) mkIdentityModule;
+  inherit (strictLib) mkStrictModule;
+  inherit (validate)
+    mkValidator
+    runValidators
+    formatErrors
+    defaultOnError
+    ;
   inherit (methods) schemaFn;
   inherit (entryType) mkSchemaOption mkSchemaEntryType;
   inherit (instance) mkInstanceType mkInstanceRegistry;

@@ -12,14 +12,14 @@ let
       {
         config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
         config.schema.host.validators = [
-          (genAlgebra.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
+          (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
         ];
       }
       # Module B adds another validator
       {
         config.schema.host.options.role = lib.mkOption { type = lib.types.str; };
         config.schema.host.validators = [
-          (genAlgebra.mkValidator "valid-role" (
+          (genSchema.mkValidator "valid-role" (
             { role, ... }:
             lib.elem role [
               "web"

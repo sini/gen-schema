@@ -16,7 +16,7 @@ let
         config.schema.host = {
           options.addr = lib.mkOption { type = lib.types.str; };
           validators = [
-            (genAlgebra.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
+            (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
           ];
         };
       }
