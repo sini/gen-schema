@@ -9,7 +9,7 @@
 }:
 let
   inherit (genSchema) mkMixin beta composeMixins;
-  record = genAlgebra.pure.record;
+  record = genAlgebra.lib.record;
 in
 {
   config._module.args.demoMixins = rec {

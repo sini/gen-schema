@@ -11,7 +11,7 @@ let
     sha256 = locked.narHash;
   };
   genAlgebra = inputs.gen-algebra or (import genSrc { inherit lib; });
-  record = genAlgebra.pure.record;
+  record = genAlgebra.lib.record;
 
   methods = import ./methods.nix { inherit lib; };
   validate = import ./validate.nix { inherit lib; };

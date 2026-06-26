@@ -150,11 +150,11 @@
     },
     "gen-algebra_4": {
       "locked": {
-        "lastModified": 1782515611,
-        "narHash": "sha256-zrWtTihpJNyMf3DWSKWctpyZ0MH/T9M3WB5nWkj88PA=",
+        "lastModified": 1782516337,
+        "narHash": "sha256-gB6QSZFHPocN+c94ALQNWfXyrLZbo5UrxK36geMNlk4=",
         "owner": "sini",
         "repo": "gen-algebra",
-        "rev": "c9082e70f4ddaa061f5e25d7c261d6deadc4ebf5",
+        "rev": "a36f93bb3ce7495829e7a3f391a877aa26ad2809",
         "type": "github"
       },
       "original": {
