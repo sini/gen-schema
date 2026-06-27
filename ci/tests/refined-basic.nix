@@ -5,7 +5,7 @@
   ...
 }:
 let
-  refinedLib = import ../../nix/lib/refined.nix { inherit lib; };
+  refinedLib = import ../../lib/refined.nix { inherit lib; };
   inherit (refinedLib)
     types
     isRefined

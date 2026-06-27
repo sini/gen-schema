@@ -8,7 +8,7 @@
   ...
 }:
 let
-  validateLib = import ../../nix/lib/validate.nix {
+  validateLib = import ../../lib/validate.nix {
     inherit lib;
     genAlgebra = genAlgebra;
   };

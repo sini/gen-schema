@@ -6,7 +6,7 @@
     inputs.gen-schema.flakeModules.default
   ];
   config._module.args = {
-    genAlgebra = inputs.gen-algebra { inherit lib; };
+    genAlgebra = inputs.gen-algebra.lib;
     inherit inputs;
   };
 }

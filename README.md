@@ -113,7 +113,7 @@ The flake-parts module provides `schema` and `genSchema` with default settings (
 # Without flake-parts — call the library directly
 let
   genSchema = gen-schema.lib;
-  # or: genSchema = import ./path/to/gen-schema/nix/lib { inherit lib; };
+  # or (standalone, no flake): genSchema = import ./path/to/gen-schema { inherit lib; };
 in
 lib.evalModules {
   modules = [{
@@ -127,7 +127,8 @@ lib.evalModules {
 
 ```nix
 let
-  genSchema = import ./path/to/gen-schema/nix/lib { inherit lib; };
+  # the root default.nix pins gen-algebra from gen-schema's own flake.lock
+  genSchema = import ./path/to/gen-schema { inherit lib; };
 in
 # use genSchema.mkSchemaOption, genSchema.mkInstanceRegistry, etc.
 ```
@@ -1350,7 +1351,7 @@ Cross-instance refs        _topology, _edges, _roots, _leaves
 ### File Layout
 
 ```
-nix/lib/
+lib/
   default.nix       — public API surface, wiring (imports gen-algebra's pure record algebra)
   entry-type.nix     — mkSchemaEntryType, mkSchemaOption (collection extraction, introspection, topology)
   instance.nix       — mkInstanceType, mkInstanceRegistry (strict + identity injection, refs)
@@ -1364,10 +1365,10 @@ nix/lib/
   mixin.nix          — mkMixin, composeMixins, beta, applyMixin (§ Bracha 1990)
   bridge.nix         — emitModule (record-algebra → NixOS module bridge, § Cardelli 1997)
   docs.nix           — renderDocs (markdown generation)
-nix/flakeModule.nix  — flake-parts integration (provides schema option + genSchema)
+flakeModule.nix      — flake-parts integration (provides schema option + genSchema)
 ```
 
-Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), and validators (`mkValidator`, `runValidators`, `formatErrors`, `defaultOnError`) are **gen-schema-owned** module-system constructors — they relocated here from [gen-algebra](https://github.com/sini/gen-algebra) on 2026-06-26 (which is now fully pure). They are exported on the public API and consumed internally by `instance.nix`. Cross-instance references use `schema.ref` (see [`ref.nix`](nix/lib/ref.nix)); the older `mkRefType` was retired in favor of `ref`'s direct mode, which is a behavioral superset. gen-schema imports only gen-algebra's pure `record` algebra.
+Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), and validators (`mkValidator`, `runValidators`, `formatErrors`, `defaultOnError`) are **gen-schema-owned** module-system constructors — they relocated here from [gen-algebra](https://github.com/sini/gen-algebra) on 2026-06-26 (which is now fully pure). They are exported on the public API and consumed internally by `instance.nix`. Cross-instance references use `schema.ref` (see [`ref.nix`](lib/ref.nix)); the older `mkRefType` was retired in favor of `ref`'s direct mode, which is a behavioral superset. gen-schema imports only gen-algebra's pure `record` algebra.
 
 ## Demo
 

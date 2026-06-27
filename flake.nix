@@ -3,17 +3,16 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    gen-algebra.url = "github:sini/gen-algebra";
   };
 
   outputs =
-    { nixpkgs, ... }:
-    let
-      schemaLib = import ./nix/lib {
-        lib = nixpkgs.lib;
-      };
-    in
+    { nixpkgs, gen-algebra, ... }:
     {
-      lib = schemaLib;
-      flakeModules.default = ./nix/flakeModule.nix;
+      lib = import ./lib {
+        lib = nixpkgs.lib;
+        algebra = gen-algebra.lib;
+      };
+      flakeModules.default = ./flakeModule.nix;
     };
 }

@@ -9,7 +9,7 @@
 }:
 let
   inherit (config) fleet;
-  record = genAlgebra.lib.record;
+  record = genAlgebra.record;
 in
 {
   flake = {

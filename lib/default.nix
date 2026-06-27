@@ -1,17 +1,9 @@
 {
-  inputs ? { },
   lib,
+  algebra,
 }:
 let
-  # No-flakes import: resolve gen-algebra from CI template's flake.lock
-  lock = builtins.fromJSON (builtins.readFile ../../ci/flake.lock);
-  inherit (lock.nodes.gen-algebra) locked;
-  genSrc = builtins.fetchTarball {
-    url = "https://github.com/${locked.owner}/${locked.repo}/archive/${locked.rev}.zip";
-    sha256 = locked.narHash;
-  };
-  genAlgebra = inputs.gen-algebra or (import genSrc { inherit lib; });
-  record = genAlgebra.lib.record;
+  record = algebra.record;
 
   methods = import ./methods.nix { inherit lib; };
   validate = import ./validate.nix { inherit lib; };

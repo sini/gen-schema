@@ -9,12 +9,11 @@
     inputs@{ gen, nixpkgs, ... }:
     let
       inherit (nixpkgs) lib;
+      # Flat set (gen-algebra root default ignores its arg and returns `import ./lib`).
       genAlgebra = import "${inputs.gen-algebra}" { inherit lib; };
-      genSchema = import ../nix/lib {
+      genSchema = import ../lib {
         inherit lib;
-        inputs = {
-          gen-algebra = inputs.gen-algebra { inherit lib; };
-        };
+        algebra = inputs.gen-algebra.lib;
       };
     in
     gen.lib.mkCi {
