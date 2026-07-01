@@ -10,8 +10,7 @@
 let
   # Dual-source (sound, content-addressed): option types use the *consumer's*
   # lib, but `algebra` is pinned from this repo's own flake.lock so the module
-  # value stays in lockstep with `.lib`'s API. See convention spec
-  # gen-specs/2026-06-26-gen-lib-root-convention.md.
+  # value stays in lockstep with `.lib`'s API (per the gen root-file convention).
   lock = builtins.fromJSON (builtins.readFile ./flake.lock);
   algebra = import "${builtins.fetchTree lock.nodes.gen-algebra.locked}/lib";
   genSchema = import ./lib { inherit lib algebra; };
