@@ -65,8 +65,10 @@ modules/
 ## Running
 
 ```bash
-# Evaluate the fleet summary (from gen-schema repo root):
-cd templates/demo
+# Evaluate the fleet summary (from this example directory):
+cd examples/demo
+nix eval .#fleet
+# or, to test against a local gen-schema checkout:
 nix eval --override-input gen-schema ../.. .#fleet
 
 # Expected output:
@@ -182,7 +184,7 @@ Methods compose across modules — multiple modules can each add methods to the 
 `renderDocs` produces markdown reference documentation from schema metadata. It reflects on all kinds and their options — including extensions from composition and methods:
 
 ```bash
-nix eval --override-input gen-schema ../.. .#docs --raw
+nix eval .#docs --raw
 ```
 
 ```markdown
@@ -194,7 +196,7 @@ nix eval --override-input gen-schema ../.. .#docs --raw
 | describe | str | — | Human-readable summary of this host. |
 | hasService | functionTo | — | Check whether a named service targets this host. |
 | metricsPort | int | 9100 | Port exposing Prometheus metrics. |
-| monitored | bool | 1 | Whether this host is scraped by the monitoring stack. |
+| monitored | bool | true | Whether this host is scraped by the monitoring stack. |
 | role | str | — | Host role (web, db, worker, ...). |
 | system | str | — | Target system architecture. |
 ```

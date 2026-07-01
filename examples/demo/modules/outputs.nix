@@ -186,15 +186,17 @@ in
           # Service codec: ref fields auto-encode to name strings
           encodedNginx = serviceCodec.encode fleet.services.nginx;
 
-          # Type-registered codec with either dispatch
+          # Type-registered codec: register an encoder keyed by type name.
+          # The int encoder fires on every field whose type is `int` — here
+          # the host's metricsPort (contributed by the monitoring plugin).
           typeCodec = genSchema.mkCodec config.schema.host {
             types = {
-              unsignedInt16 = {
+              int = {
                 encode = v: "port:${toString v}";
               };
             };
           };
-          typeEncodedPort = (typeCodec.encode fleet.hosts.igloo).port;
+          typeEncodedPort = (typeCodec.encode fleet.hosts.igloo).metricsPort;
         in
         {
           # Basic encode strips internals (name, id_hash, methods)
