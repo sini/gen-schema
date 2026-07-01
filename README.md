@@ -1,4 +1,4 @@
-# gen-schema
+# gen-schema — typed record registry for Nix
 
 [![CI](https://github.com/sini/gen-schema/actions/workflows/ci.yml/badge.svg)](https://github.com/sini/gen-schema/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github)](https://github.com/sponsors/sini)
 
@@ -6,9 +6,12 @@ A typed record registry for Nix with extension points, strict validation, refine
 
 gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions that any module can extend, strict-by-default validation that catches typos immediately, refinement contracts co-located with type declarations, stable identity comparison via `id_hash`, cross-registry references that resolve to instances, reusable mixins with structural compatibility, and auto-generated documentation from your schema.
 
+**Dependency class: nixpkgs-lib-tethered.** gen-schema is the tier of the gen ecosystem that keeps a `nixpkgs.lib` dependency on purpose — it is built on `lib.types` and `lib.evalModules` (the NixOS module system) and takes `lib` as an argument. Its only gen dependency is [gen-algebra](https://github.com/sini/gen-algebra)'s pure `record` algebra. The module-system constructors it exports (identity hashing, strict rejection, validators) are **gen-schema-owned** — they relocated here from gen-algebra on 2026-06-26, leaving gen-algebra fully pure.
+
 ## Table of Contents
 
 - [Terminology](#terminology)
+- [Overview](#overview)
 - [Gen Ecosystem](#gen-ecosystem)
 - [Quick Start](#quick-start)
 - [Use Cases](#use-cases)
@@ -39,10 +42,10 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
   - [Derive Hooks](#derive-hooks)
   - [Documentation Generation](#documentation-generation)
   - [Codec (Serialization)](#codec-serialization)
-  - [Refinement Contracts](#schematypesrefined)
-  - [Blame](#schemablame)
-  - [Field Validators](#schemamkfieldvalidator)
-  - [Mixins](#schemamkmixin)
+  - [Refinement Contracts](#refined)
+  - [Blame](#blame)
+  - [Field Validators](#mkfieldvalidator)
+  - [Mixins](#mkmixin)
 - [API Reference](#api-reference)
 - [Architecture](#architecture)
 - [Demo](#demo)
@@ -59,13 +62,32 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
 | Refs | Cross-registry references between kinds (deferred or direct) |
 | Edges | Parent (P) nesting and ref (I) import relationships, exposed via `_edges` introspection |
 
+## Overview
+
+The mental model has two layers. A **kind** is a schema-level type — a deferred NixOS module declaring `options`, `config` defaults, `methods`, and `collections`. Kinds are open: any module (including one from a downstream flake input) can extend a kind by contributing more `config.schema.<name>` fragments, which merge through the module system. An **instance** is a concrete value of a kind, materialized through a **registry** (`mkInstanceRegistry`) that stamps each instance with a `name`, a stable `id_hash`, strict-key rejection, and any bound cross-instance references.
+
+The authoring surface is small — most schemas are built from these constructors:
+
+| Constructor | Role |
+|-------------|------|
+| `mkSchemaOption` | Declares the `schema` option (holds all kinds; carries `strict`, `baseModule`, `collections`, `computed` settings) |
+| `mkInstanceRegistry` | Turns a kind into an `attrsOf` registry of instances, with `refs`, `derive`, and validator pipeline |
+| `mkInstanceType` | The single-instance submodule type (identity + strict injected), used by registries |
+| `ref` / `setOf` / `toSet` | Cross-instance references (deferred or direct) and identity-deduplicated collections |
+| `schemaFn` | Declarative methods on a kind, with named args auto-resolved from instance config |
+| `mkValidator` / `mkFieldValidator` | Cross-field constraints that travel with a kind and fire on every registry |
+| `refined` / `blame` / `mkMixin` | Refinement contracts, blame records, and first-class mixin fragments |
+| `mkCodec` / `renderDocs` | Serialization round-trips and markdown reference generation |
+
+Everything above the instance layer is pure schema — no validation or hashing happens at the kind level, which is what lets kinds compose via `imports` without duplicate-module conflicts. Instances are where the infrastructure (strict rejection, `id_hash`, ref binding, derive) is injected. Registries expose flat `_`-prefixed introspection (`_kindNames`, `_topology`, `_edges`, `_roots`, `_leaves`) that consumers read to build whatever graph format their evaluator needs.
+
 ## Gen Ecosystem
 
 | Library | Role |
 |---------|------|
 | [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base (builtins re-exports + vendored lib utils) |
 | [gen-algebra](https://github.com/sini/gen-algebra) | Pure primitives (record, search monad, either, intensional identity) |
-| [gen-schema](https://github.com/sini/gen-schema) | Typed registries (kinds, instances, collections, refs) |
+| [gen-schema](https://github.com/sini/gen-schema) | **This lib** — Typed registries (kinds, instances, collections, refs) |
 | [gen-aspects](https://github.com/sini/gen-aspects) | Aspect type system (traits, classification, dispatch) |
 | [gen-scope](https://github.com/sini/gen-scope) | HOAG scope-graph evaluator (demand-driven, \_eval memoization, circular attributes) |
 | [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph query combinators (traversal, condensation, phaseOrder) |
@@ -1214,14 +1236,16 @@ mkCodec kindValue {
 
 Returns a codec record with `encode`/`decode` (attrset ↔ attrset), format-parameterized `serialize`/`deserialize`, and curried `json.*` convenience. See [Codec (Serialization)](#codec-serialization) for full usage.
 
-### `schema.types.refined`
+> The refinement, blame, and mixin constructors below are exported **flat** off the library value — `genSchema.refined`, `genSchema.refinements`, `genSchema.blame`, `genSchema.mkMixin`, etc. There is no `genSchema.types` namespace; `refined` is a bare function (it lives at `refinedLib.types.refined` internally but is re-exported flat).
+
+### `refined`
 
 Refinement contracts co-located with type declarations (§ Findler 2002, § Rondon 2008). Predicates validate during `applyPipeline` (strict by default).
 
 ```nix
 # Single refinement
 port = mkOption {
-  type = schema.types.refined lib.types.int {
+  type = genSchema.refined lib.types.int {
     check = self: self > 0 && self < 65536;
     message = "must be valid TCP port";
   };
@@ -1229,14 +1253,14 @@ port = mkOption {
 
 # Composed refinements (all must pass)
 port = mkOption {
-  type = schema.types.refined lib.types.int [
+  type = genSchema.refined lib.types.int [
     { check = self: self > 0; message = "must be positive"; }
     { check = self: self < 65536; message = "must be < 65536"; }
   ];
 };
 
 # Reusable
-port = mkOption { type = schema.types.refined lib.types.int schema.refinements.tcpPort; };
+port = mkOption { type = genSchema.refined lib.types.int genSchema.refinements.tcpPort; };
 ```
 
 Set `lazy = true` on a refinement to defer validation to access time via `builtins.addErrorContext` (§ Chitil 2012):
@@ -1245,25 +1269,25 @@ Set `lazy = true` on a refinement to defer validation to access time via `builti
 { check = self: self > 0; message = "must be positive"; lazy = true; }
 ```
 
-### `schema.refinements.*`
+### `refinements`
 
-Built-in reusable refinements: `tcpPort`, `nonEmpty`, `positive`. Use with `schema.types.refined` to avoid repeating common predicates.
+Built-in reusable refinements: `tcpPort`, `nonEmpty`, `positive`. Use with `genSchema.refined` to avoid repeating common predicates.
 
-### `schema.blame`
+### `blame`
 
 Field-level error attribution for structured contract violations (§ Findler 2002).
 
 ```nix
-schema.blame "fieldName" "error message"
+genSchema.blame "fieldName" "error message"
 # → { __blame = true; field = "fieldName"; message = "error message"; }
 ```
 
-### `schema.mkMixin`
+### `mkMixin`
 
 First-class reusable schema fragments with structural compatibility (§ Bracha 1990). `define` receives a record-algebra record and returns a plain attrset.
 
 ```nix
-monitorable = schema.mkMixin {
+monitorable = genSchema.mkMixin {
   requires = [ "port" "hostname" ];
   provides = [ "metrics_port" ];
   # kinds = [ "service" ];  # optional kind constraint
@@ -1273,26 +1297,26 @@ monitorable = schema.mkMixin {
 };
 ```
 
-### `schema.composeMixins`
+### `composeMixins`
 
 Compose multiple mixins into one. Requires propagation: earlier mixins' `provides` satisfy later mixins' `requires`.
 
 ```nix
-enhanced = schema.composeMixins [ monitorable loggable healthcheck ];
+enhanced = genSchema.composeMixins [ monitorable loggable healthcheck ];
 
 # Mixed direction: beta mixin is overridden by what came before
-combined = schema.composeMixins [
+combined = genSchema.composeMixins [
   monitorable
-  (schema.beta tlsBase)  # Beta: existing fields win over tlsBase's
+  (genSchema.beta tlsBase)  # Beta: existing fields win over tlsBase's
   loggable
 ];
 ```
 
-### `schema.beta`
+### `beta`
 
 Annotates a mixin for Beta direction (§ Bracha 1990) — parent controls, meaning existing fields take precedence over the mixin's contributions.
 
-### `schema.applyMixin`
+### `applyMixin`
 
 ```nix
 applyMixin mixin kindRecord kindName
@@ -1300,12 +1324,12 @@ applyMixin mixin kindRecord kindName
 
 Applies a single mixin to a record-algebra record. Validates structural compatibility (`requires`) and optional kind constraint (`kinds`). Respects Smalltalk/Beta direction.
 
-### `schema.emitModule`
+### `emitModule`
 
 Bridges record-algebra records to NixOS modules (§ Cardelli 1997). Strips refinement metadata from types. Extracts collections with full shadow stacks.
 
 ```nix
-emitted = schema.emitModule [ "validators" "methods" ] recordAlgebraRecord;
+emitted = genSchema.emitModule [ "validators" "methods" ] recordAlgebraRecord;
 # → { module = <NixOS module>; collections = { ... }; refinements = { ... }; }
 ```
 
@@ -1364,8 +1388,8 @@ lib/
   ref.nix            — schema.ref (dual-mode cross-instance references, getRefKind)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)
   validate.nix       — mkValidator, runValidators, formatErrors, defaultOnError (base) + validateInstances, mkFieldValidator, filterValidators (schema-specific)
-  refined.nix        — schema.types.refined (refinement contracts, § Findler 2002 / § Rondon 2008)
-  blame.nix          — schema.blame (field-level error attribution)
+  refined.nix        — refined (refinement contracts, § Findler 2002 / § Rondon 2008)
+  blame.nix          — blame (field-level error attribution)
   mixin.nix          — mkMixin, composeMixins, beta, applyMixin (§ Bracha 1990)
   bridge.nix         — emitModule (record-algebra → NixOS module bridge, § Cardelli 1997)
   docs.nix           — renderDocs (markdown generation)
@@ -1386,13 +1410,23 @@ nix eval --override-input gen-schema ../.. .#docs --raw
 
 ## Testing
 
-379 tests via nix-unit in `ci/`:
+397 tests via nix-unit across 100 suites in `ci/tests/` — covering kinds, extension, strict validation, instances, identity hashing, cross-instance refs (deferred/direct/self-referential coerce, `listOf`/`setOf`/`nullOr` wrappers), collections and computed fields, methods, mixins, refinement contracts, blame, validators, derive hooks, codec round-trips, topology/edges introspection, and docs generation.
+
+Run the itemized suite (from `ci/`):
 
 ```bash
 cd ci
-nix develop --override-input gen-schema ../.. -c nix-unit \
-  --override-input gen-schema ../.. --flake .#.tests
+nix-unit --flake .#tests
 ```
+
+Or build the aggregated check derivation:
+
+```bash
+cd ci
+nix flake check
+```
+
+gen-schema is nixpkgs-lib-tethered by design, so there is no purity suite asserting nixpkgs-lib-freeness (unlike the Class A/B gen libraries); the tethering is intentional — it is built directly on `lib.types` and `lib.evalModules`.
 
 ## Theoretical Foundations
 
@@ -1405,7 +1439,7 @@ gen-schema draws on seven papers. Four are directly implemented in the codebase;
 | Refinement contracts with blame tracking | § Findler & Felleisen -- *Contracts for Higher-Order Functions* (ICFP 2002) | `refined.nix`: predicate contracts co-located with NixOS type declarations; `blame.nix`: field-level error attribution with `{ field, message }` blame records; `instance.nix`: strict contract checking in `applyPipeline` |
 | Lazy contracts with deferred validation | § Chitil -- *Practical Typed Lazy Contracts* (ICFP 2012) | `instance.nix`: `lazy = true` refinements wrap values with `builtins.addErrorContext`, deferring validation to access time -- matching Chitil's partial-identity semantics where unevaluated parts never trigger violations |
 | Mixin composition | § Bracha & Cook -- *Mixin-Based Inheritance* (OOPSLA 1990) | `mixin.nix`: `mkMixin`/`composeMixins` implement Bracha's `M1 * M2 = fun(i) M1(M2(i) + i) + M2(i)` formula; `beta` reverses direction so parent controls; `applyMixin` validates structural requires |
-| Refinement types | § Rondon, Kawaguchi & Jhala -- *Liquid Types* (PLDI 2008) | `refined.nix`: `schema.types.refined` attaches predicate refinements to base NixOS types via `__schema` metadata, following Rondon's model of `{v:B \| e}` base refinements co-located with type declarations |
+| Refinement types | § Rondon, Kawaguchi & Jhala -- *Liquid Types* (PLDI 2008) | `refined.nix`: `refined` attaches predicate refinements to base NixOS types via `__schema` metadata, following Rondon's model of `{v:B \| e}` base refinements co-located with type declarations |
 
 ### Informed by
 
