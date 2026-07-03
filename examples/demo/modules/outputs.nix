@@ -1,15 +1,25 @@
 # Expose fleet data as flake outputs for demonstration.
+#
+# READER side of the gen-flake value-injection split. The gen module tree is composed PURELY by
+# gen-flake (`gen.tree = ./gen-modules`), which injects the resolved config VALUES as the `genValues`
+# module arg into every flake module. This reader consumes those injected values — NOT a flake-parts
+# `fleet`/`schema` OPTION tree — so no gen TYPE ever enters the flake-parts options tree (the
+# `substSubModules`/`getSubOptions` throw the old `options.schema = mkSchemaOption {}` embed caused).
+#
+# `genSchema`/`genAlgebra` are the gen libraries (provided as flake-parts `_module.args` in flake.nix);
+# they are used here only to RENDER over the injected values (renderDocs/mkCodec/blame) and to exercise
+# the mixin API — reading `.type.name` etc. as inert data, never re-embedding a gen type as an option.
 {
   lib,
-  config,
+  genValues,
   genSchema,
   genAlgebra,
-  demoMixins,
   ...
 }:
 let
-  inherit (config) fleet;
+  inherit (genValues) fleet schema;
   record = genAlgebra.record;
+  demoMixins = import ./demo-mixins.nix { inherit lib genSchema genAlgebra; };
 in
 {
   flake = {
@@ -76,9 +86,9 @@ in
       hashesDiffer = fleet.admins.root.id_hash != fleet.users.tux.id_hash;
 
       # --- Introspection ---
-      inherit (config.schema) _kindNames;
-      hostOptionCount = builtins.length (builtins.attrNames config.schema.host.options);
-      adminOptionCount = builtins.length (builtins.attrNames config.schema.admin-user.options);
+      inherit (schema) _kindNames;
+      hostOptionCount = builtins.length (builtins.attrNames schema.host.options);
+      adminOptionCount = builtins.length (builtins.attrNames schema.admin-user.options);
 
       # --- Derive hooks ---
       # Deterministic UIDs from id_hash (auto-assigned)
@@ -112,16 +122,16 @@ in
       # --- Row-polymorphic validators (§ Leijen 2005) ---
       # The https-port validator fires only on kinds with both "port" and "protocol".
       # It silently skips kinds (host, user, network) that lack those fields.
-      serviceValidatorCount = builtins.length config.schema.service.validators;
+      serviceValidatorCount = builtins.length schema.service.validators;
 
       # --- Topology introspection ---
-      topologyHost = config.schema._topology.host;
-      topologyNetwork = config.schema._topology.network;
-      networkOptionCount = builtins.length (builtins.attrNames config.schema.network.options);
-      networkHasNoParent = config.schema._topology.network.parent == null;
-      edgeCount = builtins.length config.schema._edges;
-      schemaRoots = config.schema._roots;
-      schemaLeaves = config.schema._leaves;
+      topologyHost = schema._topology.host;
+      topologyNetwork = schema._topology.network;
+      networkOptionCount = builtins.length (builtins.attrNames schema.network.options);
+      networkHasNoParent = schema._topology.network.parent == null;
+      edgeCount = builtins.length schema._edges;
+      schemaRoots = schema._roots;
+      schemaLeaves = schema._leaves;
 
       # --- First-class mixins (§ Bracha 1990) ---
       # Exercise mixin primitives directly on record-algebra records.
@@ -160,7 +170,7 @@ in
       # --- Codec (serialization) ---
       codecDemo =
         let
-          hostCodec = genSchema.mkCodec config.schema.host {
+          hostCodec = genSchema.mkCodec schema.host {
             fields = {
               # Exclude metricsPort from serialization
               metricsPort = {
@@ -171,7 +181,7 @@ in
               };
             };
           };
-          serviceCodec = genSchema.mkCodec config.schema.service { };
+          serviceCodec = genSchema.mkCodec schema.service { };
 
           # Encode a single instance
           encodedIgloo = hostCodec.encode fleet.hosts.igloo;
@@ -189,7 +199,7 @@ in
           # Type-registered codec: register an encoder keyed by type name.
           # The int encoder fires on every field whose type is `int` — here
           # the host's metricsPort (contributed by the monitoring plugin).
-          typeCodec = genSchema.mkCodec config.schema.host {
+          typeCodec = genSchema.mkCodec schema.host {
             types = {
               int = {
                 encode = v: "port:${toString v}";
@@ -235,6 +245,6 @@ in
     };
 
     # --- Documentation generation ---
-    docs = genSchema.renderDocs config.schema;
+    docs = genSchema.renderDocs schema;
   };
 }

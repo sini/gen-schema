@@ -1,6 +1,8 @@
 # gen-schema Fleet Demo
 
-A minimal fleet management example using gen-schema as a standalone typed record registry. Demonstrates how to define entity kinds, create instance registries, enforce strict validation, and wire cross-instance references — all through flake-parts modules with import-tree.
+A minimal fleet management example using gen-schema as a standalone typed record registry. Demonstrates how to define entity kinds, create instance registries, enforce strict validation, and wire cross-instance references.
+
+The gen definition tree (`gen-modules/`) is composed **purely** by [gen-flake](https://github.com/sini/gen-flake) — gen-merge's byte-mode `evalModuleTree`, not flake-parts' nixpkgs `lib.evalModules`. gen-flake injects the resolved config **values** into the flake-parts eval as the `genValues` module arg; the reader (`modules/outputs.nix`) renders over those values. No gen *type* ever enters the flake-parts options tree — the value-injection invariant that lets a gen schema coexist with flake-parts.
 
 ## What This Showcases
 
@@ -12,64 +14,76 @@ Each kind is a named record type with declared options. Undeclared keys error im
 - **user** — accounts (`userName`, `shell`)
 - **service** — services running on hosts (`port`, `protocol`, `healthPath`, `host` ref)
 
-Kind definitions live in `modules/schema/` and are plain NixOS-style modules setting `config.schema.<kind>`. Multiple modules can extend the same kind — their options merge through deferred module merge.
+Kind definitions live in `gen-modules/schema/` and are plain modules setting `config.schema.<kind>`. Multiple modules can extend the same kind — their options merge through deferred module merge.
 
 ### Instance Registries
 
-`mkInstanceRegistry` creates a typed `attrsOf` option for each kind. Instances are validated against the kind's merged schema. Registries are declared in `modules/fleet/registries.nix`, instances in `modules/fleet/{hosts,users,services}.nix`.
+`mkInstanceRegistry` creates a typed `attrsOf` option for each kind. Instances are validated against the kind's merged schema. Registries are declared in `gen-modules/fleet/registries.nix`, instances in `gen-modules/fleet/{hosts,users,services}.nix`.
 
 ### Features Exercised
 
 | Feature | Where | What to look for |
 |---|---|---|
-| Strict validation | `modules/schema/host.nix` | Try adding `fleet.hosts.igloo.badKey = "x";` — errors with fix guidance |
-| Default propagation | `modules/schema/host.nix` | `system = mkDefault "x86_64-linux"` — igloo inherits it, iceberg overrides |
+| Strict validation | `gen-modules/schema/host.nix` | Try adding `fleet.hosts.igloo.badKey = "x";` — errors with fix guidance |
+| Default propagation | `gen-modules/schema/host.nix` | `system = mkDefault "x86_64-linux"` — igloo inherits it, iceberg overrides |
 | Identity hashing | `modules/outputs.nix` | `iglooHash` — deterministic SHA-256 from primitive options + kind prefix |
-| Cross-instance refs | `modules/fleet/registries.nix` | `ref` on service's `host` option |
-| Ref resolution | `modules/fleet/services.nix` | `host = "igloo"` resolves to the full host instance |
-| Schema composition | `modules/schema/monitoring-plugin.nix` | Extends host + service kinds from a separate module — merges cleanly |
-| Kind mix-ins | `modules/schema/admin-user.nix` | Imports user kind — inherits userName, shell, adds sudoPrivileges, sshKeys |
-| Declarative methods | `modules/fleet/methods.nix` | `hasService` closes over services registry; `describe` resolves all args from config |
-| Schema validators | `modules/fleet/validation.nix` | Host addr/role + service port validators declared on kinds, fire automatically |
-| Derive hooks | `modules/fleet/registries.nix` | Plain `derive` assigns deterministic UIDs from `id_hash` |
-| Either pipeline | `modules/fleet/registries.nix` | `deriveEither` with gen-algebra's either computes service endpoints |
-| Doc generation | `modules/outputs.nix` | `renderDocs` produces markdown tables from schema metadata |
-| Introspection | `modules/outputs.nix` | `_kindNames`, per-kind `.options`/`.refs` for programmatic schema access |
-| flake-parts integration | `modules/schema.nix` | Single import of `gen-schema.flakeModules.default` |
-| import-tree | `flake.nix` | `inputs.import-tree ./modules` auto-imports all module files |
+| Cross-instance refs | `gen-modules/fleet/registries.nix` | `ref` on service's `host` option |
+| Ref resolution | `gen-modules/fleet/services.nix` | `host = "igloo"` resolves to the full host instance |
+| Schema composition | `gen-modules/schema/monitoring-plugin.nix` | Extends host + service kinds from a separate module — merges cleanly |
+| Kind mix-ins | `gen-modules/schema/admin-user.nix` | Imports user kind — inherits userName, shell, adds sudoPrivileges, sshKeys |
+| Declarative methods | `gen-modules/fleet/methods.nix` | `hasService` closes over services registry; `describe` resolves all args from config |
+| Schema validators | `gen-modules/fleet/validation.nix` | Host addr/role + service port validators declared on kinds, fire automatically |
+| Derive hooks | `gen-modules/fleet/registries.nix` | Plain `derive` assigns deterministic UIDs from `id_hash` |
+| Either pipeline | `gen-modules/fleet/registries.nix` | `deriveEither` with gen-algebra's either computes service endpoints |
+| Doc generation | `modules/outputs.nix` | `renderDocs genValues.schema` produces markdown tables from the injected schema metadata |
+| Introspection | `modules/outputs.nix` | `_kindNames`, per-kind `.options`/`.refs` read off `genValues.schema` |
+| gen-flake value-injection | `flake.nix` | `imports = [ gen-flake.flakeModules.default ]; gen.tree = ./gen-modules;` — pure compose + `genValues` injection |
+| Reader over injected values | `modules/outputs.nix` | `{ genValues, ... }:` reads `genValues.fleet.*` / `genValues.schema` — no gen type in the flake-parts options tree |
 
 ## Layout
 
 ```
-flake.nix                         — flake-parts + import-tree + gen-schema inputs
-modules/
-  schema.nix                      — imports gen-schema flakeModule (provides schema option + genSchema)
+flake.nix                         — flake-parts + gen-flake + gen-schema/gen-algebra inputs;
+                                    gen.tree = ./gen-modules, gen.specialArgs = { lib; genAlgebra; }
+gen-modules/                      — the gen definition tree, composed PURELY by gen-flake (evalModuleTree)
+  schema.nix                      — options.schema = genSchema.mkSchemaOption {} (the typed surface, pure)
   schema/
     host.nix                      — host kind: addr, system, role
     user.nix                      — user kind: userName, shell
     service.nix                   — service kind: port, protocol
     admin-user.nix                — kind mix-in: imports user, adds sudoPrivileges + sshKeys
     monitoring-plugin.nix         — composition: extends host + service from a separate module
+    field-validators.nix          — row-polymorphic https-port validator
+    group.nix, network.nix        — group + network kinds
   fleet/
     registries.nix                — mkInstanceRegistry with derive hooks + either endpoint derivation
     hosts.nix                     — host instances: igloo (web), iceberg (db)
-    users.nix                     — user instances: tux, yeti
+    users.nix                     — user instances: tux, yeti, service-account
     admins.nix                    — admin-user instances: root, deploy (inherit user fields)
-    services.nix                  — service instances: nginx → igloo, postgres → iceberg
+    services.nix                  — service instances: nginx → igloo, postgres → iceberg, gateway
+    networks.nix, groups.nix      — network + group instances
     methods.nix                   — declarative methods: hasService, describe
     derived.nix                   — uid option on user kind (for derive hook)
     validation.nix                — schema validators: host addr/role, service port
-  outputs.nix                     — exposes fleet summary, derived UIDs, endpoints, docs
+modules/                          — the flake-parts (reader) side; NOT composed into the gen tree
+  outputs.nix                     — { genValues, ... }: reads genValues.fleet/.schema → fleet summary,
+                                    derived UIDs, endpoints, renderDocs, codec/mixin/blame demos
+  demo-mixins.nix                 — reader-side mixin definitions (pure lib construction) for the mixin demo
 ```
 
 ## Running
 
 ```bash
-# Evaluate the fleet summary (from this example directory):
+# Evaluate the fleet summary (from this example directory). While gen-flake is consumed via a local
+# path pin, pass --allow-dirty-locks:
 cd examples/demo
-nix eval .#fleet
-# or, to test against a local gen-schema checkout:
-nix eval --override-input gen-schema ../.. .#fleet
+nix eval .#fleet --allow-dirty-locks
+
+# Render the generated schema docs:
+nix eval .#docs --raw --allow-dirty-locks
+
+# Full evaluation (systems + outputs) — proves no gen type enters the flake-parts options tree:
+nix flake check --allow-dirty-locks
 
 # Expected output:
 # {
@@ -351,32 +365,32 @@ gen-schema doesn't replace the module system — it's a pattern library on top o
 
 ## Extending
 
-Add a new kind by creating a file in `modules/schema/`:
+Add a new kind by creating a file in `gen-modules/schema/`:
 
 ```nix
-# modules/schema/network.nix
+# gen-modules/schema/router.nix
 { lib, ... }:
 {
-  config.schema.network = {
+  config.schema.router = {
     options.cidr = lib.mkOption { type = lib.types.str; };
     options.gateway = lib.mkOption { type = lib.types.str; };
   };
 }
 ```
 
-Add a registry in `modules/fleet/registries.nix`:
+Add a registry in `gen-modules/fleet/registries.nix`:
 
 ```nix
-options.fleet.networks = mkInstanceRegistry config.schema "network" {};
+options.fleet.routers = mkInstanceRegistry config.schema.router {};
 ```
 
-Add instances in a new file `modules/fleet/networks.nix`:
+Add instances in a new file `gen-modules/fleet/routers.nix`:
 
 ```nix
 { ... }:
 {
-  fleet.networks.lan = { cidr = "10.0.1.0/24"; gateway = "10.0.1.1"; };
+  fleet.routers.lan = { cidr = "10.0.1.0/24"; gateway = "10.0.1.1"; };
 }
 ```
 
-import-tree picks up the new file automatically — no manual wiring needed.
+gen-flake's tree loader picks up the new file under `gen-modules/` automatically, composes it purely, and the resolved instances cross to the reader via `genValues` — no manual wiring needed.
