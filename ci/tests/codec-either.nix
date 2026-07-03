@@ -1,34 +1,42 @@
 # Codec either/oneOf dispatch — check-based branch selection, left-biased.
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry mkCodec;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         options.items = mkInstanceRegistry eval.config.schema.item { };
         config.schema.item = {
           # either str int — distinguishable by isString / isInt
-          options.value = lib.mkOption {
-            type = lib.types.either lib.types.str lib.types.int;
+          options.value = genMerge.mkOption {
+            type = genMerge.types.either genMerge.types.str genMerge.types.int;
           };
           # nullOr (either str int)
-          options.optValue = lib.mkOption {
-            type = lib.types.nullOr (lib.types.either lib.types.str lib.types.int);
+          options.optValue = genMerge.mkOption {
+            type = genMerge.types.nullOr (genMerge.types.either genMerge.types.str genMerge.types.int);
             default = null;
           };
           # oneOf [ str int bool ] — desugars to nested either
-          options.flexible = lib.mkOption {
-            type = lib.types.oneOf [
-              lib.types.str
-              lib.types.int
-              lib.types.bool
+          options.flexible = genMerge.mkOption {
+            type = genMerge.types.oneOf [
+              genMerge.types.str
+              genMerge.types.int
+              genMerge.types.bool
             ];
           };
-          # either (listOf int) str — wrappers inside branches
-          options.mixed = lib.mkOption {
-            type = lib.types.either (lib.types.listOf lib.types.int) lib.types.str;
+          # either str (listOf int) — wrappers inside branches.
+          # NB: gen-merge's `either` dispatches on the FIRST branch whose check is
+          # definitive; a bare `listOf` has no discriminating check, so the total-check
+          # branch (str) must come first. This preserves the same expected values.
+          options.mixed = genMerge.mkOption {
+            type = genMerge.types.either genMerge.types.str (genMerge.types.listOf genMerge.types.int);
           };
         };
         config.items.strItem = {

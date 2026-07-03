@@ -1,9 +1,14 @@
 # Path-based kind declarations skip collection extraction (isAttrs check).
 # Collections on path defs are not extracted — the kind should still work,
 # getting the collection default value.
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = genSchema.mkSchemaOption {

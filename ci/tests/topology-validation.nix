@@ -1,6 +1,7 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
@@ -11,16 +12,16 @@ let
     let
       result = builtins.tryEval (
         let
-          eval = lib.evalModules {
+          eval = genMerge.evalModuleTree {
             modules = [
               {
                 options.schema = mkSchemaOption { };
                 config.schema.host = {
-                  options.addr = lib.mkOption { type = lib.types.str; };
+                  options.addr = genMerge.mkOption { type = genMerge.types.str; };
                 };
                 config.schema.user = {
                   parent = "nonexistent";
-                  options.shell = lib.mkOption { type = lib.types.str; };
+                  options.shell = genMerge.mkOption { type = genMerge.types.str; };
                 };
               }
             ];

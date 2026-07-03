@@ -1,6 +1,7 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
@@ -11,7 +12,7 @@ let
     schemaFn
     ;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption {
@@ -21,13 +22,13 @@ let
         };
         options.hosts = mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
-          options.role = lib.mkOption {
-            type = lib.types.str;
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+          options.role = genMerge.mkOption {
+            type = genMerge.types.str;
             default = "worker";
           };
           tags = [ "server" ];
-          methods.label = schemaFn "Label" lib.types.str ({ name, addr, ... }: "${name}:${addr}");
+          methods.label = schemaFn "Label" genMerge.types.str ({ name, addr, ... }: "${name}:${addr}");
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";

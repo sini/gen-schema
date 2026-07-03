@@ -4,25 +4,25 @@
 # Direct:   schema.ref config.fleet.hosts → resolved immediately
 #
 # Both modes accept string keys ("igloo") or instance values (config.fleet.hosts.igloo).
-{ lib }:
+{ prelude, merge }:
 let
   # Resolved ref type with string/instance coercion.
   mkCoercingRefType =
     instances:
-    lib.mkOptionType {
+    merge.mkOptionType {
       name = "ref";
       description = "reference to an instance (key or value)";
       check = v: builtins.isString v || builtins.isAttrs v;
       merge =
         loc: defs:
         let
-          val = lib.mergeOneOption loc defs;
+          val = merge.mergeOneOption loc defs;
         in
         if builtins.isString val then
           if instances ? ${val} then
             instances.${val}
           else
-            throw "${lib.showOption loc}: reference '${val}' not found in instance registry"
+            throw "${merge.showOption loc}: reference '${val}' not found in instance registry"
         else
           val;
     };
@@ -32,11 +32,11 @@ let
   # mkInstanceRegistry detects .refKind and injects apply-based resolution.
   mkDeferredRef =
     kindName:
-    lib.mkOptionType {
+    merge.mkOptionType {
       name = "ref(${kindName})";
       description = "reference to a ${kindName} instance";
       check = v: builtins.isString v || builtins.isAttrs v;
-      merge = loc: defs: lib.mergeOneOption loc defs;
+      merge = loc: defs: merge.mergeOneOption loc defs;
     }
     // {
       refKind = kindName;
@@ -60,7 +60,7 @@ let
   dedupByHash =
     vals:
     let
-      indexed = lib.imap0 (
+      indexed = prelude.imap0 (
         i: v:
         if builtins.isAttrs v && v ? id_hash then
           {
@@ -71,7 +71,7 @@ let
           throw "gen-schema: dedupByHash: element missing id_hash — expected an instance"
       ) vals;
       grouped = builtins.groupBy (x: x.hash) indexed;
-      firsts = lib.mapAttrsToList (_: xs: builtins.head xs) grouped;
+      firsts = prelude.mapAttrsToList (_: xs: builtins.head xs) grouped;
       sorted = builtins.sort (a: b: a.i < b.i) firsts;
     in
     map (x: x.v) sorted;
@@ -86,9 +86,9 @@ in
   refsFromOptionsWithTypes =
     opts:
     let
-      refFields = lib.filterAttrs (_: opt: (opt ? type) && (getRefKind opt.type) != null) opts;
+      refFields = prelude.filterAttrs (_: opt: (opt ? type) && (getRefKind opt.type) != null) opts;
     in
-    lib.mapAttrs (_: opt: {
+    prelude.mapAttrs (_: opt: {
       refKind = getRefKind opt.type;
       type = opt.type;
     }) refFields;
@@ -102,7 +102,7 @@ in
       (getRefKind elemType != null)
       || throw "gen-schema: setOf: element type must be a ref type (e.g., setOf (ref \"host\")), got ${elemType.name or "unknown"}";
     let
-      listType = lib.types.listOf elemType;
+      listType = merge.types.listOf elemType;
     in
     listType
     // {

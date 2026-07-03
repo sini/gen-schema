@@ -1,10 +1,15 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkStrictModule;
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       (mkStrictModule "host")
-      { options.name = lib.mkOption { type = lib.types.str; }; }
+      { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
       {
         config.name = "igloo";
         config.badKey = "oops";
@@ -20,10 +25,10 @@ in
   };
   flake.tests.strict-module.test-declared-key-works = {
     expr =
-      (lib.evalModules {
+      (genMerge.evalModuleTree {
         modules = [
           (mkStrictModule "host")
-          { options.name = lib.mkOption { type = lib.types.str; }; }
+          { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
           { config.name = "igloo"; }
         ];
       }).config.name;

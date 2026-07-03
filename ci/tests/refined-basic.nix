@@ -1,11 +1,12 @@
 {
   lib,
   genSchema,
+  genMerge,
   genAlgebra,
   ...
 }:
 let
-  refinedLib = import ../../lib/refined.nix { inherit lib; };
+  refinedLib = import ../../lib/refined.nix;
   inherit (refinedLib)
     types
     isRefined
@@ -15,13 +16,13 @@ let
     ;
 
   # Single refinement
-  refinedPort = types.refined lib.types.int {
+  refinedPort = types.refined genMerge.types.int {
     check = self: self > 0 && self < 65536;
     message = "must be valid port";
   };
 
   # Composed refinements — two independent upper/lower bounds, both can fail together
-  strictPort = types.refined lib.types.int [
+  strictPort = types.refined genMerge.types.int [
     {
       check = self: self >= 1024;
       message = "must be >= 1024";
@@ -39,7 +40,7 @@ in
   };
 
   flake.tests.refined-basic.test-plain-type-not-refined = {
-    expr = isRefined lib.types.int;
+    expr = isRefined genMerge.types.int;
     expected = false;
   };
 
@@ -86,7 +87,7 @@ in
   flake.tests.refined-basic.test-composed-both-fail = {
     expr =
       let
-        bothFail = types.refined lib.types.int [
+        bothFail = types.refined genMerge.types.int [
           {
             check = self: self < 100;
             message = "must be < 100";
@@ -109,7 +110,7 @@ in
   flake.tests.refined-basic.test-reusable-refinement = {
     expr =
       let
-        portType = types.refined lib.types.int refinements.tcpPort;
+        portType = types.refined genMerge.types.int refinements.tcpPort;
       in
       checkRefinements "port" portType 8080;
     expected = [ ];
@@ -118,7 +119,7 @@ in
   flake.tests.refined-basic.test-reusable-refinement-invalid = {
     expr =
       let
-        portType = types.refined lib.types.int refinements.tcpPort;
+        portType = types.refined genMerge.types.int refinements.tcpPort;
       in
       builtins.length (checkRefinements "port" portType 0);
     expected = 1;
@@ -128,10 +129,10 @@ in
   flake.tests.refined-basic.test-evalmodules-with-refined-type = {
     expr =
       let
-        eval = lib.evalModules {
+        eval = genMerge.evalModuleTree {
           modules = [
             {
-              options.port = lib.mkOption { type = refinedPort; };
+              options.port = genMerge.mkOption { type = refinedPort; };
               config.port = 8080;
             }
           ];
@@ -143,13 +144,13 @@ in
 
   flake.tests.refined-basic.test-base-type-preserved = {
     expr = refinedPort.name;
-    expected = lib.types.int.name;
+    expected = genMerge.types.int.name;
   };
 
   flake.tests.refined-basic.test-lazy-refinement-flag = {
     expr =
       let
-        lazyType = types.refined lib.types.int {
+        lazyType = types.refined genMerge.types.int {
           check = self: self > 0;
           message = "must be positive";
           lazy = true;

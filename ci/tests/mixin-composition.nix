@@ -7,7 +7,7 @@
 let
   R = genAlgebra.record;
   record = R;
-  mixinLib = import ../../lib/mixin.nix { inherit lib record; };
+  mixinLib = import ../../lib/mixin.nix { inherit record; };
   inherit (mixinLib)
     mkMixin
     composeMixins

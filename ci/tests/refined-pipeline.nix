@@ -1,19 +1,20 @@
 {
   lib,
   genSchema,
+  genMerge,
   genAlgebra,
   ...
 }:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
-  schemaEval = lib.evalModules {
+  schemaEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
-          options.name = lib.mkOption { type = lib.types.str; };
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
         };
       }
     ];
@@ -43,7 +44,7 @@ let
     };
   };
 
-  validEval = lib.evalModules {
+  validEval = genMerge.evalModuleTree {
     modules = [
       {
         options.services = validRegistry;
@@ -55,7 +56,7 @@ let
     ];
   };
 
-  invalidEval = lib.evalModules {
+  invalidEval = genMerge.evalModuleTree {
     modules = [
       {
         options.services = invalidRegistry;
@@ -85,7 +86,7 @@ in
     expr =
       let
         noRefRegistry = mkInstanceRegistry schema.service { };
-        eval = lib.evalModules {
+        eval = genMerge.evalModuleTree {
           modules = [
             {
               options.services = noRefRegistry;
@@ -118,7 +119,7 @@ in
             ];
           };
         };
-        eval = lib.evalModules {
+        eval = genMerge.evalModuleTree {
           modules = [
             {
               options.services = multiRegistry;
@@ -153,7 +154,7 @@ in
             ];
           };
         };
-        eval = lib.evalModules {
+        eval = genMerge.evalModuleTree {
           modules = [
             {
               options.services = multiFieldRegistry;

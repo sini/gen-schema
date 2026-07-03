@@ -1,4 +1,4 @@
-{ lib }:
+{ prelude }:
 let
   escapeMd = s: builtins.replaceStrings [ "|" "`" "[" "]" "*" ] [ "\\|" "\\`" "\\[" "\\]" "\\*" ] s;
 in
@@ -11,9 +11,11 @@ in
         kind:
         let
           opts = schema.${kind}.options;
-          userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") (builtins.attrNames opts);
+          userOpts = prelude.filter (n: !(prelude.hasPrefix "_" n) && n != "id_hash") (
+            builtins.attrNames opts
+          );
         in
-        lib.concatStringsSep "\n" (
+        prelude.concatStringsSep "\n" (
           [
             "## ${kind}"
             ""
@@ -49,5 +51,5 @@ in
           escapeMd (opt.description or "")
         } |";
     in
-    lib.concatMapStringsSep "\n\n" renderKind kinds;
+    prelude.concatMapStringsSep "\n\n" renderKind kinds;
 }

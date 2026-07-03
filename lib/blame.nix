@@ -2,7 +2,7 @@
 # This is producer-side error reporting (which field, which predicate),
 # not § Chitil 2012 higher-order lazy blame. See lazy contracts in instance.nix
 # for the § Chitil 2012 deferred validation mechanism.
-{ lib }:
+# Dependency-free (pure builtins), so this is a bare value (gen convention §8).
 {
   blame = field: message: {
     __blame = true;

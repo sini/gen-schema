@@ -1,16 +1,18 @@
 {
   lib,
   genSchema,
+  genMerge,
   genAlgebra,
+  prelude,
   ...
 }:
 let
   R = genAlgebra.record;
   record = R;
-  mixinLib = import ../../lib/mixin.nix { inherit lib record; };
-  refinedLib = import ../../lib/refined.nix { inherit lib; };
+  mixinLib = import ../../lib/mixin.nix { inherit record; };
+  refinedLib = import ../../lib/refined.nix;
   bridgeLib = import ../../lib/bridge.nix {
-    inherit lib record;
+    inherit prelude record;
     inherit (refinedLib) isRefined getRefinements;
   };
   inherit (mixinLib) mkMixin composeMixins applyMixin;
@@ -22,8 +24,8 @@ let
     requires = [ "port" ];
     provides = [ "metrics_port" ];
     define = _parent: {
-      metrics_port = lib.mkOption {
-        type = lib.types.int;
+      metrics_port = genMerge.mkOption {
+        type = genMerge.types.int;
         default = 9090;
         description = "Port for metrics endpoint";
       };
@@ -32,15 +34,15 @@ let
 
   # Build a schema kind manually using the mixin workflow
   baseRecord = R.fromAttrs {
-    port = lib.mkOption { type = lib.types.int; };
-    hostname = lib.mkOption { type = lib.types.str; };
+    port = genMerge.mkOption { type = genMerge.types.int; };
+    hostname = genMerge.mkOption { type = genMerge.types.str; };
   };
 
   withMixin = applyMixin monitorable baseRecord "service";
   emitted = emitModule [ ] withMixin;
 
   # Use the emitted module in a schema
-  schemaEval = lib.evalModules {
+  schemaEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -53,7 +55,7 @@ let
 
   # Create instances
   registry = mkInstanceRegistry schema.service { };
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.services = registry;
@@ -66,12 +68,12 @@ let
   };
 
   # Test that mkSchemaEntryType stores mixins
-  entryWithMixins = lib.evalModules {
+  entryWithMixins = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { mixins = [ monitorable ]; };
         config.schema.svc = {
-          port = lib.mkOption { type = lib.types.int; };
+          port = genMerge.mkOption { type = genMerge.types.int; };
         };
       }
     ];
@@ -106,12 +108,12 @@ in
   flake.tests.kind-mixins.test-entry-type-empty-mixins-default = {
     expr =
       let
-        e = lib.evalModules {
+        e = genMerge.evalModuleTree {
           modules = [
             {
               options.schema = mkSchemaOption { };
               config.schema.basic = {
-                name = lib.mkOption { type = lib.types.str; };
+                name = genMerge.mkOption { type = genMerge.types.str; };
               };
             }
           ];

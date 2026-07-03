@@ -1,6 +1,6 @@
 { lib, genSchema, ... }:
 let
-  blameLib = import ../../lib/blame.nix { inherit lib; };
+  blameLib = import ../../lib/blame.nix;
   inherit (blameLib) blame isBlame collectBlame;
 in
 {

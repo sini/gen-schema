@@ -1,6 +1,7 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
@@ -14,7 +15,7 @@ let
   # --- Self-referential registry with deferred coerce ---
   # A trait's `needs` field references other traits in the same registry.
   # Custom coerce adds a tag to prove it ran; deferred = true avoids infinite recursion.
-  evalSelfRef = lib.evalModules {
+  evalSelfRef = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -28,12 +29,12 @@ let
           };
         };
         config.schema.trait = {
-          options.priority = lib.mkOption {
-            type = lib.types.int;
+          options.priority = genMerge.mkOption {
+            type = genMerge.types.int;
             default = 100;
           };
-          options.needs = lib.mkOption {
-            type = lib.types.listOf (ref "trait");
+          options.needs = genMerge.mkOption {
+            type = genMerge.types.listOf (ref "trait");
             default = [ ];
           };
         };
@@ -53,7 +54,7 @@ let
   };
 
   # --- Self-referential with custom selector coerce ---
-  evalSelector = lib.evalModules {
+  evalSelector = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -75,12 +76,12 @@ let
           };
         };
         config.schema.trait = {
-          options.priority = lib.mkOption {
-            type = lib.types.int;
+          options.priority = genMerge.mkOption {
+            type = genMerge.types.int;
             default = 100;
           };
-          options.needs = lib.mkOption {
-            type = lib.types.listOf (ref "trait");
+          options.needs = genMerge.mkOption {
+            type = genMerge.types.listOf (ref "trait");
             default = [ ];
           };
         };
@@ -99,7 +100,7 @@ let
   };
 
   # --- Self-referential with setOf + deferred coerce (dedup) ---
-  evalSetOf = lib.evalModules {
+  evalSetOf = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -113,7 +114,7 @@ let
           };
         };
         config.schema.trait = {
-          options.deps = lib.mkOption {
+          options.deps = genMerge.mkOption {
             type = setOf (ref "trait");
             default = [ ];
           };
@@ -130,7 +131,7 @@ let
   };
 
   # --- Non-deferred coerce still works (regression guard) ---
-  evalNonDeferred = lib.evalModules {
+  evalNonDeferred = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -143,10 +144,10 @@ let
               if builtins.isString val && val == "fallback" then evalNonDeferred.config.hosts.igloo else default;
           };
         };
-        config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
+        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
-          options.host = lib.mkOption { type = ref "host"; };
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.host = genMerge.mkOption { type = ref "host"; };
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";
@@ -160,7 +161,7 @@ let
   };
 
   # --- Mixed deferred + non-deferred refs on same kind ---
-  evalMixed = lib.evalModules {
+  evalMixed = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -175,12 +176,12 @@ let
             deferred = true;
           };
         };
-        config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
+        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
-          options.host = lib.mkOption { type = ref "host"; };
-          options.depends = lib.mkOption {
-            type = lib.types.listOf (ref "service");
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.host = genMerge.mkOption { type = ref "host"; };
+          options.depends = genMerge.mkOption {
+            type = genMerge.types.listOf (ref "service");
             default = [ ];
           };
         };

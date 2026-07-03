@@ -1,4 +1,4 @@
-{ lib }:
+{ prelude, merge }:
 let
   schemaFn = description: type: fn: {
     inherit description type fn;
@@ -8,28 +8,28 @@ let
     kind: allMethods:
     { config, ... }:
     {
-      options = lib.mapAttrs (
+      options = prelude.mapAttrs (
         _name: m:
-        lib.mkOption {
+        merge.mkOption {
           inherit (m) description type;
           readOnly = true;
         }
       ) allMethods;
 
-      config = lib.mapAttrs (
+      config = prelude.mapAttrs (
         name: m:
         let
           args = builtins.functionArgs m.fn;
-          argNames = lib.attrNames args;
-          missingArgs = lib.filter (n: !(config ? ${n})) argNames;
+          argNames = prelude.attrNames args;
+          missingArgs = prelude.filter (n: !(config ? ${n})) argNames;
         in
         if missingArgs != [ ] then
           throw "gen-schema: method '${name}' on ${kind}: references config keys ${
-            lib.concatMapStringsSep ", " (a: "'${a}'") missingArgs
+            prelude.concatMapStringsSep ", " (a: "'${a}'") missingArgs
           } which are not declared on this kind"
         else
           let
-            resolved = lib.genAttrs argNames (n: config.${n});
+            resolved = prelude.genAttrs argNames (n: config.${n});
           in
           m.fn resolved
       ) allMethods;

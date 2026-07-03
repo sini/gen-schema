@@ -1,6 +1,7 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
@@ -11,7 +12,7 @@ let
     ref
     ;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -20,31 +21,31 @@ let
           refs.peer = eval.config.peers;
         };
         config.schema.peer = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
-          options.role = lib.mkOption { type = lib.types.str; };
-          options.secret = lib.mkOption {
-            type = lib.types.str;
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+          options.role = genMerge.mkOption { type = genMerge.types.str; };
+          options.secret = genMerge.mkOption {
+            type = genMerge.types.str;
             default = "s3cret";
           };
-          options.peer = lib.mkOption {
-            type = lib.types.nullOr (ref "peer");
+          options.peer = genMerge.mkOption {
+            type = genMerge.types.nullOr (ref "peer");
             default = null;
           };
-          options.meta = lib.mkOption {
-            type = lib.types.submodule {
-              options.region = lib.mkOption {
-                type = lib.types.str;
+          options.meta = genMerge.mkOption {
+            type = genMerge.types.submodule {
+              options.region = genMerge.mkOption {
+                type = genMerge.types.str;
                 default = "us-east";
               };
-              options.zone = lib.mkOption {
-                type = lib.types.str;
+              options.zone = genMerge.mkOption {
+                type = genMerge.types.str;
                 default = "a";
               };
-              options.internal = lib.mkOption {
-                type = lib.types.str;
+              options.internal = genMerge.mkOption {
+                type = genMerge.types.str;
                 default = "x";
               };
             };

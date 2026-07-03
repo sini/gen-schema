@@ -3,17 +3,18 @@
 {
   lib,
   genSchema,
+  genMerge,
   genAlgebra,
   ...
 }:
 let
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = genSchema.mkSchemaOption { };
         options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
           validators = [
             (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr required")
           ];

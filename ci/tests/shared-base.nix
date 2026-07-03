@@ -1,30 +1,35 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption;
 
   # mkSchemaOption with a baseModule that adds a description option
-  schemaEval = lib.evalModules {
+  schemaEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption {
           baseModule = {
-            options.description = lib.mkOption {
-              type = lib.types.str;
+            options.description = genMerge.mkOption {
+              type = genMerge.types.str;
               default = "no description";
             };
           };
         };
         config.schema.host = {
-          options.name = lib.mkOption { type = lib.types.str; };
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.user = {
-          options.email = lib.mkOption { type = lib.types.str; };
+          options.email = genMerge.mkOption { type = genMerge.types.str; };
         };
       }
     ];
   };
 
-  hostInstance = lib.evalModules {
+  hostInstance = genMerge.evalModuleTree {
     modules = [
       schemaEval.config.schema.host
       {
@@ -34,7 +39,7 @@ let
     ];
   };
 
-  userInstance = lib.evalModules {
+  userInstance = genMerge.evalModuleTree {
     modules = [
       schemaEval.config.schema.user
       {

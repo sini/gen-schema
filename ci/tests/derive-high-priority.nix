@@ -1,14 +1,19 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = genSchema.mkSchemaOption { };
         options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host {
           extraModules = [
             {
-              options.computed = lib.mkOption {
-                type = lib.types.str;
+              options.computed = genMerge.mkOption {
+                type = genMerge.types.str;
                 internal = true;
               };
             }
@@ -20,7 +25,7 @@ let
           };
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";

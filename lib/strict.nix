@@ -7,23 +7,25 @@
 #
 # Relocated from gen-algebra/module so gen-schema owns its full module-system
 # surface; gen-algebra is the pure algebra root.
-{ lib }:
+{ prelude, merge }:
 {
   mkStrictModule =
     kind:
     { ... }:
     {
-      _module.freeformType = lib.mkDefault (
-        lib.mkOptionType {
+      # gen-merge reads `_module` only from `config` (top-level `_module` is dropped as
+      # non-config on a structured module), so this must live under `config`.
+      config._module.freeformType = merge.mkDefault (
+        merge.mkOptionType {
           name = "strict";
           merge =
             path: _decls:
             let
-              key = lib.last path;
+              key = prelude.last path;
             in
             throw ''
               STRICT MODE: "${key}" is not declared on ${kind}.
-              Fix: schema.${kind}.options.${key} = lib.mkOption { ... };
+              Fix: schema.${kind}.options.${key} = mkOption { ... };
             '';
         }
       );

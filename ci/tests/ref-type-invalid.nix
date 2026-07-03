@@ -1,6 +1,7 @@
 {
   lib,
   genSchema,
+  genMerge,
   genAlgebra,
   ...
 }:
@@ -8,7 +9,7 @@ let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
   inherit (genSchema) ref;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -18,7 +19,7 @@ let
             (
               { ... }:
               {
-                options.host = lib.mkOption {
+                options.host = genMerge.mkOption {
                   type = ref eval.config.hosts;
                 };
               }
@@ -26,10 +27,10 @@ let
           ];
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";

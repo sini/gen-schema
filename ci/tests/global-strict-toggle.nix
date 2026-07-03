@@ -1,14 +1,19 @@
 # Strict toggle: strict = false on mkSchemaOption flows to instances via mkInstanceRegistry.
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { strict = false; };
         options.hosts = mkInstanceRegistry eval.config.schema.host { };
-        config.schema.host.options.name = lib.mkOption { type = lib.types.str; };
+        config.schema.host.options.name = genMerge.mkOption { type = genMerge.types.str; };
         config.hosts.igloo = {
           name = "igloo";
           undeclaredKey = "should work";

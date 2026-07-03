@@ -1,6 +1,7 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
@@ -12,7 +13,7 @@ let
     toSet
     ;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -21,10 +22,10 @@ let
           refs.members = eval.config.hosts;
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.group = {
-          options.members = lib.mkOption {
+          options.members = genMerge.mkOption {
             type = setOf (ref "host");
             default = [ ];
           };
@@ -61,12 +62,12 @@ in
     test-member-false = {
       expr =
         let
-          eval2 = lib.evalModules {
+          eval2 = genMerge.evalModuleTree {
             modules = [
               {
                 options.schema = mkSchemaOption { };
                 options.hosts = mkInstanceRegistry eval2.config.schema.host { };
-                config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
+                config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
                 config.hosts.other = {
                   addr = "10.0.1.3";
                 };

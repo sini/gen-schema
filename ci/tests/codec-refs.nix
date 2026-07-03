@@ -1,6 +1,7 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
@@ -12,7 +13,7 @@ let
     setOf
     ;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -24,20 +25,20 @@ let
           refs.backends = eval.config.hosts;
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
-          options.host = lib.mkOption { type = ref "host"; };
-          options.replicas = lib.mkOption {
-            type = lib.types.listOf (ref "host");
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.host = genMerge.mkOption { type = ref "host"; };
+          options.replicas = genMerge.mkOption {
+            type = genMerge.types.listOf (ref "host");
             default = [ ];
           };
-          options.primary = lib.mkOption {
-            type = lib.types.nullOr (ref "host");
+          options.primary = genMerge.mkOption {
+            type = genMerge.types.nullOr (ref "host");
             default = null;
           };
-          options.backends = lib.mkOption {
+          options.backends = genMerge.mkOption {
             type = setOf (ref "host");
             default = [ ];
           };

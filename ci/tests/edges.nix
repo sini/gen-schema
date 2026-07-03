@@ -1,25 +1,26 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
   inherit (genSchema) mkSchemaOption ref;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.user = {
           parent = "host";
-          options.shell = lib.mkOption { type = lib.types.str; };
+          options.shell = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
-          options.host = lib.mkOption { type = ref "host"; };
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.host = genMerge.mkOption { type = ref "host"; };
         };
       }
     ];

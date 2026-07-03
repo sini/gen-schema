@@ -1,8 +1,13 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption {
@@ -26,14 +31,14 @@ let
         };
         # Kind with includes (entity)
         config.schema.host = {
-          options.name = lib.mkOption { type = lib.types.str; };
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
           includes = [ "networking" ];
         };
         # Empty kind (not entity)
         config.schema.tag = { };
         # Kind with structural content only (entity)
         config.schema.app = {
-          options.version = lib.mkOption { type = lib.types.str; };
+          options.version = genMerge.mkOption { type = genMerge.types.str; };
         };
       }
     ];

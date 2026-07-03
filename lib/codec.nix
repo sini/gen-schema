@@ -5,8 +5,44 @@
 # parent, kind, mixins, refinements) are excluded automatically. Additional
 # fields can be excluded via excludeFields. Remaining fields get identity
 # transforms unless overridden via the fields spec or types registry.
-{ lib }:
+{ prelude }:
 let
+  # Does value v structurally inhabit type t? Used ONLY for codec either/oneOf branch
+  # selection. nixpkgs `t.check` was `v -> bool`, but the gen stack splits this: gen-types
+  # leaf checkers expose `verify` (v -> null|err) with a CURRIED `check`, while gen-merge
+  # structural types (listOf/attrsOf/submodule) carry no scalar predicate at all — so a raw
+  # `t.check v` no longer discriminates. This walks the structural shape instead.
+  inhabits =
+    t: v:
+    let
+      tn = t.name or "";
+    in
+    if t ? verify then
+      t.verify v == null
+    else if tn == "listOf" then
+      builtins.isList v
+    else if tn == "attrsOf" || tn == "lazyAttrsOf" || tn == "submodule" then
+      builtins.isAttrs v
+    else if tn == "nullOr" then
+      (
+        let
+          et = (t.nestedTypes or { }).elemType or null;
+        in
+        v == null || (et != null && inhabits et v)
+      )
+    else if tn == "either" then
+      (
+        let
+          l = (t.nestedTypes or { }).left or null;
+          r = (t.nestedTypes or { }).right or null;
+        in
+        (l != null && inhabits l v) || (r != null && inhabits r v)
+      )
+    else if t ? check then
+      t.check v
+    else
+      true;
+
   builtinCollections = [
     "methods"
     "validators"
@@ -47,7 +83,7 @@ let
       );
 
       # Validate fields spec — force evaluation to surface errors early
-      _ = builtins.deepSeq (lib.mapAttrsToList (
+      _ = builtins.deepSeq (prelude.mapAttrsToList (
         name: spec:
         if (spec.exclude or false) then
           null
@@ -101,8 +137,8 @@ let
             inner = mkTypeEncoder name et;
           in
           {
-            encode = v: lib.mapAttrs (_: inner.encode) v;
-            decode = v: lib.mapAttrs (_: inner.decode) v;
+            encode = v: prelude.mapAttrs (_: inner.encode) v;
+            decode = v: prelude.mapAttrs (_: inner.decode) v;
           }
         # setOf wrapper — map (setOf is a list at value level)
         else if (type.isSetOf or false) && et != null then
@@ -124,17 +160,17 @@ let
           {
             encode =
               v:
-              if left != null && left.check v then
+              if left != null && inhabits left v then
                 leftCodec.encode v
-              else if right != null && right.check v then
+              else if right != null && inhabits right v then
                 rightCodec.encode v
               else
                 throw "gen-schema: codec: no matching branch for either/oneOf on field '${name}'";
             decode =
               v:
-              if left != null && left.check v then
+              if left != null && inhabits left v then
                 leftCodec.decode v
-              else if right != null && right.check v then
+              else if right != null && inhabits right v then
                 rightCodec.decode v
               else
                 v; # decode is lenient
@@ -175,7 +211,7 @@ let
           {
             encode =
               v:
-              lib.foldl' (
+              prelude.foldl' (
                 acc: n:
                 let
                   subSpec = subFields.${n} or { };
@@ -185,7 +221,7 @@ let
               ) { } subFieldNames;
             decode =
               v:
-              lib.foldl' (
+              prelude.foldl' (
                 acc: n:
                 let
                   subSpec = subFields.${n} or { };
@@ -229,7 +265,7 @@ let
 
       encode =
         instance:
-        lib.foldl' (
+        prelude.foldl' (
           acc: name:
           let
             fc = fieldCodecs.${name};
@@ -239,7 +275,7 @@ let
 
       decode =
         attrs:
-        lib.foldl' (
+        prelude.foldl' (
           acc: name:
           let
             fc = fieldCodecs.${name};
@@ -247,8 +283,8 @@ let
           if attrs ? ${name} then acc // { ${name} = fc.decode attrs.${name}; } else acc
         ) { } activeFields;
 
-      encodeAll = registry: lib.mapAttrs (_: encode) registry;
-      decodeAll = attrs: lib.mapAttrs (_: decode) attrs;
+      encodeAll = registry: prelude.mapAttrs (_: encode) registry;
+      decodeAll = attrs: prelude.mapAttrs (_: decode) attrs;
 
       serialize = fmt: instance: fmt.encode (encode instance);
       deserialize = fmt: raw: decode (fmt.decode raw);

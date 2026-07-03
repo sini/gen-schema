@@ -1,16 +1,21 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkIdentityModule;
   mkEval =
     kind: modules:
-    lib.evalModules {
+    genMerge.evalModuleTree {
       modules = [ (mkIdentityModule kind) ] ++ modules;
     };
 
   evalWithSecret = mkEval "host" [
     {
-      options.name = lib.mkOption { type = lib.types.str; };
-      options.secret = lib.mkOption { type = lib.types.str; } // {
+      options.name = genMerge.mkOption { type = genMerge.types.str; };
+      options.secret = genMerge.mkOption { type = genMerge.types.str; } // {
         identity = false;
       };
     }
@@ -21,8 +26,8 @@ let
   ];
   evalWithDiffSecret = mkEval "host" [
     {
-      options.name = lib.mkOption { type = lib.types.str; };
-      options.secret = lib.mkOption { type = lib.types.str; } // {
+      options.name = genMerge.mkOption { type = genMerge.types.str; };
+      options.secret = genMerge.mkOption { type = genMerge.types.str; } // {
         identity = false;
       };
     }
@@ -32,14 +37,14 @@ let
     }
   ];
   evalNameOnly = mkEval "host" [
-    { options.name = lib.mkOption { type = lib.types.str; }; }
+    { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
     { config.name = "igloo"; }
   ];
   evalWithInternal = mkEval "host" [
     {
-      options.name = lib.mkOption { type = lib.types.str; };
-      options.internal_val = lib.mkOption {
-        type = lib.types.str;
+      options.name = genMerge.mkOption { type = genMerge.types.str; };
+      options.internal_val = genMerge.mkOption {
+        type = genMerge.types.str;
         internal = true;
       };
     }

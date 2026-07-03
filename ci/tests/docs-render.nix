@@ -1,18 +1,23 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption renderDocs;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         config.schema.host = {
-          options.name = lib.mkOption {
-            type = lib.types.str;
+          options.name = genMerge.mkOption {
+            type = genMerge.types.str;
             description = "Hostname";
           };
-          options.addr = lib.mkOption {
-            type = lib.types.str;
+          options.addr = genMerge.mkOption {
+            type = genMerge.types.str;
             description = "IP address";
           };
         };

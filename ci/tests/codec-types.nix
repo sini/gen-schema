@@ -1,5 +1,10 @@
 # Codec — type-registered codecs with automatic wrapper traversal.
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema)
     mkSchemaOption
@@ -8,7 +13,7 @@ let
     ref
     ;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -17,25 +22,25 @@ let
           refs.host = eval.config.hosts;
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
-          options.port = lib.mkOption { type = lib.types.port; };
-          options.optPort = lib.mkOption {
-            type = lib.types.nullOr lib.types.port;
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.optPort = genMerge.mkOption {
+            type = genMerge.types.nullOr genMerge.types.int;
             default = null;
           };
-          options.ports = lib.mkOption {
-            type = lib.types.listOf lib.types.port;
+          options.ports = genMerge.mkOption {
+            type = genMerge.types.listOf genMerge.types.int;
             default = [ ];
           };
-          options.labels = lib.mkOption {
-            type = lib.types.attrsOf lib.types.str;
+          options.labels = genMerge.mkOption {
+            type = genMerge.types.attrsOf genMerge.types.str;
             default = { };
           };
-          options.role = lib.mkOption { type = lib.types.str; };
+          options.role = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.service = {
-          options.name = lib.mkOption { type = lib.types.str; };
-          options.host = lib.mkOption { type = ref "host"; };
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
+          options.host = genMerge.mkOption { type = ref "host"; };
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";
@@ -64,10 +69,12 @@ let
     ];
   };
 
-  # Codec with type-registered encoder for port
+  # Codec with type-registered encoder for the (int-typed) port fields.
+  # gen-merge/gen-types name the leaf "int" (nixpkgs' port alias "unsignedInt16" is gone);
+  # the codec dispatches on `type.name`, so registrations key on "int".
   portCodec = mkCodec eval.config.schema.host {
     types = {
-      unsignedInt16 = {
+      int = {
         encode = v: "port:${toString v}";
         decode = v: lib.toInt (lib.removePrefix "port:" v);
       };
@@ -86,7 +93,7 @@ let
   # Codec with per-field override suppressing type codec
   overrideCodec = mkCodec eval.config.schema.host {
     types = {
-      unsignedInt16 = {
+      int = {
         encode = v: "port:${toString v}";
       };
     };
@@ -100,8 +107,8 @@ let
   # Codec for service to test ref priority over types
   serviceCodec = mkCodec eval.config.schema.service {
     types = {
-      # This should NOT apply to the host ref field
-      str = {
+      # This should NOT apply to the host ref field ("string" is gen-types' str name)
+      string = {
         encode = v: "str:${v}";
       };
     };

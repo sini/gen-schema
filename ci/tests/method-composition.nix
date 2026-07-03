@@ -1,20 +1,25 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption schemaFn;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         config.schema.host = {
-          options.name = lib.mkOption { type = lib.types.str; };
-          options.addr = lib.mkOption { type = lib.types.str; };
-          methods.ping = schemaFn "Ping command" lib.types.str ({ addr, ... }: "ping ${addr}");
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+          methods.ping = schemaFn "Ping command" genMerge.types.str ({ addr, ... }: "ping ${addr}");
         };
       }
       {
         config.schema.host = {
-          methods.ssh = schemaFn "SSH command" lib.types.str ({ name, ... }: "ssh ${name}");
+          methods.ssh = schemaFn "SSH command" genMerge.types.str ({ name, ... }: "ssh ${name}");
         };
       }
     ];
@@ -22,7 +27,7 @@ let
 
   hostKind = eval.config.schema.host;
 
-  instance = lib.evalModules {
+  instance = genMerge.evalModuleTree {
     modules = [
       hostKind
       {

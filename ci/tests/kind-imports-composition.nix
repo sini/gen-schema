@@ -1,19 +1,24 @@
 # Kind-to-kind imports composition: the motivating case for moving
 # strict/identity to instance level. Multiple kinds importing a shared
 # base kind should not cause duplicate module conflicts when instantiated.
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
 
         # Shared base kind
         config.schema.conf = {
-          options.description = lib.mkOption {
-            type = lib.types.str;
+          options.description = genMerge.mkOption {
+            type = genMerge.types.str;
             default = "";
           };
         };
@@ -21,12 +26,12 @@ let
         # Host and user both import conf
         config.schema.host = {
           imports = [ eval.config.schema.conf ];
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.user = {
           imports = [ eval.config.schema.conf ];
-          options.shell = lib.mkOption {
-            type = lib.types.str;
+          options.shell = genMerge.mkOption {
+            type = genMerge.types.str;
             default = "/bin/bash";
           };
         };

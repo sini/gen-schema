@@ -1,12 +1,17 @@
 # baseModule options coexist correctly with collection extraction.
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = genSchema.mkSchemaOption {
-          baseModule.options.description = lib.mkOption {
-            type = lib.types.str;
+          baseModule.options.description = genMerge.mkOption {
+            type = genMerge.types.str;
             default = "";
           };
           collections.tags = {
@@ -19,7 +24,7 @@ let
             "web"
             "prod"
           ];
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.hosts.igloo.addr = "10.0.1.1";
       }

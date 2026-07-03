@@ -1,19 +1,24 @@
 # Identity equality: instances with the same primitive values should produce
 # the same id_hash. Two references to the same instance should be equal
 # via id_hash even when structural == might diverge.
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         options.hosts = mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
-          options.role = lib.mkOption {
-            type = lib.types.str;
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+          options.role = genMerge.mkOption {
+            type = genMerge.types.str;
             default = "worker";
           };
         };

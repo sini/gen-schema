@@ -1,6 +1,6 @@
 # Refinement contracts (§ Findler 2002, co-location from § Rondon 2008).
-# Predicate metadata stored in __schema attr on NixOS types.
-{ lib }:
+# Predicate metadata stored in __schema attr on gen-merge/gen-types types.
+# Dependency-free (pure builtins), so this is a bare value (gen convention §8).
 let
   normalizeRefinements = r: if builtins.isList r then r else [ r ];
 

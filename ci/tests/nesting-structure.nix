@@ -1,8 +1,13 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -17,11 +22,11 @@ let
           ];
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.user = {
-          options.shell = lib.mkOption {
-            type = lib.types.str;
+          options.shell = genMerge.mkOption {
+            type = genMerge.types.str;
             default = "/bin/bash";
           };
         };

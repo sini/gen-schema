@@ -1,8 +1,8 @@
-# NixOS module bridge (§ Cardelli 1997).
-# Translates record-algebra records into NixOS modules.
+# Module bridge (§ Cardelli 1997).
+# Translates record-algebra records into gen-merge modules.
 # One-directional: algebra → modules. Information does not flow back.
 {
-  lib,
+  prelude,
   record,
   isRefined,
   getRefinements,
@@ -18,8 +18,8 @@ let
   # Returns { fieldName = [refinements]; } for refined fields
   extractRefinements =
     attrs:
-    lib.filterAttrs (_: v: v != [ ]) (
-      lib.mapAttrs (
+    prelude.filterAttrs (_: v: v != [ ]) (
+      prelude.mapAttrs (
         _: v: if isOptionDecl v && v ? type && v.type ? __schema then getRefinements v.type else [ ]
       ) attrs
     );
@@ -30,13 +30,13 @@ let
     collectionLabels: record':
     let
       allAttrs = record.emitAll record' collectionLabels;
-      collections = lib.filterAttrs (n: _: builtins.elem n collectionLabels) allAttrs;
+      collections = prelude.filterAttrs (n: _: builtins.elem n collectionLabels) allAttrs;
       content = builtins.removeAttrs allAttrs collectionLabels;
 
-      options = lib.filterAttrs (_: isOptionDecl) content;
+      options = prelude.filterAttrs (_: isOptionDecl) content;
       config = builtins.removeAttrs content (builtins.attrNames options);
 
-      strippedOptions = lib.mapAttrs (
+      strippedOptions = prelude.mapAttrs (
         _: opt:
         if opt ? type && opt.type ? __schema then opt // { type = stripRefinements opt.type; } else opt
       ) options;

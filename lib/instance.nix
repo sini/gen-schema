@@ -8,7 +8,8 @@
 # The validate → derive → apply pipeline runs in `apply` on the option,
 # after module system evaluation. Validators and derive hooks are optional.
 {
-  lib,
+  prelude,
+  merge,
   mkStrictModule,
   mkIdentityModule,
   runValidators,
@@ -31,7 +32,7 @@ let
         null;
       kind = kindValue.kind;
     in
-    lib.types.submodule (
+    merge.types.submodule (
       { name, config, ... }:
       {
         imports = [
@@ -41,15 +42,17 @@ let
           (
             if strict then
               mkStrictModule kind
+            # gen-merge reads `_module` only from `config`, so the non-strict freeform
+            # must live under `config` (a top-level `_module` is dropped).
             else
-              { _module.freeformType = lib.types.attrsOf lib.types.anything; }
+              { config._module.freeformType = merge.types.attrsOf merge.types.anything; }
           )
           (mkIdentityModule kind)
         ]
         ++ extraModules;
         config._module.args.${kind} = config;
-        options.name = lib.mkOption {
-          type = lib.types.str;
+        options.name = merge.mkOption {
+          type = merge.types.str;
           default = name;
         };
       }
@@ -176,31 +179,31 @@ let
   # run their coerce in applyPipeline instead. This avoids infinite recursion when
   # a registry's ref field points back to itself with a custom coerce hook.
   mkRefBindingModules =
-    kind: refs: refFields:
+    kind: refs: refFields: kindOptions:
     let
       # Validate: every deferred ref field must have a binding.
       # N.B. Missing-binding check is duplicated in applyPipeline.refValidation
       # for the refs == {} case — keep error messages in sync.
-      missingBindings = lib.filterAttrs (field: _: !(refs ? ${field})) refFields;
-      extraBindings = lib.filterAttrs (field: _: !(refFields ? ${field})) refs;
+      missingBindings = prelude.filterAttrs (field: _: !(refs ? ${field})) refFields;
+      extraBindings = prelude.filterAttrs (field: _: !(refFields ? ${field})) refs;
 
       _ =
         if missingBindings != { } then
           let
-            missing = builtins.head (lib.attrNames missingBindings);
+            missing = builtins.head (prelude.attrNames missingBindings);
             targetKind = missingBindings.${missing}.refKind;
           in
           throw "gen-schema: mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
         else if extraBindings != { } then
           let
-            extra = builtins.head (lib.attrNames extraBindings);
+            extra = builtins.head (prelude.attrNames extraBindings);
           in
           throw "gen-schema: mkInstanceRegistry: refs.${extra} does not match any ref field on kind '${kind}'"
         else
           null;
 
       bindings = builtins.seq _ (
-        lib.mapAttrs (
+        prelude.mapAttrs (
           field: binding:
           let
             isDeferred = builtins.isAttrs binding && (binding.deferred or false);
@@ -240,14 +243,18 @@ let
         ) refs
       );
 
-      immediateBindings = lib.filterAttrs (_: b: !b.isDeferred) bindings;
-      deferredBindings = lib.filterAttrs (_: b: b.isDeferred) bindings;
+      immediateBindings = prelude.filterAttrs (_: b: !b.isDeferred) bindings;
+      deferredBindings = prelude.filterAttrs (_: b: b.isDeferred) bindings;
 
-      immediateModules = lib.mapAttrsToList (
+      # Re-declare the ref field's FULL option (type + default + …) with the coerce
+      # `apply` layered on. gen-merge merges option DECLARATIONS with a shallow `//`
+      # (unlike nixpkgs' deep decl-merge), so a bare `{ apply = … }` here would wipe the
+      # kind's `type`/`default` and break default-valued ref fields ([]/null).
+      immediateModules = prelude.mapAttrsToList (
         field: b:
         { ... }:
         {
-          options.${field} = lib.mkOption {
+          options.${field} = (kindOptions.${field} or { }) // {
             apply = b.coerceChain;
           };
         }
@@ -293,7 +300,7 @@ let
             deferredCoerce = { };
           }
         else
-          mkRefBindingModules kind refs refFields;
+          mkRefBindingModules kind refs refFields kindValue.options;
       allExtraModules = extraModules ++ refResult.modules;
 
       onError = if deriveEither != null then deriveEither.onError or defaultOnError else defaultOnError;
@@ -319,11 +326,11 @@ let
           refValidation =
             let
               allRefFields = kindValue.refs;
-              missingBindings = lib.filterAttrs (field: _: !(refs ? ${field})) allRefFields;
+              missingBindings = prelude.filterAttrs (field: _: !(refs ? ${field})) allRefFields;
             in
             if missingBindings != { } then
               let
-                missing = builtins.head (lib.attrNames missingBindings);
+                missing = builtins.head (prelude.attrNames missingBindings);
                 targetKind = missingBindings.${missing}.refKind;
               in
               throw "gen-schema: mkInstanceRegistry: kind '${kind}' has ref field '${missing}' targeting kind '${targetKind}' but no refs.${missing} binding was provided"
@@ -355,7 +362,7 @@ let
               let
                 deferredFields = builtins.attrNames refResult.deferredCoerce;
               in
-              lib.mapAttrs (
+              prelude.mapAttrs (
                 _name: instance:
                 builtins.foldl' (
                   inst: field:
@@ -382,7 +389,7 @@ let
             if effectiveRefinements == { } then
               coerced
             else
-              lib.mapAttrs (
+              prelude.mapAttrs (
                 instanceName: instance:
                 builtins.foldl' (
                   inst: fieldName:
@@ -454,7 +461,7 @@ let
               let
                 recovery = onError vResult;
               in
-              lib.mapAttrs (name: instance: instance // (recovery.${name} or { })) refinementChecked;
+              prelude.mapAttrs (name: instance: instance // (recovery.${name} or { })) refinementChecked;
 
           derived = if deriveFn == null then { } else deriveFn validated;
 
@@ -462,16 +469,16 @@ let
             if derived == { } then
               validated
             else
-              lib.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
+              prelude.mapAttrs (name: instance: instance // (derived.${name} or { })) validated;
         in
         # Force refValidation explicitly — ensures missing-binding errors throw
         # even when no validators or deferred coerce are present.
         builtins.seq refValidation result;
     in
-    lib.mkOption {
+    merge.mkOption {
       inherit description;
       default = { };
-      type = lib.types.attrsOf (
+      type = merge.types.attrsOf (
         mkInstanceType kindValue {
           extraModules = allExtraModules;
           inherit strict;

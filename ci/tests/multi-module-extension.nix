@@ -1,25 +1,30 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption;
 
   # Three separate modules each extending schema.host with different options
-  schemaEval = lib.evalModules {
+  schemaEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         config.schema.host = {
-          options.name = lib.mkOption { type = lib.types.str; };
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
         };
       }
       {
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
       }
       {
         config.schema.host = {
-          options.port = lib.mkOption {
-            type = lib.types.int;
+          options.port = genMerge.mkOption {
+            type = genMerge.types.int;
             default = 22;
           };
         };
@@ -29,7 +34,7 @@ let
 
   hostKind = schemaEval.config.schema.host;
 
-  instance = lib.evalModules {
+  instance = genMerge.evalModuleTree {
     modules = [
       hostKind
       {

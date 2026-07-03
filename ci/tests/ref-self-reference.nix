@@ -1,12 +1,13 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry ref;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -15,8 +16,8 @@ let
             (
               { ... }:
               {
-                options.upstream = lib.mkOption {
-                  type = lib.types.nullOr (ref eval.config.services);
+                options.upstream = genMerge.mkOption {
+                  type = genMerge.types.nullOr (ref eval.config.services);
                   default = null;
                 };
               }
@@ -24,7 +25,7 @@ let
           ];
         };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
         };
         config.services.api = {
           port = 8080;

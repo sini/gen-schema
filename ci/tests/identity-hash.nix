@@ -1,22 +1,27 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkIdentityModule;
   mkEval =
     kind: modules:
-    lib.evalModules {
+    genMerge.evalModuleTree {
       modules = [ (mkIdentityModule kind) ] ++ modules;
     };
 
   evalA = mkEval "host" [
-    { options.name = lib.mkOption { type = lib.types.str; }; }
+    { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
     { config.name = "igloo"; }
   ];
   evalB = mkEval "host" [
-    { options.name = lib.mkOption { type = lib.types.str; }; }
+    { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
     { config.name = "igloo"; }
   ];
   evalC = mkEval "host" [
-    { options.name = lib.mkOption { type = lib.types.str; }; }
+    { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
     { config.name = "castle"; }
   ];
 in

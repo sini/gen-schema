@@ -1,14 +1,19 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption schemaFn;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         config.schema.host = {
-          options.name = lib.mkOption { type = lib.types.str; };
-          methods.greet = schemaFn "Greet" lib.types.str ({ name, ... }: "hi ${name}");
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
+          methods.greet = schemaFn "Greet" genMerge.types.str ({ name, ... }: "hi ${name}");
         };
       }
     ];

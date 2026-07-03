@@ -1,7 +1,6 @@
 # First-class mixins (§ Bracha 1990).
 # Mixins operate on record-algebra records, not NixOS modules.
 {
-  lib,
   record,
 }:
 let

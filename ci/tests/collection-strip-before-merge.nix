@@ -1,8 +1,13 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption {
@@ -13,7 +18,7 @@ let
         };
         options.hosts = mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
-          options.name = lib.mkOption { type = lib.types.str; };
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
           tags = [ "server" ];
         };
         config.hosts.igloo = {

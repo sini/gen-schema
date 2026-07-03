@@ -1,12 +1,13 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry ref;
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -16,16 +17,16 @@ let
           refs.primary = eval.config.hosts;
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
-          options.hosts = lib.mkOption {
-            type = lib.types.listOf (ref "host");
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.hosts = genMerge.mkOption {
+            type = genMerge.types.listOf (ref "host");
             default = [ ];
           };
-          options.primary = lib.mkOption {
-            type = lib.types.nullOr (ref "host");
+          options.primary = genMerge.mkOption {
+            type = genMerge.types.nullOr (ref "host");
             default = null;
           };
         };

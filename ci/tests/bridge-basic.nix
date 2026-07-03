@@ -1,15 +1,17 @@
 {
   lib,
   genSchema,
+  genMerge,
   genAlgebra,
+  prelude,
   ...
 }:
 let
   R = genAlgebra.record;
   record = R;
-  refinedLib = import ../../lib/refined.nix { inherit lib; };
+  refinedLib = import ../../lib/refined.nix;
   bridgeLib = import ../../lib/bridge.nix {
-    inherit lib record;
+    inherit prelude record;
     inherit (refinedLib) isRefined getRefinements;
   };
   inherit (bridgeLib) emitModule isOptionDecl extractRefinements;
@@ -17,35 +19,35 @@ let
 
   # Build a record with mkOption values (option declarations)
   optionRecord = R.fromAttrs {
-    port = lib.mkOption {
-      type = lib.types.int;
+    port = genMerge.mkOption {
+      type = genMerge.types.int;
       default = 8080;
     };
-    hostname = lib.mkOption { type = lib.types.str; };
+    hostname = genMerge.mkOption { type = genMerge.types.str; };
   };
 
   # Record with a mix of options and plain config values
   mixedRecord = R.extend (R.fromAttrs {
-    port = lib.mkOption { type = lib.types.int; };
-    hostname = lib.mkOption { type = lib.types.str; };
+    port = genMerge.mkOption { type = genMerge.types.int; };
+    hostname = genMerge.mkOption { type = genMerge.types.str; };
   }) "defaultPort" 8080;
 
   # Record with refined type
   refinedRecord = R.fromAttrs {
-    port = lib.mkOption {
-      type = types.refined lib.types.int {
+    port = genMerge.mkOption {
+      type = types.refined genMerge.types.int {
         check = v: v > 0;
         message = "must be positive";
       };
     };
-    name = lib.mkOption { type = lib.types.str; };
+    name = genMerge.mkOption { type = genMerge.types.str; };
   };
 
   # Record with collection labels (validators, methods)
   collectionRecord =
     let
       base = R.fromAttrs {
-        port = lib.mkOption { type = lib.types.int; };
+        port = genMerge.mkOption { type = genMerge.types.int; };
         validators = [ "validator-a" ];
       };
     in
@@ -53,7 +55,7 @@ let
 in
 {
   flake.tests.bridge-basic.test-isOptionDecl-true = {
-    expr = isOptionDecl (lib.mkOption { type = lib.types.int; });
+    expr = isOptionDecl (genMerge.mkOption { type = genMerge.types.int; });
     expected = true;
   };
 
@@ -66,7 +68,7 @@ in
     expr =
       let
         result = emitModule [ ] optionRecord;
-        eval = lib.evalModules {
+        eval = genMerge.evalModuleTree {
           modules = [
             result.module
             {
@@ -84,7 +86,7 @@ in
     expr =
       let
         result = emitModule [ ] optionRecord;
-        eval = lib.evalModules {
+        eval = genMerge.evalModuleTree {
           modules = [
             result.module
             { config.hostname = "test"; }
@@ -108,7 +110,7 @@ in
     expr =
       let
         result = emitModule [ ] refinedRecord;
-        eval = lib.evalModules {
+        eval = genMerge.evalModuleTree {
           modules = [
             result.module
             {
@@ -147,7 +149,7 @@ in
     expr =
       let
         result = emitModule [ "validators" ] collectionRecord;
-        eval = lib.evalModules {
+        eval = genMerge.evalModuleTree {
           modules = [
             result.module
             { config.port = 8080; }

@@ -1,16 +1,21 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkIdentityModule;
   mkEval =
     kind: modules:
-    lib.evalModules {
+    genMerge.evalModuleTree {
       modules = [ (mkIdentityModule kind) ] ++ modules;
     };
 
   evalReflected = mkEval "host" [
     {
-      options.name = lib.mkOption { type = lib.types.str; };
-      options.role = lib.mkOption { type = lib.types.str; };
+      options.name = genMerge.mkOption { type = genMerge.types.str; };
+      options.role = genMerge.mkOption { type = genMerge.types.str; };
     }
     {
       config.name = "igloo";
@@ -19,8 +24,8 @@ let
   ];
   evalExplicitName = mkEval "host" [
     {
-      options.name = lib.mkOption { type = lib.types.str; };
-      options.role = lib.mkOption { type = lib.types.str; };
+      options.name = genMerge.mkOption { type = genMerge.types.str; };
+      options.role = genMerge.mkOption { type = genMerge.types.str; };
     }
     {
       config.name = "igloo";
@@ -30,8 +35,8 @@ let
   ];
   evalExplicitNameOnly = mkEval "host" [
     {
-      options.name = lib.mkOption { type = lib.types.str; };
-      options.role = lib.mkOption { type = lib.types.str; };
+      options.name = genMerge.mkOption { type = genMerge.types.str; };
+      options.role = genMerge.mkOption { type = genMerge.types.str; };
     }
     {
       config.name = "igloo";
@@ -41,8 +46,8 @@ let
   ];
   evalMerged = mkEval "host" [
     {
-      options.name = lib.mkOption { type = lib.types.str; };
-      options.role = lib.mkOption { type = lib.types.str; };
+      options.name = genMerge.mkOption { type = genMerge.types.str; };
+      options.role = genMerge.mkOption { type = genMerge.types.str; };
     }
     { config._identity.keys = [ "name" ]; }
     { config._identity.keys = [ "role" ]; }

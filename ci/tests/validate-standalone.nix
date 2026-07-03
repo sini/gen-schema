@@ -3,18 +3,19 @@
 {
   lib,
   genSchema,
+  genMerge,
   genAlgebra,
   ...
 }:
 let
   # Build schema with validators, but create instances manually (not via registry)
   # to avoid the registry's apply pipeline throwing on validation failure.
-  schemaEval = lib.evalModules {
+  schemaEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = genSchema.mkSchemaOption { };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
           validators = [
             (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
           ];
@@ -25,11 +26,11 @@ let
 
   # Create instances directly via mkInstanceType (no apply pipeline)
   hostType = genSchema.mkInstanceType schemaEval.config.schema.host { };
-  instanceEval = lib.evalModules {
+  instanceEval = genMerge.evalModuleTree {
     modules = [
       {
-        options.hosts = lib.mkOption {
-          type = lib.types.attrsOf hostType;
+        options.hosts = genMerge.mkOption {
+          type = genMerge.types.attrsOf hostType;
           default = { };
         };
         config.hosts.good.addr = "10.0.1.1";

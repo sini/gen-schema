@@ -1,13 +1,14 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry ref;
 
   # --- Simple binding (no coerce) — verifies normalizeBinding passthrough ---
-  evalSimple = lib.evalModules {
+  evalSimple = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -15,10 +16,10 @@ let
         options.services = mkInstanceRegistry evalSimple.config.schema.service {
           refs.host = evalSimple.config.hosts;
         };
-        config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
+        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
-          options.host = lib.mkOption { type = ref "host"; };
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.host = genMerge.mkOption { type = ref "host"; };
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";
@@ -32,7 +33,7 @@ let
   };
 
   # --- Scalar coerce test ---
-  evalScalar = lib.evalModules {
+  evalScalar = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -46,11 +47,11 @@ let
           };
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
-          options.host = lib.mkOption { type = ref "host"; };
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.host = genMerge.mkOption { type = ref "host"; };
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";
@@ -75,7 +76,7 @@ let
   };
 
   # --- listOf coerce test ---
-  evalList = lib.evalModules {
+  evalList = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -94,11 +95,11 @@ let
           };
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.group = {
-          options.members = lib.mkOption {
-            type = lib.types.listOf (ref "host");
+          options.members = genMerge.mkOption {
+            type = genMerge.types.listOf (ref "host");
             default = [ ];
           };
         };
@@ -168,7 +169,7 @@ in
     test-scalar-coerce-expansion-error = {
       expr =
         let
-          evalBad = lib.evalModules {
+          evalBad = genMerge.evalModuleTree {
             modules = [
               {
                 options.schema = mkSchemaOption { };
@@ -182,8 +183,8 @@ in
                     ];
                   };
                 };
-                config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
-                config.schema.thing.options.host = lib.mkOption { type = ref "host"; };
+                config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                config.schema.thing.options.host = genMerge.mkOption { type = ref "host"; };
                 config.hosts.igloo = {
                   addr = "10.0.1.1";
                 };

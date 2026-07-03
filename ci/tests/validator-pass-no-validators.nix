@@ -1,21 +1,26 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
-  schemaEval = lib.evalModules {
+  schemaEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = genSchema.mkSchemaOption { };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
       }
     ];
   };
   hostType = genSchema.mkInstanceType schemaEval.config.schema.host { };
-  instanceEval = lib.evalModules {
+  instanceEval = genMerge.evalModuleTree {
     modules = [
       {
-        options.hosts = lib.mkOption {
-          type = lib.types.attrsOf hostType;
+        options.hosts = genMerge.mkOption {
+          type = genMerge.types.attrsOf hostType;
           default = { };
         };
         config.hosts.igloo = {

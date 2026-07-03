@@ -1,32 +1,33 @@
 {
-  lib,
+  prelude,
+  merge,
   algebra,
 }:
 let
-  record = algebra.record;
+  inherit (algebra) record;
 
-  methods = import ./methods.nix { inherit lib; };
-  validate = import ./validate.nix { inherit lib; };
-  identityLib = import ./identity.nix { inherit lib; };
-  strictLib = import ./strict.nix { inherit lib; };
-  refinedLib = import ./refined.nix { inherit lib; };
-  blameLib = import ./blame.nix { inherit lib; };
-  mixinLib = import ./mixin.nix { inherit lib record; };
+  methods = import ./methods.nix { inherit prelude merge; };
+  validate = import ./validate.nix { inherit prelude; };
+  identityLib = import ./identity.nix { inherit prelude merge; };
+  strictLib = import ./strict.nix { inherit prelude merge; };
+  refinedLib = import ./refined.nix;
+  blameLib = import ./blame.nix;
+  mixinLib = import ./mixin.nix { inherit record; };
   bridgeLib = import ./bridge.nix {
-    inherit lib record;
+    inherit prelude record;
     inherit (refinedLib) isRefined getRefinements;
   };
-  refLib = import ./ref.nix { inherit lib; };
+  refLib = import ./ref.nix { inherit prelude merge; };
   entryType = import ./entry-type.nix {
-    inherit lib record;
+    inherit prelude merge record;
     inherit (methods) mkMethodsModule;
     inherit (refLib) refsFromOptionsWithTypes;
     inherit (mixinLib) applyMixin;
     inherit (bridgeLib) emitModule isOptionDecl;
-    inherit (refinedLib) isRefined getRefinements;
+    inherit (refinedLib) getRefinements;
   };
   instance = import ./instance.nix {
-    inherit lib;
+    inherit prelude merge;
     inherit (strictLib) mkStrictModule;
     inherit (identityLib) mkIdentityModule;
     inherit (validate)
@@ -36,11 +37,23 @@ let
       ;
     inherit (refLib) dedupByHash;
   };
-  docs = import ./docs.nix { inherit lib; };
-  codecLib = import ./codec.nix { inherit lib; };
+  docs = import ./docs.nix { inherit prelude; };
+  codecLib = import ./codec.nix { inherit prelude; };
 in
 {
-  # Module-system constructors (gen-schema-owned; relocated from gen-algebra).
+  # Module-system constructors, re-exported from gen-merge so consumers (den
+  # entities are gen-schema registries) never reach for nixpkgs `lib`.
+  inherit (merge)
+    mkOption
+    mkOptionType
+    mkMerge
+    mkDefault
+    mkForce
+    evalModuleTree
+    ;
+  inherit (merge) types;
+
+  # Identity / strict / validation module surface (gen-schema-owned).
   inherit (identityLib) mkIdentityModule;
   inherit (strictLib) mkStrictModule;
   inherit (validate)

@@ -1,15 +1,20 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
   inherit (genSchema) mkSchemaOption;
 
   # Declare a schema with a "host" kind
-  schemaEval = lib.evalModules {
+  schemaEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         config.schema.host = {
-          options.name = lib.mkOption { type = lib.types.str; };
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
       }
     ];
@@ -18,7 +23,7 @@ let
   hostKind = schemaEval.config.schema.host;
 
   # Import the kind into an instance evaluation
-  instance = lib.evalModules {
+  instance = genMerge.evalModuleTree {
     modules = [
       hostKind
       {

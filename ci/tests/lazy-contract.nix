@@ -1,19 +1,20 @@
 {
   lib,
   genSchema,
+  genMerge,
   genAlgebra,
   ...
 }:
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
-  schemaEval = lib.evalModules {
+  schemaEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
-          options.name = lib.mkOption { type = lib.types.str; };
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
         };
       }
     ];
@@ -33,7 +34,7 @@ let
     };
   };
 
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.services = lazyRegistry;
@@ -65,7 +66,7 @@ in
   flake.tests.lazy-contract.test-lazy-valid-passes = {
     expr =
       let
-        validEval = lib.evalModules {
+        validEval = genMerge.evalModuleTree {
           modules = [
             {
               options.services = lazyRegistry;
@@ -102,7 +103,7 @@ in
             ];
           };
         };
-        mixedEval = lib.evalModules {
+        mixedEval = genMerge.evalModuleTree {
           modules = [
             {
               options.services = mixedRegistry;

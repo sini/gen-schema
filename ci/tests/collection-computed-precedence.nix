@@ -1,7 +1,12 @@
 # Computed fields override collections of the same name.
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = genSchema.mkSchemaOption {
@@ -16,7 +21,7 @@ let
         };
         config.schema.host = {
           isEntity = false;
-          options.name = lib.mkOption { type = lib.types.str; };
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
         };
       }
     ];

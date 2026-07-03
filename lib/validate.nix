@@ -8,7 +8,7 @@
 #
 # Base constructors relocated from gen-algebra/module so gen-schema owns its full
 # module-system surface; gen-algebra is the pure algebra root.
-{ lib, ... }:
+{ prelude }:
 let
   # --- Base constructors (gen-schema-owned) ---
 
@@ -19,10 +19,10 @@ let
   runValidators =
     kind: validators: instances:
     let
-      failures = lib.concatLists (
-        lib.mapAttrsToList (
+      failures = prelude.concatLists (
+        prelude.mapAttrsToList (
           name: instance:
-          lib.concatMap (
+          prelude.concatMap (
             v:
             if v.pred instance then
               [ ]
@@ -42,7 +42,9 @@ let
 
   formatErrors =
     failures:
-    lib.concatMapStringsSep "\n" (f: "  ${f.kind} '${f.name}': ${f.validator} — ${f.message}") failures;
+    prelude.concatMapStringsSep "\n" (
+      f: "  ${f.kind} '${f.name}': ${f.validator} — ${f.message}"
+    ) failures;
 
   defaultOnError =
     left:

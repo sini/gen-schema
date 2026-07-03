@@ -4,13 +4,12 @@
 {
   lib,
   genSchema,
-  genAlgebra,
+  prelude,
   ...
 }:
 let
   validateLib = import ../../lib/validate.nix {
-    inherit lib;
-    genAlgebra = genAlgebra;
+    inherit prelude;
   };
   inherit (validateLib) mkFieldValidator filterValidators;
   inherit (genSchema) mkValidator;

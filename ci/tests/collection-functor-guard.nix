@@ -1,7 +1,12 @@
 # __functor is reserved — declaring it as a collection key should throw.
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = genSchema.mkSchemaOption {
@@ -9,7 +14,7 @@ let
             default = { };
           };
         };
-        config.schema.host.options.name = lib.mkOption { type = lib.types.str; };
+        config.schema.host.options.name = genMerge.mkOption { type = genMerge.types.str; };
       }
     ];
   };

@@ -1,6 +1,7 @@
 {
   lib,
   genSchema,
+  genMerge,
   ...
 }:
 let
@@ -12,7 +13,7 @@ let
     ;
 
   # --- Basic setOf test ---
-  evalBasic = lib.evalModules {
+  evalBasic = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -21,10 +22,10 @@ let
           refs.members = evalBasic.config.hosts;
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.group = {
-          options.members = lib.mkOption {
+          options.members = genMerge.mkOption {
             type = setOf (ref "host");
             default = [ ];
           };
@@ -57,7 +58,7 @@ let
   };
 
   # --- setOf with custom coerce (expansion + dedup) ---
-  evalCoerce = lib.evalModules {
+  evalCoerce = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -74,10 +75,10 @@ let
           };
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.group = {
-          options.members = lib.mkOption {
+          options.members = genMerge.mkOption {
             type = setOf (ref "host");
             default = [ ];
           };
@@ -101,7 +102,7 @@ let
   };
 
   # --- nullOr (setOf (ref "kind")) ---
-  evalNullable = lib.evalModules {
+  evalNullable = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -110,12 +111,12 @@ let
           refs.hosts = evalNullable.config.hosts;
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.service = {
-          options.port = lib.mkOption { type = lib.types.int; };
-          options.hosts = lib.mkOption {
-            type = lib.types.nullOr (setOf (ref "host"));
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.hosts = genMerge.mkOption {
+            type = genMerge.types.nullOr (setOf (ref "host"));
             default = null;
           };
         };

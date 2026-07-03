@@ -1,6 +1,7 @@
 {
   lib,
   genSchema,
+  genMerge,
   genAlgebra,
   ...
 }:
@@ -9,7 +10,7 @@ let
   inherit (genSchema) ref;
 
   # Empty schema — zero kinds
-  emptyEval = lib.evalModules {
+  emptyEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -18,18 +19,18 @@ let
   };
 
   # Docs default rendering
-  docsEval = lib.evalModules {
+  docsEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         config.schema.host = {
-          options.name = lib.mkOption { type = lib.types.str; };
-          options.port = lib.mkOption {
-            type = lib.types.int;
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
+          options.port = genMerge.mkOption {
+            type = genMerge.types.int;
             default = 80;
           };
-          options.role = lib.mkOption {
-            type = lib.types.str;
+          options.role = genMerge.mkOption {
+            type = genMerge.types.str;
             default = "worker";
           };
         };
@@ -39,7 +40,7 @@ let
   docs = renderDocs docsEval.config.schema;
 
   # ref with two modules setting same ref to different values
-  refConflictEval = lib.evalModules {
+  refConflictEval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
@@ -49,15 +50,15 @@ let
             (
               { ... }:
               {
-                options.host = lib.mkOption {
+                options.host = genMerge.mkOption {
                   type = ref refConflictEval.config.hosts;
                 };
               }
             )
           ];
         };
-        config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
-        config.schema.service.options.port = lib.mkOption { type = lib.types.int; };
+        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        config.schema.service.options.port = genMerge.mkOption { type = genMerge.types.int; };
         config.hosts.igloo.addr = "10.0.1.1";
         config.hosts.iceberg.addr = "10.0.1.2";
       }

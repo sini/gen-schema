@@ -5,28 +5,29 @@
 {
   lib,
   genSchema,
+  genMerge,
   genAlgebra,
   ...
 }:
 let
   inherit (genSchema) mkSchemaOption mkSchemaEntryType mkInstanceRegistry;
   R = genAlgebra.record;
-  refinedLib = import ../../lib/refined.nix { inherit lib; };
+  refinedLib = import ../../lib/refined.nix;
 
   # --- Test 1: Auto-extracted refinements from inline type declarations ---
 
-  schemaWithRefinedTypes = lib.evalModules {
+  schemaWithRefinedTypes = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption { };
         config.schema.service = {
-          options.port = lib.mkOption {
-            type = refinedLib.types.refined lib.types.int {
+          options.port = genMerge.mkOption {
+            type = refinedLib.types.refined genMerge.types.int {
               check = v: v > 0 && v < 65536;
               message = "must be valid TCP port";
             };
           };
-          options.name = lib.mkOption { type = lib.types.str; };
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
         };
       }
     ];
@@ -37,7 +38,7 @@ let
   # mkInstanceRegistry without explicit refinements — should auto-extract
   autoRegistry = mkInstanceRegistry schemaR.service { };
 
-  validEval = lib.evalModules {
+  validEval = genMerge.evalModuleTree {
     modules = [
       {
         options.services = autoRegistry;
@@ -49,7 +50,7 @@ let
     ];
   };
 
-  invalidEval = lib.evalModules {
+  invalidEval = genMerge.evalModuleTree {
     modules = [
       {
         options.services = autoRegistry;
@@ -67,24 +68,24 @@ let
     requires = [ "port" ];
     provides = [ "metrics_port" ];
     define = parent: {
-      metrics_port = lib.mkOption {
-        type = lib.types.int;
+      metrics_port = genMerge.mkOption {
+        type = genMerge.types.int;
         default = (R.select parent "port").default or 9090;
       };
     };
   };
 
-  schemaWithMixins = lib.evalModules {
+  schemaWithMixins = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = mkSchemaOption {
           mixins = [ monitorable ];
           baseModule = {
-            port = lib.mkOption {
-              type = lib.types.int;
+            port = genMerge.mkOption {
+              type = genMerge.types.int;
               default = 8080;
             };
-            hostname = lib.mkOption { type = lib.types.str; };
+            hostname = genMerge.mkOption { type = genMerge.types.str; };
           };
         };
         config.schema.service = { };
@@ -95,7 +96,7 @@ let
   schemaM = schemaWithMixins.config.schema;
   mixinRegistry = mkInstanceRegistry schemaM.service { };
 
-  mixinEval = lib.evalModules {
+  mixinEval = genMerge.evalModuleTree {
     modules = [
       {
         options.services = mixinRegistry;

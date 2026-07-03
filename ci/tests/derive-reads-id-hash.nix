@@ -1,14 +1,19 @@
-{ lib, genSchema, ... }:
+{
+  lib,
+  genSchema,
+  genMerge,
+  ...
+}:
 let
-  eval = lib.evalModules {
+  eval = genMerge.evalModuleTree {
     modules = [
       {
         options.schema = genSchema.mkSchemaOption { };
         options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host {
           extraModules = [
             {
-              options.hashPrefix = lib.mkOption {
-                type = lib.types.str;
+              options.hashPrefix = genMerge.mkOption {
+                type = genMerge.types.str;
                 readOnly = true;
                 internal = true;
               };
@@ -18,7 +23,7 @@ let
             instances: lib.mapAttrs (_: inst: { hashPrefix = builtins.substring 0 8 inst.id_hash; }) instances;
         };
         config.schema.host = {
-          options.addr = lib.mkOption { type = lib.types.str; };
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.hosts.igloo.addr = "10.0.1.1";
       }

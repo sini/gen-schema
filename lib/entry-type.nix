@@ -8,14 +8,14 @@
 # Strict validation and identity hashing are instance-level concerns
 # injected by mkInstanceType, not here.
 {
-  lib,
+  prelude,
+  merge,
   mkMethodsModule,
   refsFromOptionsWithTypes,
   record,
   applyMixin,
   emitModule,
   isOptionDecl,
-  isRefined,
   getRefinements,
 }:
 let
@@ -29,7 +29,7 @@ let
       strict ? true,
     }:
     let
-      base = lib.types.deferredModule;
+      base = merge.types.deferredModule;
 
       # methods is a built-in collection — user collections are additional
       allCollections =
@@ -72,38 +72,38 @@ let
         else
           throw "gen-schema: collection '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
 
-      collectionKeys = lib.attrNames allCollections;
+      collectionKeys = prelude.attrNames allCollections;
     in
     base
     // {
       merge =
         loc: defs:
         let
-          kind = lib.last loc;
+          kind = prelude.last loc;
 
           # Extract each collection from defs, merge with strategy.
           # NOTE: collections must be declared via inline attrsets, not path modules.
           # Path-based kind declarations pass through as paths — the isAttrs check
           # skips them. If two modules declare the same collection key, they merge
           # according to the collection's merge strategy.
-          extractedCollections = lib.mapAttrs (
+          extractedCollections = prelude.mapAttrs (
             name: collection:
             let
               merge = inferMerge name collection;
             in
-            lib.foldl' (
+            prelude.foldl' (
               acc: d: if builtins.isAttrs d.value && d.value ? ${name} then merge acc d.value.${name} else acc
             ) collection.default defs
           ) allCollections;
 
           # Computed fields from extracted collections + raw defs
-          # kind (lib.last loc) is passed so computed can produce entry-specific fields
+          # kind (prelude.last loc) is passed so computed can produce entry-specific fields
           computedFields = if computed != null then computed extractedCollections defs else { };
 
           # Strip all collection keys before deferredModule merge
           strippedDefs = map (
             d:
-            if builtins.isAttrs d.value && lib.any (k: d.value ? ${k}) collectionKeys then
+            if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
               d // { value = builtins.removeAttrs d.value collectionKeys; }
             else
               d
@@ -178,25 +178,27 @@ let
                     acc: d:
                     if builtins.isAttrs d.value then
                       let
-                        opts = d.value.options or (lib.filterAttrs (_: isOptionDecl) d.value);
+                        opts = d.value.options or (prelude.filterAttrs (_: isOptionDecl) d.value);
                       in
-                      acc // (lib.filterAttrs (_: v: isOptionDecl v && v ? type && v.type ? __schema) opts)
+                      acc // (prelude.filterAttrs (_: v: isOptionDecl v && v ? type && v.type ? __schema) opts)
                     else
                       acc
                   ) { } defs;
                 in
-                lib.filterAttrs (_: v: v != [ ]) (lib.mapAttrs (_: v: getRefinements v.type) allOptionDecls);
+                prelude.filterAttrs (_: v: v != [ ]) (
+                  prelude.mapAttrs (_: v: getRefinements v.type) allOptionDecls
+                );
 
             # Merge bridge-extracted collections into the collection results
             bridgeCollections =
               if mixinResult != null then
-                lib.mapAttrs (
+                prelude.mapAttrs (
                   name: stacks:
                   let
                     merge = inferMerge name allCollections.${name};
                   in
                   builtins.foldl' merge (extractedCollections.${name} or allCollections.${name}.default) stacks
-                ) (lib.filterAttrs (n: _: allCollections ? ${n}) mixinResult.collections)
+                ) (prelude.filterAttrs (n: _: allCollections ? ${n}) mixinResult.collections)
               else
                 { };
 
@@ -205,11 +207,11 @@ let
             # Inject baseModule + methods module (methods is the only collection
             # that generates instance-level options via mkMethodsModule)
             injected =
-              lib.optional (effectiveBase != null) {
+              prelude.optional (effectiveBase != null) {
                 file = "gen-schema/base";
                 value = effectiveBase;
               }
-              ++ lib.optional (finalCollections.methods != { }) {
+              ++ prelude.optional (finalCollections.methods != { }) {
                 file = "gen-schema/methods";
                 value = mkMethodsModule kind finalCollections.methods;
               };
@@ -220,8 +222,8 @@ let
             # Uses the locally-built merged module, not config.${k}, to avoid circularity.
             introspect =
               let
-                dummy = lib.evalModules { modules = [ merged ]; };
-                userOptions = lib.filterAttrs (n: _: !(lib.hasPrefix "_module" n)) dummy.options;
+                dummy = merge.evalModuleTree { modules = [ merged ]; };
+                userOptions = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) dummy.options;
               in
               {
                 options = userOptions;
@@ -254,13 +256,13 @@ let
       mixins ? [ ],
       mkType ? null,
     }:
-    lib.mkOption {
+    merge.mkOption {
       description = "Schema — typed record registry with extension points";
       default = { };
-      type = lib.types.submodule (
+      type = merge.types.submodule (
         { config, ... }:
         {
-          freeformType = lib.types.lazyAttrsOf (mkSchemaEntryType {
+          freeformType = merge.types.lazyAttrsOf (mkSchemaEntryType {
             inherit
               baseModule
               computed
@@ -271,52 +273,54 @@ let
               ;
           });
 
-          options._kindNames = lib.mkOption {
-            type = lib.types.listOf lib.types.str;
+          options._kindNames = merge.mkOption {
+            type = merge.types.listOf merge.types.str;
             internal = true;
             readOnly = true;
             description = "All kind names in the schema";
           };
-          options._topology = lib.mkOption {
-            type = lib.types.raw;
+          options._topology = merge.mkOption {
+            type = merge.types.raw;
             internal = true;
             readOnly = true;
             description = "Parent-child nesting: { kind = { parent, children }; }";
           };
-          options._refEdges = lib.mkOption {
-            type = lib.types.listOf lib.types.raw;
+          options._refEdges = merge.mkOption {
+            type = merge.types.listOf merge.types.raw;
             internal = true;
             readOnly = true;
             description = "All ref edges: [ { from, field, to } ]";
           };
-          options._edges = lib.mkOption {
-            type = lib.types.listOf lib.types.raw;
+          options._edges = merge.mkOption {
+            type = merge.types.listOf merge.types.raw;
             internal = true;
             readOnly = true;
             description = "Unified edge view: parent (§ Neron 2015 P) + ref (§ Neron 2015 I) edges";
           };
-          options._roots = lib.mkOption {
-            type = lib.types.listOf lib.types.str;
+          options._roots = merge.mkOption {
+            type = merge.types.listOf merge.types.str;
             internal = true;
             readOnly = true;
             description = "Kinds with no parent in the topology";
           };
-          options._leaves = lib.mkOption {
-            type = lib.types.listOf lib.types.str;
+          options._leaves = merge.mkOption {
+            type = merge.types.listOf merge.types.str;
             internal = true;
             readOnly = true;
             description = "Kinds with no children in the topology";
           };
           config =
             let
-              kindNames = lib.sort (a: b: a < b) (lib.filter (n: !(lib.hasPrefix "_" n)) (lib.attrNames config));
+              kindNames = prelude.sort (a: b: a < b) (
+                prelude.filter (n: !(prelude.hasPrefix "_" n)) (prelude.attrNames config)
+              );
 
               # Derive topology from parent collections on each kind.
               # Each kind can declare `parent = "host";` as a collection.
               topology =
                 let
                   # Read parent collection from each kind
-                  parentMap = lib.foldl' (
+                  parentMap = prelude.foldl' (
                     acc: k:
                     let
                       p = config.${k}.parent or null;
@@ -331,7 +335,7 @@ let
                   ) { } kindNames;
 
                   # Derive children from parent map (inverse)
-                  childrenMap = lib.foldl' (
+                  childrenMap = prelude.foldl' (
                     acc: k:
                     let
                       p = parentMap.${k} or null;
@@ -339,30 +343,30 @@ let
                     if p != null then acc // { ${p} = (acc.${p} or [ ]) ++ [ k ]; } else acc
                   ) { } kindNames;
                 in
-                lib.genAttrs kindNames (k: {
+                prelude.genAttrs kindNames (k: {
                   parent = parentMap.${k} or null;
                   children = childrenMap.${k} or [ ];
                 });
 
               # Materialize all ref edges from kind.refs across all kinds
-              refEdges = lib.concatMap (
+              refEdges = prelude.concatMap (
                 fromKind:
                 let
                   refs = config.${fromKind}.refs;
                 in
-                lib.mapAttrsToList (field: refEntry: {
+                prelude.mapAttrsToList (field: refEntry: {
                   from = fromKind;
                   inherit field;
                   to = refEntry.refKind;
                 }) refs
               ) kindNames;
               # Unified edge view: § Neron 2015 P (parent) + I (ref/import) edges
-              parentEdges = lib.concatMap (
+              parentEdges = prelude.concatMap (
                 k:
                 let
                   t = topology.${k};
                 in
-                lib.optional (t.parent != null) {
+                prelude.optional (t.parent != null) {
                   from = k;
                   to = t.parent;
                   type = "parent";
