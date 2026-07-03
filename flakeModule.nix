@@ -15,6 +15,11 @@ let
   # NB: the resulting `options.schema` type is a gen-merge type. A consumer evaluating this
   # module with nixpkgs `lib.evalModules` cannot drive it (gen-merge types don't implement the
   # nixpkgs type interface). Use gen-merge's `evalModuleTree`, or the programmatic API.
+  #
+  # SUPERSEDED for flake-parts consumers by gen-flake (`github:sini/gen-flake`,
+  # `flakeModules.default`): compose gen definition modules PURELY and QUERY the resolved VALUES
+  # from your nixpkgs eval via `_module.args` (value-injection, not type-driving) — the sanctioned
+  # nixpkgs boundary. This module is retained only for gen-merge/programmatic drivers.
   genSchema = import ./default.nix { };
 in
 {
