@@ -1413,7 +1413,7 @@ nix eval --override-input gen-schema ../.. .#docs --raw
 
 ## Testing
 
-397 tests via nix-unit across 100 suites in `ci/tests/` — covering kinds, extension, strict validation, instances, identity hashing, cross-instance refs (deferred/direct/self-referential coerce, `listOf`/`setOf`/`nullOr` wrappers), collections and computed fields, methods, mixins, refinement contracts, blame, validators, derive hooks, codec round-trips, topology/edges introspection, and docs generation.
+398 tests via nix-unit across 101 suites in `ci/tests/` — covering kinds, extension, strict validation, instances, identity hashing, cross-instance refs (deferred/direct/self-referential coerce, `listOf`/`setOf`/`nullOr` wrappers), collections and computed fields, methods, mixins, refinement contracts, blame, validators, derive hooks, codec round-trips, topology/edges introspection, and docs generation.
 
 Run the itemized suite (from `ci/`):
 
