@@ -16,9 +16,10 @@
         ...
       }:
       {
-        # gen-flake injects a `perSystem` (to spread `genValues` into per-system args), so flake-parts
-        # requires `systems`. The demo produces no per-system outputs; one system suffices.
-        systems = [ "x86_64-linux" ];
+        # gen-flake v1 injects `genValues` into the top-level flake args only; `perSystem` injection is
+        # opt-in (`gen.injectPerSystem`, default off) and emits no `perSystem` definition otherwise.
+        # This demo reads `genValues` from a top-level reader module and produces no per-system outputs,
+        # so no `systems` declaration is required.
 
         imports = [
           inputs.gen-flake.flakeModules.default
@@ -48,9 +49,9 @@
     );
 
   inputs = {
-    # gen-flake — the pure composition boundary. Consumed LOCAL (unpublished) via a path pin. It
-    # threads the published pure stack (gen-schema@39d3d5d / gen-aspects@64c3c25 / gen-merge / …) into
-    # the tree, so relocated definition modules receive `{ genSchema, genMerge, ... }` as today.
+    # gen-flake — the pure composition boundary (v1). Pinned via its published github rev. It threads
+    # the published pure stack (gen-schema / gen-aspects / gen-merge / …) into the tree, so relocated
+    # definition modules receive `{ genSchema, genMerge, ... }` as today.
     gen-flake.url = "github:sini/gen-flake";
 
     # Reuse the EXACT gen-schema / gen-algebra instances gen-flake threads into the pure tree, so the
