@@ -46,6 +46,39 @@ in
     in
     hashIdentity kind keys (k: instance.${k});
 
+  # identityHashForKind kindValue instance — the OPTION-LEVEL EXACT twin of `identityHashFor`, for a consumer
+  # that HAS the kind's processed KIND-VALUE (e.g. the den-compat shim after schema processing). It reflects
+  # the KIND's primitive options — honoring `identity = false` and `internal`, the SAME reflection
+  # `mkIdentityModule` performs — so it is EXACT where `identityHashFor` (reflecting the instance's own present
+  # fields) can only approximate. Routes through the SAME `hashIdentity`, so it can drift from neither. Same
+  # discovery/skew loudness (a non-match = "not this kind"; formula skew ⇒ every instance misses). Reflection
+  # path only (a kind pinning explicit `_identity.keys` is the sole divergence — the instance carries those,
+  # not the kind-value).
+  identityHashForKind =
+    kindValue: instance:
+    let
+      primitiveTypeNames = [
+        "string"
+        "int"
+        "bool"
+      ];
+      isPrimitive =
+        name: opt:
+        !(prelude.hasPrefix "_" name)
+        && (opt ? type)
+        && prelude.elem (opt.type.name or "") primitiveTypeNames
+        && !(opt.internal or false)
+        && (opt.identity or true);
+      # `mkInstanceType` injects `name` (a primitive identity key) at INSTANCE eval, so it is NOT in the
+      # kind-value's user `options` — add it explicitly to match `mkIdentityModule`'s full-options reflection.
+      keys = prelude.sort (a: b: a < b) (
+        prelude.unique (
+          [ "name" ] ++ prelude.attrNames (prelude.filterAttrs isPrimitive (kindValue.options or { }))
+        )
+      );
+    in
+    hashIdentity kindValue.kind keys (k: instance.${k});
+
   mkIdentityModule =
     kind:
     { config, options, ... }:

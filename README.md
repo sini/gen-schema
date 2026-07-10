@@ -498,6 +498,8 @@ lib.findFirst (k: genSchema.identityHashFor k inst == inst.id_hash) null candida
 
 `identityHashFor` reflects the instance's own primitive fields and hashes through the same `hashIdentity` formula `mkIdentityModule` uses, so the two never drift; it matches for any kind whose identity keys are its primitive options (a kind using `identity = false` on a primitive is the sole divergence). A non-match reliably means "not this kind" — a wrong-kind false match would need a sha256 collision across different preimages.
 
+If you hold the kind's processed **kind-value** (not just the instance), `identityHashForKind kindValue instance` is the EXACT twin: it reflects the kind's own primitive options — honoring `identity = false` — so it matches `mkIdentityModule` even for kinds the instance-value form can only approximate. Both route through `hashIdentity`.
+
 **Three-layer precedence for key selection:**
 
 1. **Explicit `_identity.keys`** — list the exact keys. Multiple modules can contribute via `mkMerge`.
