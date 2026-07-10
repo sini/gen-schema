@@ -489,6 +489,15 @@ The hash is computed from all non-internal primitive options (str, int, bool), p
 
 `id_hash` is marked `internal = true` and `readOnly = true` — it won't appear in NixOS option documentation generators, but is always accessible via `instance.id_hash`.
 
+**Recomputing the hash for kind discovery — `identityHashFor kind instance`.** A consumer holding an instance *value* but not its kind (e.g. mapping an arbitrarily-named registry back to the kind it holds) can recompute the hash for each candidate kind and match the carried `id_hash`:
+
+```nix
+# which kind does `inst` belong to? (name-agnostic — by the id_hash marker, not the registry key)
+lib.findFirst (k: genSchema.identityHashFor k inst == inst.id_hash) null candidateKinds
+```
+
+`identityHashFor` reflects the instance's own primitive fields and hashes through the same `hashIdentity` formula `mkIdentityModule` uses, so the two never drift; it matches for any kind whose identity keys are its primitive options (a kind using `identity = false` on a primitive is the sole divergence). A non-match reliably means "not this kind" — a wrong-kind false match would need a sha256 collision across different preimages.
+
 **Three-layer precedence for key selection:**
 
 1. **Explicit `_identity.keys`** — list the exact keys. Multiple modules can contribute via `mkMerge`.

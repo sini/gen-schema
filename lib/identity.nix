@@ -9,7 +9,43 @@
 # kinds (see instance.nix). Relocated from gen-algebra/module so gen-schema owns
 # its full module-system surface; gen-algebra is the pure algebra root.
 { prelude, merge }:
+let
+  # The content-address FORMULA — the SINGLE definition both `mkIdentityModule` (identity keys reflected
+  # from a kind's options) and `identityHashFor` (reflected from an instance value) hash through, so the
+  # two derivations can NEVER drift from each other. `<kind>|<k1=v1>|<k2=v2>…` over the sorted identity keys.
+  hashIdentity =
+    kind: keys: valueOf:
+    builtins.hashString "sha256" "${kind}|${
+      prelude.concatMapStringsSep "|" (k: "${k}=${toString (valueOf k)}") keys
+    }";
+in
 {
+  inherit hashIdentity;
+
+  # identityHashFor kind instance — recompute an instance's content-addressed `id_hash` from its VALUE +
+  # kind NAME, for EXTERNAL kind-DISCOVERY: a consumer holding an instance value but not its kind (e.g. the
+  # den-compat shim mapping a config-chosen registry key back to the kind it holds) recomputes the hash for
+  # each candidate kind and matches the instance's carried `id_hash`. Reflects the instance's own primitive
+  # fields (string/int/bool), matching `mkIdentityModule`'s hash for any kind whose identity keys are its
+  # primitive options — the common case; a kind pinning `identity = false` on a primitive is the sole
+  # divergence (documented). Goes through the SAME `hashIdentity` formula, so it cannot drift from the
+  # module. DISCOVERY PROPERTY: a recompute that does NOT match the carried hash means the kind guess is
+  # wrong — and since a WRONG-kind false match needs a sha256 collision across different preimages
+  # (negligible), a non-match is a reliable "not this kind". If two gen-schema pins' formulas ever diverged,
+  # EVERY instance would mismatch → the namespace matches NO kind → the consumer's strict gate aborts NAMED
+  # (a loud MISS, never a misclassification).
+  identityHashFor =
+    kind: instance:
+    let
+      isPrim = v: builtins.isString v || builtins.isInt v || builtins.isBool v;
+      keys = prelude.sort (a: b: a < b) (
+        builtins.filter (
+          k: !(prelude.hasPrefix "_" k) && k != "id_hash" && isPrim (instance.${k} or null)
+        ) (builtins.attrNames instance)
+      );
+    in
+    hashIdentity kind keys (k: instance.${k});
+
   mkIdentityModule =
     kind:
     { config, options, ... }:
@@ -74,9 +110,8 @@
                   k
               ) sorted;
             identityKeys = if explicitKeys != [ ] then validatedExplicitKeys else reflectedKeys;
-            encode = k: "${k}=${toString config.${k}}";
           in
-          builtins.hashString "sha256" "${kind}|${prelude.concatMapStringsSep "|" encode identityKeys}";
+          hashIdentity kind identityKeys (k: config.${k});
       };
     };
 }
