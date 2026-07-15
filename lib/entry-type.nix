@@ -27,6 +27,7 @@ let
       mixins ? [ ],
       mkType ? null,
       strict ? true,
+      keySemantics ? { },
     }:
     let
       base = merge.types.deferredModule;
@@ -133,7 +134,7 @@ let
             inherit kind;
           }
           // {
-            inherit strict;
+            inherit strict keySemantics;
             options = { };
             refs = { };
             refinements = { };
@@ -239,7 +240,12 @@ let
               {
                 imports = [ merged ];
               };
-            inherit kind mixins strict;
+            inherit
+              kind
+              mixins
+              strict
+              keySemantics
+              ;
             inherit (introspect) options refs;
             refinements = extractedRefinements;
           }
@@ -255,6 +261,7 @@ let
       computed ? null,
       mixins ? [ ],
       mkType ? null,
+      keySemantics ? { },
     }:
     merge.mkOption {
       description = "Schema — typed record registry with extension points";
@@ -270,6 +277,7 @@ let
               collections
               mkType
               strict
+              keySemantics
               ;
           });
 
