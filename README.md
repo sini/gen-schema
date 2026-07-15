@@ -1051,6 +1051,7 @@ mkSchemaOption {
   baseModule ? null,     # module imported into every kind
   collections ? {},      # { name = { default; merge? }; } — user-defined collection fields
   computed ? null,       # (collections -> defs -> attrset) — derived fields on merged result
+  keySemantics ? {},     # { <key> = { category = <opaque string>; option? }; } — per-key category metadata (recorded, not interpreted)
 }
 ```
 
@@ -1078,6 +1079,22 @@ mkSchemaEntryType {
 | `kind` | The kind name (last element of the option path) |
 
 The return value is merged with `computedFields` (computed wins for same-named keys), so topology and introspection fields remain authoritative.
+
+#### `keySemantics` — opaque per-key category surface
+
+```nix
+mkSchemaOption {
+  keySemantics = {
+    nixos    = { category = "class"; };
+    firewall = { category = "channel"; };
+    neededBy = { category = "facet"; option = lib.mkOption { type = ...; }; };
+  };
+}
+```
+
+`keySemantics` is a per-key declaration surface recorded verbatim on the emitted schema entry (introspectable via `config.schema.<kind>.keySemantics`, alongside `options`/`refinements`/`collections`). `category` is an **opaque string** — gen-schema stores and threads it but assigns it **no meaning**; a downstream library interprets it (gen-aspects reads it to dispatch aspect key-options over the bounded set `class`/`channel`/`facet`). Where a `<key>` supplies an `option` recipe, gen-schema builds it into a real option on the entry; keys with no `option` are left for the consumer to synthesize from the recorded `category`.
+
+This is what makes gen-aspects' dependency on gen-schema load-bearing: aspect key-options are declared *through* this per-key surface, not a private downstream field. No `class`/`channel`/`facet` literal appears anywhere in gen-schema — the category vocabulary and its meaning live entirely in gen-aspects. Default `{}` — recorded as empty when unset.
 
 **Use case:** gen-aspects provides its recursive `aspectType` as a custom entry type, replacing gen-schema's deferred module with its own classification and dispatch system while reusing gen-schema's collection extraction and topology.
 
