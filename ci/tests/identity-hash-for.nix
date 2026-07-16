@@ -38,7 +38,12 @@ let
           default = 0;
         };
       }
-      ({ config, ... }: { options.rackFarm = genSchema.mkInstanceRegistry config.schema.rack { }; })
+      (
+        { config, ... }:
+        {
+          options.rackFarm = genSchema.mkInstanceRegistry config.schema.rack { };
+        }
+      )
       { config.rackFarm.r1.slots = 12; }
     ];
   };

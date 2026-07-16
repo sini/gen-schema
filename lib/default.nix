@@ -54,7 +54,12 @@ in
   inherit (merge) types;
 
   # Identity / strict / validation module surface (gen-schema-owned).
-  inherit (identityLib) mkIdentityModule identityHashFor identityHashForKind hashIdentity;
+  inherit (identityLib)
+    mkIdentityModule
+    identityHashFor
+    identityHashForKind
+    hashIdentity
+    ;
   inherit (strictLib) mkStrictModule;
   inherit (validate)
     mkValidator
