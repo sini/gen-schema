@@ -107,10 +107,15 @@ in
         default =
           let
             explicitKeys = config._identity.keys;
-            # gen-types leaf CHECKERS name primitives "string"/"int"/"bool" (NOT nixpkgs'
-            # "str"): id-hash reflection over primitive fields dispatches on that name.
+            # id-hash reflection over primitive fields dispatches on the option's type NAME. gen-types
+            # leaf checkers name primitives "string"/"int"/"bool"; nixpkgs `lib.types` name the same
+            # primitive "str"/"int"/"bool". Both are accepted so a kind declared with EITHER type system
+            # reflects identically — den declares every entity option with nixpkgs `lib.types`, so a
+            # nixpkgs-str field (e.g. a home's `system`) must reflect, else same-named instances that
+            # differ only in it collapse to one id_hash.
             primitiveTypeNames = [
               "string"
+              "str"
               "int"
               "bool"
             ];
