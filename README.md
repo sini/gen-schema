@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/sini/gen-schema/actions/workflows/ci.yml/badge.svg)](https://github.com/sini/gen-schema/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github)](https://github.com/sponsors/sini)
 
-A typed record registry for Nix with extension points, strict validation, refinement contracts, identity hashing, cross-instance references, first-class mixins, introspection, and declarative methods. Built on the NixOS module system.
+A typed record registry for Nix with extension points, strict validation, refinement contracts, identity hashing, cross-instance references, first-class mixins, introspection, and declarative methods. Built on the pure-gen module system (gen-merge — a byte-mode replacement for `lib.evalModules` + `lib.types`), with no `nixpkgs.lib` dependency.
 
 gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions that any module can extend, strict-by-default validation that catches typos immediately, refinement contracts co-located with type declarations, stable identity comparison via `id_hash`, cross-registry references that resolve to instances, reusable mixins with structural compatibility, and auto-generated documentation from your schema.
 
-**Dependency class: nixpkgs-lib-tethered.** gen-schema is the tier of the gen ecosystem that keeps a `nixpkgs.lib` dependency on purpose — it is built on `lib.types` and `lib.evalModules` (the NixOS module system) and takes `lib` as an argument. Its only gen dependency is [gen-algebra](https://github.com/sini/gen-algebra)'s pure `record` algebra. The module-system constructors it exports (identity hashing, strict rejection, validators) are **gen-schema-owned** — they relocated here from gen-algebra on 2026-06-26, leaving gen-algebra fully pure.
+**Dependency class: pure-gen.** gen-schema runs on the pure-gen stack — [gen-prelude](https://github.com/sini/gen-prelude) (the pure utility base), [gen-merge](https://github.com/sini/gen-merge) (the byte-mode module engine that REPLACES `lib.evalModules` + `lib.types`), and [gen-algebra](https://github.com/sini/gen-algebra) (the pure `record` algebra). It carries no `nixpkgs.lib` dependency; the constructor takes `{ prelude, merge, algebra }`, auto-fetched from gen-schema's own lock (pass any explicitly to override). The module-system constructors it exports (identity hashing, strict rejection, validators) are **gen-schema-owned** — they relocated here from gen-algebra on 2026-06-26, leaving gen-algebra fully pure.
 
 ## Table of Contents
 
@@ -139,15 +139,16 @@ The flake-parts module provides `schema` and `genSchema` with default settings (
 ### Programmatic use
 
 ```nix
-# Without flake-parts — call the library directly
+# Without flake-parts — call the library directly. The module-system `lib` is gen-merge
+# (it REPLACES lib.evalModules + lib.types); gen-schema itself is `gen-schema.lib`.
 let
   genSchema = gen-schema.lib;
-  # or (standalone, no flake): genSchema = import ./path/to/gen-schema { inherit lib; };
+  merge = gen-merge.lib;   # evalModuleTree + mkOption + types — the pure-gen module system
 in
-lib.evalModules {
+merge.evalModuleTree {
   modules = [{
     options.schema = genSchema.mkSchemaOption {};
-    config.schema.host.options.addr = lib.mkOption { type = lib.types.str; };
+    config.schema.host.options.addr = merge.mkOption { type = merge.types.str; };
   }];
 }
 ```
@@ -156,8 +157,10 @@ lib.evalModules {
 
 ```nix
 let
-  # the root default.nix pins gen-algebra from gen-schema's own flake.lock
-  genSchema = import ./path/to/gen-schema { inherit lib; };
+  # the root default.nix auto-fetches gen-prelude/gen-types/gen-merge/gen-algebra from gen-schema's own
+  # flake.lock (content-addressed, in lockstep with the flake output). Pass { prelude; merge; algebra; }
+  # to override — e.g. local checkouts.
+  genSchema = import ./path/to/gen-schema { };
 in
 # use genSchema.mkSchemaOption, genSchema.mkInstanceRegistry, etc.
 ```
@@ -373,7 +376,7 @@ config.fleet.hosts.igloo = {};          # system → "x86_64-linux"
 config.fleet.hosts.mac.system = "aarch64-darwin";  # override works
 ```
 
-This is standard NixOS module system behavior — `lib.mkDefault` sets a low-priority value that any explicit setting overrides.
+This is standard module-system priority behavior (gen-merge reproduces it byte-for-byte) — `mkDefault` sets a low-priority value that any explicit setting overrides.
 
 ### Strict Validation
 
@@ -1457,7 +1460,7 @@ cd ci
 nix flake check
 ```
 
-gen-schema is nixpkgs-lib-tethered by design, so there is no purity suite asserting nixpkgs-lib-freeness (unlike the Class A/B gen libraries); the tethering is intentional — it is built directly on `lib.types` and `lib.evalModules`.
+gen-schema runs on the pure-gen stack — gen-merge REPLACES `lib.evalModules` + `lib.types`, so gen-schema carries no `nixpkgs.lib` dependency.
 
 ## Theoretical Foundations
 
