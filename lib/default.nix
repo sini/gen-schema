@@ -72,7 +72,7 @@ in
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (validate) validateInstances mkFieldValidator filterValidators;
   inherit (refLib) ref setOf toSet;
-  inherit (refinedLib) refinements;
+  inherit (refinedLib) refinements checkRefinements;
   inherit (refinedLib.types) refined;
   inherit (blameLib) blame;
   inherit (mixinLib)
