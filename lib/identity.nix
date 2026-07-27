@@ -18,6 +18,31 @@ let
     builtins.hashString "sha256" "${kind}|${
       prelude.concatMapStringsSep "|" (k: "${k}=${toString (valueOf k)}") keys
     }";
+
+  # THE identity-key predicate — ONE definition, because the option-reflecting derivations must agree
+  # and two copies of a list is how they stop agreeing. `mkIdentityModule` reflects the INSTANCE's
+  # merged options to stamp `id_hash`; `identityHashForKind` reflects the KIND VALUE's options to
+  # recompute it. A key one side counts and the other does not is a hash mismatch on every instance
+  # of that kind — and it is silent, because both answers are well-formed hashes.
+  #
+  # Reflection dispatches on the option's type NAME. gen-types leaf checkers name primitives
+  # "string"/"int"/"bool"; nixpkgs `lib.types` names the same primitive "str"/"int"/"bool". Both
+  # spellings are accepted so a kind declared with EITHER type system reflects identically — den
+  # declares every entity option with nixpkgs `lib.types`, so a nixpkgs-str field (e.g. a home's
+  # `system`) must reflect, else same-named instances that differ only in it collapse to one id_hash.
+  primitiveTypeNames = [
+    "string"
+    "str"
+    "int"
+    "bool"
+  ];
+  isPrimitiveOption =
+    name: opt:
+    !(prelude.hasPrefix "_" name)
+    && (opt ? type)
+    && prelude.elem (opt.type.name or "") primitiveTypeNames
+    && !(opt.internal or false)
+    && (opt.identity or true);
 in
 {
   inherit hashIdentity;
@@ -57,23 +82,11 @@ in
   identityHashForKind =
     kindValue: instance:
     let
-      primitiveTypeNames = [
-        "string"
-        "int"
-        "bool"
-      ];
-      isPrimitive =
-        name: opt:
-        !(prelude.hasPrefix "_" name)
-        && (opt ? type)
-        && prelude.elem (opt.type.name or "") primitiveTypeNames
-        && !(opt.internal or false)
-        && (opt.identity or true);
       # `mkInstanceType` injects `name` (a primitive identity key) at INSTANCE eval, so it is NOT in the
       # kind-value's user `options` — add it explicitly to match `mkIdentityModule`'s full-options reflection.
       keys = prelude.sort (a: b: a < b) (
         prelude.unique (
-          [ "name" ] ++ prelude.attrNames (prelude.filterAttrs isPrimitive (kindValue.options or { }))
+          [ "name" ] ++ prelude.attrNames (prelude.filterAttrs isPrimitiveOption (kindValue.options or { }))
         )
       );
     in
@@ -107,27 +120,8 @@ in
         default =
           let
             explicitKeys = config._identity.keys;
-            # id-hash reflection over primitive fields dispatches on the option's type NAME. gen-types
-            # leaf checkers name primitives "string"/"int"/"bool"; nixpkgs `lib.types` name the same
-            # primitive "str"/"int"/"bool". Both are accepted so a kind declared with EITHER type system
-            # reflects identically — den declares every entity option with nixpkgs `lib.types`, so a
-            # nixpkgs-str field (e.g. a home's `system`) must reflect, else same-named instances that
-            # differ only in it collapse to one id_hash.
-            primitiveTypeNames = [
-              "string"
-              "str"
-              "int"
-              "bool"
-            ];
-            isPrimitive =
-              name: opt:
-              !(prelude.hasPrefix "_" name)
-              && (opt ? type)
-              && prelude.elem (opt.type.name or "") primitiveTypeNames
-              && !(opt.internal or false)
-              && (opt.identity or true);
             reflectedKeys = prelude.sort (a: b: a < b) (
-              prelude.attrNames (prelude.filterAttrs isPrimitive options)
+              prelude.attrNames (prelude.filterAttrs isPrimitiveOption options)
             );
             # Explicit keys are user intent — validate they exist and are primitive.
             # Throw on invalid keys rather than silently dropping them.
