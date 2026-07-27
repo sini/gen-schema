@@ -421,6 +421,7 @@ config.fleet.hosts.iceberg = {
 Each instance:
 
 - Gets a `name` option defaulting to the attrset key
+- Gets `_kind` — the kind it is an instance of, so `(kind, name)` identifies the record on its own
 - Gets `_module.args.<kind> = config` for self-reference
 - Gets `id_hash` — a stable SHA-256 for safe comparison
 - Inherits the kind's strict/freeform setting
@@ -492,12 +493,22 @@ The hash is computed from all non-internal primitive options (str, int, bool), p
 
 `id_hash` is marked `internal = true` and `readOnly = true` — it won't appear in NixOS option documentation generators, but is always accessible via `instance.id_hash`.
 
-**Recomputing the hash for kind discovery — `identityHashFor kind instance`.** A consumer holding an instance *value* but not its kind (e.g. mapping an arbitrarily-named registry back to the kind it holds) can recompute the hash for each candidate kind and match the carried `id_hash`:
+**Which kind is this instance? Read `_kind` — do not recompute.** The record carries it:
 
 ```nix
-# which kind does `inst` belong to? (name-agnostic — by the id_hash marker, not the registry key)
+inst._kind          # → "host"; independent of the registry key the consumer chose
+"${inst._kind}:${inst.name}"   # a schema-graph node id, derived locally
+```
+
+`mkInstanceType` takes the kind *value*, so the binding exists at construction; carrying it means no consumer has to recover it by reflection. `_kind` is `_`-prefixed and `raw`, so it is excluded from `id_hash` by both reflections and from option-declaration walks that skip the `raw`/`deferredModule`/`anything` class.
+
+**Recomputing the hash — `identityHashFor kind instance`.** This is the fallback for an instance produced by a gen-schema too old to carry `_kind`, and the tool for *verifying* a kind you already believe (pin skew between two gen-schema revs shows up as a universal mismatch). It recomputes the hash for a candidate kind and matches the carried `id_hash`:
+
+```nix
 lib.findFirst (k: genSchema.identityHashFor k inst == inst.id_hash) null candidateKinds
 ```
+
+Prefer `_kind`: the recompute is O(candidate kinds), it must be hand-totalised (a candidate kind declaring a field the instance lacks raises a *missing attribute*, which `builtins.tryEval` cannot catch), and it cannot answer at all for an **empty** registry.
 
 `identityHashFor` reflects the instance's own primitive fields and hashes through the same `hashIdentity` formula `mkIdentityModule` uses, so the two never drift; it matches for any kind whose identity keys are its primitive options (a kind using `identity = false` on a primitive is the sole divergence). A non-match reliably means "not this kind" — a wrong-kind false match would need a sha256 collision across different preimages.
 
