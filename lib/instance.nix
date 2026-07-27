@@ -55,33 +55,6 @@ let
           type = merge.types.str;
           default = name;
         };
-        # The instance's KIND, carried by the record itself. A node in the schema graph is identified by
-        # `(kind, name)`; an instance carrying only `name` is half a node, and every consumer holding a
-        # bare instance must then recover its kind from somewhere else — by the registry key (a
-        # consumer-chosen string, so a guess), or by recomputing `id_hash` against each candidate kind
-        # (exact but O(kinds), and it must be hand-totalised because a missing attribute is not a `throw`).
-        # The constructor already HAS the kind: `mkInstanceType` takes the kind VALUE, so the binding
-        # exists at construction and only needs to be kept. Carrying it here makes kind-recovery LOCAL —
-        # a `<kind>:<name>` node-id lowering reads the record instead of the fleet.
-        #
-        # INVISIBLE TO IDENTITY, and it is the `_` PREFIX that makes it so, not the type: both
-        # reflections skip `_`-prefixed names — `mkIdentityModule` over the kind's options,
-        # `identityHashFor` over the instance's values (whose `_kind` value IS a string, so the prefix
-        # is the only thing excluding it there). Measured: typing this `str` leaves `id_hash`
-        # byte-identical. `id_hash` is pinned against a hash LITERAL in
-        # `ci/tests/instance-kind-field.nix`, armed by adding an identity-VISIBLE kind field and
-        # observing the literal move.
-        #
-        # `raw` is load-bearing for a DIFFERENT reason: a consumer that walks an instance's option
-        # declarations to decide what to carry (den-compat's `stampTreeOf` excludes the
-        # `raw`/`deferredModule`/`anything` class from deepSeq'd resolution state) then leaves this
-        # field out by the rule it already has, instead of needing a name exception.
-        options._kind = merge.mkOption {
-          type = merge.types.raw;
-          default = kind;
-          internal = true;
-          description = "The kind this instance is an instance of (schema-graph node label; `(kind, name)` identifies the node).";
-        };
       }
     );
 
