@@ -1,0 +1,259 @@
+# gen-schema — agent capability sheet
+
+## Scope
+
+Typed record registry: schema **kinds** (deferred modules carrying collections, ref fields, and a
+parent topology), **instances** (submodules with strictness and a content-addressed `id_hash`
+injected), and the **registry** option that binds them — driven on gen-merge's `evalModuleTree`, not
+nixpkgs `lib.evalModules`.
+
+## Not this library's job
+
+Quoted text is the owner's own `flake.nix` `description` field, verbatim.
+
+| Responsibility | Owner |
+|---|---|
+| The module MERGE engine itself — option merging, priorities, `evalModuleTree`, the `types.*` namespace. gen-schema re-exports gen-merge's verbatim (`lib/default.nix:46-54`) and implements none of it | `gen-merge` — "gen-merge — pure-Nix byte-mode module MERGE engine (evalModuleTree) for the pure-gen module system" |
+| Leaf/structural type CHECKING (`verify : v -> null\|err`). gen-schema declares options with these types and reads `type.name`; it writes no checker | `gen-types` — "gen-types: pure, nixpkgs-lib-free structural type checker for the gen ecosystem" |
+| The record algebra (`record.compose` / `mixin` / `combine` / `assertSatisfies`) that `lib/mixin.nix` and `lib/bridge.nix` drive; and standalone non-module identity (`mkIdentity`, name+fields → hash) — `gen-algebra/lib/identity.nix:1-3` records the module tier as relocated *to* gen-schema | `gen-algebra` — "gen-algebra: pure Nix algebra — search monad, records, intensional functions, either" |
+| General utilities (`sort`, `filterAttrs`, `hasPrefix`, `concatMapStringsSep`, …) | `gen-prelude` — "gen-prelude: vendored, nixpkgs-lib-free pure utilities for the gen ecosystem" |
+| Matching/selecting instances by attribute or graph position. gen-select *reads* the `id_hash` gen-schema mints and has no hasher of its own | `gen-select` — "gen-select: selector algebra for attributed graph positions" |
+| Traversal, condensation, and query combinators over the `_edges` graph gen-schema exposes | `gen-graph` — "gen-graph: accessor-based graph query combinators" |
+| Name resolution / demand-driven attribute evaluation. gen-schema exposes the P (parent) and I (ref) edge vocabulary as data and implements no resolution calculus | `gen-scope` — "gen-scope: demand-driven attribute grammar evaluator over algebraic scope graphs" |
+| Aspect traits and classification; also the consumer of the `keySemantics` field gen-schema stores opaquely and never reads (`gen-aspects/ci/tests/key-semantics.nix`). gen-aspects mints its aspect id through gen-schema's `hashIdentity` over `[origin, key]`, NOT `mkIdentityModule` (`gen-aspects/ci/tests/aspect-id-hash.nix:3`) | `gen-aspects` — "gen-aspects: aspect-oriented composition types (pure-gen, re-hosted on gen-merge)" |
+| Choosing a winner among matched rules; ordering and conflict resolution | `gen-dispatch` — "gen-dispatch: relational rule dispatch over ordered groups (the dispatch STEP)" |
+| The nixpkgs composition boundary for flake-parts consumers. `flakeModule.nix:19-23` marks itself SUPERSEDED by it | `gen-flake` — "gen-flake — the pure composition boundary of the pure-gen module ecosystem" |
+| Injecting external arguments into modules | `gen-bind` — "gen-bind: module binding with external arguments for Nix" |
+| Layered settings precedence with provenance (gen-schema has option defaults and collection merge, no precedence strata) | `gen-settings` — "gen-settings — stratified settings resolution as a pure layered fold, with refs-as-data, structured provenance, and the graduated injection construct" |
+
+## Exports
+
+Entry: `inputs.gen-schema.lib` (flake) or `import ./default.nix { }` (root, self-pinned from
+`flake.lock` via `fetchTree`). Both yield the applied value. `import ./lib` is a **function** of
+`{ prelude, merge, algebra }`.
+
+**Re-exported from gen-merge** — `lib/default.nix:46-54`. Consumers declare gen-schema options with
+these so they never reach for nixpkgs `lib`.
+
+| Export | Signature |
+|---|---|
+| `mkOption` / `mkOptionType` / `mkMerge` / `mkDefault` / `mkForce` | gen-merge's, verbatim |
+| `evalModuleTree` | `{ modules; … } -> { config; options; }` |
+| `types` | gen-merge's whole type namespace — see traps |
+
+**Schema kinds** — `lib/entry-type.nix`
+
+| Export | Signature |
+|---|---|
+| `mkSchemaOption` | `{ strict ? true, baseModule ? null, collections ? {}, computed ? null, mixins ? [], mkType ? null, keySemantics ? {} } -> option` |
+| `mkSchemaEntryType` | same argument set `-> type` (the `lazyAttrsOf` element type behind `mkSchemaOption`) |
+
+`baseModule` may be a module or `kindName -> module`. `computed : collections -> defs -> attrset`
+(wins over collections of the same name). `mkType : { kindModule, collections, defs, kind } -> attrset`
+is the escape hatch — it skips the mixin pipeline, `__functor` wrapping, and refinement extraction.
+
+**Instances and registries** — `lib/instance.nix`
+
+| Export | Signature |
+|---|---|
+| `mkInstanceType` | `kindValue -> { extraModules ? [], strict ? kindValue.strict } -> type` |
+| `mkInstanceRegistry` | `kindValue -> { extraModules ? [], refs ? {}, refinements ? {}, strict ? kindValue.strict, description ? "<kind> instances", derive ? null, deriveEither ? null } -> option` |
+
+The registry's `apply` is the pipeline: deferred-ref coerce → refinements → validators → derive → overlay.
+`derive` and `deriveEither` are mutually exclusive (throws).
+
+**Identity** — `lib/identity.nix`
+
+| Export | Signature |
+|---|---|
+| `mkIdentityModule` | `kindName -> module` — injects readOnly/internal `id_hash` and the `_identity.keys` submodule |
+| `hashIdentity` | `kind -> [key] -> (key -> value) -> sha256Hex` — the single formula all three derivations route through |
+| `identityHashFor` | `kindName -> instanceValue -> hash`, reflecting the **value's** primitive fields |
+| `identityHashForKind` | `kindValue -> instanceValue -> hash`, reflecting the **kind's** primitive options |
+
+**Strictness** — `lib/strict.nix`
+
+| Export | Signature |
+|---|---|
+| `mkStrictModule` | `kindName -> module` — sets a `_module.freeformType` whose merge always throws |
+
+**Validators** — `lib/validate.nix`
+
+| Export | Signature |
+|---|---|
+| `mkValidator` | `name -> pred -> message -> validator` |
+| `mkFieldValidator` | `{ fields; name; check; message; } -> validator` (adds `__fields`) |
+| `filterValidators` | `[optionName] -> [validator] -> [validator]` |
+| `runValidators` | `kindName -> [validator] -> instances -> { right = instances; } \| { left = [failure]; }` |
+| `validateInstances` | `kindValue -> instances -> { right; } \| { left; }` (reads `kindValue.validators`) |
+| `formatErrors` | `[failure] -> string` |
+| `defaultOnError` | `left -> throw` |
+
+**Refinement contracts** — `lib/refined.nix`, `lib/blame.nix`
+
+| Export | Signature |
+|---|---|
+| `refined` | `baseType -> refinement\|[refinement] -> type` (metadata under `type.__schema`) |
+| `refinements` | `{ tcpPort; nonEmpty; positive; }` — prebuilt `{ check; message; }` records |
+| `checkRefinements` | `fieldPath -> type -> value -> [failure]` — returns, never throws |
+| `blame` | `field -> message -> { __blame = true; field; message; }` |
+
+**Cross-instance references** — `lib/ref.nix`
+
+| Export | Signature |
+|---|---|
+| `ref` | `kindName -> type` (deferred marker, carries `refKind`) **or** `instances -> type` (direct, coercing) |
+| `setOf` | `refType -> type` — `listOf` that dedups by `id_hash`, first-seen order |
+| `toSet` | `[instance] -> { member; toList; length; }` |
+
+**Methods** — `lib/methods.nix`
+
+| Export | Signature |
+|---|---|
+| `schemaFn` | `description -> type -> ({ …configKeys }: value) -> methodDecl` |
+
+**Mixins and the module bridge** — `lib/mixin.nix`, `lib/bridge.nix`
+
+| Export | Signature |
+|---|---|
+| `mkMixin` | `{ define, requires ? [], provides ? [], kinds ? null, name ? "anonymous" } -> mixin` |
+| `composeMixins` | `[mixin] -> mixin` |
+| `beta` | `mixin -> mixin` — flips direction so the kind wins |
+| `applyMixin` | `mixin -> kindRecord -> kindName -> record` |
+| `emitModule` | `[collectionLabel] -> record -> { module; collections; refinements; }` |
+
+**Serialization and docs** — `lib/codec.nix`, `lib/docs.nix`
+
+| Export | Signature |
+|---|---|
+| `mkCodec` | `kindValue -> { fields ? {}, types ? {}, excludeFields ? [] } -> codec` |
+| `renderDocs` | `schema -> markdownString` |
+
+A codec is `{ encode; decode; encodeAll; decodeAll; serialize; deserialize; serializeAll; deserializeAll; json; }`, where `json` is the four `*` functions pre-applied to
+`{ encode = toJSON; decode = fromJSON; }`.
+
+**Internal**: `_internal.mkMethodsModule` — the only member.
+
+**Kind value shape** (produced, not exported). Each `config.schema.<name>` is
+`{ __functor; kind; options; refs; refinements; strict; keySemantics; mixins; methods; validators; parent; }` plus user collections and computed fields. `__functor` makes the kind directly importable
+as a module. Schema-level introspection sits alongside the kinds: `_kindNames`, `_topology`
+(`{ parent; children; }` per kind), `_refEdges` (`{ from; field; to; }`), `_edges` (parent edges plus
+ref edges, each tagged `type`), `_roots`, `_leaves`.
+
+**Instance value shape**: `{ _identity; id_hash; name; <declared options>; <methods>; }`. `name`
+defaults to the registry key.
+
+## Entry points by task
+
+| Task | Reach for |
+|---|---|
+| Declare a schema surface a consumer extends | `options.schema = mkSchemaOption { }` |
+| Add per-kind user data that merges across modules | `mkSchemaOption { collections.<name>.default = [ ] or { }; }` |
+| Derive a field from merged collections | `mkSchemaOption { computed = collections: defs: { … }; }` |
+| Replace the kind result outright (foreign type system) | `mkSchemaOption { mkType = { kindModule, collections, defs, kind }: …; }` |
+| Turn a kind into an instance registry | `mkInstanceRegistry schema.<kind> { }` |
+| Get the instance type without the registry wrapper | `mkInstanceType schema.<kind> { }` |
+| Let a kind point at another kind's instances | `ref "<kind>"` on the option, `refs.<field> = <registry>` on `mkInstanceRegistry` |
+| Resolve a ref against a registry already in scope | `ref config.fleet.hosts` (direct mode, no binding needed) |
+| Break a self-referential registry cycle | `refs.<field> = { instances = …; coerce = registry: default: raw: …; deferred = true; }` |
+| Dedup a ref list by identity | `setOf (ref "<kind>")` on the option; `toSet` on a plain instance list |
+| Compare or dedup instances outside a registry | `id_hash` equality; `toSet` for O(1) membership |
+| Recompute a hash to discover which kind a value belongs to | `identityHashForKind` when you hold the kind value, `identityHashFor` when you hold only the name |
+| Pin identity keys explicitly | `_identity.keys = [ … ]` on the instance (list-merges across modules) |
+| Exclude a primitive option from identity | `identity = false` on the option declaration |
+| Attach a predicate contract to a field | `refined <type> refinements.tcpPort`, or your own `{ check; message; lazy ? false; }` |
+| Contract-check without throwing | `checkRefinements` |
+| Assert across a whole registry | `validators = [ (mkValidator …) ]` on the kind |
+| Assert only when a field exists | `mkFieldValidator { fields = [ … ]; … }` |
+| Validate outside the registry pipeline | `validateInstances schema.<kind> instances` |
+| Add a computed attribute to every instance | `methods.<name> = schemaFn desc type ({ someField }: …)` |
+| Post-process a whole registry | `derive` (or `deriveEither` for `{ right; } \| { left; }` recovery) |
+| Share fields across kinds by composition | `mkSchemaOption { mixins = [ … ]; baseModule = … }`, or `imports = [ schema.<other> ]` |
+| Serialize a registry | `mkCodec schema.<kind> { }` then `.json.serializeAll` |
+| Generate reference docs | `renderDocs config.schema` |
+| Wire into flake-parts | `flakeModules.default` (but see the gen-flake row in negative space) |
+
+## Measured traps
+
+Each row verified in this run at `6732239` by evaluating against
+`(builtins.getFlake "…/gen-schema").lib`. Shared fixtures: `sc` = a schema built with
+`evalModuleTree { modules = [ { options.schema = mkSchemaOption {}; } … ]; }`; `bogus = { no = "kind"; }`; `ok e = (builtins.tryEval (builtins.deepSeq e e)).success` (so `false` ⇒ threw).
+
+| Trap | Evidence |
+|---|---|
+| `validateInstances`' kind-value guard is **lazy** — it is silent on an empty *and* on an all-passing instance set, because nothing forces `kindValue.kind` until a failure record is built | `lib/validate.nix:72-82`; `validateInstances bogus { }` ⇒ no throw, `validateInstances bogus { a = { port = 1; }; }` ⇒ no throw, `validateInstances { validators = [ (mkValidator "v" (_: false) "m") ]; } { a = { }; }` ⇒ threw. Positive control, same instrument, real kind value: `left` ⇒ `[ { kind = "h"; message = "too low"; name = "a"; validator = "hi"; } ]`, and a passing set ⇒ `? right`. Tests: `test-returns-either`, `test-does-not-throw` (`ci/tests/validate-standalone.nix`) |
+| `mkInstanceRegistry`'s guard defers the same way, and an explicit `description` removes the last thing that forced it | `lib/instance.nix:268-285`; `(mkInstanceRegistry bogus { }).description` ⇒ threw (default is `"${kind} instances"`), but `(mkInstanceRegistry bogus { description = "d"; }).default` ⇒ no throw |
+| A **method's return value is an identity key** when its declared type is primitive: `mkMethodsModule` emits methods as readOnly options with no `internal` and no `identity = false`, so `isPrimitiveOption` accepts them. A method over a non-identity field therefore leaks that field into `id_hash` | `lib/methods.nix:11-17` + `lib/identity.nix:39-45`; kind with `tags : listOf str` and `methods.label = schemaFn "l" types.str ({ tags }: concatStringsSep "," tags)` ⇒ instances differing only in `tags` have **different** `id_hash`. Negative control, identical options minus the method ⇒ **same** `id_hash` |
+| `identityHashFor` and `identityHashForKind` **disagree** on a kind with `identity = false`: the former reflects the instance's own primitive fields and cannot see the opt-out | `lib/identity.nix:50-61` documents it; kind with `tag` marked `identity = false` ⇒ `identityHashFor` `7f3d8035…`, module `id_hash` and `identityHashForKind` both `7d1b46a9…`. Positive control on a kind with no opt-out and no internal: all three agree. Tests: `test-identity-false-excluded`, `test-internal-excluded` (`ci/tests/identity-opt-out.nix`) |
+| Non-primitive options are **invisible** to identity — changing a `listOf str` leaves `id_hash` byte-identical | `lib/identity.nix:33-45`; two `listOf str` values ⇒ both `1b0650d3…`. Positive control, same instrument: two `str` values ⇒ different hashes |
+| `_identity.keys` naming an undeclared or non-primitive option throws (it does not silently drop) | `lib/identity.nix:128-143`; `[ "nope" ]` ⇒ threw, `[ "lst" ]` (a `listOf`) ⇒ threw, `[ "a" ]` ⇒ evaluated. Tests: `test-explicit-overrides-reflection`, `test-merged-keys` (`ci/tests/identity-explicit-keys.nix`) |
+| `lib.types` is gen-merge's namespace **verbatim**, and gen-merge folds gen-types' whole surface into it — so eight non-type names sit in `lib.types` that also exist at gen-schema's top level, and those are gen-types' implementations, not gen-schema's | `lib/default.nix:54`, `gen-merge/lib/default.nix:117`; `filter (n: elem n (attrNames lib)) (attrNames lib.types)` ⇒ `[ "defaultOnError" "formatErrors" "mkOption" "mkOptionType" "mkValidator" "refined" "refinements" "runValidators" ]`. `mapAttrs (_: r: r.message) lib.types.refinements == mapAttrs (_: r: r.message) lib.refinements` ⇒ `true` (same three messages, separate definitions) |
+| `types.str` and `types.string` are the **same** gen-types checker — both `.name` ⇒ `"string"`, and both hash identically | `lib/identity.nix:33-38`; `types.str.name` ⇒ `"string"`, `types.string.name` ⇒ `"string"`, hashes both `eefaa98e…`. The `"str"` spelling `isPrimitiveOption` also accepts comes from **nixpkgs** `lib.types`, which this run did not exercise — that path is covered by `test-nixpkgs-str-field-reflected` (`ci/tests/identity-hash.nix`) |
+| A kind whose name starts with `_` is a **full kind** but vanishes from every introspection output | `lib/entry-type.nix:322-323`; schema with kinds `visible` and `_hidden` ⇒ `_hidden.kind` is `"_hidden"`, yet `_kindNames` ⇒ `[ "visible" ]` and `attrNames _topology` ⇒ `[ "visible" ]` |
+| Collections named `__functor` or `kind` are reserved and throw | `lib/entry-type.nix:57-61`; both ⇒ threw. Control collection `fine` on the same schema ⇒ evaluated. Test: `test-reserved-key-throws` (`ci/tests/collection-functor-guard.nix`) |
+| A collection whose `default` is neither list nor attrset needs an explicit `merge`, and the throw is **deferred to first demand of that collection** — a schema carrying one evaluates fine until touched | `lib/entry-type.nix:65-74`; `scalarNoMerge.default = 0` ⇒ threw on access, while a sibling list collection on the same schema ⇒ evaluated. Test: `test-int-default-throws` (`ci/tests/collection-missing-merge-throws.nix`) |
+| Merge strategy is inferred from the default's **type**: list ⇒ `++`, attrset ⇒ `//`, anything else needs `merge` | `lib/entry-type.nix:65-74`; `[ "a" ] , [ "b" ]` ⇒ `[ "a" "b" ]`, `{ x = 1; } , { y = 2; }` ⇒ `{ x = 1; y = 2; }`, explicit `acc + v` over `3` and `4` ⇒ `7` |
+| Three collections exist on every kind whether declared or not | `lib/entry-type.nix:36-55`; a bare kind ⇒ `methods = { }`, `validators = [ ]`, `parent = null` |
+| A `parent` naming an undeclared kind throws, and two conflicting `parent` declarations for one kind throw | `lib/entry-type.nix:47-53,336-340`; both ⇒ threw. Control, `parent = "b"` with `b` declared ⇒ `{ b = { children = [ "c" ]; parent = null; }; c = { children = [ ]; parent = "b"; }; }`. Test: `test-unknown-parent-throws` (`ci/tests/topology-validation.nix`) |
+| Strict is the **default** (`kindValue.strict` ⇒ `true`); an undeclared instance key throws, and `strict = false` on the registry lets it through as freeform | `lib/entry-type.nix:29`, `lib/strict.nix:12-31`, `lib/instance.nix:42-48`; `{ addr = …; bogus = 1; }` ⇒ threw, control `.addr` on the same registry ⇒ evaluated, `strict = false` ⇒ `.bogus` ⇒ `1`. Tests: `test-undeclared-key-throws`, `test-declared-key-works` (`ci/tests/strict-module.nix`) |
+| Field-gated validators are **silently skipped** when the kind lacks the field — no warning, no error | `lib/validate.nix:58-62`; `filterValidators [ "addr" "port" ] [ <mkFieldValidator fields = ["ghost"]> ]` ⇒ `[ ]`. Controls: a plain `mkValidator` survives the same filter, and the same field validator survives when `"ghost"` **is** in the option names. Tests: `test-filter-empty-kind`, `test-filter-plain-always-passes` (`ci/tests/validator-fields.nix`) |
+| All three ref-binding errors throw: a declared ref field with no binding, a binding matching no field, and a string key absent from the target registry | `lib/instance.nix:187-202,86-87`; all three ⇒ threw. Control, correct binding ⇒ `hosts.a.net.cidr` resolves to `"10.0.0.0/8"` and the resolved value carries `id_hash`. Tests: `test-missing-binding-throws`, `test-extra-binding-throws`, `test-invalid-key-throws` |
+| `setOf` rejects a non-ref element type at construction time | `lib/ref.nix:99-103`; `setOf types.str` ⇒ threw, `(setOf (ref "net")).name` ⇒ `"setOf(ref(net))"`. Test: `test-bad-ref-throws` (`ci/tests/ref-type-invalid.nix`) |
+| `toSet` dedups first-seen, and `member` **throws** on a value without `id_hash` rather than returning false | `lib/ref.nix:119-141`; hashes `A B A` ⇒ `length` `2`, names `[ "A" "B" ]`, `member` on a present hash ⇒ `true`, absent ⇒ `false`, `member { name = "x"; }` ⇒ threw. Tests: `test-dedup-first-seen`, `test-member-true` (`ci/tests/toset.nix`) |
+| `mkCodec` and `renderDocs` disagree about methods: the codec drops them, the docs keep them | `lib/codec.nix:46-81` vs `lib/docs.nix:14`; encoding an instance carrying `name`, `id_hash`, `addr`, `port`, `url` (a method) and `methods` ⇒ `{ addr = "1.1.1.1"; port = 22; }` only, while `renderDocs` on the same kind emits a `\| url \| string \| — \| u \|` row. `renderDocs` drops `_`-prefixed names and `id_hash`, nothing else |
+| `mkCodec` guards eagerly, unlike the registry guards above: a non-kind value and a `fields` spec naming an undeclared option both throw | `lib/codec.nix:72-94`; both ⇒ threw |
+| `checkRefinements` **returns** a failure list; only the registry pipeline throws | `lib/refined.nix:24-42` vs `lib/instance.nix:421-425`; `checkRefinements "f" (refined types.int refinements.tcpPort) 99999` ⇒ `[ { field = "f"; lazy = false; message = "must be a valid TCP port (1-65535)"; value = 99999; } ]` (no throw), the same refinement on a registry field ⇒ threw, control value `80` ⇒ `80` |
+| `lazy = true` refinements let the instance build and throw only at value access | `lib/instance.nix:426-440`; `attrNames instance` ⇒ evaluated, `.lazyF` on a violating value ⇒ threw, control passing value ⇒ `5`. Tests: `test-instance-accessible`, `test-lazy-field-throws-on-access` (`ci/tests/lazy-contract.nix`) |
+| A method naming a config key the kind does not declare throws at **method access**, not at declaration | `lib/methods.nix:22-29`; `.bad` ⇒ threw, control `.addr` on the same instance ⇒ evaluated. Test: `test-bad-arg-throws` (`ci/tests/method-bad-arg.nix`) |
+| Mixin direction: the default (`"smalltalk"`) mixin overrides the kind; `beta` reverses it | `lib/mixin.nix:27-30,73-94`; same mixin and base ⇒ `"from-mixin"` plain, `"from-kind"` under `beta` |
+| Several helpers exist in `lib/` but are **not** on the public surface | `lib/default.nix:43-91`; `lib ? isBlame`, `? collectBlame`, `? getRefinements`, `? isRefined`, `? mkRefinedType`, `? getRefKind`, `? dedupByHash` ⇒ all `false`. `refined` **is** `mkRefinedType`, re-exported through `refinedLib.types` (`lib/refined.nix:67`) |
+| `flakeModule.nix` yields a gen-merge-typed `options.schema` that a nixpkgs `lib.evalModules` consumer cannot drive | `flakeModule.nix:14-17` states it. Read, not exercised in this run |
+
+## Theory
+
+Claimed in `README.md:1465-1484`, which splits its sources into **Implements** and **Informed by**,
+and restated in the file-header comments.
+
+**Implements**
+
+- **Findler & Felleisen (2002), *Contracts for Higher-Order Functions*** — `lib/refined.nix` co-locates
+  predicate contracts with type declarations; `lib/blame.nix` carries field-level attribution as
+  `{ field; message; }`; `lib/instance.nix` runs the strict contract check inside `applyPipeline`.
+- **Chitil (2012), *Practical Typed Lazy Contracts*** — `lazy = true` refinements wrap values with
+  `builtins.addErrorContext`, deferring validation to access time (`lib/instance.nix:426-440`), which the
+  README reads as Chitil's partial-identity semantics: unevaluated parts never trigger violations.
+- **Bracha & Cook (1990), *Mixin-Based Inheritance*** — `lib/mixin.nix` implements `M1 * M2 = fun(i) M1(M2(i) + i) + M2(i)`; `beta` reverses the direction so the parent controls; `applyMixin` validates
+  structural `requires`.
+- **Rondon, Kawaguchi & Jhala (2008), *Liquid Types*** — `refined` attaches predicate refinements to a
+  base type via `__schema` metadata, following the `{v:B | e}` base-refinement model.
+
+**Informed by** (README's own label; no result claimed): Leijen (2005) *Extensible Records with Scoped
+Labels* — the record algebra itself lives in gen-algebra, gen-schema consumes it; Cardelli (1997)
+*Program Fragments, Linking, and Modularization* — `lib/bridge.nix`'s one-directional record→module
+emit, without the full linking calculus; Neron, Tolmach, Visser & Wachsmuth (2015) *A Theory of Name
+Resolution* — `_edges` borrows the P (parent) and I (import/ref) edge vocabulary, and the README states
+gen-schema implements neither scope graphs nor the resolution calculus.
+
+**Checked invariant**: the library is nixpkgs-lib-free — `ci/tests/purity.nix`
+(`test-library-source-is-nixpkgs-free`) scans `lib/**.nix` plus the root `flake.nix` and `default.nix`
+for `nixpkgs`, `lib.types`, `lib.mkOption`, `lib.mkMerge`, `lib.evalModules`, `evalModules`, `{ lib }`,
+`{ lib,`. `ci/` is out of scope — the harness legitimately uses nixpkgs.
+
+## Drift check
+
+```sh
+nix eval --json .#lib --apply 'l: { top = builtins.attrNames l; internal = builtins.attrNames l._internal; types = builtins.attrNames l.types; }'
+```
+
+Current output (verbatim):
+
+```json
+{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","defaultOnError","emitModule","evalModuleTree","filterValidators","formatErrors","hashIdentity","identityHashFor","identityHashForKind","mkCodec","mkDefault","mkFieldValidator","mkForce","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMerge","mkMixin","mkOption","mkOptionType","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","types","validateInstances"],"types":["any","anything","attrs","attrsOf","bool","defaultOnError","deferredModule","derivation","either","enum","float","formatErrors","function","int","intensionalEq","intersection","lazyAttrsOf","list","listOf","mkOption","mkOptionType","mkValidator","never","null","nullOr","number","oneOf","option","optionalAttr","path","pathLike","raw","refined","refinements","runValidators","str","strict","string","struct","submodule","tuple","typeEq","typedef","typedef'","union"]}
+```
+
+**Checks.** Test-runner invocation (from the repo root; CI runs the same command with
+`working-directory: ci`, `.github/workflows/ci.yml:13,18`):
+
+```sh
+nix flake check ./ci
+```
