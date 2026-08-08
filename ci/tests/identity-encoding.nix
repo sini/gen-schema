@@ -385,8 +385,12 @@ in
       interior = refuses (hashIdentity "own:s" [ "a" ] (_: 1));
       leading = refuses (hashIdentity ":owns" [ "a" ] (_: 1));
       trailing = refuses (hashIdentity "owns:" [ "a" ] (_: 1));
-      # STRADDLES the negated-character-class edge: `[^:]` spans newlines, so a colon AFTER a
-      # newline is still a colon. A `.`-based guard would let this one through.
+      # STRADDLES the negated-character-class edge. `builtins.match` anchors the whole string, so
+      # `[^:]*` asserts TOTALITY — every character is a non-colon — and no position escapes it,
+      # which is what makes the guard exhaustive rather than a search that could stop early. The
+      # edge worth pinning is whether the class quantifies across a LINE boundary, since that is
+      # where guards commonly go line-oriented; this cell holds one side (a colon after a newline
+      # is still caught) and `newlineOnly` below holds the other (a newline alone is admitted).
       afterNewline = refuses (hashIdentity "owns\nother:x" [ "a" ] (_: 1));
     };
     expected = {

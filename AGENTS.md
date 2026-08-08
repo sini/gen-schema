@@ -174,8 +174,10 @@ defaults to the registry key.
 
 ## Measured traps
 
-Each row verified in this run at `6732239` by evaluating against
-`(builtins.getFlake "…/gen-schema").lib`. Shared fixtures: `sc` = a schema built with
+Each row verified at `6732239` by evaluating against `(builtins.getFlake "…/gen-schema").lib`, **except
+the two identity rows** (the method row and the float-domain row), which were re-measured after the
+minting change and are anchored to the named test suites rather than to a rev — those two re-verify on
+every `nix-unit --flake ./ci#tests` run instead of resting on a one-time eval. Shared fixtures: `sc` = a schema built with
 `evalModuleTree { modules = [ { options.schema = mkSchemaOption {}; } … ]; }`; `bogus = { no = "kind"; }`; `ok e = (builtins.tryEval (builtins.deepSeq e e)).success` (so `false` ⇒ threw).
 
 | Trap | Evidence |
