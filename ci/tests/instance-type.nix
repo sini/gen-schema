@@ -37,9 +37,17 @@ in
       expr = builtins.isString igloo.id_hash;
       expected = true;
     };
-    test-id-hash-length = {
-      expr = builtins.stringLength igloo.id_hash;
-      expected = 64;
+    # An identity is the kind tag joined to a 64-hex digest — the tag rides outside, so the length
+    # assertion belongs on the digest region rather than on the whole string.
+    test-id-hash-shape = {
+      expr = {
+        wholeIdentity = builtins.match "host:[0-9a-f]{64}" igloo.id_hash != null;
+        digestRegionLength = builtins.stringLength (builtins.substring 5 (-1) igloo.id_hash);
+      };
+      expected = {
+        wholeIdentity = true;
+        digestRegionLength = 64;
+      };
     };
   };
 }

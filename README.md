@@ -128,7 +128,7 @@ Everything above the instance layer is pure schema — no validation or hashing 
     # Use them
     flake.fleet = {
       iglooAddr = config.hosts.igloo.addr;     # → "10.0.1.1"
-      iglooHash = config.hosts.igloo.id_hash;  # → deterministic SHA-256
+      iglooHash = config.hosts.igloo.id_hash;  # → "host:<deterministic SHA-256>"
     };
   };
 }
@@ -422,7 +422,7 @@ Each instance:
 
 - Gets a `name` option defaulting to the attrset key
 - Gets `_module.args.<kind> = config` for self-reference
-- Gets `id_hash` — a stable SHA-256 for safe comparison
+- Gets `id_hash` — a stable `"<kind>:" + SHA-256` for safe comparison
 - Inherits the kind's strict/freeform setting
 
 ### Nested Registries
@@ -488,20 +488,32 @@ builtins.filter (h: h.id_hash != host.id_hash) allHosts
 lib.elem target.id_hash (map (h: h.id_hash) candidates)
 ```
 
-The hash is computed from all non-internal primitive options (str, int, bool), prefixed by the kind name. Two hosts with the same values hash identically. A host and a user with the same name hash differently (kind prefix).
+The identity is the **kind tag joined to a digest of the identity pairs**:
+
+```
+id_hash = "<kind>:" + sha256(<the ⟨key, value⟩ pairs, as a JSON attrset>)
+```
+
+The pairs are all non-internal primitive options (str, int, bool, float) minus the declared opt-outs. Two hosts with the same values hash identically. A host and a user with the same name hash differently — the tag separates them, so `id_hash` says what it is and the kind is recoverable by splitting on the first colon. Because the tag rides outside the digest, `:` is refused in a kind name; values are unconstrained, since JSON quotes and escapes them.
+
+Order does not enter. The pairs are rendered as an attrset and attrsets carry no order, so a caller supplying keys in any order mints the same node — there is no sort for a caller to get wrong.
 
 `id_hash` is marked `internal = true` and `readOnly = true` — it won't appear in NixOS option documentation generators, but is always accessible via `instance.id_hash`.
 
-**Recomputing the hash for kind discovery — `identityHashFor kind instance`.** A consumer holding an instance *value* but not its kind (e.g. mapping an arbitrarily-named registry back to the kind it holds) can recompute the hash for each candidate kind and match the carried `id_hash`:
+**Method returns are never identity keys.** A method is declared as a readOnly option so its return reaches `config`, but it is marked `identity = false` at that point: a method is an arbitrary function of config, so admitting its return would let a method reading an opted-out field re-admit that field, and would make *declaring* a method move an instance's identity.
+
+**Floats are admissible only for `|v| < 2^53`, strictly.** Identity follows Nix's `==` in both directions, and above that bound `==` is not an equivalence relation — two distinct ints both compare equal to one float — so there is nothing for an encoding to be faithful to. A float at or beyond the bound refuses by name at mint time. Ints are unrestricted.
+
+**Recomputing the hash for kind discovery — `identityHashForKind kindValue instance`.** A consumer holding an instance value and a candidate **kind value** can recompute the identity and match the carried `id_hash`:
 
 ```nix
 # which kind does `inst` belong to? (name-agnostic — by the id_hash marker, not the registry key)
-lib.findFirst (k: genSchema.identityHashFor k inst == inst.id_hash) null candidateKinds
+lib.findFirst (kv: genSchema.identityHashForKind kv inst == inst.id_hash) null candidateKinds
 ```
 
-`identityHashFor` reflects the instance's own primitive fields and hashes through the same `hashIdentity` formula `mkIdentityModule` uses, so the two never drift; it matches for any kind whose identity keys are its primitive options (a kind using `identity = false` on a primitive is the sole divergence). A non-match reliably means "not this kind" — a wrong-kind false match would need a sha256 collision across different preimages.
+It reflects the kind's own primitive options — honoring `internal` and `identity = false` — and routes through the same `hashIdentity` as `mkIdentityModule`, so the two cannot drift. A non-match reliably means "not this kind"; a wrong-kind false match would need a sha256 collision across different preimages.
 
-If you hold the kind's processed **kind-value** (not just the instance), `identityHashForKind kindValue instance` is the EXACT twin: it reflects the kind's own primitive options — honoring `identity = false` — so it matches `mkIdentityModule` even for kinds the instance-value form can only approximate. Both route through `hashIdentity`.
+There is deliberately **no value-only form**. Reflecting an instance value's own primitive attributes cannot honour the commitment above: a value carries no option metadata, so it sees neither `internal` nor the opt-out, and a method's return is just a primitive attribute in `config` that it would admit. One substrate has one minting authority, and two derivations that can disagree is one too many.
 
 **Three-layer precedence for key selection:**
 
@@ -520,14 +532,14 @@ config.schema.host.config._identity.keys = [ "vpnAlias" ];
 # Layer 2: exclude an option from reflection
 options.description = lib.mkOption { type = str; } // { identity = false; };
 
-# Layer 3: automatic (default) — all non-internal str/int/bool options
+# Layer 3: automatic (default) — all non-internal str/int/bool/float options
 ```
 
 Explicit keys are validated — referencing a nonexistent option or a non-primitive type throws at eval time:
 
 ```
 _identity.keys: 'nonexistent' is not declared on kind 'host'
-_identity.keys: 'tags' on kind 'host' is not a primitive type (str/int/bool)
+_identity.keys: 'tags' on kind 'host' is not a primitive type (str/int/bool/float)
 ```
 
 ### Cross-Instance References
@@ -1219,7 +1231,7 @@ genSchema.mkIdentityModule kind   # NixOS module: injects id_hash + _identity.ke
 genSchema.mkStrictModule kind     # NixOS module: rejects undeclared keys (closed-world)
 ```
 
-The module-system constructors `mkInstanceType` injects into every instance (relocated from gen-algebra on 2026-06-26). `mkIdentityModule` derives a content-addressed `id_hash` by reflecting over a kind's primitive options (str/int/bool); `_identity.keys` pins the identifying fields explicitly. `mkStrictModule` sets a freeform type that throws on any key not declared as an option.
+The module-system constructors `mkInstanceType` injects into every instance (relocated from gen-algebra on 2026-06-26). `mkIdentityModule` derives a content-addressed `id_hash` by reflecting over a kind's primitive options (str/int/bool/float); `_identity.keys` pins the identifying fields explicitly. `mkStrictModule` sets a freeform type that throws on any key not declared as an option.
 
 ### `validateInstances`
 
@@ -1417,7 +1429,7 @@ lib/
   default.nix       — public API surface, wiring (imports gen-algebra's pure record algebra)
   entry-type.nix     — mkSchemaEntryType, mkSchemaOption (collection extraction, introspection, topology)
   instance.nix       — mkInstanceType, mkInstanceRegistry (strict + identity injection, refs)
-  identity.nix       — mkIdentityModule (content-addressed id_hash via primitive-option reflection)
+  identity.nix       — hashIdentity (the one minting authority) + mkIdentityModule (id_hash via primitive-option reflection)
   strict.nix         — mkStrictModule (closed-world freeform rejection)
   ref.nix            — schema.ref (dual-mode cross-instance references, getRefKind)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)

@@ -56,7 +56,6 @@ in
   # Identity / strict / validation module surface (gen-schema-owned).
   inherit (identityLib)
     mkIdentityModule
-    identityHashFor
     identityHashForKind
     hashIdentity
     ;

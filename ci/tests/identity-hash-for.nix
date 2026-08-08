@@ -1,7 +1,11 @@
-# identityHashFor — the exported instance-value → id_hash recompute, for external kind-DISCOVERY (a
-# consumer holding an instance value but not its kind recomputes the hash per candidate kind and matches
-# the carried id_hash). It routes through the SAME `hashIdentity` formula as `mkIdentityModule`, so the two
-# can never drift; these tests pin that equivalence + the kind-discrimination the discovery relies on.
+# identityHashForKind — the exported kind-value → id_hash recompute, for external kind-DISCOVERY (a
+# consumer holding an instance value and a candidate KIND VALUE recomputes the hash and matches the carried
+# id_hash). It routes through the SAME `hashIdentity` formula as `mkIdentityModule`, so the two can never
+# drift; these tests pin that equivalence + the kind-discrimination the discovery relies on.
+#
+# It is the SOLE recompute path. A value-reflecting twin cannot honour the preimage commitment — an
+# instance value carries no option metadata, so it can see neither `internal` nor `identity = false` — and
+# one minting authority means two derivations that can disagree is one derivation too many.
 {
   lib,
   genSchema,
@@ -9,24 +13,34 @@
   ...
 }:
 let
-  inherit (genSchema) mkIdentityModule identityHashFor hashIdentity;
-  host = genMerge.evalModuleTree {
+  inherit (genSchema) hashIdentity;
+
+  # A kind with a mixed str/int identity key set, plus a SAME-SHAPED kind under a different name —
+  # the discovery discriminator's fixture: identical options and values, so only the kind separates
+  # the two recomputes.
+  hostTree = genMerge.evalModuleTree {
     modules = [
-      (mkIdentityModule "host")
-      { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
-      {
-        options.rack = genMerge.mkOption {
-          type = genMerge.types.int;
-          default = 0;
-        };
-      }
-      {
-        config.name = "igloo";
-        config.rack = 3;
-      }
+      (
+        { config, ... }:
+        {
+          options.schema = genSchema.mkSchemaOption { };
+          options.hosts = genSchema.mkInstanceRegistry config.schema.host { };
+          config.schema.host.options.rack = genMerge.mkOption {
+            type = genMerge.types.int;
+            default = 0;
+          };
+          config.schema.hostAlt.options.rack = genMerge.mkOption {
+            type = genMerge.types.int;
+            default = 0;
+          };
+          config.hosts.igloo.rack = 3;
+        }
+      )
     ];
   };
-  inst = host.config;
+  hostKv = hostTree.config.schema.host;
+  hostAltKv = hostTree.config.schema.hostAlt;
+  hostInst = hostTree.config.hosts.igloo;
 
   # A processed KIND-VALUE + instance (via mkSchemaOption + a registry), for identityHashForKind.
   schemaTree = genMerge.evalModuleTree {
@@ -93,12 +107,12 @@ in
       # to a name-only hash. Pinning what was actually hashed is what separates agreement from
       # shared blindness.
       stamped = homeInst.id_hash;
-      overNameAndSystem = builtins.hashString "sha256" "home|name=ben|system=x86_64-linux";
+      overNameAndSystem = "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
     };
     expected = {
       recomputeMatchesStamp = true;
-      stamped = builtins.hashString "sha256" "home|name=ben|system=x86_64-linux";
-      overNameAndSystem = builtins.hashString "sha256" "home|name=ben|system=x86_64-linux";
+      stamped = "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
+      overNameAndSystem = "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
     };
   };
   # identityHashForKind (option-level) equals the id_hash the module stamped — the EXACT twin.
@@ -106,25 +120,26 @@ in
     expr = (genSchema.identityHashForKind rackKv rackInst) == rackInst.id_hash;
     expected = true;
   };
-  # for a kind without `identity = false`, option-level agrees with the instance-level approximation.
-  flake.tests.identity-hash-for.test-forKind-agrees-instance = {
-    expr = (genSchema.identityHashForKind rackKv rackInst) == (identityHashFor "rack" rackInst);
-    expected = true;
-  };
-  # the EXPORTED recompute equals the id_hash the MODULE stamped — same formula, no drift.
+  # the EXPORTED recompute equals the id_hash the MODULE stamped, over a MIXED str/int key set —
+  # same formula, no drift.
   flake.tests.identity-hash-for.test-matches-module = {
-    expr = identityHashFor "host" inst == inst.id_hash;
+    expr = (genSchema.identityHashForKind hostKv hostInst) == hostInst.id_hash;
     expected = true;
   };
-  # a wrong kind name does NOT match — the discovery discriminator (a non-match = "not this kind").
+  # a wrong kind does NOT match — the discovery discriminator (a non-match = "not this kind"). The
+  # candidate kind here has an IDENTICAL option set over identical values, so the kind is the only
+  # thing separating the two recomputes; a discriminator that needed a differing field would not
+  # witness the property discovery relies on.
   flake.tests.identity-hash-for.test-discriminates-kind = {
-    expr = identityHashFor "user" inst == inst.id_hash;
+    expr = (genSchema.identityHashForKind hostAltKv hostInst) == hostInst.id_hash;
     expected = false;
   };
-  # hashIdentity is the shared primitive both derivations hash through.
+  # hashIdentity is the primitive every derivation hashes through, and this is its FORMAT: the kind
+  # joined to a digest of the pairs, the pairs rendered as a JSON attrset.
   flake.tests.identity-hash-for.test-hashIdentity-shape = {
     expr =
-      hashIdentity "host" [ "name" ] (_: "igloo") == builtins.hashString "sha256" "host|name=igloo";
+      hashIdentity "host" [ "name" ] (_: "igloo")
+      == "host:" + builtins.hashString "sha256" ''{"name":"igloo"}'';
     expected = true;
   };
 }
