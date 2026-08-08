@@ -180,8 +180,9 @@ in
         (pick {
           origin = "x";
           key = "y";
-        })
-      == hashIdentity "aspect" [ "origin" ] (pick { origin = "x|key=y"; });
+        }) == hashIdentity "aspect" [ "origin" ] (pick {
+        origin = "x|key=y";
+      });
     expected = false;
   };
   flake.tests.identity-encoding.test-control-same-input-mints-equal = {
@@ -194,8 +195,7 @@ in
         (pick {
           origin = "x";
           key = "y";
-        })
-      == hashIdentity "aspect"
+        }) == hashIdentity "aspect"
         [
           "origin"
           "key"
@@ -234,8 +234,7 @@ in
           (pick {
             host = "H";
             user = "U";
-          })
-        == hashIdentity "k"
+          }) == hashIdentity "k"
           [
             "user"
             "host"
@@ -253,8 +252,7 @@ in
           (pick {
             origin = "o";
             key = "k";
-          })
-        == hashIdentity "aspect"
+          }) == hashIdentity "aspect"
           [
             "key"
             "origin"
@@ -277,8 +275,7 @@ in
             key = "k";
             "hole:a" = "1";
             "hole:b" = "2";
-          })
-        == hashIdentity "aspect"
+          }) == hashIdentity "aspect"
           [
             "hole:b"
             "key"
@@ -312,8 +309,9 @@ in
           (pick {
             host = "H";
             user = "U";
-          })
-        == hashIdentity "k" [ "host" ] (pick { host = "H"; });
+          }) == hashIdentity "k" [ "host" ] (pick {
+          host = "H";
+        });
       swappedValues =
         hashIdentity "k"
           [
@@ -323,8 +321,7 @@ in
           (pick {
             host = "H";
             user = "U";
-          })
-        == hashIdentity "k"
+          }) == hashIdentity "k"
           [
             "host"
             "user"
@@ -473,7 +470,9 @@ in
   # the `function` cell here proves, since it could not be written at all otherwise.
   flake.tests.identity-encoding.test-non-scalar-values-refused = {
     expr = {
-      attrs = refuses (idOf { a = 1; });
+      attrs = refuses (idOf {
+        a = 1;
+      });
       null_ = refuses (idOf null);
       list = refuses (idOf [ 1 ]);
       function = refuses (idOf (y: y));
@@ -524,8 +523,6 @@ in
           user = "sha256:aaa";
           host = "sha256:bbb";
         });
-    expected =
-      "owns:"
-      + builtins.hashString "sha256" ''{"host":"sha256:bbb","user":"sha256:aaa"}'';
+    expected = "owns:" + builtins.hashString "sha256" ''{"host":"sha256:bbb","user":"sha256:aaa"}'';
   };
 }

@@ -107,12 +107,14 @@ in
       # to a name-only hash. Pinning what was actually hashed is what separates agreement from
       # shared blindness.
       stamped = homeInst.id_hash;
-      overNameAndSystem = "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
+      overNameAndSystem =
+        "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
     };
     expected = {
       recomputeMatchesStamp = true;
       stamped = "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
-      overNameAndSystem = "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
+      overNameAndSystem =
+        "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
     };
   };
   # identityHashForKind (option-level) equals the id_hash the module stamped — the EXACT twin.

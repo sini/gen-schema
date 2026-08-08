@@ -41,9 +41,7 @@ let
               };
             }
             // lib.optionalAttrs withMethod {
-              methods.leak = schemaFn "reads the opted-out field" genMerge.types.str (
-                { secret, ... }: secret
-              );
+              methods.leak = schemaFn "reads the opted-out field" genMerge.types.str ({ secret, ... }: secret);
             };
 
             config.hosts.igloo.secret = secretValue;

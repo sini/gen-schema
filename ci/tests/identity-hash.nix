@@ -85,7 +85,8 @@ in
   # A float-typed field is reflected, under EITHER type system's spelling of the type.
   flake.tests.identity-hash.test-float-field-reflected = {
     expr = {
-      genTyped = (mkFloatEval genFloatOpt 1.5).config.id_hash == (mkFloatEval genFloatOpt 2.5).config.id_hash;
+      genTyped =
+        (mkFloatEval genFloatOpt 1.5).config.id_hash == (mkFloatEval genFloatOpt 2.5).config.id_hash;
       nixpkgsTyped =
         (mkFloatEval nixFloatOpt 1.5).config.id_hash == (mkFloatEval nixFloatOpt 2.5).config.id_hash;
       # …and it merges with the `==`-equal int, which is the whole point of admitting it: the
