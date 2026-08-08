@@ -207,7 +207,7 @@ every `nix-unit --flake ./ci#tests` run instead of resting on a one-time eval. S
 | `lazy = true` refinements let the instance build and throw only at value access | `lib/instance.nix:426-440`; `attrNames instance` ⇒ evaluated, `.lazyF` on a violating value ⇒ threw, control passing value ⇒ `5`. Tests: `test-instance-accessible`, `test-lazy-field-throws-on-access` (`ci/tests/lazy-contract.nix`) |
 | A method naming a config key the kind does not declare throws at **method access**, not at declaration | `lib/methods.nix:22-29`; `.bad` ⇒ threw, control `.addr` on the same instance ⇒ evaluated. Test: `test-bad-arg-throws` (`ci/tests/method-bad-arg.nix`) |
 | Mixin direction: the default (`"smalltalk"`) mixin overrides the kind; `beta` reverses it | `lib/mixin.nix:27-30,73-94`; same mixin and base ⇒ `"from-mixin"` plain, `"from-kind"` under `beta` |
-| Several helpers exist in `lib/` but are **not** on the public surface | `lib/default.nix:43-91`; `lib ? isBlame`, `? collectBlame`, `? getRefinements`, `? isRefined`, `? mkRefinedType`, `? getRefKind`, `? dedupByHash` ⇒ all `false`. `refined` **is** `mkRefinedType`, re-exported through `refinedLib.types` (`lib/refined.nix:67`) |
+| Several helpers exist in `lib/` but are **not** on the public surface | `lib/default.nix`'s export attrset (the `in { … }` body); `lib ? isBlame`, `? collectBlame`, `? getRefinements`, `? isRefined`, `? mkRefinedType`, `? getRefKind`, `? dedupByHash` ⇒ all `false`. `refined` **is** `mkRefinedType`, re-exported through `refinedLib.types` (`lib/refined.nix:67`) |
 | `flakeModule.nix` yields a gen-merge-typed `options.schema` that a nixpkgs `lib.evalModules` consumer cannot drive | `flakeModule.nix:14-17` states it. Read, not exercised in this run |
 
 ## Theory
