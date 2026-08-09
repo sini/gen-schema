@@ -44,18 +44,6 @@ let
   codecLib = import ./codec.nix { inherit prelude; };
 in
 {
-  # Module-system constructors, re-exported from gen-merge so consumers (den
-  # entities are gen-schema registries) never reach for nixpkgs `lib`.
-  inherit (merge)
-    mkOption
-    mkOptionType
-    mkMerge
-    mkDefault
-    mkForce
-    evalModuleTree
-    ;
-  inherit (merge) types;
-
   # Identity / strict / validation module surface (gen-schema-owned).
   inherit (identityLib)
     mkIdentityModule

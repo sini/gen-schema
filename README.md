@@ -142,6 +142,11 @@ The flake-parts module provides `schema` and `genSchema` with default settings (
 ```nix
 # Without flake-parts — call the library directly. The module-system `lib` is gen-merge
 # (it REPLACES lib.evalModules + lib.types); gen-schema itself is `gen-schema.lib`.
+# Module-system vocabulary comes from gen-merge, reached through the hub as `gen.lib.merge` —
+# gen-schema does not carry a copy of it. You still never reach for nixpkgs `lib`; the promise
+# is unchanged and only the path is. A verbatim copy would be a SECOND build of the same names,
+# and two gen libraries at different pins would then disagree on a type's identity while
+# agreeing on its name (ADR-0014: the boundary is the eval, not the repo).
 let
   genSchema = gen-schema.lib;
   merge = gen-merge.lib;   # evalModuleTree + mkOption + types — the pure-gen module system

@@ -18,7 +18,7 @@ Quoted text is the owner's own `flake.nix` `description` field, verbatim.
 
 | Responsibility | Owner |
 |---|---|
-| The module MERGE engine itself — option merging, priorities, `evalModuleTree`, the `types.*` namespace. gen-schema re-exports gen-merge's verbatim (`lib/default.nix:46-54`) and implements none of it | `gen-merge` — "gen-merge — pure-Nix byte-mode module MERGE engine (evalModuleTree) for the pure-gen module system" |
+| The module MERGE engine itself — option merging, priorities, `evalModuleTree`, the `types.*` namespace. gen-schema implements none of it, and no longer re-exports it either: consumers reach it through the hub (`gen.lib.merge`), because the eval is the boundary and re-handing another library's value re-hands its build (ADR-0014, ADR-0015) | `gen-merge` — "gen-merge — pure-Nix byte-mode module MERGE engine (evalModuleTree) for the pure-gen module system" |
 | Leaf/structural type CHECKING (`verify : v -> null\|err`). gen-schema declares options with these types and reads `type.name`; it writes no checker | `gen-types` — "gen-types: pure, nixpkgs-lib-free structural type checker for the gen ecosystem" |
 | The record algebra (`record.compose` / `mixin` / `combine` / `assertSatisfies`) that `lib/mixin.nix` and `lib/bridge.nix` drive. gen-algebra carries **no** identity primitive: its standalone `name`+`fields` hasher retired into `hashIdentity`, since one substrate has one minting authority | `gen-algebra` — "gen-algebra: pure Nix algebra — search monad, records, intensional functions, either" |
 | General utilities (`sort`, `filterAttrs`, `hasPrefix`, `concatMapStringsSep`, …) | `gen-prelude` — "gen-prelude: vendored, nixpkgs-lib-free pure utilities for the gen ecosystem" |
@@ -37,14 +37,14 @@ Entry: `inputs.gen-schema.lib` (flake) or `import ./default.nix { }` (root, self
 `flake.lock` via `fetchTree`). Both yield the applied value. `import ./lib` is a **function** of
 `{ prelude, merge, algebra }`.
 
-**Re-exported from gen-merge** — `lib/default.nix:46-54`. Consumers declare gen-schema options with
-these so they never reach for nixpkgs `lib`.
-
-| Export | Signature |
-|---|---|
-| `mkOption` / `mkOptionType` / `mkMerge` / `mkDefault` / `mkForce` | gen-merge's, verbatim |
-| `evalModuleTree` | `{ modules; … } -> { config; options; }` |
-| `types` | gen-merge's whole type namespace — see traps |
+**Module-system vocabulary is NOT on this surface** — reach it through the hub. The ergonomic promise
+stands unchanged: a consumer declaring gen-schema options never reaches for nixpkgs `lib`. What changed
+is the path. `mkOption`, `mkOptionType`, `mkMerge`, `mkDefault`, `mkForce`, `evalModuleTree` and `types`
+come from `gen.lib.merge` — one build, gen-merge's own — rather than from a verbatim copy on this
+library's surface, which was a second build of the same names and made every gen↔gen pin a type-identity
+hazard (ADR-0014: the boundary is the eval, not the repo; ADR-0015: the hub is the sanctioned single
+input). `import ./lib` still takes `merge` as an injected parameter exactly as it always has; nothing
+gen-merge exports became unreachable.
 
 **Schema kinds** — `lib/entry-type.nix`
 
@@ -231,7 +231,7 @@ every `nix-unit --flake ./ci#tests` run instead of resting on a one-time eval. S
 | A float in an identity position is admissible only for `\|v\| < 2^53`, and the bound is **strict** — `9007199254740992.0` refuses **by name** at mint time. Nix's `==` is not transitive above it: two distinct ints both compare equal to that one float, so no encoding can be neither coarser nor finer there | `lib/identity.nix` (`exactBound`); `9007199254740993 == 9007199254740992.0` ⇒ `true` while `9007199254740993 == 9007199254740992` ⇒ `false`. Ints stay unrestricted because the float that could collide with them is the one excluded. Tests: `test-cross-pair-not-both-admissible` and its one-ULP-below control (`ci/tests/identity-encoding.nix`) |
 | Non-primitive options are **invisible** to identity — changing a `listOf str` leaves `id_hash` byte-identical | `lib/identity.nix:33-45`; two `listOf str` values ⇒ both `1b0650d3…`. Positive control, same instrument: two `str` values ⇒ different hashes |
 | `_identity.keys` naming an undeclared or non-primitive option throws (it does not silently drop) | `lib/identity.nix:128-143`; `[ "nope" ]` ⇒ threw, `[ "lst" ]` (a `listOf`) ⇒ threw, `[ "a" ]` ⇒ evaluated. Tests: `test-explicit-overrides-reflection`, `test-merged-keys` (`ci/tests/identity-explicit-keys.nix`) |
-| `lib.types` is gen-merge's namespace **verbatim**, and gen-merge folds gen-types' whole surface into it — so eight non-type names sit in `lib.types` that also exist at gen-schema's top level, and those are gen-types' implementations, not gen-schema's | `lib/default.nix:54`, `gen-merge/lib/default.nix:117`; `filter (n: elem n (attrNames lib)) (attrNames lib.types)` ⇒ `[ "defaultOnError" "formatErrors" "mkOption" "mkOptionType" "mkValidator" "refined" "refinements" "runValidators" ]`. `mapAttrs (_: r: r.message) lib.types.refinements == mapAttrs (_: r: r.message) lib.refinements` ⇒ `true` (same three messages, separate definitions) |
+| **`lib.types` is not on this surface at all** — the name collision it used to carry moved with it. gen-merge folds gen-types' whole surface into its `types`, so non-type names sit inside that namespace which also exist at gen-schema's top level; reading one and expecting the other's implementation is the trap, and it now spans two libraries rather than one attrset | `lib ? types` ⇒ `false`. Against the hub's copy, `filter (n: elem n (attrNames genSchema)) (attrNames genMerge.types)` ⇒ `[ "defaultOnError" "formatErrors" "mkValidator" "refined" "refinements" "runValidators" ]` — **six**, gen-types' implementations, not gen-schema's. `mkOption`/`mkOptionType` left this list with the re-export deletion (ADR-0014); `gen-merge/lib/default.nix:117` still folds them |
 | `types.str` and `types.string` are the **same** gen-types checker — both `.name` ⇒ `"string"`, and both hash identically | `lib/identity.nix:33-38`; `types.str.name` ⇒ `"string"`, `types.string.name` ⇒ `"string"`, hashes both `eefaa98e…`. The `"str"` spelling `isPrimitiveOption` also accepts comes from **nixpkgs** `lib.types`, which this run did not exercise — that path is covered by `test-nixpkgs-str-field-reflected` (`ci/tests/identity-hash.nix`) |
 | A kind whose name starts with `_` is a **full kind** but vanishes from every introspection output | `lib/entry-type.nix:322-323`; schema with kinds `visible` and `_hidden` ⇒ `_hidden.kind` is `"_hidden"`, yet `_kindNames` ⇒ `[ "visible" ]` and `attrNames _topology` ⇒ `[ "visible" ]` |
 | Collections named `__functor` or `kind` are reserved and throw | `lib/entry-type.nix:57-61`; both ⇒ threw. Control collection `fine` on the same schema ⇒ evaluated. Test: `test-reserved-key-throws` (`ci/tests/collection-functor-guard.nix`) |
@@ -287,13 +287,13 @@ for `nixpkgs`, `lib.types`, `lib.mkOption`, `lib.mkMerge`, `lib.evalModules`, `e
 ## Drift check
 
 ```sh
-nix eval --json .#lib --apply 'l: { top = builtins.attrNames l; internal = builtins.attrNames l._internal; types = builtins.attrNames l.types; }'
+nix eval --json .#lib --apply 'l: { top = builtins.attrNames l; internal = builtins.attrNames l._internal; }'
 ```
 
 Current output (verbatim):
 
 ```json
-{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","defaultOnError","emitModule","evalModuleTree","fieldRef","fieldRefMarker","fieldRefsIn","filterValidators","formatErrors","hashIdentity","identityHashForKind","isFieldRef","mkCodec","mkDefault","mkFieldValidator","mkForce","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMerge","mkMixin","mkOption","mkOptionType","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","types","validateInstances"],"types":["any","anything","attrs","attrsOf","bool","defaultOnError","deferredModule","derivation","either","enum","float","formatErrors","function","int","intensionalEq","intersection","lazyAttrsOf","list","listOf","mkOption","mkOptionType","mkValidator","never","null","nullOr","number","oneOf","option","optionalAttr","path","pathLike","raw","refined","refinements","runValidators","str","strict","string","struct","submodule","tuple","typeEq","typedef","typedef'","union"]}
+{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","defaultOnError","emitModule","fieldRef","fieldRefMarker","fieldRefsIn","filterValidators","formatErrors","hashIdentity","identityHashForKind","isFieldRef","mkCodec","mkFieldValidator","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMixin","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","validateInstances"]}
 ```
 
 **Checks.** Test-runner invocation (from the repo root; CI runs the same command with
