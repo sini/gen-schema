@@ -697,8 +697,12 @@ position, rather than being treated as a leaf:
 
 ```nix
 genSchema.fieldRefsIn { k = _: fr; }
-# → error: gen-schema: fieldRefsIn: function at scanned position k — this scan's domain is data
-#   and excludes functions, because a field ref inside a closure is unreachable to a structural scan
+# → error: gen-schema: fieldRefsIn: function at scanned position k — this scan's domain is data.
+#   A function is refused rather than skipped, because a reference inside a closure is unreachable
+#   to any structural scan: its edge could never be derived, so the dependency would go missing
+#   silently. If this position is a computed value, express it where its reads stay visible —
+#   `fieldRef <instance> <path>` for a cross-instance read, or the kind's `computed` hook for a
+#   value derived from collections and defs.
 ```
 
 That is deliberate. Nix exposes no primitive that inspects a function body, so a ref inside a closure
@@ -707,6 +711,30 @@ would have closed goes undetected, and the unresolved ref record leaks into outp
 eliminates the case instead of declaring it unanalysable, which keeps every dependence fact the scan
 reports a derived one. The values a ref scan is applied to are declared data, so on conforming input
 the refusal observes nothing.
+
+#### If the refusal is in your way
+
+The refusal is **wider than the hazard**, on purpose, and that is worth knowing before you work
+around it:
+
+- a function proved to contain no reference refuses anyway — the scan does not attempt to decide
+  what a closure reads, because no structural scan can;
+- it reaches **any depth** of the value tree, including a function inside a foreign attrset stapled
+  in from elsewhere;
+- a **raw lambda as a computed value is foreclosed**. Computed values are expected to route through
+  constructs whose reads are graph-visible: `fieldRef` for a cross-instance read, `computed` for a
+  value derived from collections and defs, `derive` on a registry for one derived per instance.
+
+That covers the cases seen so far, and it is the first thing to reach for. If it genuinely does not,
+**the escape is a declared one, not a quieter scan.** The sanctioned shape follows the pattern
+ADR-0023 sets for the value-injection invariant — by-construction as the target, a declared opt-out
+as the interim, with the price recorded: refusal stays the default, and a field is annotated
+at schema level as *not scanned, its reads declared here*. The burden of arguing why those reads
+cannot be derived attaches to that annotation at that point, which is where it can actually be
+discharged — a concrete case exists to argue from. Re-opening the scan silently is explicitly not
+sanctioned: it trades a stated refusal for an unstated hole, which is the trade this refusal exists
+to reverse. No such annotation ships today; if you need one, that is a design conversation, not a
+patch to this file.
 
 ### Parent-Child Topology
 

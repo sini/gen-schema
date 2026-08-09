@@ -82,6 +82,22 @@ in
   #        dependence fact that survives the scan is then a derived one, which is the totality
   #        Mokhov's static extraction has by typing: the inexpressible case is refused, not
   #        silently admitted. An assertion that a fact is unanalysable is not a proof of it.
+  #
+  #   ★ THE REFUSAL IS DELIBERATELY WIDER THAN THE HAZARD, and that is stated rather than hidden.
+  #   A function proved to contain no reference refuses anyway; a function at ANY depth of the value
+  #   tree refuses, including one inside a foreign attrset stapled in from elsewhere; and a raw
+  #   lambda as a computed value is foreclosed outright, which is why the refusal names the
+  #   constructs whose reads stay graph-visible instead of only saying no. The width is the price of
+  #   being total by construction: a scan that decided case-by-case would be deciding exactly the
+  #   question — what does this closure read — that no structural scan can answer.
+  #
+  #   ★ IT DOES NOT FORECLOSE A DECLARED ESCAPE. If a concrete need arrives, the sanctioned shape is
+  #   an opt-out that is DECLARED and priced: refusal by construction stays the default, and a field
+  #   is annotated at schema level as not scanned, with what it reads declared there — at which point
+  #   the burden of arguing the impossibility attaches to that annotation, and is dischargeable
+  #   because a concrete case exists to argue from. Quietly widening this scan's leaf set back out is
+  #   not that escape: it converts a stated refusal into an unstated hole, which is the exact trade
+  #   the refusal was chosen to reverse. See the README for the governing decision record.
   fieldRefsIn =
     v:
     let
@@ -99,7 +115,7 @@ in
         else if isList val then
           concatLists (imap0 (i: e: go (at ++ [ i ]) e) val)
         else if isFunction val then
-          throw "gen-schema: fieldRefsIn: function at scanned position ${renderAt at} — this scan's domain is data and excludes functions, because a field ref inside a closure is unreachable to a structural scan; make the position data, or keep it out of the scanned structure"
+          throw "gen-schema: fieldRefsIn: function at scanned position ${renderAt at} — this scan's domain is data. A function is refused rather than skipped, because a reference inside a closure is unreachable to any structural scan: its edge could never be derived, so the dependency would go missing silently. If this position is a computed value, express it where its reads stay visible — `fieldRef <instance> <path>` for a cross-instance read, or the kind's `computed` hook for a value derived from collections and defs."
         else
           [ ];
     in
