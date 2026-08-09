@@ -30,6 +30,7 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
   - [Custom Ref Coercion](#custom-ref-coercion)
   - [Deferred Coerce](#deferred-coerce-self-referential-registries)
   - [Deduplicated Sets](#deduplicated-sets)
+  - [Field References (Values)](#field-references-values)
   - [Parent-Child Topology](#parent-child-topology)
   - [Schema Introspection](#schema-introspection)
   - [Scope Graph Bridge](#scope-graph-bridge-consumer-side)
@@ -663,6 +664,50 @@ config.fleet.groups.web.members = [ "igloo" "iceberg" "igloo" ];
 
 Composes with custom coerce hooks — expansion produces duplicates, `setOf` removes them.
 
+### Field References (Values)
+
+`ref` is a **type**: it declares that a field points at an instance. `fieldRef` is the matching
+**value**: an inert record naming which instance, and which field of it.
+
+```nix
+fr = genSchema.fieldRef config.fleet.hosts.igloo [ "net" "addr" ];
+# → { __genSchemaFieldRef = true; aspect = <igloo>; path = [ "net" "addr" ]; }
+
+genSchema.isFieldRef fr                                    # → true
+genSchema.fieldRefsIn { listen = { bind = fr; }; }
+# → [ { at = [ "listen" "bind" ]; aspect = <igloo>; path = [ "net" "addr" ]; } ]
+```
+
+The target must carry `id_hash` — routing is by identity, and a display key is not one, so a name
+string is refused at application time. `fieldRefsIn` returns one record per ref it finds, with `at`
+giving the subpath (attribute keys and list indices) where the ref sat; `[ ]` means the scanned value
+was itself a ref.
+
+The two levels are complementary and both are *derived*, never declared:
+
+| | `ref` | `fieldRef` |
+|---|---|---|
+| what it is | an option **type** on a field | a **value** inhabiting such a field |
+| lives in | the kind's schema | a default or a contributed value |
+| edges | `_refEdges`, kind → kind | (instance, field) → (instance, field) |
+| refuses | an unresolvable key, at merge time | a non-identity target, at application time |
+
+**`fieldRefsIn` refuses functions.** A function found anywhere the scan descends throws, naming the
+position, rather than being treated as a leaf:
+
+```nix
+genSchema.fieldRefsIn { k = _: fr; }
+# → error: gen-schema: fieldRefsIn: function at scanned position k — this scan's domain is data
+#   and excludes functions, because a field ref inside a closure is unreachable to a structural scan
+```
+
+That is deliberate. Nix exposes no primitive that inspects a function body, so a ref inside a closure
+is invisible to any structural scan — and skipping it fails *open*: the edge is missing, a cycle it
+would have closed goes undetected, and the unresolved ref record leaks into output as data. Refusing
+eliminates the case instead of declaring it unanalysable, which keeps every dependence fact the scan
+reports a derived one. The values a ref scan is applied to are declared data, so on conforming input
+the refusal observes nothing.
+
 ### Parent-Child Topology
 
 Kinds can declare their parent kind via the `parent` collection. This establishes a schema-level nesting relationship:
@@ -1204,6 +1249,23 @@ Converts a list of instances to a set with O(1) membership lookup via attrset ba
   length = n;        # number of unique instances
 }
 ```
+
+### `fieldRef` / `isFieldRef` / `fieldRefsIn`
+
+```nix
+fieldRef instance [ fieldName … ]   # → { __genSchemaFieldRef = true; aspect; path; }
+isFieldRef v                        # → bool
+fieldRefsIn v                       # → [ { at; aspect; path; } ]
+```
+
+The value-level counterpart of `ref` — see [Field References (Values)](#field-references-values).
+`fieldRef` throws unless the target carries `id_hash` and the path is a non-empty list of strings;
+the record carries the caller's own instance, so identity in ≡ identity out.
+
+`fieldRefsIn` scans deeply for those records, returning one entry per hit with `at` giving the
+subpath where it sat (`[ ]` = the scanned value itself). It **throws** on a function in any scanned
+position: the scan's domain is data, and a ref inside a closure would be silently invisible. The
+marker key is exported as `fieldRefMarker` for consumers writing their own predicate.
 
 ### `schemaFn`
 

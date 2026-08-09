@@ -7,6 +7,11 @@ parent topology), **instances** (submodules with strictness and a content-addres
 injected), and the **registry** option that binds them — driven on gen-merge's `evalModuleTree`, not
 nixpkgs `lib.evalModules`.
 
+Also the **reference vocabulary at both levels**: `ref`, the option type declaring that a field points
+at an instance, and `fieldRef`, the inert value naming which instance and which field of it. One
+library holds both because they are the two halves of one relation, and separating them is how a
+reference type and its inhabitants drift apart.
+
 ## Not this library's job
 
 Quoted text is the owner's own `flake.nix` `description` field, verbatim.
@@ -105,6 +110,30 @@ The registry's `apply` is the pipeline: deferred-ref coerce → refinements → 
 | `setOf` | `refType -> type` — `listOf` that dedups by `id_hash`, first-seen order |
 | `toSet` | `[instance] -> { member; toList; length; }` |
 
+**Field references, the VALUE level** — `lib/field-ref.nix`
+
+| Export | Signature |
+|---|---|
+| `fieldRef` | `instance -> [fieldName] -> { __genSchemaFieldRef = true; aspect; path; }` — throws unless the target carries `id_hash` and the path is a non-empty list of strings |
+| `isFieldRef` | `v -> bool` |
+| `fieldRefsIn` | `v -> [ { at; aspect; path; } ]` — deep structural scan; `at` is the subpath (attr keys and list indices) where the ref sits. **Throws** on a function in a scanned position |
+| `fieldRefMarker` | the marker key string, for consumers writing their own predicate |
+
+★ **`ref` and `fieldRef` are two different things and the library exports both.** They sit on
+opposite sides of the type/value axis, so neither is a variant of the other:
+
+| | `ref` (`lib/ref.nix`) | `fieldRef` (`lib/field-ref.nix`) |
+|---|---|---|
+| what it is | an option **TYPE** on a field | a **VALUE** inhabiting such a field |
+| declared where | in the kind's schema | in a default or a contributed value |
+| edges it derives | `_refEdges`, **kind → kind**, one per declared ref field | **(instance, field) → (instance, field)**, one per ref a scan finds |
+| refuses | an unresolvable key, at merge time | a non-identity target, at application time |
+
+The type declares that a field points at another instance; the value names **which one, and which
+field of it**. Neither *declares* the dependence fact — both derive it from structure that is present
+for another reason, which is why both can be read statically. The record field is named `aspect`
+because gen-settings, the incumbent consumer, addresses aspects; it is the target **instance**.
+
 **Methods** — `lib/methods.nix`
 
 | Export | Signature |
@@ -201,6 +230,7 @@ every `nix-unit --flake ./ci#tests` run instead of resting on a one-time eval. S
 | All three ref-binding errors throw: a declared ref field with no binding, a binding matching no field, and a string key absent from the target registry | `lib/instance.nix:187-202,86-87`; all three ⇒ threw. Control, correct binding ⇒ `hosts.a.net.cidr` resolves to `"10.0.0.0/8"` and the resolved value carries `id_hash`. Tests: `test-missing-binding-throws`, `test-extra-binding-throws`, `test-invalid-key-throws` |
 | `setOf` rejects a non-ref element type at construction time | `lib/ref.nix:99-103`; `setOf types.str` ⇒ threw, `(setOf (ref "net")).name` ⇒ `"setOf(ref(net))"`. Test: `test-bad-ref-throws` (`ci/tests/ref-type-invalid.nix`) |
 | `toSet` dedups first-seen, and `member` **throws** on a value without `id_hash` rather than returning false | `lib/ref.nix:119-141`; hashes `A B A` ⇒ `length` `2`, names `[ "A" "B" ]`, `member` on a present hash ⇒ `true`, absent ⇒ `false`, `member { name = "x"; }` ⇒ threw. Tests: `test-dedup-first-seen`, `test-member-true` (`ci/tests/toset.nix`) |
+| `fieldRefsIn` **throws** on a function in a scanned position rather than treating it as a leaf — including a function nested under a list, and including an attrset whose `__functor` member is one. The scan is total on its domain and that domain is data | `lib/field-ref.nix`, the `isFunction` arm of `fieldRefsIn`'s `go`. A ref in data ⇒ **1** hop; the same ref inside a function body ⇒ threw; ordinary ref-free data ⇒ accepted, `[ ]`. Tests: `test-hazard-control-ref-in-data-is-one-hop`, `test-hazard-ref-in-function-body-is-refused`, `test-hazard-control-plain-data-is-accepted` (`ci/tests/field-ref.nix`). ★ **Those three discriminate the shipped scan from the open one**: reverting the `isFunction` arm to `[ ]` and re-running the suite ⇒ `474/477`, red on exactly `test-hazard-ref-in-function-body-is-refused`, `test-refuses-function-nested-under-a-list` and `test-functor-attrset-is-refused`, with every control still green |
 | `mkCodec` and `renderDocs` disagree about methods: the codec drops them, the docs keep them | `lib/codec.nix:46-81` vs `lib/docs.nix:14`; encoding an instance carrying `name`, `id_hash`, `addr`, `port`, `url` (a method) and `methods` ⇒ `{ addr = "1.1.1.1"; port = 22; }` only, while `renderDocs` on the same kind emits a `\| url \| string \| — \| u \|` row. `renderDocs` drops `_`-prefixed names and `id_hash`, nothing else |
 | `mkCodec` guards eagerly, unlike the registry guards above: a non-kind value and a `fields` spec naming an undeclared option both throw | `lib/codec.nix:72-94`; both ⇒ threw |
 | `checkRefinements` **returns** a failure list; only the registry pipeline throws | `lib/refined.nix:24-42` vs `lib/instance.nix:421-425`; `checkRefinements "f" (refined types.int refinements.tcpPort) 99999` ⇒ `[ { field = "f"; lazy = false; message = "must be a valid TCP port (1-65535)"; value = 99999; } ]` (no throw), the same refinement on a registry field ⇒ threw, control value `80` ⇒ `80` |
@@ -249,7 +279,7 @@ nix eval --json .#lib --apply 'l: { top = builtins.attrNames l; internal = built
 Current output (verbatim):
 
 ```json
-{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","defaultOnError","emitModule","evalModuleTree","filterValidators","formatErrors","hashIdentity","identityHashForKind","mkCodec","mkDefault","mkFieldValidator","mkForce","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMerge","mkMixin","mkOption","mkOptionType","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","types","validateInstances"],"types":["any","anything","attrs","attrsOf","bool","defaultOnError","deferredModule","derivation","either","enum","float","formatErrors","function","int","intensionalEq","intersection","lazyAttrsOf","list","listOf","mkOption","mkOptionType","mkValidator","never","null","nullOr","number","oneOf","option","optionalAttr","path","pathLike","raw","refined","refinements","runValidators","str","strict","string","struct","submodule","tuple","typeEq","typedef","typedef'","union"]}
+{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","defaultOnError","emitModule","evalModuleTree","fieldRef","fieldRefMarker","fieldRefsIn","filterValidators","formatErrors","hashIdentity","identityHashForKind","isFieldRef","mkCodec","mkDefault","mkFieldValidator","mkForce","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMerge","mkMixin","mkOption","mkOptionType","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","types","validateInstances"],"types":["any","anything","attrs","attrsOf","bool","defaultOnError","deferredModule","derivation","either","enum","float","formatErrors","function","int","intensionalEq","intersection","lazyAttrsOf","list","listOf","mkOption","mkOptionType","mkValidator","never","null","nullOr","number","oneOf","option","optionalAttr","path","pathLike","raw","refined","refinements","runValidators","str","strict","string","struct","submodule","tuple","typeEq","typedef","typedef'","union"]}
 ```
 
 **Checks.** Test-runner invocation (from the repo root; CI runs the same command with
