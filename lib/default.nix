@@ -18,6 +18,9 @@ let
     inherit (refinedLib) isRefined getRefinements;
   };
   refLib = import ./ref.nix { inherit prelude merge; };
+  # The VALUE-level reference vocabulary, kin to refLib's type-level one — see field-ref.nix's
+  # header for the axis that separates them.
+  fieldRefLib = import ./field-ref.nix { inherit prelude; };
   entryType = import ./entry-type.nix {
     inherit prelude merge record;
     inherit (methods) mkMethodsModule;
@@ -71,6 +74,12 @@ in
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (validate) validateInstances mkFieldValidator filterValidators;
   inherit (refLib) ref setOf toSet;
+  inherit (fieldRefLib)
+    fieldRef
+    isFieldRef
+    fieldRefsIn
+    fieldRefMarker
+    ;
   inherit (refinedLib) refinements checkRefinements;
   inherit (refinedLib.types) refined;
   inherit (blameLib) blame;
