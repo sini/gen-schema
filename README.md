@@ -1552,7 +1552,10 @@ nix eval --override-input gen-schema ../.. .#docs --raw
 
 ## Testing
 
-398 tests via nix-unit across 101 suites in `ci/tests/` — covering kinds, extension, strict validation, instances, identity hashing, cross-instance refs (deferred/direct/self-referential coerce, `listOf`/`setOf`/`nullOr` wrappers), collections and computed fields, methods, mixins, refinement contracts, blame, validators, derive hooks, codec round-trips, topology/edges introspection, and docs generation.
+483 tests via nix-unit across 107 suites in `ci/tests/` — both figures are command output rather
+than hand-maintained prose: `nix-unit --flake ./ci#tests` ⇒ `483/483 successful` (exit 0), and
+`git ls-tree --name-only HEAD ci/tests/ | grep -c '\.nix$'` ⇒ `107`, which is also the number of
+distinct suites the runner reports. Covering kinds, extension, strict validation, instances, identity hashing, cross-instance refs (deferred/direct/self-referential coerce, `listOf`/`setOf`/`nullOr` wrappers), collections and computed fields, methods, mixins, refinement contracts, blame, validators, derive hooks, codec round-trips, topology/edges introspection, and docs generation.
 
 Run the itemized suite (from `ci/`):
 
