@@ -13,6 +13,7 @@
 # scan, which is the failure-open mode the refusal exists to eliminate).
 {
   genSchema,
+  prelude,
   ...
 }:
 let
@@ -21,6 +22,14 @@ let
     isFieldRef
     fieldRefsIn
     ;
+
+  # The refusal's position renderer. Nix cannot capture a throw's message — `builtins.tryEval`
+  # yields only `success` — so the part of the error a user actually acts on is pinned by calling
+  # the SHIPPED renderer, reached by importing the module directly. A golden that re-implemented it
+  # would not be an oracle for the one that ships. `renderAt` is deliberately absent from the public
+  # `lib`; `test-render-at-is-not-public-surface` below is what keeps that true.
+  fieldRefLib = import ../../lib/field-ref.nix { inherit prelude; };
+  inherit (fieldRefLib) renderAt;
 
   throws = e: (builtins.tryEval (builtins.deepSeq e e)).success == false;
   # The scan is lazy in its result spine, so a refusal buried in it needs forcing to observe.
@@ -179,6 +188,45 @@ in
       };
       expected = true;
     };
+    # ── the refusal's blame position, which is the part of the message a user acts on ──
+    # Every arm above only asserts that the throw FIRES. These pin WHERE it says the function was,
+    # so a dropped root case or a mis-composed list index cannot pass while breaking the error.
+    test-render-at-dotted-attr-path = {
+      expr = renderAt [
+        "listen"
+        "bind"
+      ];
+      expected = "listen.bind";
+    };
+    test-render-at-list-index-in-path = {
+      expr = renderAt [
+        "xs"
+        1
+        "deep"
+      ];
+      expected = "xs.1.deep";
+    };
+    test-render-at-root-is-named-not-empty = {
+      expr = renderAt [ ];
+      expected = "(the scanned value itself)";
+    };
+    test-render-at-single-component = {
+      expr = renderAt [ "k" ];
+      expected = "k";
+    };
+    # The renderer is reached by importing the module, NOT through the library's exports. This is
+    # the assertion that keeps the golden above from quietly becoming a public-surface addition.
+    test-render-at-is-not-public-surface = {
+      expr = genSchema ? renderAt;
+      expected = false;
+    };
+    # CONTROL for the row above: the same predicate reports true for a name that IS exported, so a
+    # renamed or vanished export could not read as "correctly absent".
+    test-control-public-surface-predicate-fires = {
+      expr = genSchema ? fieldRefsIn;
+      expected = true;
+    };
+
     # An attrset carrying `__functor` is not a function to `builtins.isFunction`, but its member
     # IS one in a scanned position — so the attrset is refused too. The domain is data, without a
     # callable exception.

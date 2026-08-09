@@ -45,10 +45,21 @@ in
 {
   inherit fieldRefMarker isFieldRef;
 
-  # fieldRef instance path -> field ref record
-  #   `instance` MUST carry id_hash: routing is by identity, and a display key is not one, so a
-  #   name string never crosses the boundary. Identity in ≡ identity out — the record carries the
-  #   given entry, so the scan hands back the caller's own instance rather than a lookup of it.
+  # renderAt is returned so a golden can call the SHIPPED renderer instead of re-implementing it —
+  # a re-implementation is not an oracle for the real one, and a throw's message is unreachable to
+  # `builtins.tryEval`, which yields only `success`. It is deliberately NOT re-exported by
+  # ./default.nix: the public surface is the four names above, and this one is reachable only by
+  # importing this module directly, which is what the suite does.
+  inherit renderAt;
+
+  # fieldRef aspect path -> field ref record
+  #   `aspect` is the TARGET INSTANCE. Parameter and record field carry that name because the
+  #   incumbent consumer addresses aspects and states its provenance records over it; nothing here
+  #   reads the target as anything narrower than an instance carrying id_hash, and renaming it would
+  #   change a consumer's user-visible record shape rather than this library's behaviour.
+  #   It MUST carry id_hash: routing is by identity, and a display key is not one, so a name string
+  #   never crosses the boundary. Identity in ≡ identity out — the record carries the given entry,
+  #   so the scan hands back the caller's own instance rather than a lookup of it.
   fieldRef =
     aspect: path:
     if !(isAttrs aspect && aspect ? id_hash) then
