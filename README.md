@@ -702,7 +702,8 @@ genSchema.fieldRefsIn { k = _: fr; }
 #   to any structural scan: its edge could never be derived, so the dependency would go missing
 #   silently. If this position is a computed value, express it where its reads stay visible —
 #   `fieldRef <instance> <path>` for a cross-instance read, or the kind's `computed` hook for a
-#   value derived from collections and defs.
+#   value derived from collections and defs; otherwise, make the position data, or keep the
+#   function outside the scanned structure.
 ```
 
 That is deliberate. Nix exposes no primitive that inspects a function body, so a ref inside a closure
