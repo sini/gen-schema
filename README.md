@@ -524,8 +524,8 @@ There is deliberately **no value-only form**. Reflecting an instance value's own
 **Three-layer precedence for key selection:**
 
 1. **Explicit `_identity.keys`** — list the exact keys. Multiple modules can contribute via `mkMerge`.
-1. **`identity = false`** — exclude individual options from reflection.
-1. **Auto-reflection** — all non-internal primitives included (default).
+2. **`identity = false`** — exclude individual options from reflection.
+3. **Auto-reflection** — all non-internal primitives included (default).
 
 ```nix
 # Layer 1: explicit keys — composable across modules
