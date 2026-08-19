@@ -5,9 +5,14 @@
   # nixpkgs-lib-free (checked by ci/tests/purity.nix): it drives the registry engine on gen-merge's
   # byte-mode evalModuleTree + gen-types leaf checkers, NOT lib.evalModules / lib.types. nixpkgs is
   # pulled ONLY in ci/ (the nix-unit harness + any non-schema `lib.*` the test corpus still uses).
+  #
+  # gen-types is reached THROUGH gen-merge and is not declared here. It was, and gen-schema called
+  # it zero times: the library entry takes { prelude, merge, algebra } and gen-types was never
+  # injected into it. A declared-but-uncalled input is a false coupling fact — an edge the hub's
+  # direction-of-dependence lint reads, ranks and reports for a dependence that does not exist —
+  # so the declaration is gen-merge's to make, from gen-merge's own lock.
   inputs = {
     gen-prelude.url = "github:sini/gen-prelude";
-    gen-types.url = "github:sini/gen-types";
     gen-merge.url = "github:sini/gen-merge";
     gen-algebra.url = "github:sini/gen-algebra";
   };
