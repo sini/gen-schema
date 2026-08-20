@@ -1525,7 +1525,8 @@ lib/
   default.nix       — public API surface, wiring (imports gen-algebra's pure record algebra)
   entry-type.nix     — mkSchemaEntryType, mkSchemaOption (collection extraction, introspection, topology)
   instance.nix       — mkInstanceType, mkInstanceRegistry (strict + identity injection, refs)
-  identity.nix       — hashIdentity (the one minting authority) + mkIdentityModule (id_hash via primitive-option reflection)
+  id-hash.nix        — mkIdentityModule (id_hash via primitive-option reflection) + identityHashForKind.
+                       The MINT is not here: `hashIdentity` lives in gen-identity and arrives injected
   strict.nix         — mkStrictModule (closed-world freeform rejection)
   ref.nix            — schema.ref (dual-mode cross-instance references, getRefKind)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)

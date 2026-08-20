@@ -72,7 +72,7 @@ The registry's `apply` is the pipeline: deferred-ref coerce → refinements → 
 | Export | Signature |
 |---|---|
 | `mkIdentityModule` | `kindName -> module` — injects readOnly/internal `id_hash` and the `_identity.keys` submodule |
-| `hashIdentity` | `kind -> [label] -> (label -> value) -> "<kind>:<sha256Hex>"` — the single minting authority both derivations route through. Label order is irrelevant; `:` is refused in a kind name |
+| ~~`hashIdentity`~~ | **NOT EXPORTED.** The one minting authority moved to `gen-identity`, a dependency-free leaf. gen-schema INJECTS it (`identity`) and constructs with it; re-exporting would re-export its build, which is the verbatim re-handing ADR-0014 rejects — and this repository is that ADR's own discharged instance |
 | `identityHashForKind` | `kindValue -> instanceValue -> identity`, reflecting the **kind's** primitive options — the sole recompute path |
 
 **Strictness** — `lib/strict.nix`
@@ -293,7 +293,7 @@ nix eval --json .#lib --apply 'l: { top = builtins.attrNames l; internal = built
 Current output (verbatim):
 
 ```json
-{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","defaultOnError","emitModule","fieldRef","fieldRefMarker","fieldRefsIn","filterValidators","formatErrors","hashIdentity","identityHashForKind","isFieldRef","mkCodec","mkFieldValidator","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMixin","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","validateInstances"]}
+{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","defaultOnError","emitModule","fieldRef","fieldRefMarker","fieldRefsIn","filterValidators","formatErrors","identityHashForKind","isFieldRef","mkCodec","mkFieldValidator","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMixin","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","validateInstances"]}
 ```
 
 **Checks.** Test-runner invocation (from the repo root; CI runs the same command with
