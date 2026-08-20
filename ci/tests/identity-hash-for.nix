@@ -108,13 +108,13 @@ in
       # shared blindness.
       stamped = homeInst.id_hash;
       overNameAndSystem =
-        "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
+        "home:" + builtins.hashString "sha256" ''{"name":s"ben","system":s"x86_64-linux",}'';
     };
     expected = {
       recomputeMatchesStamp = true;
-      stamped = "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
+      stamped = "home:" + builtins.hashString "sha256" ''{"name":s"ben","system":s"x86_64-linux",}'';
       overNameAndSystem =
-        "home:" + builtins.hashString "sha256" ''{"name":"ben","system":"x86_64-linux"}'';
+        "home:" + builtins.hashString "sha256" ''{"name":s"ben","system":s"x86_64-linux",}'';
     };
   };
   # identityHashForKind (option-level) equals the id_hash the module stamped — the EXACT twin.
@@ -141,7 +141,7 @@ in
   flake.tests.identity-hash-for.test-hashIdentity-shape = {
     expr =
       hashIdentity "host" [ "name" ] (_: "igloo")
-      == "host:" + builtins.hashString "sha256" ''{"name":"igloo"}'';
+      == "host:" + builtins.hashString "sha256" ''{"name":s"igloo",}'';
     expected = true;
   };
 }
