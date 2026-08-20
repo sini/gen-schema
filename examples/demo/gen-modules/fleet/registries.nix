@@ -41,11 +41,33 @@ let
     in
     lib.foldl' (acc: c: acc * 16 + hexChars.${c}) 0 (lib.stringToCharacters s);
 
+  # An identity is `"<kind>:" + sha256(<pairs preimage>)` — the kind tag rides OUTSIDE the digest and
+  # is recoverable by splitting on the FIRST colon, which is well defined because the mint refuses `:`
+  # in a kind name (`gen-schema/lib/identity.nix`, `hashIdentity`). A derived UID wants the digest
+  # region, which is the kind-INDEPENDENT half.
+  #
+  # Slicing the digest out is legitimate HERE and nowhere near an identity comparison: the identity is
+  # the WHOLE STRING, so `hashesDiffer` below compares un-sliced values. This slice feeds a derivation,
+  # not an equality.
+  #
+  # The no-colon form is REFUSED rather than tolerated. Accepting it would mean silently deriving from
+  # a whole legacy identity when this tree is pinned to a mint that predates the kind join — different
+  # UIDs, no signal. A throw names the pin instead.
+  digestOf =
+    identity:
+    let
+      parts = builtins.match "[^:]*:(.*)" identity;
+    in
+    if parts == null then
+      throw "identity '${identity}' carries no kind tag: expected \"<kind>:<sha256>\" from gen-schema's mint. A pin predating the kind join derives different values silently, so it is refused here."
+    else
+      builtins.head parts;
+
   idFromHash =
     { min, max }:
     hash:
     let
-      raw = hexToInt (builtins.substring 0 8 hash);
+      raw = hexToInt (builtins.substring 0 8 (digestOf hash));
     in
     min + lib.mod raw (max - min);
 

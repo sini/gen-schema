@@ -255,11 +255,13 @@ options.fleet.users = mkInstanceRegistry config.schema "user" {
     in lib.mapAttrs (name: _: { uid = uids.${name}; }) users;
 };
 
-fleet.users.tux.uid   → 34213  (deterministic from id_hash)
-fleet.users.yeti.uid  → 33045  (different hash → different UID)
+fleet.users.tux.uid   → 4866  (deterministic from id_hash)
+fleet.users.yeti.uid  → 5388  (different hash → different UID)
 ```
 
 Derive reads `id_hash` from each instance to compute collision-free UIDs. Derived fields are `internal = true` (excluded from `id_hash`) and `readOnly = true` (only the derive hook writes them).
+
+The two numbers above are **pin-dependent** and are the only values in this README that are: they fall out of the `id_hash` digest, so they move whenever the pinned gen-schema changes how it mints. Everything else documented here is declared data, or computed from declared data, and holds across pins. Regenerate them with `nix eval .#fleet.tuxUid` and `nix eval .#fleet.yetiUid` rather than trusting the transcription.
 
 ## Either Pipeline
 
