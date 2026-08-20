@@ -1260,6 +1260,8 @@ ref target
 
 `target` is a string -> deferred ref (kind name, bound via `refs` on `mkInstanceRegistry`). `target` is an attrset -> direct ref (resolved immediately). Both modes accept string keys or instance values.
 
+The deferred ref's `refKind` sits inside the descriptor handed to `mkOptionType`, not stapled onto the finished type afterwards. `mkOptionType` stamps the protocol onto the record it is handed and mints a functor pointing back at that completed record, so a `// { refKind = ...; }` over a completed type leaves every protocol answer — `typeMerge`'s rebuild included — describing a `ref` without its kind. Declaring the same option twice as `ref "host"` therefore merges to a `ref(host)` that `getRefKind` still reads through any `nullOr` / `listOf` / `setOf` wrapper and `mkCoerceChain` still builds a coercion for, rather than to a bare `ref` whose string keys reach the instance unresolved.
+
 ### `setOf`
 
 ```nix
