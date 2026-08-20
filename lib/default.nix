@@ -9,7 +9,10 @@ let
 
   methods = import ./methods.nix { inherit prelude merge; };
   validate = import ./validate.nix { inherit prelude; };
-  identityLib = import ./identity.nix { inherit prelude merge identity; };
+  # Named for the field it produces, and for the one thing both its bindings agree on. It was
+  # `identity.nix` while it contained the mint; it does not, and a file called that beside a
+  # LIBRARY called gen-identity is a reader's trap rather than a tidy-up.
+  idHashLib = import ./id-hash.nix { inherit prelude merge identity; };
   strictLib = import ./strict.nix { inherit prelude merge; };
   refinedLib = import ./refined.nix;
   blameLib = import ./blame.nix;
@@ -33,7 +36,7 @@ let
   instance = import ./instance.nix {
     inherit prelude merge;
     inherit (strictLib) mkStrictModule;
-    inherit (identityLib) mkIdentityModule;
+    inherit (idHashLib) mkIdentityModule;
     inherit (validate)
       runValidators
       defaultOnError
@@ -46,10 +49,14 @@ let
 in
 {
   # Identity / strict / validation module surface (gen-schema-owned).
-  inherit (identityLib)
+  # ★ `hashIdentity` IS NOT HERE, and its absence is the point. The mint lives in
+  # `gen-identity`; re-exporting it under gen-schema's name would re-export its BUILD, which is
+  # the verbatim re-handing ADR-0014 rejects — and gen-schema's own discharged instance of that
+  # ADR was doing exactly this with gen-merge's seven bindings. A consumer that wants the mint
+  # takes the leaf, which it can, because the leaf has no inputs to conflict with anything.
+  inherit (idHashLib)
     mkIdentityModule
     identityHashForKind
-    hashIdentity
     ;
   inherit (strictLib) mkStrictModule;
   inherit (validate)
