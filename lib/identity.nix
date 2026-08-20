@@ -11,7 +11,11 @@
 # This is the structural-identity primitive instances add on top of bare schema
 # kinds (see instance.nix). Relocated from gen-algebra/module so gen-schema owns
 # its full module-system surface; gen-algebra is the pure algebra root.
-{ prelude, merge }:
+{
+  prelude,
+  merge,
+  identity,
+}:
 let
   # 2^53 — the magnitude past which Nix's `==` stops being an equivalence relation across int and
   # float. `9007199254740993 == 9007199254740992.0` and `9007199254740992 == 9007199254740992.0`
@@ -386,7 +390,7 @@ in
         )
       );
     in
-    hashIdentity kindValue.kind keys (k: instance.${k});
+    identity.hashIdentity kindValue.kind keys (k: instance.${k});
 
   mkIdentityModule =
     kind:
@@ -439,7 +443,7 @@ in
               ) sorted;
             identityKeys = if explicitKeys != [ ] then validatedExplicitKeys else reflectedKeys;
           in
-          hashIdentity kind identityKeys (k: config.${k});
+          identity.hashIdentity kind identityKeys (k: config.${k});
       };
     };
 }

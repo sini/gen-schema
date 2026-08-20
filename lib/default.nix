@@ -2,13 +2,14 @@
   prelude,
   merge,
   algebra,
+  identity,
 }:
 let
   inherit (algebra) record;
 
   methods = import ./methods.nix { inherit prelude merge; };
   validate = import ./validate.nix { inherit prelude; };
-  identityLib = import ./identity.nix { inherit prelude merge; };
+  identityLib = import ./identity.nix { inherit prelude merge identity; };
   strictLib = import ./strict.nix { inherit prelude merge; };
   refinedLib = import ./refined.nix;
   blameLib = import ./blame.nix;

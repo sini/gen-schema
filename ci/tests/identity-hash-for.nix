@@ -10,10 +10,13 @@
   lib,
   genSchema,
   genMerge,
+  genIdentity,
   ...
 }:
 let
-  inherit (genSchema) hashIdentity;
+  # The mint is gen-identity's; the reflection path this file tests is gen-schema's, and it
+  # builds values WITH the injected mint rather than owning one.
+  inherit (genIdentity) hashIdentity;
 
   # A kind with a mixed str/int identity key set, plus a SAME-SHAPED kind under a different name —
   # the discovery discriminator's fixture: identical options and values, so only the kind separates
@@ -135,13 +138,5 @@ in
   flake.tests.identity-hash-for.test-discriminates-kind = {
     expr = (genSchema.identityHashForKind hostAltKv hostInst) == hostInst.id_hash;
     expected = false;
-  };
-  # hashIdentity is the primitive every derivation hashes through, and this is its FORMAT: the kind
-  # joined to a digest of the pairs, the pairs rendered as a JSON attrset.
-  flake.tests.identity-hash-for.test-hashIdentity-shape = {
-    expr =
-      hashIdentity "host" [ "name" ] (_: "igloo")
-      == "host:" + builtins.hashString "sha256" ''{"name":s"igloo",}'';
-    expected = true;
   };
 }

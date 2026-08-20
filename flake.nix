@@ -15,6 +15,11 @@
     gen-prelude.url = "github:sini/gen-prelude";
     gen-merge.url = "github:sini/gen-merge";
     gen-algebra.url = "github:sini/gen-algebra";
+    # The one minting authority, now its own dependency-free leaf. gen-schema keeps the
+    # identity REFLECTION half — which of a kind's options are identity keys, and stamping
+    # id_hash — and builds values WITH the injected mint inside its own evaluation, which is
+    # ADR-0014's constructing arm rather than a re-hand.
+    gen-identity.url = "github:sini/gen-identity";
   };
 
   outputs =
@@ -22,6 +27,7 @@
       gen-prelude,
       gen-merge,
       gen-algebra,
+      gen-identity,
       ...
     }:
     {
@@ -29,6 +35,7 @@
         prelude = gen-prelude.lib;
         merge = gen-merge.lib;
         algebra = gen-algebra.lib;
+        identity = gen-identity.lib;
       };
       flakeModules.default = ./flakeModule.nix;
     };
