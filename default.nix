@@ -17,5 +17,16 @@
   # today (both 887ad87), and now they cannot disagree.
   merge ? import "${fetch "gen-merge"}" { inherit prelude; },
   algebra ? import "${fetch "gen-algebra"}/lib",
+  # The one minting authority: a dependency-free leaf, so its lib is a bare value and this
+  # takes no argument. Derived from THIS shim's lock so the whole construction mints through one
+  # encoding — two instances would be two content-address formulas for one node.
+  identity ? import "${fetch "gen-identity"}/lib",
 }:
-import ./lib { inherit prelude merge algebra; }
+import ./lib {
+  inherit
+    prelude
+    merge
+    algebra
+    identity
+    ;
+}
