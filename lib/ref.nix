@@ -30,6 +30,12 @@ let
   # Deferred ref — marker type carrying target kind name.
   # Unresolved: merge passes through the raw value (string or attrset).
   # mkInstanceRegistry detects .refKind and injects apply-based resolution.
+  #
+  # refKind sits INSIDE the descriptor rather than being stapled on afterwards. mkOptionType
+  # completes a type by stamping the protocol onto the record it is handed, and the functor it
+  # mints points back at that completed record — so a `// { refKind = …; }` over the finished
+  # type leaves every protocol answer, typeMerge's rebuild included, describing a ref WITHOUT
+  # its kind. An answer the construction owns has to be present before the completion runs.
   mkDeferredRef =
     kindName:
     merge.mkOptionType {
@@ -37,8 +43,6 @@ let
       description = "reference to a ${kindName} instance";
       check = v: builtins.isString v || builtins.isAttrs v;
       merge = loc: defs: merge.mergeOneOption loc defs;
-    }
-    // {
       refKind = kindName;
     };
 
@@ -75,11 +79,64 @@ let
       sorted = builtins.sort (a: b: a.i < b.i) firsts;
     in
     map (x: x.v) sorted;
+
+  # Set type: deduplicates by id_hash, preserving first-seen order.
+  # Only meaningful with ref element types — setOf requires instance refs.
+  # nestedTypes.elemType is set so getRefKind traverses through setOf like listOf.
+  #
+  # Built THROUGH mkOptionType rather than as `listType // { … }`. An override over an already
+  # completed type answers the protocol as its LEFT operand: every field the override does not
+  # name is still listOf's, and two of those fields REBUILD it — `functor.type`, which is what a
+  # typeMerge over two declarations of the same option returns, and `substSubModules`. Either
+  # path hands back a plain listOf with the name, the description and the isSetOf discriminator
+  # that instance.nix and codec.nix dispatch on all gone. What setOf borrows from listOf is its
+  # VALUE behaviour, named one field at a time below; every answer about setOf's own identity
+  # setOf supplies itself.
+  setOf =
+    elemType:
+    assert
+      (getRefKind elemType != null)
+      || throw "gen-schema: setOf: element type must be a ref type (e.g., setOf (ref \"host\")), got ${elemType.name or "unknown"}";
+    let
+      listType = merge.types.listOf elemType;
+    in
+    merge.mkOptionType {
+      name = "setOf(${elemType.name})";
+      description = "deduplicated set of ${elemType.description or elemType.name} (by id_hash)";
+      isSetOf = true;
+      # Borrowed deliberately: a set IS a list at value level, so the fold and the membership
+      # predicate are listOf's. Naming them keeps setOf tracking listOf if either changes.
+      inherit (listType)
+        merge
+        check
+        getSubOptions
+        emptyValue
+        ;
+      # Do NOT set apply here — dedup must run AFTER ref coercion, which happens
+      # in mkRefBindingModules' option-level apply. Type-level apply runs before
+      # option apply, so strings wouldn't be resolved yet (no id_hash to dedup by).
+      # Dedup is handled by mkCoerceChain's setOf branch in instance.nix instead.
+      inherit elemType;
+      nestedTypes = { inherit elemType; };
+      # The sub-protocol pair, which the protocol gates on each other: a consumer only calls
+      # substSubModules where getSubModules is non-null, so the two have to agree about whether
+      # this type carries a module set. setOf's is its element's, and a rebuild over a
+      # replacement set yields a setOf. A ref element carries no modules and answers null to the
+      # substitution, so the element is kept rather than substituted away — the assert above
+      # requires a ref element, and a null one could not satisfy it.
+      getSubModules = elemType.getSubModules or null;
+      substSubModules =
+        m:
+        let
+          substituted = if elemType ? substSubModules then elemType.substSubModules m else null;
+        in
+        setOf (if substituted == null then elemType else substituted);
+    };
 in
 {
   ref = target: if builtins.isString target then mkDeferredRef target else mkCoercingRefType target;
 
-  inherit getRefKind dedupByHash;
+  inherit getRefKind dedupByHash setOf;
 
   # Scan evaluated options for deferred ref types, preserving the option type
   # for coercion chain construction. Returns { fieldName = { refKind; type; }; }.
@@ -92,29 +149,6 @@ in
       refKind = getRefKind opt.type;
       type = opt.type;
     }) refFields;
-
-  # Set type: deduplicates by id_hash, preserving first-seen order.
-  # Only meaningful with ref element types — setOf requires instance refs.
-  # nestedTypes.elemType is set so getRefKind traverses through setOf like listOf.
-  setOf =
-    elemType:
-    assert
-      (getRefKind elemType != null)
-      || throw "gen-schema: setOf: element type must be a ref type (e.g., setOf (ref \"host\")), got ${elemType.name or "unknown"}";
-    let
-      listType = merge.types.listOf elemType;
-    in
-    listType
-    // {
-      name = "setOf(${elemType.name})";
-      description = "deduplicated set of ${elemType.description or elemType.name} (by id_hash)";
-      isSetOf = true;
-      # Do NOT set apply here — dedup must run AFTER ref coercion, which happens
-      # in mkRefBindingModules' option-level apply. Type-level apply runs before
-      # option apply, so strings wouldn't be resolved yet (no id_hash to dedup by).
-      # Dedup is handled by mkCoerceChain's setOf branch in instance.nix instead.
-      nestedTypes = { inherit elemType; };
-    };
 
   # Convert a list of instances to a set with O(1) membership by id_hash.
   # Deduplicates by id_hash (first-seen wins), so safe to call on any instance list.

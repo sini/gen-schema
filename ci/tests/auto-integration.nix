@@ -12,7 +12,7 @@
 let
   inherit (genSchema) mkSchemaOption mkSchemaEntryType mkInstanceRegistry;
   R = genAlgebra.record;
-  refinedLib = import ../../lib/refined.nix;
+  refinedLib = import ../../lib/refined.nix { merge = genMerge; };
 
   # --- Test 1: Auto-extracted refinements from inline type declarations ---
 

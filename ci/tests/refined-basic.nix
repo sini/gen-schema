@@ -6,7 +6,7 @@
   ...
 }:
 let
-  refinedLib = import ../../lib/refined.nix;
+  refinedLib = import ../../lib/refined.nix { merge = genMerge; };
   inherit (refinedLib)
     types
     isRefined

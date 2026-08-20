@@ -75,8 +75,19 @@ let
 
       collectionKeys = prelude.attrNames allCollections;
     in
-    base
-    // {
+    # Built THROUGH mkOptionType rather than as `base // { merge = …; }`. An override over an
+    # already completed type answers the protocol as its LEFT operand, so the entry type would
+    # carry deferredModule's name, its description and — the one that bites — its functor, whose
+    # `type` points back at the plain deferredModule. A typeMerge over two declarations of the
+    # same schema option then rebuilds a bare deferredModule and the collection-extracting merge
+    # below is gone, silently, with the defs falling through to a plain module import. The entry
+    # type is not a deferredModule; it DELEGATES to one (`base.merge`, called inside), and that
+    # delegation is the only thing it takes from it.
+    merge.mkOptionType {
+      name = "schemaKindEntry";
+      description = "schema kind entry — options, config, collections and computed fields";
+      # deferredModule accepts any def value and lets the merge decide; so does this.
+      inherit (base) check;
       merge =
         loc: defs:
         let

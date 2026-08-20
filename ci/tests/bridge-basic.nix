@@ -9,7 +9,7 @@
 let
   R = genAlgebra.record;
   record = R;
-  refinedLib = import ../../lib/refined.nix;
+  refinedLib = import ../../lib/refined.nix { merge = genMerge; };
   bridgeLib = import ../../lib/bridge.nix {
     inherit prelude record;
     inherit (refinedLib) isRefined getRefinements;

@@ -1151,7 +1151,7 @@ mkSchemaOption {
 
 Returns `lib.mkOption` — use as `options.schema = mkSchemaOption { ... }`.
 
-`mkSchemaEntryType` is also exported for advanced use — it returns the raw `deferredModule` type used for schema kind values, without wrapping in `mkOption` or adding introspection options. Most consumers should use `mkSchemaOption`.
+`mkSchemaEntryType` is also exported for advanced use — it returns the type used for schema kind values (`schemaKindEntry`), without wrapping in `mkOption` or adding introspection options. Most consumers should use `mkSchemaOption`. The entry type delegates the module-collecting half of its merge to `deferredModule` but is not one: it is built through `mkOptionType` and so answers the option-type protocol for itself, which is what makes a redeclaration of the same schema option rebuild a `schemaKindEntry` with its collection extraction intact rather than a plain `deferredModule` without it.
 
 #### `mkSchemaEntryType` `mkType` parameter
 
@@ -1267,6 +1267,8 @@ setOf elemType
 ```
 
 A list type that deduplicates by `id_hash`, preserving first-seen order. Only meaningful with `ref` element types — `setOf` requires instance refs. Composes with custom coerce hooks: expansion produces duplicates, `setOf` removes them. Uses `nestedTypes.elemType` so `getRefKind` traverses through it like `listOf`.
+
+`setOf` borrows `listOf`'s value behaviour — the merge, the check — but is built through `mkOptionType` rather than as an override over a completed `listOf`, so it answers the option-type protocol as itself. A rebuild through `substSubModules`, and a `typeMerge` against a second declaration of the same option, both return a `setOf` with the `isSetOf` discriminator that `mkCoerceChain` and the codec dispatch on. A `setOf` and a plain `listOf` of the same element are different types and do not merge.
 
 ### `toSet`
 
@@ -1410,6 +1412,8 @@ Set `lazy = true` on a refinement to defer validation to access time via `builti
 ```nix
 { check = self: self > 0; message = "must be positive"; lazy = true; }
 ```
+
+A refined type keeps its base's `name` — a refined `int` still says `int` in its error messages — but carries a distinct functor name, `refined<int>`, which is the identity two declarations of the same option are compared on. Declaring an option twice as the same refined type merges to that type with its refinements intact; declaring it once refined and once as the bare base is a reported type conflict rather than a silent drop to the unrefined type.
 
 ### `refinements`
 

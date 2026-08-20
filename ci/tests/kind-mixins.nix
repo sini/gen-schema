@@ -10,7 +10,7 @@ let
   R = genAlgebra.record;
   record = R;
   mixinLib = import ../../lib/mixin.nix { inherit record; };
-  refinedLib = import ../../lib/refined.nix;
+  refinedLib = import ../../lib/refined.nix { merge = genMerge; };
   bridgeLib = import ../../lib/bridge.nix {
     inherit prelude record;
     inherit (refinedLib) isRefined getRefinements;

@@ -14,7 +14,7 @@ let
   # LIBRARY called gen-identity is a reader's trap rather than a tidy-up.
   idHashLib = import ./id-hash.nix { inherit prelude merge identity; };
   strictLib = import ./strict.nix { inherit prelude merge; };
-  refinedLib = import ./refined.nix;
+  refinedLib = import ./refined.nix { inherit merge; };
   blameLib = import ./blame.nix;
   mixinLib = import ./mixin.nix { inherit record; };
   bridgeLib = import ./bridge.nix {
