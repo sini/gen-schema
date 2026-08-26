@@ -13,6 +13,12 @@ let
         merge.mkOption {
           inherit (m) description type;
           readOnly = true;
+          # A method is not a declared field — internal = true is the same shared marker
+          # id-hash.nix's isPrimitiveOption reads to exclude derived options from reflection.
+          # mkCodec and renderDocs both filter on it, so a method is excluded from serialized
+          # shape and rendered docs by the SAME representation, not by two independently
+          # re-derived notions of "is this a method".
+          internal = true;
           # A method is NOT an identity key. The identity preimage is a kind's option-reflected
           # identity keys minus the declared opt-outs; a method is an option only because that is
           # how its return reaches `config`, and its return is derived from the instance rather

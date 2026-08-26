@@ -75,12 +75,15 @@ let
       kind = kindValue.kind;
       kindOptions = kindValue.options;
 
-      methodNames = builtins.attrNames (kindValue.methods or { });
-      allExcluded = builtinInternals ++ methodNames ++ builtinCollections ++ excludeFields;
+      allExcluded = builtinInternals ++ builtinCollections ++ excludeFields;
 
-      resolvedFields = builtins.filter (n: !(builtins.elem n allExcluded)) (
-        builtins.attrNames kindOptions
-      );
+      # Methods are excluded via the shared `internal` marker (set by mkMethodsModule in
+      # methods.nix) — the same per-option flag id-hash.nix's isPrimitiveOption reads for
+      # the same purpose, so a method is dropped here by the SAME representation renderDocs
+      # uses to skip it, not by a separately re-derived name list.
+      resolvedFields = builtins.filter (
+        n: !(builtins.elem n allExcluded) && !(kindOptions.${n}.internal or false)
+      ) (builtins.attrNames kindOptions);
 
       # Validate fields spec — force evaluation to surface errors early
       _ = builtins.deepSeq (prelude.mapAttrsToList (

@@ -11,9 +11,12 @@ in
         kind:
         let
           opts = schema.${kind}.options;
-          userOpts = prelude.filter (n: !(prelude.hasPrefix "_" n) && n != "id_hash") (
-            builtins.attrNames opts
-          );
+          # `internal` is the shared per-option marker (also read by id-hash.nix's
+          # isPrimitiveOption) for a derived option — includes methods, which mkCodec
+          # already excludes from serialized shape on the same flag.
+          userOpts = prelude.filter (
+            n: !(prelude.hasPrefix "_" n) && n != "id_hash" && !(opts.${n}.internal or false)
+          ) (builtins.attrNames opts);
         in
         prelude.concatStringsSep "\n" (
           [
