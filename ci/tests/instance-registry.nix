@@ -7,6 +7,10 @@
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
+  # A bogus kind value -- no `kind`/`options` -- with an explicit description so the lazy `kind`
+  # binding inside mkInstanceRegistry is never forced; only the applyPipeline guard should catch it.
+  bogusRegistry = mkInstanceRegistry { no = "kind"; } { description = "d"; };
+
   eval = genMerge.evalModuleTree {
     modules = [
       {
@@ -51,6 +55,20 @@ in
         "igloo"
         "yurt"
       ];
+    };
+
+    # den-hoag-fvxh: applyPipeline's guard. Beside the well-formed self-referential registry
+    # above (test-registry-keys et al., resolved through evalModuleTree, unaffected by the fix),
+    # a bogus kind value now throws as soon as the registry is actually read through the module
+    # system -- the class that used to fall through to whatever refValidation/coercion produced
+    # without ever checking kind-shape.
+    test-control-self-referential-registry-still-resolves = {
+      expr = (builtins.tryEval eval.config.hosts.igloo.addr).success;
+      expected = true;
+    };
+    test-bogus-kind-apply-throws = {
+      expr = (builtins.tryEval (bogusRegistry.apply { a = { }; })).success;
+      expected = false;
     };
   };
 }

@@ -8,6 +8,13 @@
   ...
 }:
 let
+  inherit (genSchema) mkValidator;
+
+  # A bogus kind value -- no `kind`/`options`, the shape validateInstances' guard rejects.
+  bogus = {
+    no = "kind";
+  };
+
   # Build schema with validators, but create instances manually (not via registry)
   # to avoid the registry's apply pipeline throwing on validation failure.
   schemaEval = genMerge.evalModuleTree {
@@ -53,5 +60,34 @@ in
   flake.tests."validate-standalone".test-does-not-throw = {
     expr = (builtins.tryEval result).success;
     expected = true;
+  };
+
+  # den-hoag-fvxh: the kind-value guard used to be silent here -- an empty instance set, and an
+  # all-passing one, never forced kindValue.kind, so a bogus kind value slipped through undetected.
+  # Both now throw the guard's own assert, checked in the same run as test-does-not-throw above
+  # (the real-kind positive control: a well-formed kind never trips this guard).
+  flake.tests."validate-standalone".test-bogus-empty-set-throws = {
+    expr = (builtins.tryEval (genSchema.validateInstances bogus { })).success;
+    expected = false;
+  };
+  flake.tests."validate-standalone".test-bogus-all-pass-set-throws = {
+    expr =
+      (builtins.tryEval (
+        genSchema.validateInstances bogus {
+          a = {
+            port = 1;
+          };
+        }
+      )).success;
+    expected = false;
+  };
+  # Already threw before the fix (a failing validator forces `kind` to build its failure record);
+  # pinned here so a future regression on this arm is caught alongside the two that were silent.
+  flake.tests."validate-standalone".test-bogus-with-failing-validator-still-throws = {
+    expr =
+      (builtins.tryEval (
+        genSchema.validateInstances { validators = [ (mkValidator "v" (_: false) "m") ]; } { a = { }; }
+      )).success;
+    expected = false;
   };
 }

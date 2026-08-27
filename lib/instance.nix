@@ -486,6 +486,19 @@ let
     in
     merge.mkOption {
       inherit description;
+      # `default` is a raw value on this record, never routed through `apply` -- a caller that
+      # reads `.default` directly (bypassing the module system that would otherwise merge and
+      # apply it) sees no kind-shape check at all, bogus kindValue included. Argued impossibility
+      # (ADR-0013 form): making this eager would mean forcing kindValue's shape as soon as this
+      # attrset is built, which is exactly the WHNF forcing that recurses infinitely against the
+      # self-referential idiom `options.hosts = mkInstanceRegistry eval.config.schema.host {}`
+      # (den-hoag-fvxh measured this directly: constructing the option record needs `kindValue`,
+      # a config value, before `eval`'s options phase -- needed to compute that same config -- has
+      # run). What would have to change for `.default` to become checkable: either the registry
+      # stops being constructible from a self-referential `eval.config...` kind value, or the
+      # module system stops separating the options phase from the config phase -- neither is on
+      # the table. The module-system path IS the consumer contract: every in-contract read goes
+      # through `apply` (below), which does carry the unconditional guard.
       default = { };
       type = merge.types.attrsOf (
         mkInstanceType kindValue {
