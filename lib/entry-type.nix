@@ -278,7 +278,7 @@ let
       description = "Schema — typed record registry with extension points";
       default = { };
       type = merge.types.submodule (
-        { config, ... }:
+        { config, options, ... }:
         {
           freeformType = merge.types.lazyAttrsOf (mkSchemaEntryType {
             inherit
@@ -330,9 +330,29 @@ let
           };
           config =
             let
-              kindNames = prelude.sort (a: b: a < b) (
-                prelude.filter (n: !(prelude.hasPrefix "_" n)) (prelude.attrNames config)
+              # A kind name is any config key that is not one of this submodule's own
+              # declared introspection options (_kindNames, _topology, etc. above) — those
+              # carry `internal = true`, the same shared per-option marker id-hash.nix's
+              # isPrimitiveOption and docs.nix read to separate internal fields from user
+              # ones, reused here at the kind-name granularity instead of a re-derived name
+              # prefix. A freeform kind has no declared option, so `options.${n}` is absent
+              # and the check falls through to `false` — never internal by construction.
+              isInternalField = n: options.${n}.internal or false;
+
+              # Reserving the `_` prefix (README: "kind names starting with `_` are
+              # reserved for internal use") must be enforced, not merely documented — a
+              # reserved name that silently vanished from _kindNames/_topology instead of
+              # being refused is exactly the absence-collapse this schema's own reserved
+              # collection keys (__functor, kind — above) already refuse loudly.
+              reservedKindNames = builtins.filter (n: !(isInternalField n) && prelude.hasPrefix "_" n) (
+                prelude.attrNames config
               );
+
+              kindNames =
+                if reservedKindNames != [ ] then
+                  throw "gen-schema: kind name '${builtins.head reservedKindNames}' is reserved — names starting with '_' are internal use only (_kindNames, _topology, etc.)"
+                else
+                  prelude.sort (a: b: a < b) (prelude.filter (n: !(isInternalField n)) (prelude.attrNames config));
 
               # Derive topology from parent collections on each kind.
               # Each kind can declare `parent = "host";` as a collection.

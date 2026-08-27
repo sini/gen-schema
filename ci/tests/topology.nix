@@ -63,5 +63,19 @@ in
         "user"
       ];
     };
+    # den-hoag-p2ld: _topology is derived from _kindNames, so the same internal/user
+    # discrimination applies here — the schema's own introspection options must never
+    # appear as topology entries.
+    test-internal-fields-excluded-from-topology = {
+      expr = builtins.all (n: !(topo ? ${n})) [
+        "_kindNames"
+        "_topology"
+        "_refEdges"
+        "_edges"
+        "_roots"
+        "_leaves"
+      ];
+      expected = true;
+    };
   };
 }

@@ -329,7 +329,7 @@ config.schema.host = {
 
 Kinds are deferred modules — they define options and config but aren't evaluated until imported by an instance.
 
-Kind names starting with `_` are reserved for internal use (`_kindNames`, `_topology`, etc.). They are excluded from `_kindNames` and `renderDocs`.
+Kind names starting with `_` are reserved for internal use (`_kindNames`, `_topology`, etc.) — declaring a kind with a leading underscore throws.
 
 ### Extension
 

@@ -13,10 +13,12 @@ in
           opts = schema.${kind}.options;
           # `internal` is the shared per-option marker (also read by id-hash.nix's
           # isPrimitiveOption) for a derived option — includes methods, which mkCodec
-          # already excludes from serialized shape on the same flag.
-          userOpts = prelude.filter (
-            n: !(prelude.hasPrefix "_" n) && n != "id_hash" && !(opts.${n}.internal or false)
-          ) (builtins.attrNames opts);
+          # already excludes from serialized shape on the same flag. No name-prefix
+          # heuristic here: a user field is never dropped from docs just for being
+          # named with a leading underscore, only for actually being marked internal.
+          userOpts = prelude.filter (n: n != "id_hash" && !(opts.${n}.internal or false)) (
+            builtins.attrNames opts
+          );
         in
         prelude.concatStringsSep "\n" (
           [
