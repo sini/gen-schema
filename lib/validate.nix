@@ -69,17 +69,19 @@ in
     defaultOnError
     ;
 
+  # The kind-value guard is asserted directly in the body (not behind a `kind`
+  # binding runValidators may or may not force) so it fires whenever the
+  # result is forced at all -- including an empty instance set or an
+  # all-passing one, where nothing else would ever demand `kindValue.kind`.
   validateInstances =
     kindValue: instances:
+    assert
+      (kindValue ? kind && kindValue ? options)
+      || throw "gen-schema: validateInstances: expected a kind value (e.g., schema.host), got an attrset without 'kind' or 'options'";
     let
-      _guard =
-        assert
-          (kindValue ? kind && kindValue ? options)
-          || throw "gen-schema: validateInstances: expected a kind value (e.g., schema.host), got an attrset without 'kind' or 'options'";
-        null;
       validators = kindValue.validators or [ ];
     in
-    runValidators (builtins.seq _guard kindValue.kind) validators instances;
+    runValidators kindValue.kind validators instances;
 
   # Wrap mkValidator with field requirements.
   # Validators with __fields are skipped when any required field is absent from the kind.

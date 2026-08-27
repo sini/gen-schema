@@ -268,14 +268,16 @@ let
   mkInstanceRegistry =
     kindValue:
     let
-      # Deferred guard — forced when kind is accessed, avoids infinite recursion
-      # at option-declaration time when kindValue = eval.config.schema.host
-      _guard =
-        assert
-          (kindValue ? kind && kindValue ? options)
-          || throw "gen-schema: mkInstanceRegistry: expected a kind value (e.g., schema.host), got an attrset without 'kind' or 'options'";
-        null;
-      kind = builtins.seq _guard kindValue.kind;
+      _guardMsg = "gen-schema: mkInstanceRegistry: expected a kind value (e.g., schema.host), got an attrset without 'kind' or 'options'";
+      # Deferred guard — forced when `kind` is accessed, avoids infinite
+      # recursion at option-declaration time when kindValue = eval.config.schema.host.
+      # This alone is not enough (a registry with no validators/refs never
+      # forces `kind` even once genuinely read) — applyPipeline below carries
+      # the unconditional half, forced only at config-fixpoint demand time,
+      # which is late enough to read kindValue safely.
+      kind =
+        assert (kindValue ? kind && kindValue ? options) || throw _guardMsg;
+        kindValue.kind;
     in
     {
       extraModules ? [ ],
@@ -320,6 +322,13 @@ let
       # The apply pipeline: validate → derive → overlay.
       applyPipeline =
         instances:
+        # Unconditional half of the kind-value guard: `apply` runs only at
+        # config-fixpoint demand time (safely after the options phase), so
+        # asserting here — rather than relying on `kind` being referenced by
+        # some conditional branch below — catches a bogus kindValue even for
+        # a registry with no validators and no ref bindings, where nothing
+        # else in this pipeline would ever force `kindValue.kind`.
+        assert (kindValue ? kind && kindValue ? options) || throw _guardMsg;
         let
           # Ref binding validation — check for missing bindings (refs == {} but
           # kind declares ref fields). Mirrors mkRefBindingModules error messages.
