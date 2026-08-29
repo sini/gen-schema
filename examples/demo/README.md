@@ -103,7 +103,7 @@ nix flake check --allow-dirty-locks
 
 Kinds are open — any module can extend any kind by setting `config.schema.<kind>.options.*`. Extensions merge cleanly through deferred module merge. Neither the base definition nor the extension needs to know about the other.
 
-`modules/schema/host.nix` declares the base host kind (`addr`, `system`, `role`). `modules/schema/monitoring-plugin.nix` extends it with `metricsPort` and `monitored` — simulating what a separate flake input would do:
+`gen-modules/schema/host.nix` declares the base host kind (`addr`, `system`, `role`). `gen-modules/schema/monitoring-plugin.nix` extends it with `metricsPort` and `monitored` — simulating what a separate flake input would do:
 
 ```nix
 # monitoring-plugin.nix — extends host without touching host.nix
@@ -129,7 +129,7 @@ A kind can import another kind's schema, inheriting all of its options. This is 
 `admin-user` imports the base `user` kind and adds admin-specific fields:
 
 ```nix
-# modules/schema/admin-user.nix
+# gen-modules/schema/admin-user.nix
 config.schema.admin-user = {
   imports = [ config.schema.user ];
   options.sudoPrivileges = lib.mkOption { type = bool; default = true; };
@@ -140,8 +140,8 @@ config.schema.admin-user = {
 Admin-user instances get `userName` and `shell` from the user kind, plus `sudoPrivileges` and `sshKeys` from their own definition. Each kind gets its own registry with independent instances:
 
 ```nix
-options.fleet.users = mkInstanceRegistry config.schema "user" {};
-options.fleet.admins = mkInstanceRegistry config.schema "admin-user" {};
+options.fleet.users = mkInstanceRegistry config.schema.user {};
+options.fleet.admins = mkInstanceRegistry config.schema.admin-user {};
 ```
 
 Instances in each registry are independent — admins don't appear in the user registry. Identity hashes include the kind prefix, so a user "root" and an admin "root" hash differently.
@@ -222,7 +222,7 @@ The monitoring plugin's fields (`metricsPort`, `monitored`) and the methods (`de
 Validators are cross-field constraints declared on schema kinds. They travel with the kind and run automatically on every registry.
 
 ```nix
-# modules/fleet/validation.nix
+# gen-modules/fleet/validation.nix
 config.schema.host.validators = [
   (genSchema.mkValidator "has-addr"
     ({ addr, ... }: addr != "")
@@ -248,8 +248,8 @@ Derive hooks compute values from the full evaluated registry and merge them back
 **Plain derive — deterministic UIDs:**
 
 ```nix
-# modules/fleet/registries.nix
-options.fleet.users = mkInstanceRegistry config.schema "user" {
+# gen-modules/fleet/registries.nix
+options.fleet.users = mkInstanceRegistry config.schema.user {
   derive = users:
     let uids = assignIds { min = 1000; max = 60000; } users;
     in lib.mapAttrs (name: _: { uid = uids.${name}; }) users;
@@ -268,14 +268,14 @@ The two numbers above are **pin-dependent** and are the only values in this READ
 The `deriveEither` hook supports Either-based enrichment using [gen-algebra](https://github.com/sini/gen-algebra)'s either combinators — short-circuit pipelines where each step returns `{ right = ...; }` or `{ left = ...; }`.
 
 ```nix
-# modules/fleet/registries.nix
+# gen-modules/fleet/registries.nix
 mkEndpoint = service:
   gen.either.pipe [
     (s: gen.either.right { addr = s.host.addr; port = s.port; protocol = s.protocol; })
     ({ addr, port, protocol }: gen.either.right "${protocol}://${addr}:${toString port}")
   ] service;
 
-options.fleet.services = mkInstanceRegistry config.schema "service" {
+options.fleet.services = mkInstanceRegistry config.schema.service {
   deriveEither = {
     derive = services:
       let
