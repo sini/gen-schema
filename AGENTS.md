@@ -27,7 +27,7 @@ Quoted text is the owner's own `flake.nix` `description` field, verbatim.
 | Name resolution / demand-driven attribute evaluation. gen-schema exposes the P (parent) and I (ref) edge vocabulary as data and implements no resolution calculus | `gen-scope` — "gen-scope: demand-driven attribute grammar evaluator over algebraic scope graphs" |
 | Aspect traits and classification; also the consumer of the `keySemantics` field gen-schema stores opaquely and never reads (`gen-aspects/ci/tests/key-semantics.nix`). gen-aspects mints its aspect id through gen-identity's `hashIdentity` over `[origin, key]` — injected directly (`gen-aspects/flake.nix` declares `gen-identity` as a dependency; `gen-aspects/lib/default.nix`: `inherit (identity) hashIdentity;`), NOT through gen-schema and NOT `mkIdentityModule` (`gen-aspects/ci/tests/aspect-id-hash.nix:3`). This replaces an earlier claim routing it through gen-schema's own `hashIdentity` — true only while gen-schema hosted the mint | `gen-aspects` — "gen-aspects: aspect-oriented composition types (pure-gen, re-hosted on gen-merge)" |
 | Choosing a winner among matched rules; ordering and conflict resolution | `gen-dispatch` — "gen-dispatch: relational rule dispatch over ordered groups (the dispatch STEP)" |
-| The nixpkgs composition boundary for flake-parts consumers. `flakeModule.nix:19-23` marks itself SUPERSEDED by it | `gen-flake` — "gen-flake — the pure composition boundary of the pure-gen module ecosystem" |
+| The nixpkgs composition boundary for flake-parts consumers. `flakeModule.nix:19-23` marks itself SUPERSEDED by it | The hub's `lib.compose` / interim `flakeModules.default` (INTERIM, not yet ADR-0027) — **`gen-flake` DISSOLVED rather than moving as one library.** ADR-0031 F2/F3 sent the compose S2 core to the hub, warm/override/trace to `gen-memo`, the projection + `realize` to `gen-delivery`, and inject/terminals to the crossing's Adapter set. The repo orphans as reference; take no new dependency on it |
 | Injecting external arguments into modules | `gen-bind` — "gen-bind: module binding with external arguments for Nix" |
 | Layered settings precedence with provenance (gen-schema has option defaults and collection merge, no precedence strata) | `gen-settings` — "gen-settings — stratified settings resolution as a pure layered fold, with refs-as-data, structured provenance, and the graduated injection construct" |
 
@@ -213,7 +213,7 @@ defaults to the registry key.
 | Share fields across kinds by composition | `mkSchemaOption { mixins = [ … ]; baseModule = … }`, or `imports = [ schema.<other> ]` |
 | Serialize a registry | `mkCodec schema.<kind> { }` then `.json.serializeAll` |
 | Generate reference docs | `renderDocs config.schema` |
-| Wire into flake-parts | `flakeModules.default` (but see the gen-flake row in negative space) |
+| Wire into flake-parts | `flakeModules.default` — but for flake-parts consumers the sanctioned wiring is the hub's `flakeModules.default` (INTERIM, not yet ADR-0027); `gen-flake` DISSOLVED (ADR-0031 F2/F3), so this module is retained for gen-merge / programmatic drivers |
 
 ## Measured traps
 
