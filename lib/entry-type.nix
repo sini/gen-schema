@@ -19,6 +19,42 @@
   getRefinements,
 }:
 let
+  # methods is a built-in collection — user collections are additional.
+  #
+  # Hoisted out of mkSchemaEntryType so the entry type and mkSchemaOption's published
+  # `_collectionKeys` share ONE derivation rather than two spellings of one contract.
+  # The two reserved-key refusals stay INSIDE this body deliberately: a read of the
+  # published key set must reach the same refusal a kind merge does, so a schema that
+  # declares a reserved collection is refused whether or not it declares a kind.
+  mkAllCollections =
+    collections:
+    let
+      merged = {
+        methods = {
+          default = { };
+        };
+        validators = {
+          default = [ ];
+        };
+        parent = {
+          default = null;
+          merge =
+            acc: val:
+            if acc != null && val != acc then
+              throw "gen-schema: conflicting parent declarations: '${acc}' vs '${val}'"
+            else
+              val;
+        };
+      }
+      // collections;
+    in
+    if merged ? __functor then
+      throw "gen-schema: collection '__functor' is reserved — cannot be used as a collection key"
+    else if merged ? kind then
+      throw "gen-schema: collection 'kind' is reserved — cannot be used as a collection key"
+    else
+      merged;
+
   mkSchemaEntryType =
     {
       baseModule ? null,
@@ -32,34 +68,7 @@ let
     let
       base = merge.types.deferredModule;
 
-      # methods is a built-in collection — user collections are additional
-      allCollections =
-        let
-          merged = {
-            methods = {
-              default = { };
-            };
-            validators = {
-              default = [ ];
-            };
-            parent = {
-              default = null;
-              merge =
-                acc: val:
-                if acc != null && val != acc then
-                  throw "gen-schema: conflicting parent declarations: '${acc}' vs '${val}'"
-                else
-                  val;
-            };
-          }
-          // collections;
-        in
-        if merged ? __functor then
-          throw "gen-schema: collection '__functor' is reserved — cannot be used as a collection key"
-        else if merged ? kind then
-          throw "gen-schema: collection 'kind' is reserved — cannot be used as a collection key"
-        else
-          merged;
+      allCollections = mkAllCollections collections;
 
       # Infer merge strategy from default type
       inferMerge =
@@ -328,6 +337,12 @@ let
             readOnly = true;
             description = "Kinds with no children in the topology";
           };
+          options._collectionKeys = merge.mkOption {
+            type = merge.types.listOf merge.types.str;
+            internal = true;
+            readOnly = true;
+            description = "Collection keys extracted from kind defs: built-ins plus this schema's declared collections";
+          };
           config =
             let
               # A kind name is any config key that is not one of this submodule's own
@@ -426,6 +441,9 @@ let
               _edges = edges;
               _roots = roots;
               _leaves = leaves;
+              # The same derivation the entry type extracts with — not a second spelling.
+              # attrNames is already sorted, so no sort is added.
+              _collectionKeys = prelude.attrNames (mkAllCollections collections);
             };
         }
       );

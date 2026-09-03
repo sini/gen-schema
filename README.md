@@ -80,7 +80,7 @@ The authoring surface is small — most schemas are built from these constructor
 | `refined` / `blame` / `mkMixin` | Refinement contracts, blame records, and first-class mixin fragments |
 | `mkCodec` / `renderDocs` | Serialization round-trips and markdown reference generation |
 
-Everything above the instance layer is pure schema — no validation or hashing happens at the kind level, which is what lets kinds compose via `imports` without duplicate-module conflicts. Instances are where the infrastructure (strict rejection, `id_hash`, ref binding, derive) is injected. Registries expose flat `_`-prefixed introspection (`_kindNames`, `_topology`, `_edges`, `_roots`, `_leaves`) that consumers read to build whatever graph format their evaluator needs.
+Everything above the instance layer is pure schema — no validation or hashing happens at the kind level, which is what lets kinds compose via `imports` without duplicate-module conflicts. Instances are where the infrastructure (strict rejection, `id_hash`, ref binding, derive) is injected. Registries expose flat `_`-prefixed introspection (`_kindNames`, `_topology`, `_edges`, `_roots`, `_leaves`, `_collectionKeys`) that consumers read to build whatever graph format their evaluator needs.
 
 ## Gen Ecosystem
 
@@ -789,6 +789,10 @@ config.schema._edges
 # Ref edges only
 config.schema._refEdges
 # → [ { from = "service"; field = "host"; to = "host"; } ]
+
+# Collection keys extracted from kind defs — built-ins plus this schema's own
+config.schema._collectionKeys
+# → [ "includes" "methods" "parent" "validators" ]
 ```
 
 `_edges` combines parent edges (from topology) and ref edges (from `schema.ref` declarations) into a single typed list. Every edge has `{ from, to, type, field }` — `field` is `null` for parent edges and the option name for ref edges.
@@ -974,6 +978,7 @@ Every schema has flat `_`-prefixed options for programmatic access:
 
 ```nix
 config.schema._kindNames                # → [ "host" "service" "user" ]
+config.schema._collectionKeys           # → [ "includes" "methods" "parent" "validators" ]
 
 # Per-kind introspection — available on each kind value
 config.schema.host.options          # → full option declarations (filtered, no _module.*)
@@ -981,6 +986,23 @@ config.schema.host.refs             # → { field = { refKind = "targetKind"; ty
 config.schema.host.strict           # → true
 builtins.attrNames config.schema.host.options  # → [ "addr" "describe" "hasService" "metricsPort" ... ]
 ```
+
+`_collectionKeys` is the set gen-schema extracts from kind defs before the deferred module merge —
+the built-in `methods`/`validators`/`parent` plus whatever `collections` this schema declared. It is
+derived from the same expression the extraction runs on, so a consumer reads it instead of
+maintaining its own copy of the list. Because it is the whole set, selection is positive and no
+prefix filter is needed:
+
+```nix
+prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
+# → { includes = [ "policy-a" ]; methods = { }; parent = null; validators = [ ]; }
+```
+
+**Scope.** That idiom reads collection values on the **default entry-type path**. Two caveats, both
+real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
+and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
+with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `kind`) is refused
+when `_collectionKeys` is read, exactly as it is refused when a kind is merged.
 
 ### Schema Validators
 

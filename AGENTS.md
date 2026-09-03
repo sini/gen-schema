@@ -180,7 +180,8 @@ A codec is `{ encode; decode; encodeAll; decodeAll; serialize; deserialize; seri
 `{ __functor; kind; options; refs; refinements; strict; keySemantics; mixins; methods; validators; parent; }` plus user collections and computed fields. `__functor` makes the kind directly importable
 as a module. Schema-level introspection sits alongside the kinds: `_kindNames`, `_topology`
 (`{ parent; children; }` per kind), `_refEdges` (`{ from; field; to; }`), `_edges` (parent edges plus
-ref edges, each tagged `type`), `_roots`, `_leaves`.
+ref edges, each tagged `type`), `_roots`, `_leaves`, `_collectionKeys` (the collection keys
+extracted from kind defs — built-ins plus this schema's declared `collections`).
 
 **Instance value shape**: `{ _identity; id_hash; name; <declared options>; <methods>; }`. `name`
 defaults to the registry key.

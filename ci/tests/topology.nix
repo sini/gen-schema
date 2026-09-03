@@ -74,6 +74,7 @@ in
         "_edges"
         "_roots"
         "_leaves"
+        "_collectionKeys"
       ];
       expected = true;
     };
