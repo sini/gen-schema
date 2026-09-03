@@ -23,7 +23,7 @@ let
   optionNames = builtins.attrNames hostKind.options;
 
   # Filter out internal options for assertions
-  userOpts = lib.filter (n: !(lib.hasPrefix "_" n) && n != "id_hash") optionNames;
+  userOpts = lib.filter (n: n != "id_hash") optionNames;
 in
 {
   flake.tests.introspect-meta.test-option-names-contain-name = {

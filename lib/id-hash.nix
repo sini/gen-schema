@@ -51,9 +51,8 @@ let
     "float"
   ];
   isPrimitiveOption =
-    name: opt:
-    !(prelude.hasPrefix "_" name)
-    && (opt ? type)
+    _name: opt:
+    (opt ? type)
     && prelude.elem (opt.type.name or "") primitiveTypeNames
     && !(opt.internal or false)
     && (opt.identity or true);

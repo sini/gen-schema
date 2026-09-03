@@ -49,6 +49,47 @@ let
     ];
   genFloatOpt = genMerge.mkOption { type = genMerge.types.float; };
   nixFloatOpt = lib.mkOption { type = lib.types.float; };
+
+  # den-hoag-376hw. A leading underscore is not a reservation in FIELD space: the schema's
+  # reserved-name mechanism ranges over KIND names (`lib/entry-type.nix`, `reservedKindNames`),
+  # while a kind's own options are discriminated by the `internal = true` flag -- the same marker
+  # `docs.nix` and `codec.nix` already read. A declared, non-`internal`, primitive `_legacyId` is
+  # distinguishing content and must enter the preimage; before the prefix clause left
+  # `isPrimitiveOption` these two instances hashed identically, and identically to
+  # `evalNoUnderscore` below, which never declares the field at all.
+  mkUnderscoreEval =
+    legacyOpt: legacyValue:
+    mkEval "host" [
+      {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        options._legacyId = legacyOpt;
+      }
+      {
+        config.name = "igloo";
+        config.addr = "10.0.0.1";
+        config._legacyId = legacyValue;
+      }
+    ];
+  underscoreOpt = genMerge.mkOption { type = genMerge.types.str; };
+  underscoreInternalOpt = genMerge.mkOption {
+    type = genMerge.types.str;
+    internal = true;
+  };
+
+  # The same kind with NO underscore field -- the arm that proves the reflection change disturbs
+  # nothing else. Its hash is pinned as a literal, not compared to a sibling: a comparison between
+  # two things the same edit moves cannot see them both move.
+  evalNoUnderscore = mkEval "host" [
+    {
+      options.name = genMerge.mkOption { type = genMerge.types.str; };
+      options.addr = genMerge.mkOption { type = genMerge.types.str; };
+    }
+    {
+      config.name = "igloo";
+      config.addr = "10.0.0.1";
+    }
+  ];
 in
 {
   flake.tests.identity-hash.test-same-entity-same-hash = {
@@ -113,5 +154,29 @@ in
   flake.tests.identity-hash.test-control-float-field-inside-domain-admitted = {
     expr = (builtins.tryEval (mkFloatEval genFloatOpt 9007199254740991.0).config.id_hash).success;
     expected = true;
+  };
+
+  # A `_`-prefixed field is reflected when it is a declared, non-`internal` primitive: two instances
+  # differing only in it hash differently.
+  flake.tests.identity-hash.test-underscore-nonint-field-reflected = {
+    expr =
+      (mkUnderscoreEval underscoreOpt "A").config.id_hash == (mkUnderscoreEval underscoreOpt "B")
+      .config.id_hash;
+    expected = false;
+  };
+  # Control: the SAME field marked `internal = true` is excluded -- the flag is what discriminates,
+  # and it exercises the predicate at an input the cell above never reaches.
+  flake.tests.identity-hash.test-control-underscore-internal-field-not-reflected = {
+    expr =
+      (mkUnderscoreEval underscoreInternalOpt "A").config.id_hash
+      == (mkUnderscoreEval underscoreInternalOpt "B").config.id_hash;
+    expected = true;
+  };
+  # Control: a kind with no underscore field anywhere hashes to a pinned literal, byte-identical
+  # across the reflection change. This is the blast-radius arm -- an already-minted identity that
+  # moved would red here.
+  flake.tests.identity-hash.test-control-no-underscore-field-hash-unchanged = {
+    expr = evalNoUnderscore.config.id_hash;
+    expected = "host:813217e3cf0b6bc979121615b67c75532bc05e7742b0b5ebf9897a14aa8a6e43";
   };
 }
