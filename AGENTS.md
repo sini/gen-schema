@@ -181,7 +181,9 @@ A codec is `{ encode; decode; encodeAll; decodeAll; serialize; deserialize; seri
 as a module. Schema-level introspection sits alongside the kinds: `_kindNames`, `_topology`
 (`{ parent; children; }` per kind), `_refEdges` (`{ from; field; to; }`), `_edges` (parent edges plus
 ref edges, each tagged `type`), `_roots`, `_leaves`, `_collectionKeys` (the collection keys
-extracted from kind defs — built-ins plus this schema's declared `collections`).
+extracted from kind defs — built-ins plus this schema's declared `collections`; a computed
+field of the same name wins on the kind result, so reading a key through the published set
+may return the computed value).
 
 **Instance value shape**: `{ _identity; id_hash; name; <declared options>; <methods>; }`. `name`
 defaults to the registry key.

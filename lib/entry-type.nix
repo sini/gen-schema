@@ -341,7 +341,7 @@ let
             type = merge.types.listOf merge.types.str;
             internal = true;
             readOnly = true;
-            description = "Collection keys extracted from kind defs: built-ins plus this schema's declared collections";
+            description = "Collection keys extracted from kind defs: built-ins plus this schema's declared collections; a computed field of the same name wins on the kind result, so reading a key through it may return the computed value";
           };
           config =
             let
