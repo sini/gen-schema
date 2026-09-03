@@ -92,6 +92,25 @@ let
       default = { };
     };
   };
+
+  # den-hoag-25mae. A user kind NAMED AFTER a declared internal introspection option. Every
+  # existing cell for this behaviour observes the internal names as OPTION DECLARATIONS, on a
+  # schema where no user kind carries one -- this is the collision input, and nothing exercised
+  # it. `host` is load-bearing: without it `_kindNames` reads `[ ]`, which is also what a fixture
+  # declaring no kinds at all returns -- a value that cannot fail.
+  collidePlus = evalModuleTree {
+    modules = [
+      {
+        options.schema = mkSchemaOption { };
+        config.schema._collectionKeys = {
+          options.x = str;
+        };
+        config.schema.host = {
+          options.addr = str;
+        };
+      }
+    ];
+  };
 in
 {
   # O1 — the surface exists where a consumer stands, holding config.schema and nothing else.
@@ -174,5 +193,25 @@ in
       "parent"
       "validators"
     ];
+  };
+
+  # O6 -- the collision input, the one arm the filtered/refused pair is missing. An ARBITRARY `_`
+  # kind name is refused by name (introspect-names.test-underscore-kind-name-throws); a name that
+  # COLLIDES with a declared internal option is not, because `reservedKindNames` tests
+  # `!(isInternalField n)` first -- so `_kindNames` answers and drops it, and the collision
+  # surfaces only when `_collectionKeys` is forced.
+  flake.tests.collection-keys.test-collectionkeys-kind-filtered-not-refused = {
+    expr = collidePlus.config.schema._kindNames;
+    expected = [ "host" ];
+  };
+  # The force-time refusal itself. COMPANION, not a discriminator: measured, no mutation of
+  # entry-type.nix reachable within `tryEval` moves this value -- dropping `readOnly` or the
+  # `config._collectionKeys` assignment aborts uncatchably and takes any control with it, and
+  # `type = raw` still refuses. It pins documented behaviour and is marked so no reader mistakes
+  # it for a guard; the discriminating cell is the one above, and the standing control that
+  # exercises `_collectionKeys` at a non-colliding input is `test-published-at-schema-level`.
+  flake.tests.collection-keys.test-collectionkeys-collision-refused-at-force = {
+    expr = (builtins.tryEval (builtins.deepSeq collidePlus.config.schema._collectionKeys true)).success;
+    expected = false;
   };
 }
