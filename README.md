@@ -55,13 +55,13 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
 
 ## Terminology
 
-| Term | Definition |
-|------|-----------|
-| Kinds | Schema-level type declarations (deferred modules defining options and config) |
-| Instances | Concrete values of a kind, evaluated through registries |
-| Collections | Named multi-contributor aggregation points with a merge strategy |
-| Refs | Cross-registry references between kinds (deferred or direct) |
-| Edges | Parent (P) nesting and ref (I) import relationships, exposed via `_edges` introspection |
+| Term        | Definition                                                                              |
+| ----------- | --------------------------------------------------------------------------------------- |
+| Kinds       | Schema-level type declarations (deferred modules defining options and config)           |
+| Instances   | Concrete values of a kind, evaluated through registries                                 |
+| Collections | Named multi-contributor aggregation points with a merge strategy                        |
+| Refs        | Cross-registry references between kinds (deferred or direct)                            |
+| Edges       | Parent (P) nesting and ref (I) import relationships, exposed via `_edges` introspection |
 
 ## Overview
 
@@ -69,36 +69,36 @@ The mental model has two layers. A **kind** is a schema-level type — a deferre
 
 The authoring surface is small — most schemas are built from these constructors:
 
-| Constructor | Role |
-|-------------|------|
-| `mkSchemaOption` | Declares the `schema` option (holds all kinds; carries `strict`, `baseModule`, `collections`, `computed` settings) |
-| `mkInstanceRegistry` | Turns a kind into an `attrsOf` registry of instances, with `refs`, `derive`, and validator pipeline |
-| `mkInstanceType` | The single-instance submodule type (identity + strict injected), used by registries |
-| `ref` / `setOf` / `toSet` | Cross-instance references (deferred or direct) and identity-deduplicated collections |
-| `schemaFn` | Declarative methods on a kind, with named args auto-resolved from instance config |
-| `mkValidator` / `mkFieldValidator` | Cross-field constraints that travel with a kind and fire on every registry |
-| `refined` / `blame` / `mkMixin` | Refinement contracts, blame records, and first-class mixin fragments |
-| `mkCodec` / `renderDocs` | Serialization round-trips and markdown reference generation |
+| Constructor                        | Role                                                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `mkSchemaOption`                   | Declares the `schema` option (holds all kinds; carries `strict`, `baseModule`, `collections`, `computed` settings) |
+| `mkInstanceRegistry`               | Turns a kind into an `attrsOf` registry of instances, with `refs`, `derive`, and validator pipeline                |
+| `mkInstanceType`                   | The single-instance submodule type (identity + strict injected), used by registries                                |
+| `ref` / `setOf` / `toSet`          | Cross-instance references (deferred or direct) and identity-deduplicated collections                               |
+| `schemaFn`                         | Declarative methods on a kind, with named args auto-resolved from instance config                                  |
+| `mkValidator` / `mkFieldValidator` | Cross-field constraints that travel with a kind and fire on every registry                                         |
+| `refined` / `blame` / `mkMixin`    | Refinement contracts, blame records, and first-class mixin fragments                                               |
+| `mkCodec` / `renderDocs`           | Serialization round-trips and markdown reference generation                                                        |
 
 Everything above the instance layer is pure schema — no validation or hashing happens at the kind level, which is what lets kinds compose via `imports` without duplicate-module conflicts. Instances are where the infrastructure (strict rejection, `id_hash`, ref binding, derive) is injected. Registries expose flat `_`-prefixed introspection (`_kindNames`, `_topology`, `_edges`, `_roots`, `_leaves`, `_collectionKeys`) that consumers read to build whatever graph format their evaluator needs.
 
 ## Gen Ecosystem
 
-| Library | Role |
-|---------|------|
-| [gen-prelude](https://github.com/sini/gen-prelude) | Pure nixpkgs-lib-free utility base (builtins re-exports + vendored lib utils) |
-| [gen-algebra](https://github.com/sini/gen-algebra) | Pure primitives (record, search monad, either, intensional identity) |
-| [gen-types](https://github.com/sini/gen-types) | Clean-room MIT structural type checker (leaf/poly checkers; `verify: v → null\|err`) |
-| [gen-merge](https://github.com/sini/gen-merge) | Byte-mode module merge engine (`evalModuleTree`, byte-identical to nixpkgs `lib.evalModules` over the priority subset) |
-| [gen-schema](https://github.com/sini/gen-schema) | **This lib** — Typed registries (kinds, instances, collections, refs); re-hosted on gen-merge |
-| [gen-aspects](https://github.com/sini/gen-aspects) | Aspect type system (traits, classification, dispatch); re-hosted on gen-merge |
-| [gen-scope](https://github.com/sini/gen-scope) | HOAG scope-graph evaluator (demand-driven, \_eval memoization, circular attributes) |
-| [gen-graph](https://github.com/sini/gen-graph) | Accessor-based graph query combinators (traversal, condensation, phaseOrder) |
-| [gen-select](https://github.com/sini/gen-select) | Selector algebra (pattern matching over graph positions) |
-| [gen-bind](https://github.com/sini/gen-bind) | Module binding (inject external args into NixOS modules) |
-| [gen-dispatch](https://github.com/sini/gen-dispatch) | Relational rule dispatch STEP (stratified phases, conflict resolution) |
-| [gen-memo](https://github.com/sini/gen-memo) | The incremental plane — decides reuse, never evaluates (change propagation, AFFECTED set) |
-| [gen-vars](https://github.com/sini/gen-vars) | Pure-Nix vars/secrets (den-agnostic) |
+| Library                                              | Role                                                                                                                   |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| [gen-prelude](https://github.com/sini/gen-prelude)   | Pure nixpkgs-lib-free utility base (builtins re-exports + vendored lib utils)                                          |
+| [gen-algebra](https://github.com/sini/gen-algebra)   | Pure primitives (record, search monad, either, intensional identity)                                                   |
+| [gen-types](https://github.com/sini/gen-types)       | Clean-room MIT structural type checker (leaf/poly checkers; `verify: v → null\|err`)                                   |
+| [gen-merge](https://github.com/sini/gen-merge)       | Byte-mode module merge engine (`evalModuleTree`, byte-identical to nixpkgs `lib.evalModules` over the priority subset) |
+| [gen-schema](https://github.com/sini/gen-schema)     | **This lib** — Typed registries (kinds, instances, collections, refs); re-hosted on gen-merge                          |
+| [gen-aspects](https://github.com/sini/gen-aspects)   | Aspect type system (traits, classification, dispatch); re-hosted on gen-merge                                          |
+| [gen-scope](https://github.com/sini/gen-scope)       | HOAG scope-graph evaluator (demand-driven, \_eval memoization, circular attributes)                                    |
+| [gen-graph](https://github.com/sini/gen-graph)       | Accessor-based graph query combinators (traversal, condensation, phaseOrder)                                           |
+| [gen-select](https://github.com/sini/gen-select)     | Selector algebra (pattern matching over graph positions)                                                               |
+| [gen-bind](https://github.com/sini/gen-bind)         | Module binding (inject external args into NixOS modules)                                                               |
+| [gen-dispatch](https://github.com/sini/gen-dispatch) | Relational rule dispatch STEP (stratified phases, conflict resolution)                                                 |
+| [gen-memo](https://github.com/sini/gen-memo)         | The incremental plane — decides reuse, never evaluates (change propagation, AFFECTED set)                              |
+| [gen-vars](https://github.com/sini/gen-vars)         | Pure-Nix vars/secrets (den-agnostic)                                                                                   |
 
 ## Quick Start
 
@@ -688,12 +688,12 @@ was itself a ref.
 
 The two levels are complementary and both are *derived*, never declared:
 
-| | `ref` | `fieldRef` |
-|---|---|---|
-| what it is | an option **type** on a field | a **value** inhabiting such a field |
-| lives in | the kind's schema | a default or a contributed value |
-| edges | `_refEdges`, kind → kind | (instance, field) → (instance, field) |
-| refuses | an unresolvable key, at merge time | a non-identity target, at application time |
+|            | `ref`                              | `fieldRef`                                 |
+| ---------- | ---------------------------------- | ------------------------------------------ |
+| what it is | an option **type** on a field      | a **value** inhabiting such a field        |
+| lives in   | the kind's schema                  | a default or a contributed value           |
+| edges      | `_refEdges`, kind → kind           | (instance, field) → (instance, field)      |
+| refuses    | an unresolvable key, at merge time | a non-identity target, at application time |
 
 **`fieldRefsIn` refuses functions.** A function found anywhere the scan descends throws, naming the
 position, rather than being treated as a leaf:
@@ -917,11 +917,11 @@ config.schema.host.includes  # → [ policy-a policy-b ]
 
 **Merge strategy inference:**
 
-| Default type | Inferred merge | Example |
-|---|---|---|
-| List (`[]`) | `acc ++ val` | `includes`, `excludes` |
-| Attrset (`{}`) | `acc // val` | `metadata`, `methods` (built-in) |
-| Other | Explicit `merge` required | `priority = { default = 0; merge = _acc: val: val; }` |
+| Default type   | Inferred merge            | Example                                               |
+| -------------- | ------------------------- | ----------------------------------------------------- |
+| List (`[]`)    | `acc ++ val`              | `includes`, `excludes`                                |
+| Attrset (`{}`) | `acc // val`              | `metadata`, `methods` (built-in)                      |
+| Other          | Explicit `merge` required | `priority = { default = 0; merge = _acc: val: val; }` |
 
 Providing a non-list, non-attrset default without an explicit `merge` function throws at evaluation time.
 
@@ -1185,12 +1185,12 @@ mkSchemaEntryType {
 
 `mkType` receives four arguments in an attrset:
 
-| Argument | Description |
-|----------|-------------|
-| `kindModule` | The resolved `baseModule` (after applying kind-name function, if any), or `null` |
-| `collections` | Extracted collection values (methods, validators, parent, plus user-defined) |
-| `defs` | Stripped definitions (collection keys removed) for wiring into the custom type |
-| `kind` | The kind name (last element of the option path) |
+| Argument      | Description                                                                      |
+| ------------- | -------------------------------------------------------------------------------- |
+| `kindModule`  | The resolved `baseModule` (after applying kind-name function, if any), or `null` |
+| `collections` | Extracted collection values (methods, validators, parent, plus user-defined)     |
+| `defs`        | Stripped definitions (collection keys removed) for wiring into the custom type   |
+| `kind`        | The kind name (last element of the option path)                                  |
 
 The return value is merged with `computedFields` (computed wins for same-named keys), so topology and introspection fields remain authoritative.
 
@@ -1606,17 +1606,17 @@ gen-schema draws on seven papers. Four are directly implemented in the codebase;
 
 ### Implements
 
-| Feature | Paper | Where |
-|---------|-------|-------|
+| Feature                                  | Paper                                                                       | Where                                                                                                                                                                                                                       |
+| ---------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Refinement contracts with blame tracking | § Findler & Felleisen -- *Contracts for Higher-Order Functions* (ICFP 2002) | `refined.nix`: predicate contracts co-located with NixOS type declarations; `blame.nix`: field-level error attribution with `{ field, message }` blame records; `instance.nix`: strict contract checking in `applyPipeline` |
-| Lazy contracts with deferred validation | § Chitil -- *Practical Typed Lazy Contracts* (ICFP 2012) | `instance.nix`: `lazy = true` refinements wrap values with `builtins.addErrorContext`, deferring validation to access time -- matching Chitil's partial-identity semantics where unevaluated parts never trigger violations |
-| Mixin composition | § Bracha & Cook -- *Mixin-Based Inheritance* (OOPSLA 1990) | `mixin.nix`: `mkMixin`/`composeMixins` implement Bracha's `M1 * M2 = fun(i) M1(M2(i) + i) + M2(i)` formula; `beta` reverses direction so parent controls; `applyMixin` validates structural requires |
-| Refinement types | § Rondon, Kawaguchi & Jhala -- *Liquid Types* (PLDI 2008) | `refined.nix`: `refined` attaches predicate refinements to base NixOS types via `__schema` metadata, following Rondon's model of `{v:B \| e}` base refinements co-located with type declarations |
+| Lazy contracts with deferred validation  | § Chitil -- *Practical Typed Lazy Contracts* (ICFP 2012)                    | `instance.nix`: `lazy = true` refinements wrap values with `builtins.addErrorContext`, deferring validation to access time -- matching Chitil's partial-identity semantics where unevaluated parts never trigger violations |
+| Mixin composition                        | § Bracha & Cook -- *Mixin-Based Inheritance* (OOPSLA 1990)                  | `mixin.nix`: `mkMixin`/`composeMixins` implement Bracha's `M1 * M2 = fun(i) M1(M2(i) + i) + M2(i)` formula; `beta` reverses direction so parent controls; `applyMixin` validates structural requires                        |
+| Refinement types                         | § Rondon, Kawaguchi & Jhala -- *Liquid Types* (PLDI 2008)                   | `refined.nix`: `refined` attaches predicate refinements to base NixOS types via `__schema` metadata, following Rondon's model of `{v:B \| e}` base refinements co-located with type declarations                            |
 
 ### Informed by
 
-| Concept | Paper | Influence |
-|---------|-------|-----------|
-| Record algebra | § Leijen -- *Extensible Records with Scoped Labels* (TFP 2005) | gen-schema consumes gen-algebra's `record.compose`, `record.select`, `record.mixin` etc. The record algebra itself lives in gen-algebra; gen-schema uses it for mixin application and module bridging |
-| Module linking | § Cardelli -- *Program Fragments, Linking, and Modularization* (POPL 1997) | `bridge.nix`: `emitModule` translates record-algebra records into NixOS modules (one-directional). Cardelli's linkset model -- separately compiled fragments linked via type-compatible substitution -- informs the design, though gen-schema doesn't implement the full linking calculus |
-| Scope graph edge model | § Neron, Tolmach, Visser & Wachsmuth -- *A Theory of Name Resolution* (ESOP 2015) | `entry-type.nix`: `_edges` introspection uses Neron's P (parent) and I (import/ref) edge vocabulary to expose schema topology. gen-schema doesn't implement scope graphs or the resolution calculus -- that lives in gen-scope |
+| Concept                | Paper                                                                             | Influence                                                                                                                                                                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Record algebra         | § Leijen -- *Extensible Records with Scoped Labels* (TFP 2005)                    | gen-schema consumes gen-algebra's `record.compose`, `record.select`, `record.mixin` etc. The record algebra itself lives in gen-algebra; gen-schema uses it for mixin application and module bridging                                                                                     |
+| Module linking         | § Cardelli -- *Program Fragments, Linking, and Modularization* (POPL 1997)        | `bridge.nix`: `emitModule` translates record-algebra records into NixOS modules (one-directional). Cardelli's linkset model -- separately compiled fragments linked via type-compatible substitution -- informs the design, though gen-schema doesn't implement the full linking calculus |
+| Scope graph edge model | § Neron, Tolmach, Visser & Wachsmuth -- *A Theory of Name Resolution* (ESOP 2015) | `entry-type.nix`: `_edges` introspection uses Neron's P (parent) and I (import/ref) edge vocabulary to expose schema topology. gen-schema doesn't implement scope graphs or the resolution calculus -- that lives in gen-scope                                                            |

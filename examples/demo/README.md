@@ -22,23 +22,23 @@ Kind definitions live in `gen-modules/schema/` and are plain modules setting `co
 
 ### Features Exercised
 
-| Feature | Where | What to look for |
-|---|---|---|
-| Strict validation | `gen-modules/schema/host.nix` | Try adding `fleet.hosts.igloo.badKey = "x";` — errors with fix guidance |
-| Default propagation | `gen-modules/schema/host.nix` | `system = mkDefault "x86_64-linux"` — igloo inherits it, iceberg overrides |
-| Identity hashing | `modules/outputs.nix` | `iglooHash` — deterministic SHA-256 from primitive options + kind prefix |
-| Cross-instance refs | `gen-modules/fleet/registries.nix` | `ref` on service's `host` option |
-| Ref resolution | `gen-modules/fleet/services.nix` | `host = "igloo"` resolves to the full host instance |
-| Schema composition | `gen-modules/schema/monitoring-plugin.nix` | Extends host + service kinds from a separate module — merges cleanly |
-| Kind mix-ins | `gen-modules/schema/admin-user.nix` | Imports user kind — inherits userName, shell, adds sudoPrivileges, sshKeys |
-| Declarative methods | `gen-modules/fleet/methods.nix` | `hasService` closes over services registry; `describe` resolves all args from config |
-| Schema validators | `gen-modules/fleet/validation.nix` | Host addr/role + service port validators declared on kinds, fire automatically |
-| Derive hooks | `gen-modules/fleet/registries.nix` | Plain `derive` assigns deterministic UIDs from `id_hash` |
-| Either pipeline | `gen-modules/fleet/registries.nix` | `deriveEither` with gen-algebra's either computes service endpoints |
-| Doc generation | `modules/outputs.nix` | `renderDocs genValues.schema` produces markdown tables from the injected schema metadata |
-| Introspection | `modules/outputs.nix` | `_kindNames`, per-kind `.options`/`.refs` read off `genValues.schema` |
-| gen-flake value-injection | `flake.nix` | `imports = [ gen-flake.flakeModules.default ]; gen.tree = ./gen-modules;` — pure compose + `genValues` injection |
-| Reader over injected values | `modules/outputs.nix` | `{ genValues, ... }:` reads `genValues.fleet.*` / `genValues.schema` — no gen type in the flake-parts options tree |
+| Feature                     | Where                                      | What to look for                                                                                                   |
+| --------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Strict validation           | `gen-modules/schema/host.nix`              | Try adding `fleet.hosts.igloo.badKey = "x";` — errors with fix guidance                                            |
+| Default propagation         | `gen-modules/schema/host.nix`              | `system = mkDefault "x86_64-linux"` — igloo inherits it, iceberg overrides                                         |
+| Identity hashing            | `modules/outputs.nix`                      | `iglooHash` — deterministic SHA-256 from primitive options + kind prefix                                           |
+| Cross-instance refs         | `gen-modules/fleet/registries.nix`         | `ref` on service's `host` option                                                                                   |
+| Ref resolution              | `gen-modules/fleet/services.nix`           | `host = "igloo"` resolves to the full host instance                                                                |
+| Schema composition          | `gen-modules/schema/monitoring-plugin.nix` | Extends host + service kinds from a separate module — merges cleanly                                               |
+| Kind mix-ins                | `gen-modules/schema/admin-user.nix`        | Imports user kind — inherits userName, shell, adds sudoPrivileges, sshKeys                                         |
+| Declarative methods         | `gen-modules/fleet/methods.nix`            | `hasService` closes over services registry; `describe` resolves all args from config                               |
+| Schema validators           | `gen-modules/fleet/validation.nix`         | Host addr/role + service port validators declared on kinds, fire automatically                                     |
+| Derive hooks                | `gen-modules/fleet/registries.nix`         | Plain `derive` assigns deterministic UIDs from `id_hash`                                                           |
+| Either pipeline             | `gen-modules/fleet/registries.nix`         | `deriveEither` with gen-algebra's either computes service endpoints                                                |
+| Doc generation              | `modules/outputs.nix`                      | `renderDocs genValues.schema` produces markdown tables from the injected schema metadata                           |
+| Introspection               | `modules/outputs.nix`                      | `_kindNames`, per-kind `.options`/`.refs` read off `genValues.schema`                                              |
+| gen-flake value-injection   | `flake.nix`                                | `imports = [ gen-flake.flakeModules.default ]; gen.tree = ./gen-modules;` — pure compose + `genValues` injection   |
+| Reader over injected values | `modules/outputs.nix`                      | `{ genValues, ... }:` reads `genValues.fleet.*` / `genValues.schema` — no gen type in the flake-parts options tree |
 
 ## Layout
 
@@ -344,18 +344,18 @@ Both contributions merge through `deferredModule` — the kind type is open, not
 
 ### Comparison
 
-| Concern | Bare `attrsOf submodule` | gen-schema |
-|---|---|---|
-| Type definition | Closed value in one file | Open — any module can extend via `config.schema.<kind>` |
-| Undeclared keys | Silently accepted (freeform default) | Error with fix guidance (strict default) |
-| Entity comparison | `==` (fragile, can diverge) | `id_hash` (cheap, deterministic) |
-| Cross-references | Manual string lookup | `ref` — validated, resolves to instance |
-| Defaults | `config.x = mkDefault val` (same) | Same — deferred module merge preserves this |
-| Introspection | None without evaluating instances | `_kindNames`, per-kind `.options`/`.refs` |
-| Declarative methods | Manual `functionTo` options + config wiring | `schemaFn` — auto-resolves config args |
-| Documentation | Write it yourself | `renderDocs` generates from schema metadata |
-| Dependencies | None | nixpkgs only |
-| Overhead | None | Thin layer (~330 lines) over `deferredModule` + `submodule` |
+| Concern             | Bare `attrsOf submodule`                    | gen-schema                                                  |
+| ------------------- | ------------------------------------------- | ----------------------------------------------------------- |
+| Type definition     | Closed value in one file                    | Open — any module can extend via `config.schema.<kind>`     |
+| Undeclared keys     | Silently accepted (freeform default)        | Error with fix guidance (strict default)                    |
+| Entity comparison   | `==` (fragile, can diverge)                 | `id_hash` (cheap, deterministic)                            |
+| Cross-references    | Manual string lookup                        | `ref` — validated, resolves to instance                     |
+| Defaults            | `config.x = mkDefault val` (same)           | Same — deferred module merge preserves this                 |
+| Introspection       | None without evaluating instances           | `_kindNames`, per-kind `.options`/`.refs`                   |
+| Declarative methods | Manual `functionTo` options + config wiring | `schemaFn` — auto-resolves config args                      |
+| Documentation       | Write it yourself                           | `renderDocs` generates from schema metadata                 |
+| Dependencies        | None                                        | nixpkgs only                                                |
+| Overhead            | None                                        | Thin layer (~330 lines) over `deferredModule` + `submodule` |
 
 ### When to use which
 
