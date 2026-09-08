@@ -2132,13 +2132,11 @@
         "gen": "gen",
         "gen-algebra": [
           "gen",
-          "gen-flake",
           "gen-schema",
           "gen-algebra"
         ],
         "gen-schema": [
           "gen",
-          "gen-flake",
           "gen-schema"
         ],
         "nixpkgs": "nixpkgs_2"

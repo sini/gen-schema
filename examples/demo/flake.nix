@@ -60,12 +60,16 @@
     # Reuse the EXACT gen-schema / gen-algebra instances the composition threads into the pure tree, so
     # the reader-side renderDocs/mkCodec/applyMixin operate on type + record objects structurally
     # identical to the injected `genValues` (and no duplicate fetch). gen-algebra rides gen-schema's own
-    # pin. The path goes THROUGH the hub's gen-flake node and not to the hub's own top-level
-    # gen-schema: `flakeModules.default` binds the roster's `flake` member, which is
-    # `gen-flake.lib` self-resolving ITS gen-schema — a different node from `gen/gen-schema`, so
-    # following the shorter path would hand the reader a second build of the same names.
-    gen-schema.follows = "gen/gen-flake/gen-schema";
-    gen-algebra.follows = "gen/gen-flake/gen-schema/gen-algebra";
+    # pin. The path is the hub's own top-level gen-schema, which IS the instance
+    # `flakeModules.default` threads: ADR-0031 dissolved gen-flake, so there is no `flake` roster
+    # member self-resolving a second gen-schema and no second build of the same names to avoid.
+    # ── The superseded ground, recorded rather than dropped ── this read
+    # `follows = "gen/gen-flake/gen-schema"` because `flakeModules.default` bound the roster's `flake`
+    # member, which was `gen-flake.lib` self-resolving ITS gen-schema — a different node from
+    # `gen/gen-schema`, so the short path would then have handed the reader a second build. That
+    # reason is falsified by ADR-0031, and the long path now names an input the hub no longer has.
+    gen-schema.follows = "gen/gen-schema";
+    gen-algebra.follows = "gen/gen-schema/gen-algebra";
 
     # The terminal / output side keeps the demo's own nixpkgs + flake-parts (the flake-parts eval that
     # hosts the reader + emits outputs). nixpkgs-lib follows nixpkgs so the tree's injected `lib` and
