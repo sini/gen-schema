@@ -80,7 +80,7 @@ The authoring surface is small — most schemas are built from these constructor
 | `refined` / `blame` / `mkMixin`    | Refinement contracts, blame records, and first-class mixin fragments                                               |
 | `mkCodec` / `renderDocs`           | Serialization round-trips and markdown reference generation                                                        |
 
-Everything above the instance layer is pure schema — no validation or hashing happens at the kind level, which is what lets kinds compose via `imports` without duplicate-module conflicts. Instances are where the infrastructure (strict rejection, `id_hash`, ref binding, derive) is injected. Registries expose flat `_`-prefixed introspection (`_kindNames`, `_topology`, `_edges`, `_roots`, `_leaves`, `_collectionKeys`) that consumers read to build whatever graph format their evaluator needs.
+Everything above the instance layer is pure schema — no validation or hashing happens at the kind level, which is what lets kinds compose via `imports` without duplicate-module conflicts. Instances are where the infrastructure (strict rejection, `id_hash`, ref binding, derive) is injected. Registries expose flat `_`-prefixed introspection (`_kindNames`, `_topology`, `_edges`, `_refEdges`, `_roots`, `_leaves`, `_collectionKeys`) that consumers read to build whatever graph format their evaluator needs.
 
 ## Gen Ecosystem
 
