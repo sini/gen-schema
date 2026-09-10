@@ -38,6 +38,13 @@
       inherit inputs;
       name = "gen-schema";
       testModules = ./tests;
+      # The SECOND output, `nix-unit --flake ./ci#testsError`. `mkCi`'s `checks.default` asserter
+      # quantifies over `flake.tests` and evaluates every cell's `expr` unconditionally, so a cell
+      # with a throwing `expr` crashes that gate instead of failing it — which is why a refusal whose
+      # MESSAGE is the subject cannot live under `./tests`. `tryEval` discards the message
+      # (`{ success = false; value = false; }`), so the cells that assert WHICH refusal fired have
+      # nowhere else to go. Same wiring as gen-merge's and gen-memo's.
+      extraModules = [ ./tests-error.nix ];
       specialArgs = {
         inherit
           genIdentity

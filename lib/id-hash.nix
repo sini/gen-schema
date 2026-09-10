@@ -155,20 +155,38 @@ in
             # Explicit keys are user intent, and they are validated AGAINST THE CLOSED SET — the same
             # boundary the reflection now respects, so the two cannot disagree about what a key is.
             # This is a behaviour change and it is the intended one: `_identity.keys` naming an option
-            # contributed on the instance side used to succeed, and an instance-side option is no
-            # longer an identity key of the kind, so naming one is naming something undeclared there.
-            # The message is the existing one, unchanged — a key outside the closed set is outside it
-            # for one reason as far as the kind is concerned, and no new vocabulary is owed.
+            # contributed on the instance side used to succeed.
+            #
+            # THE MESSAGE NAMES MEMBERSHIP, NOT A CAUSE, because the closed set excludes for three
+            # different reasons and the module holds only the set. A name can be outside it because
+            # nothing declares it, because what declares it is not primitive, or because it is
+            # declared primitive and excluded (`internal`, `identity = false`, or contributed on the
+            # instance side). The predecessor said "is not declared on kind", which is FALSE on the
+            # second and third — a kind declaring `tags : listOf str` was told `tags` is undeclared.
+            # Membership is true on all three, and the set is printed so the reader sees which.
             validatedExplicitKeys = map (
               k:
               if prelude.elem k identityKeys then
                 k
               else
-                throw "_identity.keys: '${k}' is not declared on kind '${kind}'"
+                throw "_identity.keys: '${k}' is not an identity key of kind '${kind}' (identity keys: ${prelude.concatStringsSep ", " identityKeys})"
             ) (prelude.sort (a: b: a < b) explicitKeys);
             keys = if explicitKeys != [ ] then validatedExplicitKeys else identityKeys;
           in
-          identity.hashIdentity kind keys (k: config.${k});
+          # ADR-0034: a value or a NAMED refusal, never an abort. The accessor is partial — a key in
+          # the set that the instance carries no value for used to reach `config.${k}` and die on a
+          # raw missing-attribute error naming a line in this file. `name` is the reachable case and
+          # the guard is not written for it alone: `name` is RESERVED rather than declared, injected
+          # at instance eval by `mkInstanceType`, so a caller reaching `mkIdentityModule` directly is
+          # the one party that can hand over an instance without it. Guarding the accessor rather
+          # than that one key costs the same and is total over the whole set.
+          identity.hashIdentity kind keys (
+            k:
+            if config ? ${k} then
+              config.${k}
+            else
+              throw "gen-schema: mkIdentityModule: kind '${kind}' identifies instances by '${k}', which this instance does not declare (identity keys: ${prelude.concatStringsSep ", " keys}); 'name' is reserved and is declared by mkInstanceType"
+          );
       };
     };
 }
