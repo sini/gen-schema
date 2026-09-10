@@ -36,7 +36,7 @@ let
   instance = import ./instance.nix {
     inherit prelude merge;
     inherit (strictLib) mkStrictModule;
-    inherit (idHashLib) mkIdentityModule;
+    inherit (idHashLib) mkIdentityModule identityKeysForKind;
     inherit (validate)
       runValidators
       defaultOnError
@@ -57,6 +57,11 @@ in
   inherit (idHashLib)
     mkIdentityModule
     identityHashForKind
+    # The key-set half of the recompute, published for the same reason the hash half is: a consumer
+    # holding a kind value can ask WHICH options an instance of it is identified by without minting
+    # anything. It is the one derivation both the stamp and the recompute read, so a consumer that
+    # pins it is pinning the thing that moves rather than a copy of it.
+    identityKeysForKind
     ;
   inherit (strictLib) mkStrictModule;
   inherit (validate)

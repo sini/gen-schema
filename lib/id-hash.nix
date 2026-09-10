@@ -27,11 +27,11 @@
   identity,
 }:
 let
-  # THE identity-key predicate — ONE definition, because the option-reflecting derivations must agree
-  # and two copies of a list is how they stop agreeing. `mkIdentityModule` reflects the INSTANCE's
-  # merged options to stamp `id_hash`; `identityHashForKind` reflects the KIND VALUE's options to
-  # recompute it. A key one side counts and the other does not is a hash mismatch on every instance
-  # of that kind — and it is silent, because both answers are well-formed hashes.
+  # THE identity-key predicate. It used to need a warning about two derivations agreeing; it no
+  # longer does, because there is one. `identityKeysForKind` below is the single derivation, and
+  # BOTH readers — the stamp (`mkIdentityModule`, which now takes the key set as data) and the
+  # recompute (`identityHashForKind`) — take their keys from it. The agreement is structural rather
+  # than maintained, so a key one side counts and the other does not is no longer expressible.
   #
   # Reflection dispatches on the option's type NAME. gen-types leaf checkers name primitives
   # "string"/"int"/"bool"; nixpkgs `lib.types` names the same primitive "str"/"int"/"bool". Both
@@ -56,12 +56,53 @@ let
     && prelude.elem (opt.type.name or "") primitiveTypeNames
     && !(opt.internal or false)
     && (opt.identity or true);
+
+  # ★ THE IDENTITY-KEY SET, DERIVED AT THE KIND BOUNDARY — the one derivation, and the boundary is
+  # the point. An entity's identity is a function of its KIND's option set (ADR-0016 ruling 5), and a
+  # kind's option set is closed the moment the kind is a value. So the keys are derived by evaluating
+  # the kind module AS ITS OWN CLOSED STRATUM — one eval, outside the instance fixpoint entirely —
+  # rather than read out of the fixpoint that is still collecting declarations. ADR-0033: nothing
+  # consumes its own stratum's in-flight output. Reading the instance's merged `options` was exactly
+  # that read, and it does not diverge only because the module system gathers declarations before it
+  # realizes config, so the read succeeds and returns whatever the sweep happened to reach.
+  #
+  # WHAT THIS BUYS, BY CONSTRUCTION AND NOT BY CHECK. An option contributed through `extraModules`,
+  # through a `refs` binding module, through a refinement, or by any module a caller adds to the
+  # instance submodule has NOWHERE TO ATTACH: the key set was a value before those modules were seen.
+  # That contribution is not refused, it is inexpressible — the shape `gen-scope/lib/mint.nix` takes
+  # with its `kinds` argument, whose comment states the same reach ("an expression with nowhere to
+  # attach", "what is owed is dataflow and not a check").
+  #
+  # ★ THE SOURCE IS THE KIND'S OWN EVALUATION, NOT `kindValue.options`, AND THAT IS A MEASUREMENT.
+  # `options` is populated on a kind declared through `mkSchemaOption` and EMPTY on one declared
+  # through gen-aspects' `schemaOption`, which keeps its declarations in `__defsModule.imports`. A
+  # derivation reading `kindValue.options` therefore mints over `[ "name" ]` alone for every
+  # aspect-declared kind — silently disagreeing with the stamp those instances carry, and collapsing
+  # two instances differing only in a kind option onto one identity. Both shapes answer `__functor`,
+  # so both evaluate here, and the two agree.
+  #
+  # `name` is prepended because `mkInstanceType` injects it at INSTANCE eval: it is an identity key
+  # by construction and is not in the kind's own option set to be reflected out of it. A kind whose
+  # instances differ only in `name` collapsing to one identity is the silent-collapse class one door
+  # over, so it is added here rather than left to a reflection that cannot see it.
+  identityKeysForKind =
+    kindValue:
+    prelude.sort (a: b: a < b) (
+      prelude.unique (
+        [ "name" ]
+        ++ prelude.attrNames (
+          prelude.filterAttrs isPrimitiveOption (merge.evalModuleTree { modules = [ kindValue ]; }).options
+        )
+      )
+    );
 in
 {
+  inherit identityKeysForKind;
+
   # identityHashForKind kindValue instance — THE recompute path, for a consumer that HAS the kind's processed
-  # KIND-VALUE. It reflects the KIND's primitive options — honoring `identity = false` and `internal`, the SAME
-  # reflection `mkIdentityModule` performs — so it agrees with the stamp by construction. Routes through the
-  # SAME `hashIdentity`, so it can drift from neither.
+  # KIND-VALUE. It takes its keys from `identityKeysForKind`, which is also where the stamp gets them, so it
+  # agrees with the stamp by construction rather than by two reflections being kept in step. Routes through
+  # the SAME `hashIdentity`, so it can drift from neither.
   #
   # It is the SOLE recompute path because there is one minting authority and a second derivation that can
   # disagree with the first is one derivation too many. A value-reflecting twin — keeping any attribute whose
@@ -78,20 +119,14 @@ in
   # divergence — the instance carries those, not the kind-value).
   identityHashForKind =
     kindValue: instance:
-    let
-      # `mkInstanceType` injects `name` (a primitive identity key) at INSTANCE eval, so it is NOT in the
-      # kind-value's user `options` — add it explicitly to match `mkIdentityModule`'s full-options reflection.
-      keys = prelude.sort (a: b: a < b) (
-        prelude.unique (
-          [ "name" ] ++ prelude.attrNames (prelude.filterAttrs isPrimitiveOption (kindValue.options or { }))
-        )
-      );
-    in
-    identity.hashIdentity kindValue.kind keys (k: instance.${k});
+    identity.hashIdentity kindValue.kind (identityKeysForKind kindValue) (k: instance.${k});
 
+  # `identityKeys` is the CLOSED key set, derived once at the kind boundary by `mkInstanceType` and
+  # handed in as data. This module reflects nothing: the instance's merged `options` is the in-flight
+  # output this construction exists to stop reading, and it is not an argument here any more.
   mkIdentityModule =
-    kind:
-    { config, options, ... }:
+    kind: identityKeys:
+    { config, ... }:
     {
       # `_identity` is a submodule option (not a bare nested `options._identity.keys`):
       # gen-merge collects declared options with a flat `//` and does not descend into
@@ -117,30 +152,23 @@ in
         default =
           let
             explicitKeys = config._identity.keys;
-            reflectedKeys = prelude.sort (a: b: a < b) (
-              prelude.attrNames (prelude.filterAttrs isPrimitiveOption options)
-            );
-            # Explicit keys are user intent — validate they exist and are primitive.
-            # Throw on invalid keys rather than silently dropping them.
-            validatedExplicitKeys =
-              let
-                sorted = prelude.sort (a: b: a < b) explicitKeys;
-              in
-              map (
-                k:
-                let
-                  opt = options.${k} or null;
-                in
-                if opt == null then
-                  throw "_identity.keys: '${k}' is not declared on kind '${kind}'"
-                else if !(opt ? type) || !(prelude.elem (opt.type.name or "") primitiveTypeNames) then
-                  throw "_identity.keys: '${k}' on kind '${kind}' is not a primitive type (str/int/bool/float)"
-                else
-                  k
-              ) sorted;
-            identityKeys = if explicitKeys != [ ] then validatedExplicitKeys else reflectedKeys;
+            # Explicit keys are user intent, and they are validated AGAINST THE CLOSED SET — the same
+            # boundary the reflection now respects, so the two cannot disagree about what a key is.
+            # This is a behaviour change and it is the intended one: `_identity.keys` naming an option
+            # contributed on the instance side used to succeed, and an instance-side option is no
+            # longer an identity key of the kind, so naming one is naming something undeclared there.
+            # The message is the existing one, unchanged — a key outside the closed set is outside it
+            # for one reason as far as the kind is concerned, and no new vocabulary is owed.
+            validatedExplicitKeys = map (
+              k:
+              if prelude.elem k identityKeys then
+                k
+              else
+                throw "_identity.keys: '${k}' is not declared on kind '${kind}'"
+            ) (prelude.sort (a: b: a < b) explicitKeys);
+            keys = if explicitKeys != [ ] then validatedExplicitKeys else identityKeys;
           in
-          identity.hashIdentity kind identityKeys (k: config.${k});
+          identity.hashIdentity kind keys (k: config.${k});
       };
     };
 }

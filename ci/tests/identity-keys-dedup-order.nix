@@ -5,11 +5,18 @@
   ...
 }:
 let
-  inherit (genSchema) mkIdentityModule;
+  inherit (genSchema) mkIdentityModule identityKeysForKind;
+  # One module list plays both parts — the kind whose own evaluation closes the key set, and the
+  # modules imported beside the identity module. See ci/tests/identity-hash.nix for the full note.
   mkEval =
     kind: modules:
     genMerge.evalModuleTree {
-      modules = [ (mkIdentityModule kind) ] ++ modules;
+      modules = [
+        (mkIdentityModule kind (identityKeysForKind {
+          imports = modules;
+        }))
+      ]
+      ++ modules;
     };
 
   # den-hoag-ngsq — gen-schema's own consumption of `prelude.unique` was measured BLIND to a

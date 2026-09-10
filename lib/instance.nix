@@ -12,6 +12,7 @@
   merge,
   mkStrictModule,
   mkIdentityModule,
+  identityKeysForKind,
   runValidators,
   defaultOnError,
   dedupByHash,
@@ -31,6 +32,16 @@ let
           || throw "gen-schema: mkInstanceType: expected a kind value with 'kind' and 'options' attributes";
         null;
       kind = kindValue.kind;
+
+      # ★ THE KIND BOUNDARY. The identity-key set closes HERE, one stratum above the instance
+      # fixpoint, and is carried into that fixpoint as data. Everything below this line — the strict
+      # or freeform module, the identity module, `extraModules`, and every module a ref binding or a
+      # refinement adds — is seen AFTER the set is a value, so none of them can enter it. Lazy on
+      # purpose: forcing it here would force `kindValue` at option-DECLARATION time, which is the
+      # recursion `mkInstanceRegistry`'s deferred guard exists to avoid on the self-referential
+      # `mkInstanceRegistry config.schema.host { }` idiom. It is forced at config-demand time, by
+      # `id_hash` or by a read of `_identityKeys`, which is late enough.
+      identityKeys = identityKeysForKind kindValue;
     in
     merge.types.submodule (
       { name, config, ... }:
@@ -47,13 +58,29 @@ let
             else
               { config._module.freeformType = merge.types.attrsOf merge.types.anything; }
           )
-          (mkIdentityModule kind)
+          (mkIdentityModule kind identityKeys)
         ]
         ++ extraModules;
         config._module.args.${kind} = config;
         options.name = merge.mkOption {
           type = merge.types.str;
           default = name;
+        };
+        # The closed key set, published beside `id_hash` as a readable datum.
+        #
+        # WHY A DATUM AND NOT A CHECK. Two COLD evaluations a week apart is the one region of this
+        # class the substrate cannot close: nothing here holds the earlier evaluation, and no party
+        # can compare against what it does not have. Inventing a comparison that cannot see the
+        # second evaluation would be worse than the gap, so what is offered instead is the set
+        # itself — a caller pins it, diffs it across runs, or hashes it into its own acceptance
+        # corpus, and the caller is then the party that holds both. That is the whole of what is
+        # available, and a caller whose pinned set goes stale hears NOTHING from this library.
+        options._identityKeys = merge.mkOption {
+          readOnly = true;
+          internal = true;
+          type = merge.types.listOf merge.types.str;
+          default = identityKeys;
+          description = "The closed identity-key set this kind's instances are minted over.";
         };
       }
     );

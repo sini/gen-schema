@@ -5,11 +5,34 @@
   ...
 }:
 let
-  inherit (genSchema) mkIdentityModule;
+  inherit (genSchema) mkIdentityModule identityKeysForKind;
+  # The key set closes at the KIND boundary and reaches the identity module as data — what
+  # `mkInstanceType` does in production. Here ONE module list plays both parts: it is the kind whose
+  # own evaluation the set is derived from, and it is imported into the instance eval beside the
+  # identity module. So every fixture below still exercises `isPrimitiveOption` over its own
+  # declarations, at the stratum that now owns the reflection.
+  #
+  # `name` is declared here because `mkInstanceType` declares it in production and the key set
+  # prepends it unconditionally — a kind whose instances differ only in `name` must not collapse to
+  # one identity. A fixture below that mints without declaring `name` is not a kind this library can
+  # be handed through its own constructor, so the stand-in supplies what the constructor would. It
+  # moves no pinned hash: the fixtures that already declare `name` merge with this and keep their
+  # value, and the paired fixtures that did not carry the same default on both arms.
   mkEval =
     kind: modules:
     genMerge.evalModuleTree {
-      modules = [ (mkIdentityModule kind) ] ++ modules;
+      modules = [
+        (mkIdentityModule kind (identityKeysForKind {
+          imports = modules;
+        }))
+        {
+          options.name = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "instance";
+          };
+        }
+      ]
+      ++ modules;
     };
 
   evalA = mkEval "host" [
