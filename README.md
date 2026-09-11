@@ -144,7 +144,7 @@ The flake-parts module provides `schema` and `genSchema` with default settings (
 # gen-schema does not carry a copy of it. You still never reach for nixpkgs `lib`; the promise
 # is unchanged and only the path is. A verbatim copy would be a SECOND build of the same names,
 # and two gen libraries at different pins would then disagree on a type's identity while
-# agreeing on its name (ADR-0014: the boundary is the eval, not the repo).
+# agreeing on its name — the boundary is the eval, not the repo.
 let
   genSchema = gen-schema.lib;
   merge = gen-merge.lib;   # evalModuleTree + mkOption + types — the pure-gen module system
@@ -731,7 +731,7 @@ around it:
 
 That covers the cases seen so far, and it is the first thing to reach for. If it genuinely does not,
 **the escape is a declared one, not a quieter scan.** The sanctioned shape follows the pattern
-ADR-0023 sets for the value-injection invariant — by-construction as the target, a declared opt-out
+the value-injection invariant sets — by-construction as the target, a declared opt-out
 as the interim, with the price recorded: refusal stays the default, and a field is annotated
 at schema level as *not scanned, its reads declared here*. The burden of arguing why those reads
 cannot be derived attaches to that annotation at that point, which is where it can actually be
