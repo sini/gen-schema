@@ -36,6 +36,24 @@ let
             type = genMerge.types.int;
             default = 0;
           };
+          # `hook` is declared FUNCTION-typed on host, so reflection does not select it and the host
+          # stamp is unmoved — while the instance still carries a value at that name. The candidate
+          # kind `sleeve` below declares the same name `str`, so `hook` IS one of its identity keys:
+          # the pair is a candidate whose key the instance carries at a value the MINT refuses.
+          config.schema.host.options.hook = lib.mkOption {
+            type = lib.types.functionTo lib.types.str;
+            default = _: "";
+          };
+          # A candidate kind identifying by an option `host` does not declare at all — the wrong-kind
+          # discovery case the recompute must ANSWER rather than abort on.
+          config.schema.spindle.options.gauge = genMerge.mkOption {
+            type = genMerge.types.int;
+            default = 0;
+          };
+          config.schema.sleeve.options.hook = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "";
+          };
           config.hosts.igloo.rack = 3;
         }
       )
@@ -43,7 +61,39 @@ let
   };
   hostKv = hostTree.config.schema.host;
   hostAltKv = hostTree.config.schema.hostAlt;
+  spindleKv = hostTree.config.schema.spindle;
+  sleeveKv = hostTree.config.schema.sleeve;
   hostInst = hostTree.config.hosts.igloo;
+
+  # A kind whose identity key is DECLARED primitive and whose value is not: `apply` is not
+  # type-constrained, so `tag : str` reflects as an identity key while the instance carries a list.
+  # The mint admits inert composites (lambdas, paths and derivations are what it refuses), so this is
+  # a RIGHT-kind instance with a computable identity — and any guard reading the VALUE rather than
+  # its presence answers `null` for it and misses its own kind.
+  widgetTree = genMerge.evalModuleTree {
+    modules = [
+      (
+        { config, ... }:
+        {
+          options.schema = genSchema.mkSchemaOption { };
+          options.widgets = genSchema.mkInstanceRegistry config.schema.widget { };
+          config.schema.widget.options.tag = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "t";
+            apply = x: [ x ];
+          };
+          # the live control: a plain `str` key on the same kind, which every candidate guard admits.
+          config.schema.widget.options.zone = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "z";
+          };
+          config.widgets.cog = { };
+        }
+      )
+    ];
+  };
+  widgetKv = widgetTree.config.schema.widget;
+  widgetInst = widgetTree.config.widgets.cog;
 
   # A processed KIND-VALUE + instance (via mkSchemaOption + a registry), for identityHashForKind.
   schemaTree = genMerge.evalModuleTree {
@@ -138,5 +188,95 @@ in
   flake.tests.identity-hash-for.test-discriminates-kind = {
     expr = (genSchema.identityHashForKind hostAltKv hostInst) == hostInst.id_hash;
     expected = false;
+  };
+  # THE DISCOVERY PROPERTY over candidates with DIFFERENT key sets — the shape `test-discriminates-kind`
+  # above is structurally incapable of witnessing, because its two kinds declare identical option sets
+  # and so have no key the instance can be missing. Runs the README's own `findFirst` loop and pins the
+  # cardinality, so a loop that stopped early rather than passing over the wrong candidate fails loudly.
+  flake.tests.identity-hash-for.test-discovers-kind-over-different-key-sets =
+    let
+      candidates = [
+        spindleKv
+        hostAltKv
+        hostKv
+      ];
+    in
+    {
+      expr = {
+        hostKeys = genSchema.identityKeysForKind hostKv;
+        spindleKeys = genSchema.identityKeysForKind spindleKv;
+        wrongKind = genSchema.identityHashForKind spindleKv hostInst;
+        checked = builtins.length candidates;
+        discovered =
+          (lib.findFirst (kv: genSchema.identityHashForKind kv hostInst == hostInst.id_hash) null candidates)
+          .kind;
+        # the literal the recompute already produced before the guard existed. Agreement alone is
+        # satisfied by two sides degenerating together, and a guard that moved an existing identity
+        # would pass a cell that only compared them.
+        rightKind = genSchema.identityHashForKind hostKv hostInst;
+      };
+      expected = {
+        hostKeys = [
+          "name"
+          "rack"
+        ];
+        spindleKeys = [
+          "gauge"
+          "name"
+        ];
+        wrongKind = null;
+        checked = 3;
+        discovered = "host";
+        rightKind = "host:7a1847c6ceea7a285adb586989da79a769bf29d408c572e011f79ddee05a8e1a";
+      };
+    };
+  # THE GUARD TESTS PRESENCE AND NOTHING ELSE. A value predicate re-derived here would be a second copy
+  # of the mint's domain, and the mint's domain is wider than any list gen-schema can see: `tag` is
+  # declared `str` (so it is an identity key) and carries a list (which the mint admits).
+  flake.tests.identity-hash-for.test-guard-does-not-narrow-the-mint-domain = {
+    expr = {
+      widgetKeys = genSchema.identityKeysForKind widgetKv;
+      tagType = builtins.typeOf widgetInst.tag;
+      zoneType = builtins.typeOf widgetInst.zone;
+      ownKindRecompute = genSchema.identityHashForKind widgetKv widgetInst;
+      stamped = widgetInst.id_hash;
+    };
+    expected = {
+      widgetKeys = [
+        "name"
+        "tag"
+        "zone"
+      ];
+      tagType = "list";
+      zoneType = "string";
+      ownKindRecompute = "widget:f36919cea13ef0dd3cd04208ee807a987fc596b07ef368e8cf18423705eda679";
+      stamped = "widget:f36919cea13ef0dd3cd04208ee807a987fc596b07ef368e8cf18423705eda679";
+    };
+  };
+  # THE BOUNDARY. Where the instance CARRIES the candidate's identity key at a value the mint refuses,
+  # the answer is the mint's own named refusal, propagated — not `null`. That is a stated terminal
+  # state: the domain belongs to the one minting authority, and a consumer iterating over candidates of
+  # unknown shape catches it with `tryEval`, which is what separates it from the abort this guard
+  # removed.
+  flake.tests.identity-hash-for.test-out-of-domain-value-is-the-mints-refusal = {
+    expr = {
+      sleeveKeys = genSchema.identityKeysForKind sleeveKv;
+      hostCarriesHook = hostInst ? hook;
+      hookType = builtins.typeOf hostInst.hook;
+      refusalIsCaught = (builtins.tryEval (genSchema.identityHashForKind sleeveKv hostInst)).success;
+      # the live control: without it `refusalIsCaught = false` is satisfied by a `tryEval` that fails
+      # on everything.
+      controlWellFormed = (builtins.tryEval (genSchema.identityHashForKind hostKv hostInst)).success;
+    };
+    expected = {
+      sleeveKeys = [
+        "hook"
+        "name"
+      ];
+      hostCarriesHook = true;
+      hookType = "set";
+      refusalIsCaught = false;
+      controlWellFormed = true;
+    };
   };
 }

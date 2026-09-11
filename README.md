@@ -517,6 +517,10 @@ lib.findFirst (kv: genSchema.identityHashForKind kv inst == inst.id_hash) null c
 
 It reflects the kind's own primitive options — honoring `internal` and `identity = false` — and routes through the same `hashIdentity` as `mkIdentityModule`, so the two cannot drift. A non-match reliably means "not this kind"; a wrong-kind false match would need a sha256 collision across different preimages.
 
+A candidate whose identity keys the instance does not carry answers **`null`** — *not this kind* — so the loop above passes over it rather than aborting. `null` is not an identity and mints nothing; `null == inst.id_hash` is plain `false`.
+
+A candidate whose identity key the instance *does* carry, at a value the mint refuses — a lambda, a path, a derivation, at any depth — still propagates the mint's named refusal, because the value domain belongs to the mint and not to this reflection. A consumer iterating over candidates of unknown shape therefore wraps the call in `builtins.tryEval`, which catches that refusal.
+
 There is deliberately **no value-only form**. Reflecting an instance value's own primitive attributes cannot honour the commitment above: a value carries no option metadata, so it sees neither `internal` nor the opt-out, and a method's return is just a primitive attribute in `config` that it would admit. One substrate has one minting authority, and two derivations that can disagree is one too many.
 
 **Three-layer precedence for key selection:**

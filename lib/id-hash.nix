@@ -115,11 +115,32 @@ in
   # since a WRONG-kind false match needs a sha256 collision across different preimages (negligible), a
   # non-match is a reliable "not this kind". If two gen-schema pins' formulas ever diverged, EVERY instance
   # would mismatch → the namespace matches NO kind → the consumer's strict gate aborts NAMED (a loud MISS,
-  # never a misclassification). Reflection path only (a kind pinning explicit `_identity.keys` is the sole
-  # divergence — the instance carries those, not the kind-value).
+  # never a misclassification).
+  #
+  # ★ TOTAL OVER CANDIDATE KINDS, which is why the codomain is `identity | null`. Discovery iterates over
+  # candidates that are, by construction, mostly wrong, so an instance not carrying a candidate's identity
+  # keys is an EXPECTED absence and not a caller error — the shape `codec.nix` answers rather than refuses,
+  # where `ref.nix`, `methods.nix` and `mkIdentityModule` below all refuse by name because each is invoked
+  # on an instance of the kind in hand. The guard tests PRESENCE and nothing else: such a candidate answers
+  # `null`, and `null` is not an identity, mints nothing, and cannot be read back as a hash. Whether a
+  # VALUE may bear an identity at all is the MINT's own question, and a domain predicate re-derived here
+  # would be a second copy of it, decaying independently of its source. So one residue stands, stated
+  # rather than hidden: where the instance CARRIES a candidate's identity key at a value the mint refuses —
+  # a lambda, a path, a derivation, at any depth — the mint's named refusal PROPAGATES, and a consumer
+  # iterating over candidates of unknown shape wraps the call in `tryEval`, which catches that refusal.
+  #
+  # Reflection path only, and it now parts from the stamp in TWO places: a kind pinning explicit
+  # `_identity.keys` (the instance carries those, not the kind-value), and the `null` answer above, which
+  # a stamp computed over an instance of its own kind has no counterpart for.
   identityHashForKind =
     kindValue: instance:
-    identity.hashIdentity kindValue.kind (identityKeysForKind kindValue) (k: instance.${k});
+    let
+      keys = identityKeysForKind kindValue;
+    in
+    if prelude.all (k: instance ? ${k}) keys then
+      identity.hashIdentity kindValue.kind keys (k: instance.${k})
+    else
+      null;
 
   # `identityKeys` is the CLOSED key set, derived once at the kind boundary by `mkInstanceType` and
   # handed in as data. This module reflects nothing: the instance's merged `options` is the in-flight
