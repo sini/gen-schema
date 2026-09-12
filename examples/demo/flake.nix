@@ -72,6 +72,25 @@
               gen.aspectCnf = import ./aspect-cnf.nix;
             }
           )
+          (
+            # THE NODE REGISTRY (ADR-0035, den-hoag-hub-hardcodes-hosts-mxpd5). The hub used to take
+            # gen-delivery's `values.hosts or { }` default, so a registry spelled anything else
+            # projected `{ }` with no diagnostic — and THIS tree's registries are nested at
+            # `fleet.hosts`, which that default could not express at all. The option is an ATTRIBUTE
+            # PATH and it must name the REGISTRY, never the container: `[ "fleet" ]` resolves to an
+            # attrset of six registries and would project their KEYS as node names.
+            #
+            # Guarded for the same reason `gen.aspectCnf` above is, and measured the same way: the
+            # option is undeclared at this demo's committed pin, and DEFINING it there — even as
+            # `null` — is itself "the option `gen.nodeRegistryPath' does not exist". Omitted
+            # outright, not conditioned false, until the relock lands.
+            lib.optionalAttrs (options.gen ? nodeRegistryPath) {
+              gen.nodeRegistryPath = [
+                "fleet"
+                "hosts"
+              ];
+            }
+          )
         ];
       }
     );
