@@ -1,8 +1,9 @@
 # Standalone (non-flake) entry. Flake consumers should use the `.lib` output.
 #
-# gen-schema is a function of three named values — gen-prelude (the pure utility base),
+# gen-schema is a function of four named values — gen-prelude (the pure utility base),
 # gen-merge (the byte-mode module MERGE engine that REPLACES lib.evalModules + lib.types),
-# and gen-algebra (the pure record algebra). Defaults fetch the flake-locked revs
+# gen-algebra (the pure record algebra), and gen-identity (the one minting authority for
+# identity keys). Defaults fetch the flake-locked revs
 # (content-addressed via narHash, so the plain-import path stays pure and in lockstep with
 # the flake output). Pass any explicitly to override (e.g. a local checkout).
 {

@@ -6,7 +6,7 @@ A typed record registry for Nix with extension points, strict validation, refine
 
 gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions that any module can extend, strict-by-default validation that catches typos immediately, refinement contracts co-located with type declarations, stable identity comparison via `id_hash`, cross-registry references that resolve to instances, reusable mixins with structural compatibility, and auto-generated documentation from your schema.
 
-**Dependency class: pure-gen.** gen-schema runs on the pure-gen stack — [gen-prelude](https://github.com/sini/gen-prelude) (the pure utility base), [gen-merge](https://github.com/sini/gen-merge) (the byte-mode module engine that REPLACES `lib.evalModules` + `lib.types`), and [gen-algebra](https://github.com/sini/gen-algebra) (the pure `record` algebra). It carries no `nixpkgs.lib` dependency; the constructor takes `{ prelude, merge, algebra }`, auto-fetched from gen-schema's own lock (pass any explicitly to override). The module-system constructors it exports (identity hashing, strict rejection, validators) are **gen-schema-owned** — they relocated here from gen-algebra on 2026-06-26, leaving gen-algebra fully pure.
+**Dependency class: pure-gen.** gen-schema runs on the pure-gen stack — [gen-prelude](https://github.com/sini/gen-prelude) (the pure utility base), [gen-merge](https://github.com/sini/gen-merge) (the byte-mode module engine that REPLACES `lib.evalModules` + `lib.types`), and [gen-algebra](https://github.com/sini/gen-algebra) (the pure `record` algebra). It carries no `nixpkgs.lib` dependency; the constructor takes the four formals `default.nix` declares — `prelude`, `merge`, `algebra`, `identity` — each auto-fetched from gen-schema's own lock (pass any explicitly to override). The module-system constructors it exports (identity hashing, strict rejection, validators) are **gen-schema-owned** — they relocated here from gen-algebra on 2026-06-26, leaving gen-algebra fully pure.
 
 ## Table of Contents
 
@@ -543,12 +543,13 @@ options.description = lib.mkOption { type = str; } // { identity = false; };
 # Layer 3: automatic (default) — all non-internal str/int/bool/float options
 ```
 
-Explicit keys are validated — referencing a nonexistent option or a non-primitive type throws at eval time:
-
-```
-_identity.keys: 'nonexistent' is not declared on kind 'host'
-_identity.keys: 'tags' on kind 'host' is not a primitive type (str/int/bool/float)
-```
+Explicit keys are validated against the identity-key set closed at the kind boundary — a name outside
+it refuses. The set excludes for three different reasons (nothing declares it, what declares it is not
+primitive, or it is declared primitive but excluded via `internal`, `identity = false`, or contributed
+on the instance side), and the refusal names membership rather than which of the three applied,
+printing the closed set alongside the excluded name. The exact wording is pinned by the
+`identity-refusals` cells in `ci/tests-error.nix` — read it there rather than retyped here, since a
+hand-copied error string is a second copy that decays independently of its source.
 
 ### Cross-Instance References
 
