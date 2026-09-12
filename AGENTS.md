@@ -1,5 +1,7 @@
 # gen-schema — agent capability sheet
 
+> **Library class: reference-grade.** Deletion requires a domain argument — wrong abstraction, subsumption by another construct, or theory-unsoundness; a usage count is inadmissible as a deletion ground (P7, 2026-08-17).
+
 ## Scope
 
 Typed record registry: schema **kinds** (deferred modules carrying collections, ref fields, and a
