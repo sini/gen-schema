@@ -13,6 +13,7 @@
       {
         lib,
         inputs,
+        options,
         ...
       }:
       {
@@ -26,25 +27,52 @@
           ./modules/outputs.nix
         ];
 
-        # PURE composition of the gen definition tree. The composition surface threads its own
-        # gen-merge/gen-schema/gen-aspects into every tree module; the demo adds the two extra module
-        # args the relocated definitions reach for: `lib` (their kind definitions use nixpkgs
-        # `lib.mkOption`/`lib.types`) and `genAlgebra` (record algebra + the Either pipeline). Passed
-        # via `gen.specialArgs` so the pure `evalModuleTree` sees them (it auto-provides only
-        # `config`/`options`).
-        gen.tree = ./gen-modules;
-        gen.specialArgs = {
-          inherit lib;
-          genAlgebra = inputs.gen-algebra.lib;
-        };
+        # `config`, not a plain top-level attrset, because one of the values below (`gen.aspectCnf`)
+        # is conditioned on `options` (den-hoag-xork6, next comment down) — and `options` is the
+        # merged declaration tree from every imported module, so reading it to decide the module's
+        # own TOP-LEVEL SHAPE (rather than a value nested inside `config`) is circular: the module
+        # system needs this module's declarations to finish computing `options`, before it can call
+        # this module to get that shape. Nested inside `config`, the read happens only once `options`
+        # is already settled, which is the ordinary, safe place for it.
+        config = lib.mkMerge [
+          {
+            # PURE composition of the gen definition tree. The composition surface threads its own
+            # gen-merge/gen-schema/gen-aspects into every tree module; the demo adds the two extra
+            # module args the relocated definitions reach for: `lib` (their kind definitions use
+            # nixpkgs `lib.mkOption`/`lib.types`) and `genAlgebra` (record algebra + the Either
+            # pipeline). Passed via `gen.specialArgs` so the pure `evalModuleTree` sees them (it
+            # auto-provides only `config`/`options`).
+            gen.tree = ./gen-modules;
+            gen.specialArgs = {
+              inherit lib;
+              genAlgebra = inputs.gen-algebra.lib;
+            };
 
-        # READER-side gen LIBRARIES (distinct from the injected VALUES). `outputs.nix` renders over the
-        # injected `genValues` with these: `renderDocs`/`mkCodec`/`blame`/`applyMixin`. Injected into
-        # the flake's top-level module args alongside the module's `genValues`.
-        _module.args = {
-          genSchema = inputs.gen-schema.lib;
-          genAlgebra = inputs.gen-algebra.lib;
-        };
+            # READER-side gen LIBRARIES (distinct from the injected VALUES). `outputs.nix` renders
+            # over the injected `genValues` with these: `renderDocs`/`mkCodec`/`blame`/`applyMixin`.
+            # Injected into the flake's top-level module args alongside the module's `genValues`.
+            _module.args = {
+              genSchema = inputs.gen-schema.lib;
+              genAlgebra = inputs.gen-algebra.lib;
+            };
+          }
+          (
+            # THE DECLARATION INPUT for the hub's delivery-class projection (ADR-0028's Rider;
+            # den-hoag-xork6). `null` (the option's own default) is the ABSENT state, not "no
+            # aspects": with no category source gen-delivery's `requireCnf` refuses BY NAME rather
+            # than degrading to a shape test. This tree declares no aspect keys at all, so the
+            # truthful value is the empty declaration in `./aspect-cnf.nix` — the shared home a
+            # future aspect-schema module in this tree would import too, so the two cannot drift
+            # (see that file's header). Guarded on `options.gen ? aspectCnf` because the option is
+            # undeclared at a gen pin before `a3e9436` — DEFINING it there, even as `null`, is
+            # itself "the option `gen.aspectCnf' does not exist" (measured: the committed pin
+            # `9acf8bb` predates that commit) — so the key is omitted outright, not just
+            # conditioned false, until the hub relock lands.
+            lib.optionalAttrs (options.gen ? aspectCnf) {
+              gen.aspectCnf = import ./aspect-cnf.nix;
+            }
+          )
+        ];
       }
     );
 
