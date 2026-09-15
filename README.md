@@ -161,8 +161,8 @@ merge.evalModuleTree {
 
 ```nix
 let
-  # the root default.nix auto-fetches gen-prelude/gen-types/gen-merge/gen-algebra from gen-schema's own
-  # flake.lock (content-addressed, in lockstep with the flake output). Pass { prelude; merge; algebra; }
+  # the root default.nix auto-fetches gen-prelude/gen-merge/gen-algebra/gen-identity from gen-schema's own
+  # flake.lock (content-addressed, in lockstep with the flake output). Pass { prelude; merge; algebra; identity; }
   # to override — e.g. local checkouts.
   genSchema = import ./path/to/gen-schema { };
 in
