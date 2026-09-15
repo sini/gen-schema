@@ -1,7 +1,8 @@
 # First-class mixins (§ Bracha 1990).
 # Reusable schema fragments with structural compatibility checks.
 #
-# Under the gen-flake value-injection split this is a READER-SIDE artifact: it is PURE library
+# Under the hub's value-injection split (ADR-0031 F1: rehomed from gen-flake) this is a READER-SIDE
+# artifact: it is PURE library
 # construction (mkMixin/beta/composeMixins over records), independent of the resolved fleet config,
 # and no tree module consumes it. It therefore lives on the flake-parts side and is imported by
 # `outputs.nix` to exercise the mixin API — rather than being composed into the gen tree (where its

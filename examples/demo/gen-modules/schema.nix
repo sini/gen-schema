@@ -6,7 +6,7 @@
 # flake-parts' nixpkgs `lib.evalModules` walked it via `substSubModules`/`getSubOptions` and threw.
 # The kind bodies (`config.schema.<kind>`) live in ./schema/*.nix; the instance registries
 # (`options.fleet.<kind>`) in ./fleet/registries.nix. The resolved values cross to the flake-parts
-# reader via gen-flake's injected `genValues`; the gen type never leaves this pure eval.
+# reader via the hub's injected `genValues`; the gen type never leaves this pure eval.
 { genSchema, ... }:
 {
   options.schema = genSchema.mkSchemaOption { };

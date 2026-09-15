@@ -1,7 +1,8 @@
 # Expose fleet data as flake outputs for demonstration.
 #
-# READER side of the gen-flake value-injection split. The gen module tree is composed PURELY by
-# gen-flake (`gen.tree = ./gen-modules`), which injects the resolved config VALUES as the `genValues`
+# READER side of the hub's value-injection split (ADR-0031 F1: rehomed from gen-flake, marked
+# INTERIM). The gen module tree is composed PURELY by the hub's `flakeModules.default`
+# (`gen.tree = ./gen-modules`), which injects the resolved config VALUES as the `genValues`
 # module arg into every flake module. This reader consumes those injected values — NOT a flake-parts
 # `fleet`/`schema` OPTION tree — so no gen TYPE ever enters the flake-parts options tree (the
 # `substSubModules`/`getSubOptions` throw the old `options.schema = mkSchemaOption {}` embed caused).
