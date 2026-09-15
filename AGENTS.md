@@ -36,8 +36,16 @@ Quoted text is the owner's own `flake.nix` `description` field, verbatim.
 ## Exports
 
 Entry: `inputs.gen-schema.lib` (flake) or `import ./default.nix { }` (root, self-pinned from
-`flake.lock` via `fetchTree`). Both yield the applied value. `import ./lib` is a **function** of
+`ci/flake.lock` via `fetchTree`). Both yield the applied value. `import ./lib` is a **function** of
 `{ prelude, merge, algebra }`.
+
+Root `default.nix`'s `wire ? { deps, resolve }: import ./lib deps` formal is the seam that hands this
+exact parameter set to `./lib` as `deps`, and it is also the only channel by which the shim publishes
+anything outward — a formal is an INPUT channel and cannot carry a value out, so the lock-parameterised
+`follows` resolver rides out on the same record. Overriding `wire` is how a cell reads the shim's own
+formal-to-path map AND its own resolver, with nothing fetched, no path restated and no fold
+transcribed — which is why the `follows` rule is declared exactly once in this repository, in
+`default.nix`.
 
 **Module-system vocabulary is NOT on this surface** — reach it through the hub. The ergonomic promise
 stands unchanged: a consumer declaring gen-schema options never reaches for nixpkgs `lib`. What changed
