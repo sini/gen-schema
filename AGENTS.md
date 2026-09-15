@@ -37,7 +37,8 @@ Quoted text is the owner's own `flake.nix` `description` field, verbatim.
 
 Entry: `inputs.gen-schema.lib` (flake) or `import ./default.nix { }` (root, self-pinned from
 `ci/flake.lock` via `fetchTree`). Both yield the applied value. `import ./lib` is a **function** of
-`{ prelude, merge, algebra }`.
+`{ prelude, merge, algebra, identity }` (`builtins.functionArgs (import ./lib/default.nix)` at
+`00ba0d8`).
 
 Root `default.nix`'s `wire ? { deps, resolve }: import ./lib deps` formal is the seam that hands this
 exact parameter set to `./lib` as `deps`, and it is also the only channel by which the shim publishes
