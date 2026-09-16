@@ -82,7 +82,13 @@ let
 
   # Set type: deduplicates by id_hash, preserving first-seen order.
   # Only meaningful with ref element types — setOf requires instance refs.
-  # nestedTypes.elemType is set so getRefKind traverses through setOf like listOf.
+  # nestedTypes.elemType is set directly so getRefKind traverses through setOf like listOf
+  # against the pin still in ci/flake.lock — completeType there predates lib/interface.nix and
+  # passes nestedTypes straight through unread. The functor below states the same element the
+  # way gen-merge's own listOf/nullOr do (name/payload/binOp/type): gen-merge's boundary reads
+  # only functor.payload, so a bare nestedTypes field alone is silently recomputed to `{ }` on
+  # export under it, and a functor missing name/binOp crashes the first typeMerge (e.g. a
+  # redeclared option) that reaches it.
   #
   # Built THROUGH mkOptionType rather than as `listType // { … }`. An override over an already
   # completed type answers the protocol as its LEFT operand: every field the override does not
@@ -116,8 +122,22 @@ let
       # in mkRefBindingModules' option-level apply. Type-level apply runs before
       # option apply, so strings wouldn't be resolved yet (no id_hash to dedup by).
       # Dedup is handled by mkCoerceChain's setOf branch in instance.nix instead.
-      inherit elemType;
       nestedTypes = { inherit elemType; };
+      functor = {
+        name = "setOf(${elemType.name})";
+        payload = { inherit elemType; };
+        type = payload: setOf payload.elemType;
+        binOp =
+          a: b:
+          let
+            merged =
+              if a.elemType ? typeMerge && b.elemType ? functor then
+                a.elemType.typeMerge b.elemType.functor
+              else
+                null;
+          in
+          if merged == null then null else { elemType = merged; };
+      };
       # The sub-protocol pair, which the protocol gates on each other: a consumer only calls
       # substSubModules where getSubModules is non-null, so the two have to agree about whether
       # this type carries a module set. setOf's is its element's, and a rebuild over a
