@@ -12,8 +12,30 @@
   ...
 }:
 let
-  inherit (genSchema) mkInstanceRegistry ref;
+  inherit (genSchema) mkInstanceRegistry ref evalSchema;
   inherit (genAlgebra) either;
+
+  # The frozen kind set. Kind declarations that used to reach `config.schema.<k>` through this
+  # tree's own recursive `config` (the crossing this migration retires) are applied directly here
+  # and staged through `evalSchema`, gen-schema's own inheritance pass — the same files, still
+  # walked by the outer `gen.tree` unchanged, now ALSO composed as a self-contained pass so
+  # admin-user's `inherits = [ "user" ]` resolves through real staged injection rather than a bare
+  # read of this tree's own in-flight `config`.
+  schema = evalSchema {
+    modules = [
+      (import ../schema/host.nix { inherit lib; })
+      (import ../schema/user.nix { inherit lib; })
+      (import ../schema/group.nix { inherit lib genSchema; })
+      (import ../schema/network.nix { inherit lib genSchema; })
+      (import ../schema/service.nix { inherit lib genSchema; })
+      (import ../schema/admin-user.nix { inherit lib; })
+      (import ../schema/field-validators.nix { inherit genSchema; })
+      (import ../schema/monitoring-plugin.nix { inherit lib; })
+      (import ./derived.nix { inherit lib; })
+      (import ./methods.nix { inherit lib config genSchema; })
+      (import ./validation.nix { inherit lib genSchema; })
+    ];
+  };
 
   # --- UID assignment helpers ---
 
@@ -146,11 +168,11 @@ let
     ] service;
 in
 {
-  options.fleet.hosts = mkInstanceRegistry config.schema.host {
+  options.fleet.hosts = mkInstanceRegistry schema.host {
     description = "Fleet host instances.";
   };
 
-  options.fleet.users = mkInstanceRegistry config.schema.user {
+  options.fleet.users = mkInstanceRegistry schema.user {
     description = "Fleet user instances.";
     derive = deriveUids {
       min = 1000;
@@ -158,7 +180,7 @@ in
     };
   };
 
-  options.fleet.admins = mkInstanceRegistry config.schema.admin-user {
+  options.fleet.admins = mkInstanceRegistry schema.admin-user {
     description = "Fleet admin user instances (inherits user kind).";
     derive = deriveUids {
       min = 60001;
@@ -166,7 +188,7 @@ in
     };
   };
 
-  options.fleet.services = mkInstanceRegistry config.schema.service {
+  options.fleet.services = mkInstanceRegistry schema.service {
     description = "Fleet service instances.";
     # Deferred ref: bind "host" kind-ref to the hosts registry
     refs.host = config.fleet.hosts;
@@ -204,12 +226,12 @@ in
     ];
   };
 
-  options.fleet.groups = mkInstanceRegistry config.schema.group {
+  options.fleet.groups = mkInstanceRegistry schema.group {
     description = "Fleet host group instances.";
     refs.members = config.fleet.hosts;
   };
 
-  options.fleet.networks = mkInstanceRegistry config.schema.network {
+  options.fleet.networks = mkInstanceRegistry schema.network {
     description = "Fleet network instances.";
   };
 }
