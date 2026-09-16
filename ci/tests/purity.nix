@@ -244,6 +244,33 @@ in
     ];
   };
 
+  # The detector has teeth, and it grows them on the real subject: the scan runs over exactly the
+  # source list the cell above asserts, with one synthetic entry appended. So the firing is proven by
+  # the same call that reports the tree clean, and the expectation states both halves at once — the
+  # library contributes nothing and the planted tether contributes precisely this.
+  #
+  # The expectation is the violation LIST, not merely that one was produced: a detector that fires on
+  # the wrong token, or whose `file: 'tok'` message has decayed into something a reader cannot act on
+  # off a red CI, is broken in the way that matters and a bare non-emptiness check would pass it. The
+  # synthetic entry is never written to disk, and its label is bracketed so it cannot be read as one
+  # of the repo-root-relative paths it now sits beside. Its trailing comment names `nixpkgs`, which
+  # the strip removes — so this cell also fails if the strip stops running.
+  flake.tests.purity.test-detector-catches-injected-violation = {
+    expr = scan (
+      sources
+      ++ [
+        {
+          name = "<injected>";
+          code = stripComments "  foo = lib.types.str; # comment mentioning nixpkgs is stripped";
+        }
+      ]
+    );
+    expected = [
+      "<injected>: 'lib.'"
+      "<injected>: 'lib.types'"
+    ];
+  };
+
   # THE STRIP IS THE OPERAND OF THE CELL ABOVE, exercised here at an input that cell never reads.
   # The `[ ]` above is a claim about code only if the strip discards comments and nothing else, and
   # a strip that cut at the first `#` would produce that same `[ ]` while hiding the tail of four
