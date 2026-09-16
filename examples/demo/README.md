@@ -124,24 +124,25 @@ The generated docs (`nix eval .#docs --raw`) list all options from all contribut
 
 ## Kind Mix-ins
 
-A kind can import another kind's schema, inheriting all of its options. This is how you build specialized variants without duplicating field declarations.
+A kind can declare `inherits` on another kind, gaining all of its options. This is how you build specialized variants without duplicating field declarations.
 
-`admin-user` imports the base `user` kind and adds admin-specific fields:
+`admin-user` inherits the base `user` kind and adds admin-specific fields:
 
 ```nix
 # gen-modules/schema/admin-user.nix
 config.schema.admin-user = {
-  imports = [ config.schema.user ];
+  inherits = [ "user" ];
   options.sudoPrivileges = lib.mkOption { type = bool; default = true; };
   options.sshKeys = lib.mkOption { type = listOf str; default = []; };
 };
 ```
 
-Admin-user instances get `userName` and `shell` from the user kind, plus `sudoPrivileges` and `sshKeys` from their own definition. Each kind gets its own registry with independent instances:
+Admin-user instances get `userName` and `shell` from the user kind, plus `sudoPrivileges` and `sshKeys` from their own definition. The registries file resolves inheritance through a frozen `evalSchema` pass, then each kind gets its own registry with independent instances:
 
 ```nix
-options.fleet.users = mkInstanceRegistry config.schema.user {};
-options.fleet.admins = mkInstanceRegistry config.schema.admin-user {};
+schema = genSchema.evalSchema { modules = [ (import ../schema/user.nix {...}) (import ../schema/admin-user.nix {...}) ]; };
+options.fleet.users = mkInstanceRegistry schema.user {};
+options.fleet.admins = mkInstanceRegistry schema.admin-user {};
 ```
 
 Instances in each registry are independent — admins don't appear in the user registry. Identity hashes include the kind prefix, so a user "root" and an admin "root" hash differently.
