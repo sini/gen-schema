@@ -21,48 +21,50 @@ let
   # A kind with a mixed str/int identity key set, plus a SAME-SHAPED kind under a different name —
   # the discovery discriminator's fixture: identical options and values, so only the kind separates
   # the two recomputes.
-  hostTree = genMerge.evalModuleTree {
+  hostSchema = genSchema.evalSchema {
     modules = [
-      (
-        { config, ... }:
-        {
-          options.schema = genSchema.mkSchemaOption { };
-          options.hosts = genSchema.mkInstanceRegistry config.schema.host { };
-          config.schema.host.options.rack = genMerge.mkOption {
-            type = genMerge.types.int;
-            default = 0;
-          };
-          config.schema.hostAlt.options.rack = genMerge.mkOption {
-            type = genMerge.types.int;
-            default = 0;
-          };
-          # `hook` is declared FUNCTION-typed on host, so reflection does not select it and the host
-          # stamp is unmoved — while the instance still carries a value at that name. The candidate
-          # kind `sleeve` below declares the same name `str`, so `hook` IS one of its identity keys:
-          # the pair is a candidate whose key the instance carries at a value the MINT refuses.
-          config.schema.host.options.hook = lib.mkOption {
-            type = lib.types.functionTo lib.types.str;
-            default = _: "";
-          };
-          # A candidate kind identifying by an option `host` does not declare at all — the wrong-kind
-          # discovery case the recompute must ANSWER rather than abort on.
-          config.schema.spindle.options.gauge = genMerge.mkOption {
-            type = genMerge.types.int;
-            default = 0;
-          };
-          config.schema.sleeve.options.hook = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "";
-          };
-          config.hosts.igloo.rack = 3;
-        }
-      )
+      {
+        config.schema.host.options.rack = genMerge.mkOption {
+          type = genMerge.types.int;
+          default = 0;
+        };
+        config.schema.hostAlt.options.rack = genMerge.mkOption {
+          type = genMerge.types.int;
+          default = 0;
+        };
+        # `hook` is declared FUNCTION-typed on host, so reflection does not select it and the host
+        # stamp is unmoved — while the instance still carries a value at that name. The candidate
+        # kind `sleeve` below declares the same name `str`, so `hook` IS one of its identity keys:
+        # the pair is a candidate whose key the instance carries at a value the MINT refuses.
+        config.schema.host.options.hook = lib.mkOption {
+          type = lib.types.functionTo lib.types.str;
+          default = _: "";
+        };
+        # A candidate kind identifying by an option `host` does not declare at all — the wrong-kind
+        # discovery case the recompute must ANSWER rather than abort on.
+        config.schema.spindle.options.gauge = genMerge.mkOption {
+          type = genMerge.types.int;
+          default = 0;
+        };
+        config.schema.sleeve.options.hook = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "";
+        };
+      }
     ];
   };
-  hostKv = hostTree.config.schema.host;
-  hostAltKv = hostTree.config.schema.hostAlt;
-  spindleKv = hostTree.config.schema.spindle;
-  sleeveKv = hostTree.config.schema.sleeve;
+  hostTree = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = genSchema.mkInstanceRegistry hostSchema.host { };
+        config.hosts.igloo.rack = 3;
+      }
+    ];
+  };
+  hostKv = hostSchema.host;
+  hostAltKv = hostSchema.hostAlt;
+  spindleKv = hostSchema.spindle;
+  sleeveKv = hostSchema.sleeve;
   hostInst = hostTree.config.hosts.igloo;
 
   # A kind whose identity key is DECLARED primitive and whose value is not: `apply` is not
@@ -70,51 +72,51 @@ let
   # The mint admits inert composites (lambdas, paths and derivations are what it refuses), so this is
   # a RIGHT-kind instance with a computable identity — and any guard reading the VALUE rather than
   # its presence answers `null` for it and misses its own kind.
-  widgetTree = genMerge.evalModuleTree {
+  widgetSchema = genSchema.evalSchema {
     modules = [
-      (
-        { config, ... }:
-        {
-          options.schema = genSchema.mkSchemaOption { };
-          options.widgets = genSchema.mkInstanceRegistry config.schema.widget { };
-          config.schema.widget.options.tag = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "t";
-            apply = x: [ x ];
-          };
-          # the live control: a plain `str` key on the same kind, which every candidate guard admits.
-          config.schema.widget.options.zone = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "z";
-          };
-          config.widgets.cog = { };
-        }
-      )
+      {
+        config.schema.widget.options.tag = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "t";
+          apply = x: [ x ];
+        };
+        # the live control: a plain `str` key on the same kind, which every candidate guard admits.
+        config.schema.widget.options.zone = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "z";
+        };
+      }
     ];
   };
-  widgetKv = widgetTree.config.schema.widget;
+  widgetTree = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.widgets = genSchema.mkInstanceRegistry widgetSchema.widget { };
+        config.widgets.cog = { };
+      }
+    ];
+  };
+  widgetKv = widgetSchema.widget;
   widgetInst = widgetTree.config.widgets.cog;
 
   # A processed KIND-VALUE + instance (via mkSchemaOption + a registry), for identityHashForKind.
-  schemaTree = genMerge.evalModuleTree {
+  rackSchema = genSchema.evalSchema {
     modules = [
-      { options.schema = genSchema.mkSchemaOption { }; }
       {
         config.schema.rack.options.slots = genMerge.mkOption {
           type = genMerge.types.int;
           default = 0;
         };
       }
-      (
-        { config, ... }:
-        {
-          options.rackFarm = genSchema.mkInstanceRegistry config.schema.rack { };
-        }
-      )
+    ];
+  };
+  schemaTree = genMerge.evalModuleTree {
+    modules = [
+      { options.rackFarm = genSchema.mkInstanceRegistry rackSchema.rack { }; }
       { config.rackFarm.r1.slots = 12; }
     ];
   };
-  rackKv = schemaTree.config.schema.rack;
+  rackKv = rackSchema.rack;
   rackInst = schemaTree.config.rackFarm.r1;
 
   # The same pairing over a kind whose identity field is declared with NIXPKGS `lib.types.str`.
@@ -123,9 +125,8 @@ let
   # declares every entity option with nixpkgs `lib.types`) is the ONLY shape on which the two can
   # disagree. The gen-typed fixture above uses an `int`, a name both type systems share, so it is
   # structurally incapable of witnessing that disagreement: it stayed green while they diverged.
-  homeTree = genMerge.evalModuleTree {
+  homeSchema = genSchema.evalSchema {
     modules = [
-      { options.schema = genSchema.mkSchemaOption { }; }
       {
         config.schema.home.imports = [
           (_: {
@@ -136,16 +137,15 @@ let
           })
         ];
       }
-      (
-        { config, ... }:
-        {
-          options.homes = genSchema.mkInstanceRegistry config.schema.home { };
-        }
-      )
+    ];
+  };
+  homeTree = genMerge.evalModuleTree {
+    modules = [
+      { options.homes = genSchema.mkInstanceRegistry homeSchema.home { }; }
       { config.homes.ben.system = "x86_64-linux"; }
     ];
   };
-  homeKv = homeTree.config.schema.home;
+  homeKv = homeSchema.home;
   homeInst = homeTree.config.homes.ben;
 in
 {

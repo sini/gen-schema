@@ -5,14 +5,20 @@
   ...
 }:
 let
-  eval = genMerge.evalModuleTree {
+  schema = genSchema.evalSchema {
     modules = [
       {
-        options.schema = genSchema.mkSchemaOption { };
-        options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = genSchema.mkInstanceRegistry schema.host { };
         config.hosts.igloo.addr = "10.0.1.1";
       }
     ];

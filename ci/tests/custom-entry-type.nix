@@ -5,7 +5,7 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) evalSchema mkSchemaOption mkInstanceRegistry;
 
   # Custom mkType that produces a simple attrset with a `modules` list
   # instead of the default deferredModule __functor wrapping.
@@ -74,21 +74,28 @@ let
 
   # --- Collections stripped before custom type sees defs ---
 
-  collectionStripEval = genMerge.evalModuleTree {
+  stripSchema = evalSchema {
+    schemaOption = mkSchemaOption {
+      mkType = customMkType;
+      collections.tags = {
+        default = [ ];
+      };
+      strict = true;
+    };
     modules = [
       {
-        options.schema = mkSchemaOption {
-          mkType = customMkType;
-          collections.tags = {
-            default = [ ];
-          };
-          strict = true;
-        };
-        options.hosts = mkInstanceRegistry collectionStripEval.config.schema.host { };
         config.schema.host = {
           options.name = genMerge.mkOption { type = genMerge.types.str; };
           tags = [ "server" ];
         };
+      }
+    ];
+  };
+
+  collectionStripEval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry stripSchema.host { };
         config.hosts.igloo = {
           name = "igloo";
         };

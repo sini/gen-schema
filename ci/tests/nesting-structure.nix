@@ -5,22 +5,11 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) evalSchema mkInstanceRegistry;
 
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema.host {
-          extraModules = [
-            (
-              { ... }:
-              {
-                options.users = mkInstanceRegistry eval.config.schema.user { };
-              }
-            )
-          ];
-        };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
@@ -29,6 +18,23 @@ let
             type = genMerge.types.str;
             default = "/bin/bash";
           };
+        };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry schema.host {
+          extraModules = [
+            (
+              { ... }:
+              {
+                options.users = mkInstanceRegistry schema.user { };
+              }
+            )
+          ];
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";

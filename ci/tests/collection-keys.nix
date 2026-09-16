@@ -118,6 +118,7 @@ in
     expr = plain.config.schema._collectionKeys;
     expected = [
       "includes"
+      "inherits"
       "methods"
       "parent"
       "validators"
@@ -129,6 +130,7 @@ in
   flake.tests.collection-keys.test-base-only-without-collections = {
     expr = noCols.config.schema._collectionKeys;
     expected = [
+      "inherits"
       "methods"
       "parent"
       "validators"
@@ -139,6 +141,7 @@ in
     expected = [
       "excludes"
       "includes"
+      "inherits"
       "methods"
       "parent"
       "validators"
@@ -162,6 +165,7 @@ in
     expr = prelude.genAttrs plain.config.schema._collectionKeys (k: plainKind.${k});
     expected = {
       includes = [ "policy-a" ];
+      inherits = [ ];
       methods = { };
       parent = null;
       validators = [ ];
@@ -189,6 +193,7 @@ in
     expr = fineColAttempt.value;
     expected = [
       "fine"
+      "inherits"
       "methods"
       "parent"
       "validators"

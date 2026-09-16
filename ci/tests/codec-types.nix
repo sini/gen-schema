@@ -7,20 +7,15 @@
 }:
 let
   inherit (genSchema)
-    mkSchemaOption
+    evalSchema
     mkInstanceRegistry
     mkCodec
     ref
     ;
 
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
-        options.services = mkInstanceRegistry eval.config.schema.service {
-          refs.host = eval.config.hosts;
-        };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
           options.port = genMerge.mkOption { type = genMerge.types.int; };
@@ -41,6 +36,17 @@ let
         config.schema.service = {
           options.name = genMerge.mkOption { type = genMerge.types.str; };
           options.host = genMerge.mkOption { type = ref "host"; };
+        };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry schema.host { };
+        options.services = mkInstanceRegistry schema.service {
+          refs.host = eval.config.hosts;
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";
@@ -72,7 +78,7 @@ let
   # Codec with type-registered encoder for the (int-typed) port fields.
   # gen-merge/gen-types name the leaf "int" (nixpkgs' port alias "unsignedInt16" is gone);
   # the codec dispatches on `type.name`, so registrations key on "int".
-  portCodec = mkCodec eval.config.schema.host {
+  portCodec = mkCodec schema.host {
     types = {
       int = {
         encode = v: "port:${toString v}";
@@ -82,7 +88,7 @@ let
   };
 
   # Codec with unused type (no fields of this type exist on host)
-  unusedCodec = mkCodec eval.config.schema.host {
+  unusedCodec = mkCodec schema.host {
     types = {
       nonexistentType = {
         encode = v: v;
@@ -91,7 +97,7 @@ let
   };
 
   # Codec with per-field override suppressing type codec
-  overrideCodec = mkCodec eval.config.schema.host {
+  overrideCodec = mkCodec schema.host {
     types = {
       int = {
         encode = v: "port:${toString v}";
@@ -105,7 +111,7 @@ let
   };
 
   # Codec for service to test ref priority over types
-  serviceCodec = mkCodec eval.config.schema.service {
+  serviceCodec = mkCodec schema.service {
     types = {
       # This should NOT apply to the host ref field ("string" is gen-types' str name)
       string = {

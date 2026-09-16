@@ -6,29 +6,35 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) evalSchema mkInstanceRegistry;
   inherit (genSchema) ref;
 
-  # Two separate modules: one defines hosts, another defines services with refs
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
     modules = [
-      # Module 1: schema + hosts
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.service = {
           options.port = genMerge.mkOption { type = genMerge.types.int; };
         };
+      }
+    ];
+  };
+
+  # Two separate modules: one defines hosts, another defines services with refs
+  eval = genMerge.evalModuleTree {
+    modules = [
+      # Module 1: hosts
+      {
+        options.hosts = mkInstanceRegistry schema.host { };
         config.hosts.igloo = {
           addr = "10.0.1.1";
         };
       }
       # Module 2: services with ref to hosts
       {
-        options.services = mkInstanceRegistry eval.config.schema.service {
+        options.services = mkInstanceRegistry schema.service {
           extraModules = [
             (
               { ... }:

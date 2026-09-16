@@ -6,24 +6,16 @@
 }:
 let
   inherit (genSchema)
-    mkSchemaOption
+    evalSchema
     mkInstanceRegistry
     mkCodec
     ref
     setOf
     ;
 
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
-        options.services = mkInstanceRegistry eval.config.schema.service {
-          refs.host = eval.config.hosts;
-          refs.replicas = eval.config.hosts;
-          refs.primary = eval.config.hosts;
-          refs.backends = eval.config.hosts;
-        };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
@@ -42,6 +34,20 @@ let
             type = setOf (ref "host");
             default = [ ];
           };
+        };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry schema.host { };
+        options.services = mkInstanceRegistry schema.service {
+          refs.host = eval.config.hosts;
+          refs.replicas = eval.config.hosts;
+          refs.primary = eval.config.hosts;
+          refs.backends = eval.config.hosts;
         };
         config.hosts = {
           igloo = {
@@ -73,7 +79,7 @@ let
     ];
   };
 
-  codec = mkCodec eval.config.schema.service { };
+  codec = mkCodec schema.service { };
 
   encoded = codec.encode eval.config.services.nginx;
   encodedSolo = codec.encode eval.config.services.solo;

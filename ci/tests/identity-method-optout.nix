@@ -18,7 +18,7 @@
 }:
 let
   inherit (genSchema)
-    mkSchemaOption
+    evalSchema
     mkInstanceRegistry
     schemaFn
     ;
@@ -27,14 +27,10 @@ let
   # primitive-typed method, instantiated once with the given secret value.
   mkArm =
     { withMethod, secretValue }:
-    (genMerge.evalModuleTree {
-      modules = [
-        (
-          { config, ... }:
+    let
+      schema = evalSchema {
+        modules = [
           {
-            options.schema = mkSchemaOption { };
-            options.hosts = mkInstanceRegistry config.schema.host { };
-
             config.schema.host = {
               options.secret = genMerge.mkOption { type = genMerge.types.str; } // {
                 identity = false;
@@ -43,10 +39,16 @@ let
             // lib.optionalAttrs withMethod {
               methods.leak = schemaFn "reads the opted-out field" genMerge.types.str ({ secret, ... }: secret);
             };
-
-            config.hosts.igloo.secret = secretValue;
           }
-        )
+        ];
+      };
+    in
+    (genMerge.evalModuleTree {
+      modules = [
+        {
+          options.hosts = mkInstanceRegistry schema.host { };
+          config.hosts.igloo.secret = secretValue;
+        }
       ];
     }).config.hosts.igloo;
 

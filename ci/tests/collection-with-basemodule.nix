@@ -6,19 +6,18 @@
   ...
 }:
 let
-  eval = genMerge.evalModuleTree {
+  schema = genSchema.evalSchema {
+    schemaOption = genSchema.mkSchemaOption {
+      baseModule.options.description = genMerge.mkOption {
+        type = genMerge.types.str;
+        default = "";
+      };
+      collections.tags = {
+        default = [ ];
+      };
+    };
     modules = [
       {
-        options.schema = genSchema.mkSchemaOption {
-          baseModule.options.description = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "";
-          };
-          collections.tags = {
-            default = [ ];
-          };
-        };
-        options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           tags = [
             "web"
@@ -26,6 +25,14 @@ let
           ];
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = genSchema.mkInstanceRegistry schema.host { };
         config.hosts.igloo.addr = "10.0.1.1";
       }
     ];
@@ -37,7 +44,7 @@ in
     expected = "";
   };
   flake.tests."collection-base".test-collection-on-kind = {
-    expr = eval.config.schema.host.tags;
+    expr = schema.host.tags;
     expected = [
       "web"
       "prod"

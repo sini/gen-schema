@@ -6,21 +6,21 @@
 }:
 let
   inherit (genSchema)
+    evalSchema
     mkSchemaOption
     mkInstanceRegistry
     mkCodec
     schemaFn
     ;
 
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
+    schemaOption = mkSchemaOption {
+      collections.tags = {
+        default = [ ];
+      };
+    };
     modules = [
       {
-        options.schema = mkSchemaOption {
-          collections.tags = {
-            default = [ ];
-          };
-        };
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
           options.role = genMerge.mkOption {
@@ -30,6 +30,14 @@ let
           tags = [ "server" ];
           methods.label = schemaFn "Label" genMerge.types.str ({ name, addr, ... }: "${name}:${addr}");
         };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry schema.host { };
         config.hosts.igloo = {
           addr = "10.0.1.1";
           role = "web";
@@ -41,7 +49,7 @@ let
     ];
   };
 
-  codec = mkCodec eval.config.schema.host {
+  codec = mkCodec schema.host {
     excludeFields = [ "tags" ];
   };
 

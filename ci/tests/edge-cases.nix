@@ -6,7 +6,12 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry renderDocs;
+  inherit (genSchema)
+    evalSchema
+    mkSchemaOption
+    mkInstanceRegistry
+    renderDocs
+    ;
   inherit (genSchema) ref;
 
   # Empty schema — zero kinds
@@ -39,13 +44,21 @@ let
   };
   docs = renderDocs docsEval.config.schema;
 
+  refConflictSchema = evalSchema {
+    modules = [
+      {
+        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        config.schema.service.options.port = genMerge.mkOption { type = genMerge.types.int; };
+      }
+    ];
+  };
+
   # ref with two modules setting same ref to different values
   refConflictEval = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry refConflictEval.config.schema.host { };
-        options.services = mkInstanceRegistry refConflictEval.config.schema.service {
+        options.hosts = mkInstanceRegistry refConflictSchema.host { };
+        options.services = mkInstanceRegistry refConflictSchema.service {
           extraModules = [
             (
               { ... }:
@@ -57,8 +70,6 @@ let
             )
           ];
         };
-        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        config.schema.service.options.port = genMerge.mkOption { type = genMerge.types.int; };
         config.hosts.igloo.addr = "10.0.1.1";
         config.hosts.iceberg.addr = "10.0.1.2";
       }

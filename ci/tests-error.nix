@@ -21,7 +21,7 @@
   ...
 }:
 let
-  inherit (genSchema) mkIdentityModule identityKeysForKind;
+  inherit (genSchema) mkIdentityModule identityKeysForKind evalSchema;
 
   # A kind declaring one primitive identity key and one option that is DECLARED but not an identity
   # key. `tags` is the input P3 was measured on: it is declared, so "is not declared" was a lie.
@@ -53,6 +53,66 @@ let
     }).config.id_hash;
 in
 {
+  # evalSchema's two refusals, and the capability the relocation removes. All three are here rather
+  # than under ./tests for the same reason the identity cells are: `tryEval` discards the message,
+  # and WHICH refusal fired is the subject.
+  flake.testsError.schema-inheritance-refusals = {
+    # An inheritance cycle refuses by NAME, where HEAD's `imports` idiom diverges into an
+    # uncatchable `stack overflow; max-call-depth exceeded`. ADR-0016 ruling 7: a kind may inherit
+    # only kinds resolved in a strictly earlier pass, and the substrate refuses by name.
+    test-cycle-refuses-by-name = {
+      expr = evalSchema {
+        modules = [
+          {
+            config.schema.a.inherits = [ "b" ];
+            config.schema.b.inherits = [ "a" ];
+          }
+        ];
+      };
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: inheritance cycle among kinds \\[a b\\] — a kind may inherit only kinds resolved in a strictly earlier pass$";
+      };
+    };
+
+    # A parent name nothing declares refuses by name too, and names both ends of the edge.
+    test-unknown-parent-refuses-by-name = {
+      expr = evalSchema {
+        modules = [ { config.schema.derived.inherits = [ "nosuch" ]; } ];
+      };
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'derived' inherits 'nosuch' which is not a declared kind$";
+      };
+    };
+
+    # C10's GREEN arm. At HEAD a consumer's own config knob selects which options a kind declares
+    # (both arms driven in ci/tests/schema-inheritance.nix, so the capability is shown to have
+    # existed). In the pass the consumer's option set is not in the tree at all, so the read has
+    # nothing to resolve — the knob is not refused, it is INEXPRESSIBLE.
+    test-consumer-config-cannot-decide-a-kind = {
+      expr =
+        (evalSchema {
+          modules = [
+            (
+              { config, ... }:
+              {
+                config.schema.base =
+                  if config.knob then
+                    { options.hem = genMerge.mkOption { type = genMerge.types.str; }; }
+                  else
+                    { options.selvage = genMerge.mkOption { type = genMerge.types.str; }; };
+              }
+            )
+          ];
+        }).base;
+      expectedError = {
+        type = "EvalError";
+        msg = "attribute 'knob' missing";
+      };
+    };
+  };
+
   flake.testsError.identity-refusals = {
     # P3, on the input that made the predecessor false. `tags` IS declared on this kind, so the
     # message may not say it is not; it names membership and prints the set instead.

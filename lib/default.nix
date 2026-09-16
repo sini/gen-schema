@@ -33,6 +33,10 @@ let
     inherit (bridgeLib) emitModule isOptionDecl;
     inherit (refinedLib) getRefinements;
   };
+  evalSchemaLib = import ./eval-schema.nix {
+    inherit prelude merge;
+    inherit (entryType) mkSchemaOption;
+  };
   instance = import ./instance.nix {
     inherit prelude merge;
     inherit (strictLib) mkStrictModule;
@@ -72,6 +76,7 @@ in
     ;
   inherit (methods) schemaFn;
   inherit (entryType) mkSchemaOption mkSchemaEntryType;
+  inherit (evalSchemaLib) evalSchema;
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (validate) validateInstances mkFieldValidator filterValidators;
   inherit (refLib) ref setOf toSet;

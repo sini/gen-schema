@@ -5,7 +5,20 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry ref;
+  inherit (genSchema) evalSchema mkInstanceRegistry ref;
+
+  schema = evalSchema {
+    modules = [
+      {
+        config.schema.host = {
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        };
+        config.schema.service = {
+          options.host = genMerge.mkOption { type = ref "host"; };
+        };
+      }
+    ];
+  };
 
   throwsOnInvalidKey =
     let
@@ -14,16 +27,9 @@ let
           eval = genMerge.evalModuleTree {
             modules = [
               {
-                options.schema = mkSchemaOption { };
-                options.hosts = mkInstanceRegistry eval.config.schema.host { };
-                options.services = mkInstanceRegistry eval.config.schema.service {
+                options.hosts = mkInstanceRegistry schema.host { };
+                options.services = mkInstanceRegistry schema.service {
                   refs.host = eval.config.hosts;
-                };
-                config.schema.host = {
-                  options.addr = genMerge.mkOption { type = genMerge.types.str; };
-                };
-                config.schema.service = {
-                  options.host = genMerge.mkOption { type = ref "host"; };
                 };
                 config.hosts.igloo = {
                   addr = "10.0.1.1";

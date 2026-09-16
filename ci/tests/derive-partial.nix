@@ -5,11 +5,20 @@
   ...
 }:
 let
+  schema = genSchema.evalSchema {
+    modules = [
+      {
+        config.schema.host = {
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        };
+      }
+    ];
+  };
+
   eval = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = genSchema.mkSchemaOption { };
-        options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host {
+        options.hosts = genSchema.mkInstanceRegistry schema.host {
           extraModules = [
             {
               options.tag = genMerge.mkOption {
@@ -24,9 +33,6 @@ let
               tag = "tagged";
             };
           };
-        };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.hosts.igloo.addr = "10.0.1.1";
         config.hosts.iceberg.addr = "10.0.1.2";

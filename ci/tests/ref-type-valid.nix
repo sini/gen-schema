@@ -6,15 +6,28 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) evalSchema mkInstanceRegistry;
   inherit (genSchema) ref;
+
+  schema = evalSchema {
+    modules = [
+      {
+        config.schema.host = {
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+          options.role = genMerge.mkOption { type = genMerge.types.str; };
+        };
+        config.schema.service = {
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+        };
+      }
+    ];
+  };
 
   eval = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
-        options.services = mkInstanceRegistry eval.config.schema.service {
+        options.hosts = mkInstanceRegistry schema.host { };
+        options.services = mkInstanceRegistry schema.service {
           extraModules = [
             (
               { ... }:
@@ -25,13 +38,6 @@ let
               }
             )
           ];
-        };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          options.role = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";

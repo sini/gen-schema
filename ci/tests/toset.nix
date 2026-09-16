@@ -6,21 +6,16 @@
 }:
 let
   inherit (genSchema)
-    mkSchemaOption
+    evalSchema
     mkInstanceRegistry
     ref
     setOf
     toSet
     ;
 
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
-        options.groups = mkInstanceRegistry eval.config.schema.group {
-          refs.members = eval.config.hosts;
-        };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
@@ -29,6 +24,17 @@ let
             type = setOf (ref "host");
             default = [ ];
           };
+        };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry schema.host { };
+        options.groups = mkInstanceRegistry schema.group {
+          refs.members = eval.config.hosts;
         };
         config.hosts = {
           igloo = {
@@ -65,9 +71,7 @@ in
           eval2 = genMerge.evalModuleTree {
             modules = [
               {
-                options.schema = mkSchemaOption { };
-                options.hosts = mkInstanceRegistry eval2.config.schema.host { };
-                config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                options.hosts = mkInstanceRegistry schema.host { };
                 config.hosts.other = {
                   addr = "10.0.1.3";
                 };

@@ -5,21 +5,27 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) evalSchema mkInstanceRegistry;
 
   # A bogus kind value -- no `kind`/`options` -- with an explicit description so the lazy `kind`
   # binding inside mkInstanceRegistry is never forced; only the applyPipeline guard should catch it.
   bogusRegistry = mkInstanceRegistry { no = "kind"; } { description = "d"; };
 
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
           options.role = genMerge.mkOption { type = genMerge.types.str; };
         };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry schema.host { };
         config.hosts.igloo = {
           addr = "10.0.1.1";
           role = "server";

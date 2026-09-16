@@ -8,17 +8,23 @@
   ...
 }:
 let
-  eval = genMerge.evalModuleTree {
+  schema = genSchema.evalSchema {
     modules = [
       {
-        options.schema = genSchema.mkSchemaOption { };
-        options.hosts = genSchema.mkInstanceRegistry eval.config.schema.host { };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
           validators = [
             (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr required")
           ];
         };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = genSchema.mkInstanceRegistry schema.host { };
         config.hosts.bad.addr = "";
       }
     ];

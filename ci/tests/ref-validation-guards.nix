@@ -6,24 +6,30 @@
 }:
 let
   inherit (genSchema)
-    mkSchemaOption
+    evalSchema
     mkInstanceRegistry
     ref
     setOf
     toSet
     ;
 
+  schema = evalSchema {
+    modules = [
+      {
+        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        config.schema.service.options.host = genMerge.mkOption { type = ref "host"; };
+      }
+    ];
+  };
+
   # #1: Non-instance attrset passed to a ref field should throw
   evalBadAttrset = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalBadAttrset.config.schema.host { };
-        options.services = mkInstanceRegistry evalBadAttrset.config.schema.service {
+        options.hosts = mkInstanceRegistry schema.host { };
+        options.services = mkInstanceRegistry schema.service {
           refs.host = evalBadAttrset.config.hosts;
         };
-        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        config.schema.service.options.host = genMerge.mkOption { type = ref "host"; };
         config.hosts.igloo = {
           addr = "10.0.1.1";
         };
@@ -40,9 +46,7 @@ let
   evalGood = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalGood.config.schema.host { };
-        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        options.hosts = mkInstanceRegistry schema.host { };
         config.hosts.igloo = {
           addr = "10.0.1.1";
         };

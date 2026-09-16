@@ -6,14 +6,19 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) evalSchema mkSchemaOption mkInstanceRegistry;
+
+  schema = evalSchema {
+    schemaOption = mkSchemaOption { strict = false; };
+    modules = [
+      { config.schema.host.options.name = genMerge.mkOption { type = genMerge.types.str; }; }
+    ];
+  };
 
   eval = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { strict = false; };
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
-        config.schema.host.options.name = genMerge.mkOption { type = genMerge.types.str; };
+        options.hosts = mkInstanceRegistry schema.host { };
         config.hosts.igloo = {
           name = "igloo";
           undeclaredKey = "should work";

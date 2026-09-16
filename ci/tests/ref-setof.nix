@@ -6,21 +6,15 @@
 }:
 let
   inherit (genSchema)
-    mkSchemaOption
+    evalSchema
     mkInstanceRegistry
     ref
     setOf
     ;
 
-  # --- Basic setOf test ---
-  evalBasic = genMerge.evalModuleTree {
+  basicSchema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalBasic.config.schema.host { };
-        options.groups = mkInstanceRegistry evalBasic.config.schema.group {
-          refs.members = evalBasic.config.hosts;
-        };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
@@ -29,6 +23,18 @@ let
             type = setOf (ref "host");
             default = [ ];
           };
+        };
+      }
+    ];
+  };
+
+  # --- Basic setOf test ---
+  evalBasic = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry basicSchema.host { };
+        options.groups = mkInstanceRegistry basicSchema.group {
+          refs.members = evalBasic.config.hosts;
         };
         config.hosts = {
           igloo = {
@@ -61,9 +67,8 @@ let
   evalCoerce = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalCoerce.config.schema.host { };
-        options.groups = mkInstanceRegistry evalCoerce.config.schema.group {
+        options.hosts = mkInstanceRegistry basicSchema.host { };
+        options.groups = mkInstanceRegistry basicSchema.group {
           refs.members = {
             instances = evalCoerce.config.hosts;
             coerce =
@@ -72,15 +77,6 @@ let
                 builtins.attrValues evalCoerce.config.hosts
               else
                 default;
-          };
-        };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.group = {
-          options.members = genMerge.mkOption {
-            type = setOf (ref "host");
-            default = [ ];
           };
         };
         config.hosts = {
@@ -101,15 +97,9 @@ let
     ];
   };
 
-  # --- nullOr (setOf (ref "kind")) ---
-  evalNullable = genMerge.evalModuleTree {
+  nullableSchema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalNullable.config.schema.host { };
-        options.services = mkInstanceRegistry evalNullable.config.schema.service {
-          refs.hosts = evalNullable.config.hosts;
-        };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
@@ -119,6 +109,18 @@ let
             type = genMerge.types.nullOr (setOf (ref "host"));
             default = null;
           };
+        };
+      }
+    ];
+  };
+
+  # --- nullOr (setOf (ref "kind")) ---
+  evalNullable = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry nullableSchema.host { };
+        options.services = mkInstanceRegistry nullableSchema.service {
+          refs.hosts = evalNullable.config.hosts;
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";

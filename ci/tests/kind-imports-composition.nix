@@ -1,6 +1,7 @@
-# Kind-to-kind imports composition: the motivating case for moving
-# strict/identity to instance level. Multiple kinds importing a shared
-# base kind should not cause duplicate module conflicts when instantiated.
+# Kind-to-kind inheritance: the motivating case for moving strict/identity to instance level.
+# Multiple kinds inheriting a shared base kind should not cause duplicate module conflicts when
+# instantiated. The relation travels as a NAME through `inherits`, resolved by `evalSchema` against
+# the frozen output of a strictly earlier pass.
 {
   lib,
   genSchema,
@@ -8,13 +9,11 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) evalSchema mkInstanceRegistry;
 
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-
         # Shared base kind
         config.schema.conf = {
           options.description = genMerge.mkOption {
@@ -23,22 +22,28 @@ let
           };
         };
 
-        # Host and user both import conf
+        # Host and user both inherit conf
         config.schema.host = {
-          imports = [ eval.config.schema.conf ];
+          inherits = [ "conf" ];
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.user = {
-          imports = [ eval.config.schema.conf ];
+          inherits = [ "conf" ];
           options.shell = genMerge.mkOption {
             type = genMerge.types.str;
             default = "/bin/bash";
           };
         };
+      }
+    ];
+  };
 
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
         # Instantiate both — should not conflict
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
-        options.users = mkInstanceRegistry eval.config.schema.user { };
+        options.hosts = mkInstanceRegistry schema.host { };
+        options.users = mkInstanceRegistry schema.user { };
 
         config.hosts.igloo = {
           addr = "10.0.1.1";

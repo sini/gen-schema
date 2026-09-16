@@ -6,20 +6,15 @@
 }:
 let
   inherit (genSchema)
-    mkSchemaOption
+    evalSchema
     mkInstanceRegistry
     mkCodec
     ref
     ;
 
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.peers = mkInstanceRegistry eval.config.schema.peer { };
-        options.hosts = mkInstanceRegistry eval.config.schema.host {
-          refs.peer = eval.config.peers;
-        };
         config.schema.peer = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
@@ -52,6 +47,17 @@ let
             default = { };
           };
         };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.peers = mkInstanceRegistry schema.peer { };
+        options.hosts = mkInstanceRegistry schema.host {
+          refs.peer = eval.config.peers;
+        };
         config.peers = {
           yurt = {
             addr = "10.0.1.2";
@@ -74,7 +80,7 @@ let
   igloo = eval.config.hosts.igloo;
 
   # Codec with exclusion
-  codecExclude = mkCodec eval.config.schema.host {
+  codecExclude = mkCodec schema.host {
     fields = {
       secret = {
         exclude = true;
@@ -83,7 +89,7 @@ let
   };
 
   # Codec with custom encode/decode
-  codecCustom = mkCodec eval.config.schema.host {
+  codecCustom = mkCodec schema.host {
     fields = {
       secret = {
         exclude = true;
@@ -96,7 +102,7 @@ let
   };
 
   # Codec with recursive fields
-  codecNested = mkCodec eval.config.schema.host {
+  codecNested = mkCodec schema.host {
     fields = {
       secret = {
         exclude = true;
@@ -114,7 +120,7 @@ let
   };
 
   # Codec with custom encoder suppressing ref auto-encode
-  codecCustomRef = mkCodec eval.config.schema.host {
+  codecCustomRef = mkCodec schema.host {
     fields = {
       secret = {
         exclude = true;
@@ -190,7 +196,7 @@ in
     test-exclude-nonexistent-silent = {
       expr =
         let
-          c = mkCodec eval.config.schema.host {
+          c = mkCodec schema.host {
             fields = {
               nonexistent = {
                 exclude = true;
@@ -203,7 +209,7 @@ in
     };
     test-encode-nonexistent-throws = {
       expr = builtins.tryEval (
-        mkCodec eval.config.schema.host {
+        mkCodec schema.host {
           fields = {
             nonexistent = {
               encode = v: v;

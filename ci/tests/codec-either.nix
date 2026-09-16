@@ -6,13 +6,11 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry mkCodec;
+  inherit (genSchema) evalSchema mkInstanceRegistry mkCodec;
 
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.items = mkInstanceRegistry eval.config.schema.item { };
         config.schema.item = {
           # either str int — distinguishable by isString / isInt
           options.value = genMerge.mkOption {
@@ -39,6 +37,14 @@ let
             type = genMerge.types.either genMerge.types.str (genMerge.types.listOf genMerge.types.int);
           };
         };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.items = mkInstanceRegistry schema.item { };
         config.items.strItem = {
           value = "hello";
           flexible = "text";
@@ -64,7 +70,7 @@ let
   };
 
   # Register a codec for int type
-  codec = mkCodec eval.config.schema.item {
+  codec = mkCodec schema.item {
     types = {
       int = {
         encode = v: "n:${toString v}";
@@ -74,7 +80,7 @@ let
   };
 
   # No type registrations — identity for all branches
-  identityCodec = mkCodec eval.config.schema.item { };
+  identityCodec = mkCodec schema.item { };
 in
 {
   flake.tests.codec-either = {

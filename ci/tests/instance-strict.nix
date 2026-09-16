@@ -5,16 +5,23 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema) evalSchema mkSchemaOption mkInstanceRegistry;
+
+  schema = evalSchema {
+    schemaOption = mkSchemaOption { strict = true; };
+    modules = [
+      {
+        config.schema.host = {
+          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        };
+      }
+    ];
+  };
 
   eval = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { strict = true; };
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
+        options.hosts = mkInstanceRegistry schema.host { };
         config.hosts.igloo = {
           addr = "10.0.1.1";
           bogus = "should-fail";

@@ -5,17 +5,11 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry ref;
+  inherit (genSchema) evalSchema mkInstanceRegistry ref;
 
-  eval = genMerge.evalModuleTree {
+  schema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry eval.config.schema.host { };
-        options.services = mkInstanceRegistry eval.config.schema.service {
-          refs.hosts = eval.config.hosts;
-          refs.primary = eval.config.hosts;
-        };
         config.schema.host = {
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
@@ -29,6 +23,18 @@ let
             type = genMerge.types.nullOr (ref "host");
             default = null;
           };
+        };
+      }
+    ];
+  };
+
+  eval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry schema.host { };
+        options.services = mkInstanceRegistry schema.service {
+          refs.hosts = eval.config.hosts;
+          refs.primary = eval.config.hosts;
         };
         config.hosts = {
           igloo = {

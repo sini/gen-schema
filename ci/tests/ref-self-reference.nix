@@ -5,13 +5,22 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption mkInstanceRegistry ref;
+  inherit (genSchema) evalSchema mkInstanceRegistry ref;
+
+  schema = evalSchema {
+    modules = [
+      {
+        config.schema.service = {
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+        };
+      }
+    ];
+  };
 
   eval = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.services = mkInstanceRegistry eval.config.schema.service {
+        options.services = mkInstanceRegistry schema.service {
           extraModules = [
             (
               { ... }:
@@ -23,9 +32,6 @@ let
               }
             )
           ];
-        };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
         };
         config.services.api = {
           port = 8080;

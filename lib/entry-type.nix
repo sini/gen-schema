@@ -45,6 +45,16 @@ let
             else
               val;
         };
+        # Inheritance, carried as a NAME. It is a BUILT-IN and not a caller-supplied collection
+        # because every schema constructor in the ecosystem would otherwise have to re-declare the
+        # relation — gen-aspects builds its own option through `mkSchemaOption { collections = …; }`
+        # and the acceptance corpus drives its registries through that option. One declaration, one
+        # authority. `inherits` is NOT `parent`: parent is containment and feeds
+        # `_topology`/`_roots`/`_leaves`, inheritance is composition, and a kind may be nested under
+        # one container while inheriting from another.
+        inherits = {
+          default = [ ];
+        };
       }
       // collections;
     in
@@ -323,7 +333,7 @@ let
             type = merge.types.listOf merge.types.raw;
             internal = true;
             readOnly = true;
-            description = "Unified edge view: parent (§ Neron 2015 P) + ref (§ Neron 2015 I) edges";
+            description = "Unified edge view: parent (§ Neron 2015 P) + inherits + ref (§ Neron 2015 I) edges";
           };
           options._roots = merge.mkOption {
             type = merge.types.listOf merge.types.str;
@@ -428,7 +438,20 @@ let
                 }
               ) kindNames;
 
-              edges = parentEdges ++ map (e: e // { type = "ref"; }) refEdges;
+              # The third constituent, derived from the same name graph `evalSchema` stages over —
+              # one derivation, not a second spelling. `or [ ]` for a custom `mkType` entry, which
+              # carries no collections, exactly as the topology derivation does on `parent`.
+              inheritsEdges = prelude.concatMap (
+                k:
+                map (p: {
+                  from = k;
+                  to = p;
+                  type = "inherits";
+                  field = null;
+                }) (config.${k}.inherits or [ ])
+              ) kindNames;
+
+              edges = parentEdges ++ inheritsEdges ++ map (e: e // { type = "ref"; }) refEdges;
 
               roots = builtins.filter (k: topology.${k}.parent == null) kindNames;
               leaves = builtins.filter (k: topology.${k}.children == [ ]) kindNames;

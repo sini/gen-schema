@@ -6,28 +6,15 @@
 }:
 let
   inherit (genSchema)
-    mkSchemaOption
+    evalSchema
     mkInstanceRegistry
     ref
     setOf
     ;
 
-  # --- Self-referential registry with deferred coerce ---
-  # A trait's `needs` field references other traits in the same registry.
-  # Custom coerce adds a tag to prove it ran; deferred = true avoids infinite recursion.
-  evalSelfRef = genMerge.evalModuleTree {
+  traitSchema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.traits = mkInstanceRegistry evalSelfRef.config.schema.trait {
-          refs.needs = {
-            instances = evalSelfRef.config.traits;
-            coerce =
-              _registry: default: val:
-              if builtins.isList default then default else [ default ];
-            deferred = true;
-          };
-        };
         config.schema.trait = {
           options.priority = genMerge.mkOption {
             type = genMerge.types.int;
@@ -36,6 +23,25 @@ let
           options.needs = genMerge.mkOption {
             type = genMerge.types.listOf (ref "trait");
             default = [ ];
+          };
+        };
+      }
+    ];
+  };
+
+  # --- Self-referential registry with deferred coerce ---
+  # A trait's `needs` field references other traits in the same registry.
+  # Custom coerce adds a tag to prove it ran; deferred = true avoids infinite recursion.
+  evalSelfRef = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.traits = mkInstanceRegistry traitSchema.trait {
+          refs.needs = {
+            instances = evalSelfRef.config.traits;
+            coerce =
+              _registry: default: val:
+              if builtins.isList default then default else [ default ];
+            deferred = true;
           };
         };
         config.traits.base = {
@@ -57,8 +63,7 @@ let
   evalSelector = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.traits = mkInstanceRegistry evalSelector.config.schema.trait {
+        options.traits = mkInstanceRegistry traitSchema.trait {
           refs.needs = {
             instances = evalSelector.config.traits;
             coerce =
@@ -75,16 +80,6 @@ let
             deferred = true;
           };
         };
-        config.schema.trait = {
-          options.priority = genMerge.mkOption {
-            type = genMerge.types.int;
-            default = 100;
-          };
-          options.needs = genMerge.mkOption {
-            type = genMerge.types.listOf (ref "trait");
-            default = [ ];
-          };
-        };
         config.traits.base = {
           priority = 0;
         };
@@ -99,24 +94,30 @@ let
     ];
   };
 
+  depsSchema = evalSchema {
+    modules = [
+      {
+        config.schema.trait = {
+          options.deps = genMerge.mkOption {
+            type = setOf (ref "trait");
+            default = [ ];
+          };
+        };
+      }
+    ];
+  };
+
   # --- Self-referential with setOf + deferred coerce (dedup) ---
   evalSetOf = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.traits = mkInstanceRegistry evalSetOf.config.schema.trait {
+        options.traits = mkInstanceRegistry depsSchema.trait {
           refs.deps = {
             instances = evalSetOf.config.traits;
             coerce =
               _registry: default: val:
               if builtins.isList default then default else [ default ];
             deferred = true;
-          };
-        };
-        config.schema.trait = {
-          options.deps = genMerge.mkOption {
-            type = setOf (ref "trait");
-            default = [ ];
           };
         };
         config.traits.a = { };
@@ -130,24 +131,30 @@ let
     ];
   };
 
+  serviceSchema = evalSchema {
+    modules = [
+      {
+        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        config.schema.service = {
+          options.port = genMerge.mkOption { type = genMerge.types.int; };
+          options.host = genMerge.mkOption { type = ref "host"; };
+        };
+      }
+    ];
+  };
+
   # --- Non-deferred coerce still works (regression guard) ---
   evalNonDeferred = genMerge.evalModuleTree {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalNonDeferred.config.schema.host { };
-        options.services = mkInstanceRegistry evalNonDeferred.config.schema.service {
+        options.hosts = mkInstanceRegistry serviceSchema.host { };
+        options.services = mkInstanceRegistry serviceSchema.service {
           refs.host = {
             instances = evalNonDeferred.config.hosts;
             coerce =
               default: val:
               if builtins.isString val && val == "fallback" then evalNonDeferred.config.hosts.igloo else default;
           };
-        };
-        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = ref "host"; };
         };
         config.hosts.igloo = {
           addr = "10.0.1.1";
@@ -160,22 +167,9 @@ let
     ];
   };
 
-  # --- Mixed deferred + non-deferred refs on same kind ---
-  evalMixed = genMerge.evalModuleTree {
+  mixedSchema = evalSchema {
     modules = [
       {
-        options.schema = mkSchemaOption { };
-        options.hosts = mkInstanceRegistry evalMixed.config.schema.host { };
-        options.services = mkInstanceRegistry evalMixed.config.schema.service {
-          refs.host = evalMixed.config.hosts;
-          refs.depends = {
-            instances = evalMixed.config.services;
-            coerce =
-              _registry: default: val:
-              if builtins.isList default then default else [ default ];
-            deferred = true;
-          };
-        };
         config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
         config.schema.service = {
           options.port = genMerge.mkOption { type = genMerge.types.int; };
@@ -183,6 +177,25 @@ let
           options.depends = genMerge.mkOption {
             type = genMerge.types.listOf (ref "service");
             default = [ ];
+          };
+        };
+      }
+    ];
+  };
+
+  # --- Mixed deferred + non-deferred refs on same kind ---
+  evalMixed = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.hosts = mkInstanceRegistry mixedSchema.host { };
+        options.services = mkInstanceRegistry mixedSchema.service {
+          refs.host = evalMixed.config.hosts;
+          refs.depends = {
+            instances = evalMixed.config.services;
+            coerce =
+              _registry: default: val:
+              if builtins.isList default then default else [ default ];
+            deferred = true;
           };
         };
         config.hosts.igloo = {
