@@ -18,7 +18,11 @@
   ...
 }:
 let
-  inherit (genValues) fleet schema;
+  # `frozenSchema`, not `genValues.schema`: the latter is the outer `gen.tree`'s plain merge and
+  # does not resolve `inherits` (den-hoag examples-demo-outer-merge-introspection-k1sf7). The
+  # introspection/docs/codec reads below want the SAME evalSchema-staged, inheritance-aware view
+  # `fleet`'s registries are built from — `gen-modules/fleet/registries.nix` republishes it.
+  inherit (genValues) fleet frozenSchema;
   record = genAlgebra.record;
   demoMixins = import ./demo-mixins.nix { inherit lib genSchema genAlgebra; };
 in
@@ -87,9 +91,47 @@ in
       hashesDiffer = fleet.admins.root.id_hash != fleet.users.tux.id_hash;
 
       # --- Introspection ---
-      inherit (schema) _kindNames;
-      hostOptionCount = builtins.length (builtins.attrNames schema.host.options);
-      adminOptionCount = builtins.length (builtins.attrNames schema.admin-user.options);
+      inherit (frozenSchema) _kindNames;
+      hostOptionCount = builtins.length (builtins.attrNames frozenSchema.host.options);
+      adminOptionCount = builtins.length (builtins.attrNames frozenSchema.admin-user.options);
+
+      # Guards `adminOptionCount` (and every other read above) against silently sliding back onto
+      # `genValues.schema` (the outer `gen.tree` merge, which does not resolve `inherits`) --
+      # exactly the regression den-hoag examples-demo-outer-merge-introspection-k1sf7 measured:
+      # `adminOptionCount` read 2, not 5, because admin-user's `inherits = [ "user" ]` never
+      # reached that merge. Checked STRUCTURALLY rather than against a pinned count, so it holds
+      # regardless of how many fields either kind declares: for every kind with a nonempty
+      # `inherits`, its `.options` must be a superset of each parent's `.options`. Forced by
+      # `nix eval .#fleet` (the row's own oracle), which prints every leaf of this attrset.
+      schemaInheritanceGuard =
+        let
+          violations = lib.concatMap (
+            k:
+            let
+              ownOpts = builtins.attrNames frozenSchema.${k}.options;
+              parents = frozenSchema.${k}.inherits or [ ];
+            in
+            lib.concatMap (
+              p:
+              let
+                missing = builtins.filter (o: !(builtins.elem o ownOpts)) (
+                  builtins.attrNames frozenSchema.${p}.options
+                );
+              in
+              lib.optional (missing != [ ]) "'${k}' inherits '${p}' but is missing option(s): ${toString missing}"
+            ) parents
+          ) frozenSchema._kindNames;
+        in
+        if violations != [ ] then
+          throw ''
+            gen-schema examples/demo: schema inheritance is not resolved in `frozenSchema` --
+            ${lib.concatStringsSep "\n            " violations}
+            This is the outer-merge-vs-frozen-schema regression den-hoag
+            examples-demo-outer-merge-introspection-k1sf7 fixed. Check that `outputs.nix` and
+            `gen-modules/fleet/registries.nix` still read the `evalSchema`-staged `frozenSchema`
+            option, not `genValues.schema` (the outer `gen.tree`'s plain merge).''
+        else
+          true;
 
       # --- Derive hooks ---
       # Deterministic UIDs from id_hash (auto-assigned)
@@ -123,16 +165,16 @@ in
       # --- Row-polymorphic validators (§ Leijen 2005) ---
       # The https-port validator fires only on kinds with both "port" and "protocol".
       # It silently skips kinds (host, user, network) that lack those fields.
-      serviceValidatorCount = builtins.length schema.service.validators;
+      serviceValidatorCount = builtins.length frozenSchema.service.validators;
 
       # --- Topology introspection ---
-      topologyHost = schema._topology.host;
-      topologyNetwork = schema._topology.network;
-      networkOptionCount = builtins.length (builtins.attrNames schema.network.options);
-      networkHasNoParent = schema._topology.network.parent == null;
-      edgeCount = builtins.length schema._edges;
-      schemaRoots = schema._roots;
-      schemaLeaves = schema._leaves;
+      topologyHost = frozenSchema._topology.host;
+      topologyNetwork = frozenSchema._topology.network;
+      networkOptionCount = builtins.length (builtins.attrNames frozenSchema.network.options);
+      networkHasNoParent = frozenSchema._topology.network.parent == null;
+      edgeCount = builtins.length frozenSchema._edges;
+      schemaRoots = frozenSchema._roots;
+      schemaLeaves = frozenSchema._leaves;
 
       # --- First-class mixins (§ Bracha 1990) ---
       # Exercise mixin primitives directly on record-algebra records.
@@ -171,7 +213,7 @@ in
       # --- Codec (serialization) ---
       codecDemo =
         let
-          hostCodec = genSchema.mkCodec schema.host {
+          hostCodec = genSchema.mkCodec frozenSchema.host {
             fields = {
               # Exclude metricsPort from serialization
               metricsPort = {
@@ -182,7 +224,7 @@ in
               };
             };
           };
-          serviceCodec = genSchema.mkCodec schema.service { };
+          serviceCodec = genSchema.mkCodec frozenSchema.service { };
 
           # Encode a single instance
           encodedIgloo = hostCodec.encode fleet.hosts.igloo;
@@ -200,7 +242,7 @@ in
           # Type-registered codec: register an encoder keyed by type name.
           # The int encoder fires on every field whose type is `int` — here
           # the host's metricsPort (contributed by the monitoring plugin).
-          typeCodec = genSchema.mkCodec schema.host {
+          typeCodec = genSchema.mkCodec frozenSchema.host {
             types = {
               int = {
                 encode = v: "port:${toString v}";
@@ -246,6 +288,6 @@ in
     };
 
     # --- Documentation generation ---
-    docs = genSchema.renderDocs schema;
+    docs = genSchema.renderDocs frozenSchema;
   };
 }

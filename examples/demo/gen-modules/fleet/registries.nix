@@ -168,6 +168,29 @@ let
     ] service;
 in
 {
+  # Republish the frozen, inheritance-aware `schema` above for readers OUTSIDE the declaration
+  # plane (e.g. `modules/outputs.nix`'s introspection: `_kindNames`, per-kind `.options`,
+  # `renderDocs`, `mkCodec`). `options.schema` (`../schema.nix`) is the outer `gen.tree`'s plain
+  # merge over the same kind files and does NOT resolve `inherits` (den-hoag
+  # examples-demo-outer-merge-introspection-k1sf7) — admin-user's `inherits = [ "user" ]` never
+  # reaches it, so a reader of `options.schema.admin-user.options` sees only admin-user's own two
+  # fields instead of the five the inheritance-aware kind actually has.
+  #
+  # `types.raw` + a plain `default` (never `config.frozenSchema = schema`) because `schema` is
+  # already a fully-evaluated value, not a set of module defs: assigning it as a CONFIG
+  # DEFINITION onto an `mkSchemaOption`-typed option re-enters that option's own internal
+  # collection/readOnly bookkeeping and breaks it — measured (candidate rejected): `_kindNames`,
+  # `_edges`, `_topology`, `_roots`, `_leaves` come back `«error: … is read-only, but it is
+  # defined 2 times»`, and list-valued collections like `validators` silently double (2 → 4),
+  # both because the per-file kind declarations still ALSO define the SAME option through the
+  # outer merge. A bare `default` on an independent option has exactly one source of truth.
+  options.frozenSchema = lib.mkOption {
+    type = lib.types.raw;
+    readOnly = true;
+    default = schema;
+    description = "The evalSchema-staged, inheritance-aware schema tree that fleet's registries above are built from -- what introspection and doc/codec generation should read instead of the outer-merge `options.schema`.";
+  };
+
   options.fleet.hosts = mkInstanceRegistry schema.host {
     description = "Fleet host instances.";
   };
