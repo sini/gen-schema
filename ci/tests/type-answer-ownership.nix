@@ -62,7 +62,8 @@ let
           };
         }
       ]
-    ) ? methods;
+    )
+      ? methods;
 in
 {
   flake.tests.type-answer-ownership = {
