@@ -121,9 +121,6 @@ let
     # The mark is applied LAST, so without this refusal a collection named `__mint` would be
     # SILENTLY OVERWRITTEN — something vanishes and nothing says so. Same strength and same shape
     # as its two siblings, for the same reason.
-    # The mark is applied LAST, so without this refusal a collection named `__mint` would be
-    # SILENTLY OVERWRITTEN — something vanishes and nothing says so. Same strength and same shape
-    # as its two siblings, for the same reason.
     else if merged ? __mint then
       throw "gen-schema: collection '__mint' is reserved — cannot be used as a collection key"
     else

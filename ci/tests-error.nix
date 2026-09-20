@@ -190,11 +190,18 @@ in
     # mark, and the mark is now what is read.
     test-mkInstanceRegistry-refuses-an-unmarked-kind = {
       expr =
-        # LIVE CONTROL, in the same cell and the same run, and it DISCRIMINATES: a guard that
-        # refused everything would fail this assert, and an `assertion failed` is neither the type
-        # nor the message `expectedError` pins, so the cell reds instead of passing for the wrong
-        # reason. A bare `seq` would not do — it would propagate this very message.
-        assert (mkInstanceRegistry markedHostKind { }).description == "host instances";
+        # ★ LIVE CONTROL, in the same cell and the same run, and the `tryEval` is load-bearing
+        # rather than defensive. Written bare — `assert (mkInstanceRegistry markedHostKind
+        # { }).description == "host instances";` — it does NOT discriminate: when the control
+        # refuses, its throw IS `_guardMsg`, which is exactly what `expectedError` pins, so a guard
+        # that refused everything passes. Measured on the sibling cell in gen-select with the
+        # predicate seeded `&& false`: 4/4 green. `tryEval` turns the control's refusal into an
+        # `assertion failed`, which matches neither the type nor the message below.
+        assert
+          let
+            control = builtins.tryEval (mkInstanceRegistry markedHostKind { }).description;
+          in
+          control.success && control.value == "host instances";
         (mkInstanceRegistry {
           kind = "host";
           options = { };
