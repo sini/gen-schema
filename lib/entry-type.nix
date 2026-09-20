@@ -197,9 +197,6 @@ let
             # `__mint` is refused here for the reason `mkAllCollections` refuses it as a collection
             # key: the stamp is applied last and would overwrite a computed field of that name
             # without saying so.
-            # `__mint` is refused here for the reason `mkAllCollections` refuses it as a collection
-            # key: the stamp is applied last and would overwrite a computed field of that name
-            # without saying so.
             if fields ? __mint then
               throw "gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType"
             else
