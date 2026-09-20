@@ -8,7 +8,10 @@ let
   inherit (algebra) record;
 
   methods = import ./methods.nix { inherit prelude merge; };
-  validate = import ./validate.nix { inherit prelude; };
+  validate = import ./validate.nix {
+    inherit prelude;
+    inherit (entryType) isSchemaKind;
+  };
   # Named for the field it produces, and for the one thing both its bindings agree on. It was
   # `identity.nix` while it contained the mint; it does not, and a file called that beside a
   # LIBRARY called gen-identity is a reader's trap rather than a tidy-up.
@@ -25,8 +28,17 @@ let
   # The VALUE-level reference vocabulary, kin to refLib's type-level one — see field-ref.nix's
   # header for the axis that separates them.
   fieldRefLib = import ./field-ref.nix { inherit prelude; };
+  # `identity` is threaded in for the PROVENANCE MARK (ADR-0034) this file's entry-type mints on
+  # every kind value. It takes the mint as an injected leaf and constructs with it — the same
+  # discipline `id-hash.nix` is under, and the reason `hashIdentity` is still absent from the
+  # published surface below.
   entryType = import ./entry-type.nix {
-    inherit prelude merge record;
+    inherit
+      prelude
+      merge
+      record
+      identity
+      ;
     inherit (methods) mkMethodsModule;
     inherit (refLib) refsFromOptionsWithTypes;
     inherit (mixinLib) applyMixin;
@@ -39,6 +51,7 @@ let
   };
   instance = import ./instance.nix {
     inherit prelude merge;
+    inherit (entryType) isSchemaKind;
     inherit (strictLib) mkStrictModule;
     inherit (idHashLib) mkIdentityModule identityKeysForKind;
     inherit (validate)
@@ -49,7 +62,10 @@ let
     inherit (refLib) dedupByHash;
   };
   docs = import ./docs.nix { inherit prelude; };
-  codecLib = import ./codec.nix { inherit prelude; };
+  codecLib = import ./codec.nix {
+    inherit prelude;
+    inherit (entryType) isSchemaKind;
+  };
 in
 {
   # Identity / strict / validation module surface (gen-schema-owned).

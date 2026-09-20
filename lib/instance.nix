@@ -10,6 +10,7 @@
 {
   prelude,
   merge,
+  isSchemaKind,
   mkStrictModule,
   mkIdentityModule,
   identityKeysForKind,
@@ -28,8 +29,8 @@ let
     let
       _ =
         assert
-          (kindValue ? kind && kindValue ? options)
-          || throw "gen-schema: mkInstanceType: expected a kind value with 'kind' and 'options' attributes";
+          isSchemaKind kindValue
+          || throw "gen-schema: mkInstanceType: expected a kind value carrying a mint-backed mark (`__mint.minted`); got an attrset with no mark";
         null;
       kind = kindValue.kind;
 
@@ -295,15 +296,20 @@ let
   mkInstanceRegistry =
     kindValue:
     let
-      _guardMsg = "gen-schema: mkInstanceRegistry: expected a kind value (e.g., schema.host), got an attrset without 'kind' or 'options'";
+      _guardMsg = "gen-schema: mkInstanceRegistry: expected a kind value carrying a mint-backed mark (`__mint.minted`); got an attrset with no mark";
       # Deferred guard — forced when `kind` is accessed, avoids infinite
       # recursion at option-declaration time when kindValue = eval.config.schema.host.
       # This alone is not enough (a registry with no validators/refs never
       # forces `kind` even once genuinely read) — applyPipeline below carries
       # the unconditional half, forced only at config-fixpoint demand time,
       # which is late enough to read kindValue safely.
+      #
+      # ★ THE DEFERRAL IS THE CONSTRAINT, NOT THE PREDICATE'S DEPTH, and `isSchemaKind` is written
+      # so it costs the staging nothing: its four reads stop at the mark RECORD and never force
+      # `minted`, so the preimage's `introspect.options` — a full `evalModuleTree` of the merged
+      # kind module — is not run here.
       kind =
-        assert (kindValue ? kind && kindValue ? options) || throw _guardMsg;
+        assert isSchemaKind kindValue || throw _guardMsg;
         kindValue.kind;
     in
     {
@@ -355,7 +361,7 @@ let
         # some conditional branch below — catches a bogus kindValue even for
         # a registry with no validators and no ref bindings, where nothing
         # else in this pipeline would ever force `kindValue.kind`.
-        assert (kindValue ? kind && kindValue ? options) || throw _guardMsg;
+        assert isSchemaKind kindValue || throw _guardMsg;
         let
           # Ref binding validation — check for missing bindings (refs == {} but
           # kind declares ref fields). Mirrors mkRefBindingModules error messages.

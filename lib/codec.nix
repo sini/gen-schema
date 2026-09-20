@@ -5,7 +5,10 @@
 # parent, kind, mixins, refinements) are excluded automatically. Additional
 # fields can be excluded via excludeFields. Remaining fields get identity
 # transforms unless overridden via the fields spec or types registry.
-{ prelude }:
+{
+  prelude,
+  isSchemaKind,
+}:
 let
   # Does value v structurally inhabit type t? Used ONLY for codec either/oneOf branch
   # selection. nixpkgs `t.check` was `v -> bool`, but the gen stack splits this: gen-types
@@ -69,8 +72,8 @@ let
       excludeFields ? [ ],
     }:
     assert
-      (kindValue ? kind && kindValue ? options)
-      || throw "gen-schema: mkCodec: expected a kind value (e.g., schema.host), got an attrset without 'kind' or 'options'";
+      isSchemaKind kindValue
+      || throw "gen-schema: mkCodec: expected a kind value carrying a mint-backed mark (`__mint.minted`); got an attrset with no mark";
     let
       kind = kindValue.kind;
       kindOptions = kindValue.options;

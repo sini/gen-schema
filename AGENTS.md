@@ -188,8 +188,14 @@ A codec is `{ encode; decode; encodeAll; decodeAll; serialize; deserialize; seri
 **Internal**: `_internal.mkMethodsModule` — the only member.
 
 **Kind value shape** (produced, not exported). Each `config.schema.<name>` is
-`{ __functor; kind; options; refs; refinements; strict; keySemantics; mixins; methods; validators; parent; }` plus user collections and computed fields. `__functor` makes the kind directly importable
-as a module. Schema-level introspection sits alongside the kinds: `_kindNames`, `_topology`
+`{ __functor; __mint; kind; options; refs; refinements; strict; keySemantics; mixins; methods; validators; parent; }` plus user collections and computed fields. `__functor` makes the kind directly importable
+as a module. `__mint.minted` is the PROVENANCE MARK (ADR-0034), minted over the kind's declared inert
+surface by the one authority (`gen-identity`'s `hashIdentity`, ADR-0016 ruling 5) and tagged
+`"schemakind"`; it is what `mkInstanceType`, `mkInstanceRegistry`, `validateInstances` and `mkCodec`
+read to decide a value is a kind value, replacing the `? kind && ? options` presence test that
+admitted any hand-written attrset. It is LAZY and the admission read never forces it — see
+`lib/entry-type.nix`'s `isSchemaKind`. `__mint` is reserved as a collection key and as a computed
+field, both refused by name. Schema-level introspection sits alongside the kinds: `_kindNames`, `_topology`
 (`{ parent; children; }` per kind), `_refEdges` (`{ from; field; to; }`), `_edges` (parent edges plus
 ref edges, each tagged `type`), `_roots`, `_leaves`, `_collectionKeys` (the collection keys
 extracted from kind defs — built-ins plus this schema's declared `collections`; a computed

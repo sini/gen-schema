@@ -58,22 +58,44 @@ let
 
   # The kind-value shape gen-aspects' `schemaOption` produces: the declarations live in the module the
   # `__functor` imports and `options` is EMPTY. gen-aspects is not an input here — it depends on this
-  # library — so the shape is reproduced directly. What the cell measures is the SHAPE, which is what
-  # the derivation has to be total over; the library that emits it is incidental.
-  aspectShapedKind = {
-    __functor = _: _: {
-      imports = [
-        {
-          options.spool = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "";
-          };
-        }
-      ];
-    };
-    kind = "thimble";
-    options = { };
+  # library — so the shape is reproduced through THE DOOR GEN-ASPECTS ITSELF GOES THROUGH,
+  # `mkSchemaOption { mkType = …; }` (`gen-aspects/lib/schema.nix:26`), which is the entry type's
+  # mkType ARM — the arm that sets `options = { }`. What the cell measures is the SHAPE, which is
+  # what the derivation has to be total over; the library that emits it is incidental.
+  #
+  # ★ IT USED TO BE A HAND-WRITTEN LITERAL, and ADR-0034's mark is why it can no longer be one: a
+  # kind value's provenance is now CHECKED, so a literal of that shape is refused by
+  # `mkInstanceType` rather than minted — which is the mechanism, not a fixture problem. Driving
+  # the real door is strictly more faithful than simulating its output, and it pins the same
+  # figures: measured byte-for-byte against the literal it replaces (same identity keys, same empty
+  # `options`, same stamped `id_hash`), with the literal's refusal as the live control.
+  aspectShapedTree = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.schema = genSchema.mkSchemaOption {
+          mkType =
+            {
+              defs,
+              kind,
+              ...
+            }:
+            {
+              __functor = _: _: {
+                imports = map (d: d.value) defs;
+              };
+              inherit kind;
+            };
+        };
+      }
+      {
+        config.schema.thimble.options.spool = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "";
+        };
+      }
+    ];
   };
+  aspectShapedKind = aspectShapedTree.config.schema.thimble;
 
   # The control arm: the SAME option set declared the way gen-schema declares one, where `options` is
   # populated. It agreed with the stamp before this change and must still — a cell that only watched

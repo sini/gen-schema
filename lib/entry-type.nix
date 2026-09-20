@@ -10,6 +10,7 @@
 {
   prelude,
   merge,
+  identity,
   mkMethodsModule,
   refsFromOptionsWithTypes,
   record,
@@ -19,6 +20,61 @@
   getRefinements,
 }:
 let
+  # ★ THE PROVENANCE MARK (ADR-0034), minted at the ONE site every kind value reaches — both
+  # declaration shapes arrive at `mkSchemaEntryType`'s merge, `mkSchemaOption` directly and
+  # gen-aspects through `genSchema.mkSchemaOption`. It is what makes "this value came out of a
+  # schema" a CHECKABLE property instead of a shape heuristic: the `? kind && ? options` guard it
+  # replaces admitted any hand-written attrset, so every message naming a kind value named a
+  # provenance its own predicate never looked at.
+  #
+  # MINTED over the kind's declared INERT surface — its name, the NAME SETS of its options, refs,
+  # refinements and collections, its `strict` flag and its `keySemantics` key set. The option
+  # `type` checkers and merges, `methods`, `validators`, `mixins`, `computed`, `mkType` and
+  # `__functor` are lambdas: the mint refuses them at any depth and there is no substitute
+  # (ADR-0034's REFUSED regime). So the mark is an identity over the kind's DECLARED SURFACE and
+  # not over its behaviour, and ADR-0013's argued impossibility is written here at the
+  # declaration — a lambda's body and captured environment are exposed by no builtin. Two kinds
+  # sharing a name and a surface but differing in an option's checker share a mark; within one
+  # schema they cannot, because the kind name is in the preimage and names are unique in a schema.
+  #
+  # NO SECOND MINTING AUTHORITY (ADR-0016 ruling 5). This CONSTRUCTS with the injected mint inside
+  # gen-schema's own evaluation, which is ADR-0014's constructing arm; nothing here re-derives an
+  # encoder and nothing re-exports `hashIdentity` under gen-schema's name (see ./default.nix).
+  #
+  # LAZY, and that is load-bearing rather than tidy. The stamp is a thunk: nothing forces it at
+  # kind-record construction, so the preimage may reach `introspect.options` — a full
+  # `evalModuleTree` of the merged kind module — and is forced only where an identity is DEMANDED,
+  # the same stratum `id_hash` and `identityKeys` are already forced at. `isSchemaKind` below is
+  # what keeps it that way on the reading side.
+  #
+  # Hoisted beside `mkAllCollections` for the reason that one is: the label list is ONE derivation
+  # read by both arms of the merge, not two spellings of one preimage. `attrNames` is already
+  # sorted, so no sort is added.
+  markOf =
+    components:
+    identity.hashIdentity "schemakind" [
+      "collections"
+      "keySemantics"
+      "kind"
+      "options"
+      "refinements"
+      "refs"
+      "strict"
+    ] (l: components.${l});
+
+  # THE READER of the mark, and the seam's whole admission test. FOUR READS, NONE OF WHICH FORCES
+  # THE DIGEST: `v ? __mint` forces `v` to WHNF, and `v.__mint ? minted` forces the mark RECORD and
+  # never `minted` itself. That is what lets a guard placed at option-DECLARATION time keep its
+  # staging — `mkInstanceRegistry`'s deferred guard reads this on `config.schema.host` while the
+  # schema's own options are still being declared, and forcing the digest there would run
+  # `introspect`'s `evalModuleTree` on a value that is not yet a value.
+  #
+  # `? minted` RATHER THAN `? __mint` ALONE, and it is regime selection rather than a defensive
+  # extra conjunct: `__mint` is a TAGGED SUM (authored in `gen-algebra/lib/intensional.nix`, whose
+  # comment forbids branching on field presence and reading `.minted` raw), so a value carrying no
+  # mintable identity has `__mint` present and `minted` absent, and that read aborts uncatchably.
+  isSchemaKind = v: builtins.isAttrs v && v ? kind && v ? __mint && v.__mint ? minted;
+
   # methods is a built-in collection — user collections are additional.
   #
   # Hoisted out of mkSchemaEntryType so the entry type and mkSchemaOption's published
@@ -62,6 +118,14 @@ let
       throw "gen-schema: collection '__functor' is reserved — cannot be used as a collection key"
     else if merged ? kind then
       throw "gen-schema: collection 'kind' is reserved — cannot be used as a collection key"
+    # The mark is applied LAST, so without this refusal a collection named `__mint` would be
+    # SILENTLY OVERWRITTEN — something vanishes and nothing says so. Same strength and same shape
+    # as its two siblings, for the same reason.
+    # The mark is applied LAST, so without this refusal a collection named `__mint` would be
+    # SILENTLY OVERWRITTEN — something vanishes and nothing says so. Same strength and same shape
+    # as its two siblings, for the same reason.
+    else if merged ? __mint then
+      throw "gen-schema: collection '__mint' is reserved — cannot be used as a collection key"
     else
       merged;
 
@@ -129,7 +193,20 @@ let
 
           # Computed fields from extracted collections + raw defs
           # kind (prelude.last loc) is passed so computed can produce entry-specific fields
-          computedFields = if computed != null then computed extractedCollections defs else { };
+          computedFields =
+            let
+              fields = if computed != null then computed extractedCollections defs else { };
+            in
+            # `__mint` is refused here for the reason `mkAllCollections` refuses it as a collection
+            # key: the stamp is applied last and would overwrite a computed field of that name
+            # without saying so.
+            # `__mint` is refused here for the reason `mkAllCollections` refuses it as a collection
+            # key: the stamp is applied last and would overwrite a computed field of that name
+            # without saying so.
+            if fields ? __mint then
+              throw "gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType"
+            else
+              fields;
 
           # Strip all collection keys before deferredModule merge
           strippedDefs = map (
@@ -170,6 +247,22 @@ let
             refinements = { };
           }
           // computedFields
+          // {
+            # `kind` is the LET-BOUND `prelude.last loc` — the option path, which is
+            # authoritative — never the `mkType` result's echo of it, which is caller data.
+            # This arm declares no options, refs or refinements (the three literals above), so
+            # those components of the preimage are empty by construction, not by omission.
+            __mint = {
+              minted = markOf {
+                inherit kind strict;
+                options = [ ];
+                refs = [ ];
+                refinements = [ ];
+                collections = prelude.attrNames extractedCollections;
+                keySemantics = prelude.attrNames keySemantics;
+              };
+            };
+          }
         else
           let
             # When mixins are present and baseModule is an inline attrset,
@@ -280,7 +373,21 @@ let
             refinements = extractedRefinements;
           }
           // finalCollections
-          // computedFields;
+          // computedFields
+          // {
+            # Applied LAST so the mark cannot be shadowed by a collection or a computed field;
+            # both are refused by name above rather than left to win silently here.
+            __mint = {
+              minted = markOf {
+                inherit kind strict;
+                options = prelude.attrNames introspect.options;
+                refs = prelude.attrNames introspect.refs;
+                refinements = prelude.attrNames extractedRefinements;
+                collections = prelude.attrNames finalCollections;
+                keySemantics = prelude.attrNames keySemantics;
+              };
+            };
+          };
     };
 
   mkSchemaOption =
@@ -473,5 +580,5 @@ let
     };
 in
 {
-  inherit mkSchemaEntryType mkSchemaOption;
+  inherit mkSchemaEntryType mkSchemaOption isSchemaKind;
 }

@@ -8,7 +8,10 @@
 #
 # Base constructors relocated from gen-algebra/module so gen-schema owns its full
 # module-system surface; gen-algebra is the pure algebra root.
-{ prelude }:
+{
+  prelude,
+  isSchemaKind,
+}:
 let
   # --- Base constructors (gen-schema-owned) ---
 
@@ -76,8 +79,8 @@ in
   validateInstances =
     kindValue: instances:
     assert
-      (kindValue ? kind && kindValue ? options)
-      || throw "gen-schema: validateInstances: expected a kind value (e.g., schema.host), got an attrset without 'kind' or 'options'";
+      isSchemaKind kindValue
+      || throw "gen-schema: validateInstances: expected a kind value carrying a mint-backed mark (`__mint.minted`); got an attrset with no mark";
     let
       validators = kindValue.validators or [ ];
     in

@@ -4,15 +4,13 @@
 {
   lib,
   genSchema,
-  prelude,
   ...
 }:
 let
-  validateLib = import ../../lib/validate.nix {
-    inherit prelude;
-  };
-  inherit (validateLib) mkFieldValidator filterValidators;
-  inherit (genSchema) mkValidator;
+  # Both bindings come off the PUBLISHED surface rather than a direct `import ../../lib/validate.nix`
+  # with its formals written out here: `default.nix` already re-exports them, and the direct import
+  # was a second wiring of one module that breaks whenever the module gains an argument.
+  inherit (genSchema) mkFieldValidator filterValidators mkValidator;
 
   # A plain validator (no fields) — always runs
   plainValidator = mkValidator "always-run" (inst: inst ? name) "must have name";

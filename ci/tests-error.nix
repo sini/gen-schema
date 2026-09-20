@@ -21,7 +21,22 @@
   ...
 }:
 let
-  inherit (genSchema) mkIdentityModule identityKeysForKind evalSchema;
+  inherit (genSchema)
+    mkIdentityModule
+    identityKeysForKind
+    evalSchema
+    mkSchemaOption
+    mkInstanceRegistry
+    ;
+
+  # A kind value the way a caller actually gets one, for the kind-mark cells below.
+  markedHostKind =
+    (genMerge.evalModuleTree {
+      modules = [
+        { options.schema = mkSchemaOption { }; }
+        { config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; }; }
+      ];
+    }).config.schema.host;
 
   # A kind declaring one primitive identity key and one option that is DECLARED but not an identity
   # key. `tags` is the input P3 was measured on: it is declared, so "is not declared" was a lie.
@@ -161,6 +176,77 @@ in
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: mkIdentityModule: kind 'host' identifies instances by 'name', which this instance does not declare \\(identity keys: load, name\\); 'name' is reserved and is declared by mkInstanceType$";
+      };
+    };
+  };
+
+  # THE PROVENANCE MARK's refusals (ADR-0034). All three are message cells: what changed at this
+  # seam is precisely WHICH property the message names, so a cell reading only `.success == false`
+  # would have passed at HEAD, where the same input was ADMITTED and the same message was a claim
+  # about a predicate that did not check it.
+  flake.testsError.kind-mark-refusals = {
+    # O5. The stand-in the retired `? kind && ? options` guard admitted — a hand-written attrset
+    # with a kind name and an empty option set. At HEAD this built a registry; the message names the
+    # mark, and the mark is now what is read.
+    test-mkInstanceRegistry-refuses-an-unmarked-kind = {
+      expr =
+        # LIVE CONTROL, in the same cell and the same run, and it DISCRIMINATES: a guard that
+        # refused everything would fail this assert, and an `assertion failed` is neither the type
+        # nor the message `expectedError` pins, so the cell reds instead of passing for the wrong
+        # reason. A bare `seq` would not do — it would propagate this very message.
+        assert (mkInstanceRegistry markedHostKind { }).description == "host instances";
+        (mkInstanceRegistry {
+          kind = "host";
+          options = { };
+        } { }).description;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: mkInstanceRegistry: expected a kind value carrying a mint-backed mark \\(`__mint.minted`\\); got an attrset with no mark$";
+      };
+    };
+
+    # The mark is applied LAST, so a collection named `__mint` would be overwritten silently — the
+    # class this substrate refuses by name everywhere else. Sibling of the `__functor` and `kind`
+    # refusals in the same derivation.
+    test-mint-is-a-reserved-collection-key = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = mkSchemaOption {
+                collections.__mint = {
+                  default = [ ];
+                };
+              };
+            }
+            { config.schema.host = { }; }
+          ];
+        }).config.schema.host.kind;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: collection '__mint' is reserved — cannot be used as a collection key$";
+      };
+    };
+
+    # The same door on the OTHER key source that is merged before the stamp. Computed fields win
+    # over collections, so a guard on collections alone leaves this half open.
+    test-mint-is-a-reserved-computed-field = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = mkSchemaOption {
+                computed = _: _: {
+                  __mint = "forged";
+                };
+              };
+            }
+            { config.schema.host = { }; }
+          ];
+        }).config.schema.host.__mint;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType$";
       };
     };
   };
