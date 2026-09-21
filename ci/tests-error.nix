@@ -83,6 +83,27 @@ let
     type = genMerge.types.str;
     default = "none";
   };
+
+  # den-hoag-6vgwm. The collection-key collision needs an INSTANCE plane as well as a kind plane:
+  # its severe half is that the shadow MOVES `id_hash` — a different node under ADR-0016 ruling 5 —
+  # and only a minted instance shows that.
+  instanceOf =
+    args: decl:
+    (genMerge.evalModuleTree {
+      modules = [
+        {
+          options.hosts = mkInstanceRegistry (kindOf args decl) { };
+          config.hosts.h1 = {
+            name = "h1";
+          };
+        }
+      ];
+    }).config.hosts.h1;
+
+  # A control forced WHOLE inside its own `tryEval`. `tryEval` alone stops at WHNF, so a list whose
+  # ELEMENT throws escapes the wrapper and the throw then lands outside the `assert` — where the
+  # cell's `expectedError` pattern can match it and a refuse-everything implementation scores green.
+  forced = v: builtins.tryEval (builtins.deepSeq v v);
 in
 {
   # evalSchema's two refusals, and the capability the relocation removes. All three are here rather
@@ -421,6 +442,121 @@ in
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kind 'host': declaration key '__functor' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread$";
+      };
+    };
+  };
+
+  # ★ THE COLLECTION KEY SPACE COLLIDING WITH gen-schema's OWN VOCABULARY (den-hoag-6vgwm). The
+  # mirror image of the group above: that door guards a DECLARATION against the vocabulary, this one
+  # guards the VOCABULARY against the constructor argument. They cannot cover for each other —
+  # `surplusDeclarationKeys`' predicate has `collectionKeys` as a term of its own ALLOW-list, so no
+  # collection key can ever be surplus, and the declaration door is blind to every input here.
+  #
+  # ★ WHY EVERY CELL BELOW SITS ON THE MINT OR THE INSTANCE AND NOT ON `kind.options`. Measured
+  # before the door existed: with `collections.options` declared, `attrNames kind.options` reads
+  # `[ "role" ]` and `attrNames kind.options.role` reads `[ "_type" "default" "type" ]` — on BOTH
+  # arms. The collection value has replaced the introspection and carries the same names and the
+  # same shape, so the kind ADVERTISES an option its instances do not have and a cell written on
+  # that read passes UNCHANGED through the defect. The two reads that separate the arms are the
+  # kind's `__mint` and the instance.
+  #
+  # ★ AND WHY THE FIXTURES DIFFER BETWEEN CELLS, which is not tidiness. A collision arm is live only
+  # if the FIXTURE CARRIES THE COLLIDING KEY — `strippedDefs` can only remove a key a def HAS — so
+  # O3's fixture must declare `config`. But that same fat fixture converts O1/O2's subject from a
+  # SILENT failure into a LOUD one: with `options` stripped, a declared `config.role` is undeclared
+  # and strict mode refuses it on its own. The headline silent arms REQUIRE the lean fixture.
+  flake.testsError.collection-key-collision-refusals = {
+    # O1 · the shadow at its cheapest plane. LEAN fixture. Before the door this returned
+    # `"schemakind:608c5bba…"` against the clean twin's `"schemakind:9b67e15b…"`, with no throw and
+    # no warning: `markOf`'s preimage takes `attrNames introspect.options`, and `introspect` is an
+    # `evalModuleTree` over defs the collection key has already been stripped from.
+    test-marker-collection-refuses-by-name = {
+      expr =
+        assert
+          let
+            control = forced (builtins.attrNames (kindOf { } { options.role = strOpt; }).options);
+          in
+          control.success && control.value == [ "role" ];
+        (kindOf {
+          collections.options = {
+            default = { };
+          };
+        } { options.role = strOpt; }).__mint.minted;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: collection 'options' is reserved — cannot be used as a collection key$";
+      };
+    };
+
+    # O2 · THE SEVERE HALF — the shadow moved an INSTANCE IDENTITY. LEAN fixture. Before the door
+    # this returned `"host:0da58b39…"` where the clean twin mints `"host:6405e005…"`, and under
+    # ADR-0016 ruling 5 that is a different node, propagating into every binding that references it.
+    #
+    # ★ BOTH CONTROL CONJUNCTS ARE LOAD-BEARING. The digest alone stays satisfied if the mint stops
+    # reflecting options at all; `_identityKeys` is the reflected set and is the thing that moved,
+    # measured `[ "name" "role" ]` ⇒ `[ "name" ]`.
+    test-marker-collection-cannot-move-an-instance-identity = {
+      expr =
+        assert
+          let
+            clean = instanceOf { } { options.role = strOpt; };
+            id = forced clean.id_hash;
+            keys = forced clean._identityKeys;
+          in
+          id.success
+          && id.value == "host:6405e005e418788c6ed366500451c25899c6b853ce1046952d3d6244622a792b"
+          && keys.success
+          &&
+            keys.value == [
+              "name"
+              "role"
+            ];
+        (instanceOf {
+          collections.options = {
+            default = { };
+          };
+        } { options.role = strOpt; }).id_hash;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: collection 'options' is reserved — cannot be used as a collection key$";
+      };
+    };
+
+    # O3 · THE CUT IS BY CLASS, NOT BY NAME. `config` is a different member of the same collision and
+    # its failure is worse than a moved identity: the strip removes the declaration's `config` block,
+    # so a declared value silently reverts to its default. Measured before the door — this returned
+    # `"host:6405e005…"`, BYTE-IDENTICAL to an instance of a declaration that never carried `config`
+    # at all, while the clean twin mints `"host:5c5feebf…"` and reads `role = "web"`. A door cut at
+    # `options` alone passes O1 and O2 and leaves this live.
+    test-marker-collection-class-config-refuses-by-name = {
+      expr =
+        assert
+          let
+            clean = instanceOf { } {
+              options.role = strOpt;
+              config.role = "web";
+            };
+            id = forced clean.id_hash;
+            role = forced clean.role;
+          in
+          id.success
+          && id.value == "host:5c5feebf2beb3af5429ab36de21bb24c78491ba8eece8534eb69627111464850"
+          && role.success
+          && role.value == "web";
+        (instanceOf
+          {
+            collections.config = {
+              default = { };
+            };
+          }
+          {
+            options.role = strOpt;
+            config.role = "web";
+          }
+        ).id_hash;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: collection 'config' is reserved — cannot be used as a collection key$";
       };
     };
   };

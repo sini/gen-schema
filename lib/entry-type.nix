@@ -79,7 +79,7 @@ let
   #
   # Hoisted out of mkSchemaEntryType so the entry type and mkSchemaOption's published
   # `_collectionKeys` share ONE derivation rather than two spellings of one contract.
-  # The two reserved-key refusals stay INSIDE this body deliberately: a read of the
+  # The reserved-key refusal stays INSIDE this body deliberately: a read of the
   # published key set must reach the same refusal a kind merge does, so a schema that
   # declares a reserved collection is refused whether or not it declares a kind.
   mkAllCollections =
@@ -113,16 +113,11 @@ let
         };
       }
       // collections;
+
+      offending = builtins.filter (k: merged ? ${k}) reservedCollectionKeys;
     in
-    if merged ? __functor then
-      throw "gen-schema: collection '__functor' is reserved — cannot be used as a collection key"
-    else if merged ? kind then
-      throw "gen-schema: collection 'kind' is reserved — cannot be used as a collection key"
-    # The mark is applied LAST, so without this refusal a collection named `__mint` would be
-    # SILENTLY OVERWRITTEN — something vanishes and nothing says so. Same strength and same shape
-    # as its two siblings, for the same reason.
-    else if merged ? __mint then
-      throw "gen-schema: collection '__mint' is reserved — cannot be used as a collection key"
+    if offending != [ ] then
+      throw "gen-schema: collection '${builtins.head offending}' is reserved — cannot be used as a collection key"
     else
       merged;
 
@@ -162,6 +157,59 @@ let
   # contract IS a finite list; the prefix rule and the option-declaration rule are NOT lists and go
   # in the option's description instead.
   declarationKeys = prelude.sort (a: b: a < b) (declarationMarkers ++ declarationMetaKeys);
+
+  # ★ THE NAMES `mkSchemaEntryType` WRITES ONTO THE KIND VALUE, each with the writer that earns
+  # it. RESTATED for the reason `declarationMarkers` is: the record is built inside the merge body
+  # while `mkAllCollections` runs outside it, so it cannot be read off the result. A name omitted
+  # here is an UNDER-fire — a missed refusal, never a false one — and the §3b census is what keeps
+  # it from drifting.
+  kindResultKeys = [
+    "__functor" # the importable-module wrapper, default branch
+    "kind" # `prelude.last loc`, both branches
+    "mixins" # the declared mixin list, default branch
+    "strict" # the `strict` formal, both branches
+    "keySemantics" # the `keySemantics` formal, both branches
+    "options" # `introspect.options`, both branches
+    "refs" # `introspect.refs`, both branches
+    "refinements" # `extractedRefinements`, both branches
+    # Written AFTER `// finalCollections` and refused for the REVERSE reason: the mark is applied
+    # last, so a collection of that name is SILENTLY OVERWRITTEN — something vanishes and nothing
+    # says so. Kept verbatim from the door's own third clause.
+    "__mint"
+  ];
+
+  # ★ THE COLLECTION KEY SPACE'S RESERVED SET (den-hoag-6vgwm). A caller-supplied collection NAME
+  # lands in a key space gen-schema already occupies, and the collision bites in TWO places, both
+  # inside `mkSchemaEntryType`'s own merge:
+  #
+  #   (A) THE DEF-SIDE STRIP. `strippedDefs` runs `removeAttrs d.value collectionKeys` over every
+  #       def BEFORE `base.merge`, so a collection named for a module key gen-merge reads deletes
+  #       that key from the declaration and gen-merge never receives it. Measured: `collections.
+  #       options` deletes the kind's option MODULE while `kind.options` still advertises it, and
+  #       the instance's `id_hash` moves — a different node under ADR-0016 ruling 5, silently.
+  #       `collections.config` reverts a declared `config.role = "web"` to its default by the same
+  #       route. That is why the set is `declarationKeys ++ kindResultKeys` and not the latter
+  #       alone: case (A) is reachable on BOTH branches, unconditionally.
+  #   (B) THE RESULT-SIDE SHADOW. `// finalCollections` splats over the written kind record, so
+  #       every name in `kindResultKeys` is shadowable.
+  #
+  # ONE DOOR AT THE SOLE CONSTRUCTOR rather than a filter at each consumer: `mkAllCollections` is
+  # the only path into the collection key space (`allCollections` and `_collectionKeys`), so the
+  # colliding set never forms and `strippedDefs`, `finalCollections` and `markOf` each receive a
+  # sound input rather than a checked one.
+  #
+  # The refusal names ONE key and says nothing about WHY it is reserved: the reason is per-name
+  # (two of them, fourteen names) and the caller's remedy is the same for all — rename the
+  # collection. A maintainer reads the reason here, at the site they would edit.
+  #
+  # ★ UNIFORM ACROSS BOTH BRANCHES, at a stated cost. On the `mkType` branch `finalCollections` is
+  # never splatted into the result, so `mixins`, `refs` and `refinements` are inert there and
+  # refusing them over-fires by three names. `reservedDeclarationKeysFor` branches on `mkType`
+  # because `__functor` is LEGITIMATE on that branch; none of these three is legitimate as a
+  # collection on either, so one list is taken over two.
+  reservedCollectionKeys = prelude.sort (a: b: a < b) (
+    prelude.unique (declarationKeys ++ kindResultKeys)
+  );
 
   isStructuredDecl = v: builtins.isAttrs v && prelude.any (k: v ? ${k}) declarationMarkers;
 
@@ -632,6 +680,17 @@ let
             readOnly = true;
             description = "Collection keys extracted from kind defs: built-ins plus this schema's declared collections; a computed field of the same name wins on the kind result, so reading a key through it may return the computed value";
           };
+          # Published for the reason its two siblings are (`den-hoag-4kh.53.55`): consumers
+          # hardcode what a library does not publish, and a consumer that GENERATES collection
+          # names — which gen-aspects' caller-supplied cnf makes reachable — needs the set it must
+          # avoid without re-deriving it from this file. Single-line description for the reason
+          # `_declarationKeys`' is.
+          options._reservedCollectionKeys = merge.mkOption {
+            type = merge.types.listOf merge.types.str;
+            internal = true;
+            readOnly = true;
+            description = "The collection names `mkSchemaOption` refuses, by name, at construction: gen-merge's structural markers plus the `key` metadata name (a collection of that name would delete the key from every kind declaration before the module merge sees it) together with the names gen-schema writes onto the kind value itself (a collection of that name would shadow what this library wrote, or — for `__mint`, applied last — be silently overwritten by it). The remedy for all of them is the same: rename the collection.";
+          };
           # Published for the reason `_collectionKeys` was (`den-hoag-4kh.53.55`): consumers
           # hardcode what a library does not publish. The LIST is only the finite, enforced part of
           # the contract; the two rules that are not lists are stated here and NOT published as
@@ -764,6 +823,7 @@ let
               _collectionKeys = prelude.attrNames (mkAllCollections collections);
               # Likewise ONE derivation with the guard's own predicate.
               _declarationKeys = declarationKeys;
+              _reservedCollectionKeys = reservedCollectionKeys;
             };
         }
       );
