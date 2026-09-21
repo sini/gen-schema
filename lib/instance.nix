@@ -25,6 +25,15 @@ let
     {
       extraModules ? [ ],
       strict ? kindValue.strict,
+      # BASE MODULE ARGS for the instance fixpoint, handed to gen-merge's type-level inlet below.
+      # A module that forces an argument at its OWN WHNF — `{ lib, ... }: { options.x = mkOption {
+      # default = lib.foo; }; }` — cannot be served from `_module.args`: reading that forces the
+      # config fixpoint the module is part of, and the result is an UNCATCHABLE infinite recursion
+      # naming neither the module nor the argument. A base arg is the admissible channel, and
+      # ADR-0033 rules the declaration-plane `_module.args` read inadmissible precisely so this one
+      # is used instead. Empty by default: a kind whose modules declare no extra formal is
+      # unaffected, because a function module binds only the formals it declares.
+      specialArgs ? { },
     }:
     let
       _ =
@@ -44,7 +53,10 @@ let
       # `id_hash` or by a read of `_identityKeys`, which is late enough.
       identityKeys = identityKeysForKind kindValue;
     in
-    merge.types.submodule (
+    # ★ THE INLET IS ON THE TYPE, NOT THE CONSTRUCTOR, and it is applied UNCONDITIONALLY rather than
+    # behind an `if specialArgs == { }` — one path, so every instance gen-schema builds goes through
+    # the same construction and the empty case is not a second, untested one.
+    (merge.types.submodule (
       { name, config, ... }:
       {
         imports = [
@@ -84,7 +96,8 @@ let
           description = "The closed identity-key set this kind's instances are minted over.";
         };
       }
-    );
+    )).withArgs
+      specialArgs;
 
   # Type-tree predicates for coercion chain dispatch.
   isRefLeaf = t: (t.refKind or null) != null;
@@ -320,6 +333,11 @@ let
       description ? "${kind} instances",
       derive ? null,
       deriveEither ? null,
+      # Forwarded VERBATIM to `mkInstanceType` below — the registry builds its element with that
+      # constructor, so this is the same thread reaching the same inlet, not a second one. Stated
+      # here because a registry is how a consumer declares instances in practice; without it the
+      # channel would be published on a constructor most callers never name.
+      specialArgs ? { },
     }:
     assert
       (derive == null || deriveEither == null)
@@ -536,7 +554,7 @@ let
       type = merge.types.attrsOf (
         mkInstanceType kindValue {
           extraModules = allExtraModules;
-          inherit strict;
+          inherit strict specialArgs;
         }
       );
       apply = applyPipeline;
