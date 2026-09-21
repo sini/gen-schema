@@ -51,7 +51,13 @@ let
       # recursion `mkInstanceRegistry`'s deferred guard exists to avoid on the self-referential
       # `mkInstanceRegistry config.schema.host { }` idiom. It is forced at config-demand time, by
       # `id_hash` or by a read of `_identityKeys`, which is late enough.
-      identityKeys = identityKeysForKind kindValue;
+      #
+      # ★ IT TAKES THE SAME `specialArgs` THE INLET BELOW DOES, and that is not a duplicate of the
+      # thread. The inlet serves the INSTANCE fixpoint; this is a SECOND application of the kind's
+      # modules, one stratum up, and a module forcing its argument to produce its own WHNF refuses
+      # under ADR-0033 here while evaluating perfectly through the inlet. That is why an instance
+      # could read every declared option and still not be stampable.
+      identityKeys = identityKeysForKind { inherit specialArgs; } kindValue;
     in
     # ★ THE INLET IS ON THE TYPE, NOT THE CONSTRUCTOR, and it is applied UNCONDITIONALLY rather than
     # behind an `if specialArgs == { }` — one path, so every instance gen-schema builds goes through

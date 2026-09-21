@@ -203,8 +203,8 @@ in
     in
     {
       expr = {
-        hostKeys = genSchema.identityKeysForKind hostKv;
-        spindleKeys = genSchema.identityKeysForKind spindleKv;
+        hostKeys = genSchema.identityKeysForKind { } hostKv;
+        spindleKeys = genSchema.identityKeysForKind { } spindleKv;
         wrongKind = genSchema.identityHashForKind spindleKv hostInst;
         checked = builtins.length candidates;
         discovered =
@@ -235,7 +235,7 @@ in
   # declared `str` (so it is an identity key) and carries a list (which the mint admits).
   flake.tests.identity-hash-for.test-guard-does-not-narrow-the-mint-domain = {
     expr = {
-      widgetKeys = genSchema.identityKeysForKind widgetKv;
+      widgetKeys = genSchema.identityKeysForKind { } widgetKv;
       tagType = builtins.typeOf widgetInst.tag;
       zoneType = builtins.typeOf widgetInst.zone;
       ownKindRecompute = genSchema.identityHashForKind widgetKv widgetInst;
@@ -260,7 +260,7 @@ in
   # removed.
   flake.tests.identity-hash-for.test-out-of-domain-value-is-the-mints-refusal = {
     expr = {
-      sleeveKeys = genSchema.identityKeysForKind sleeveKv;
+      sleeveKeys = genSchema.identityKeysForKind { } sleeveKv;
       hostCarriesHook = hostInst ? hook;
       hookType = builtins.typeOf hostInst.hook;
       refusalIsCaught = (builtins.tryEval (genSchema.identityHashForKind sleeveKv hostInst)).success;

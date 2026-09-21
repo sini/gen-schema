@@ -59,9 +59,11 @@ let
     k:
     (genMerge.evalModuleTree {
       modules = [
-        (mkIdentityModule "host" (identityKeysForKind {
-          imports = hostModules;
-        }))
+        (mkIdentityModule "host" (
+          identityKeysForKind { } {
+            imports = hostModules;
+          }
+        ))
       ]
       ++ hostModules
       ++ [ { config._identity.keys = [ k ]; } ];
@@ -205,9 +207,11 @@ in
         in
         (genMerge.evalModuleTree {
           modules = [
-            (mkIdentityModule "host" (identityKeysForKind {
-              imports = noName;
-            }))
+            (mkIdentityModule "host" (
+              identityKeysForKind { } {
+                imports = noName;
+              }
+            ))
           ]
           ++ noName;
         }).config.id_hash;

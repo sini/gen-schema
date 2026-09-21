@@ -12,9 +12,11 @@ let
     kind: modules:
     genMerge.evalModuleTree {
       modules = [
-        (mkIdentityModule kind (identityKeysForKind {
-          imports = modules;
-        }))
+        (mkIdentityModule kind (
+          identityKeysForKind { } {
+            imports = modules;
+          }
+        ))
       ]
       ++ modules;
     };

@@ -85,13 +85,36 @@ let
   # by construction and is not in the kind's own option set to be reflected out of it. A kind whose
   # instances differ only in `name` collapsing to one identity is the silent-collapse class one door
   # over, so it is added here rather than left to a reflection that cannot see it.
+  #
+  # ★ BASE MODULE ARGS, BECAUSE THIS IS A SECOND APPLICATION OF THE KIND'S MODULES. Reading the
+  # option set AT ALL applies them, and a module whose body is `{ lib, ... }: lib.mkIf …` forces its
+  # argument to produce its own WHNF — so an argument-less application here refuses under ADR-0033
+  # even though nothing but option NAMES is wanted. Reading names is safe only for a module that
+  # forces its argument inside an option DEFAULT, which is the narrower shape, not the class.
+  #
+  # ★ THE CHANNEL IS A NAMED FORMAL, and it is OPTIONS-FIRST so an omitted set is a refusal AT THE
+  # CALL SITE naming the argument, not a function surfacing as a list somewhere downstream. Same
+  # vocabulary as `mkSchemaOption { specialArgs = …; }` and as `entry-type.nix`'s `introspect`: at a
+  # direct engine call there is no type for a method to hang on, so `evalModuleTree`'s own published
+  # `specialArgs ? { }` is reached by an ordinary formal.
+  #
+  # Defaulted, so the two callers differ only in what they have: `mkInstanceType` passes the set it
+  # received, and `identityHashForKind` below — the reflection path, which takes no such argument —
+  # passes nothing and keeps today's behaviour exactly.
   identityKeysForKind =
+    {
+      specialArgs ? { },
+    }:
     kindValue:
     prelude.sort (a: b: a < b) (
       prelude.unique (
         [ "name" ]
         ++ prelude.attrNames (
-          prelude.filterAttrs isPrimitiveOption (merge.evalModuleTree { modules = [ kindValue ]; }).options
+          prelude.filterAttrs isPrimitiveOption
+            (merge.evalModuleTree {
+              modules = [ kindValue ];
+              inherit specialArgs;
+            }).options
         )
       )
     );
@@ -135,7 +158,11 @@ in
   identityHashForKind =
     kindValue: instance:
     let
-      keys = identityKeysForKind kindValue;
+      # No base args: this path takes only a kind value and an instance, so it has none to pass and
+      # nowhere to accept them. A kind whose modules need an argument is therefore still refused
+      # HERE, unchanged by the thread above — giving this path a channel cascades to its own callers
+      # and is a separate decision.
+      keys = identityKeysForKind { } kindValue;
     in
     if prelude.all (k: instance ? ${k}) keys then
       identity.hashIdentity kindValue.kind keys (k: instance.${k})

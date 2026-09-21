@@ -217,7 +217,7 @@ in
   # "not this kind" for every instance of it, silently.
   flake.tests.identity-key-closure.test-forKind-agrees-with-stamp-on-an-imports-declared-kind = {
     expr = {
-      keys = genSchema.identityKeysForKind aspectShapedKind;
+      keys = genSchema.identityKeysForKind { } aspectShapedKind;
       kindValueOptionsIsEmpty = aspectShapedKind.options == { };
       recomputeMatchesStamp =
         (genSchema.identityHashForKind aspectShapedKind aspectInstance) == aspectInstance.id_hash;
@@ -241,7 +241,7 @@ in
   # same identity — the disagreement §1.6 measured was the derivation's, never the kinds'.
   flake.tests.identity-key-closure.test-control-both-kind-value-shapes-mint-alike = {
     expr = {
-      keys = genSchema.identityKeysForKind schemaShapedKind;
+      keys = genSchema.identityKeysForKind { } schemaShapedKind;
       kindValueOptionsIsPopulated = builtins.attrNames schemaShapedKind.options;
       recomputeMatchesStamp =
         (genSchema.identityHashForKind schemaShapedKind schemaInstance) == schemaInstance.id_hash;

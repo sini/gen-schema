@@ -22,9 +22,11 @@ let
     kind: modules:
     genMerge.evalModuleTree {
       modules = [
-        (mkIdentityModule kind (identityKeysForKind {
-          imports = modules;
-        }))
+        (mkIdentityModule kind (
+          identityKeysForKind { } {
+            imports = modules;
+          }
+        ))
         {
           options.name = genMerge.mkOption {
             type = genMerge.types.str;
