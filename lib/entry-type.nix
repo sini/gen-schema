@@ -174,6 +174,13 @@ let
   # gen-merge's module classifier and DELETES the rest of the declaration (`options` ⇒ `[ ]` against
   # `[ "role" ]` on the clean twin). Same class, same strength and same shape as the three reserved
   # COLLECTION keys `mkAllCollections` refuses above.
+  #
+  # ★ WHAT THIS DOOR IS FOR, stated precisely because the obvious reading is wrong. It does NOT
+  # repair a swallow that some earlier door was doing `__`-specifically: before this guard existed
+  # there was no declaration-key door at all, and a bare `__mint` and a bare `mint` vanished exactly
+  # alike, at every revision, mark or no mark. What it does is make these two names LEGIBLE to rule
+  # 4, which would otherwise exempt them for carrying the very prefix that marks a key as none of
+  # gen-schema's business. Without it, `mint` would refuse and `__mint` would not.
   reservedDeclarationKeysFor =
     mkType:
     if mkType == null then

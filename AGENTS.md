@@ -217,7 +217,10 @@ their own door because gen-schema writes them onto every kind value: `__mint` al
 where `mkType` is null. Measured before the guard existed — a declared `__mint` did not survive and
 the kind's own mark was byte-identical with and without it; a declared `__functor` was applied by
 gen-merge's module classifier and **deleted the rest of the declaration** (`options` ⇒ `[ ]` against
-`[ "role" ]` on the clean twin).
+`[ "role" ]` on the clean twin). ★ That door does **not** repair a `__`-specific swallow: before the
+guard there was no declaration-key door at all and a bare `__mint` vanished exactly as a bare `mint`
+did, at every revision. What it does is make the two names **legible to rule 4**, which would
+otherwise exempt them for carrying the prefix that marks a key as none of gen-schema's business.
 
 **Instance value shape**: `{ _identity; id_hash; name; <declared options>; <methods>; }`. `name`
 defaults to the registry key.
