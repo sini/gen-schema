@@ -16,15 +16,40 @@ let
   evalSchema =
     {
       modules,
-      schemaOption ? mkSchemaOption { },
+      # `null` rather than `mkSchemaOption { }` so "the caller supplied one" is a QUESTION THIS
+      # FUNCTION CAN ASK. The resolved value is identical when nobody supplies one; what the sentinel
+      # buys is the refusal below, which a defaulted record could not state.
+      schemaOption ? null,
+      # Base module args for the kind tree, forwarded into the schema option this builds. The surface
+      # a consumer reaches first, so the channel is published here as well as on
+      # `mkSchemaOption`/`mkSchemaEntryType` — one formal forwarded, never a second mechanism.
+      specialArgs ? { },
     }:
     let
+      # ★ THE TWO TOGETHER ARE REFUSED BY NAME, because they are a SILENT LOSS. A caller-supplied
+      # `schemaOption` is already built and its entry type has already closed over whatever args it
+      # was given, so args stated here would be threaded nowhere and the kind tree would diverge
+      # exactly as if none had been supplied — the very failure this channel exists to remove,
+      # reappearing at the one call that states both. Refused where the caller states it, which is
+      # the same discipline `withArgs` applies to a reserved key.
+      resolvedSchemaOption =
+        if schemaOption == null then
+          mkSchemaOption { inherit specialArgs; }
+        else if specialArgs != { } then
+          throw (
+            "gen-schema: `evalSchema' was given both `schemaOption' and `specialArgs'. The schema "
+            + "option supplied here is already built, so those args would reach no kind tree; state "
+            + "them where it is constructed instead — `mkSchemaOption { specialArgs = …; }'"
+          )
+        else
+          schemaOption;
+
       # One evaluation of the schema tree. `injected` carries this pass's parent defs and is empty
       # at pass 0.
       evalAt =
         injected:
         (merge.evalModuleTree {
-          modules = [ { options.schema = schemaOption; } ] ++ modules ++ injected;
+          modules = [ { options.schema = resolvedSchemaOption; } ] ++ modules ++ injected;
         }).config.schema;
 
       # Pass 0 freezes every kind that inherits nothing. Reading `.inherits` off it is safe on a

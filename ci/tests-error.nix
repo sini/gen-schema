@@ -560,4 +560,75 @@ in
       };
     };
   };
+
+  # ── `evalSchema`'s two-channel collision ──────────────────────────────────────────────────────
+  # A caller-supplied `schemaOption` has ALREADY been built, and its entry type has already closed
+  # over whatever base module args it was given. `specialArgs` stated beside it would therefore be
+  # threaded nowhere and the kind tree would diverge exactly as if none had been supplied — the
+  # failure this channel exists to remove, reappearing at the one call that states both. Refused
+  # where the caller states it, and the message names the place to state it instead; a `tryEval`
+  # cell could only say that something threw.
+  flake.testsError.schema-special-args = {
+    test-evalSchema-refuses-schemaOption-and-specialArgs-together = {
+      expr = evalSchema {
+        modules = [
+          { config.schema.fleet.options.hostName = genMerge.mkOption { type = genMerge.types.str; }; }
+        ];
+        schemaOption = mkSchemaOption { };
+        specialArgs = {
+          argand = {
+            inletTag = "CALLER";
+          };
+        };
+      };
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: `evalSchema' was given both `schemaOption' and `specialArgs'\\. The schema option supplied here is already built, so those args would reach no kind tree; state them where it is constructed instead — `mkSchemaOption \\{ specialArgs = …; \\}'$";
+      };
+    };
+    # LIVE CONTROL, same run: each channel ALONE is admitted, so the cell above is about the
+    # collision and not about a surface that refuses either one.
+    test-either-channel-alone-is-admitted-control = {
+      expr =
+        let
+          viaArgs =
+            (evalSchema {
+              modules = [
+                {
+                  config.schema.fleet.imports = [
+                    (
+                      { argand, ... }:
+                      {
+                        options.hostName = genMerge.mkOption {
+                          type = genMerge.types.str;
+                          default = argand.inletTag;
+                        };
+                      }
+                    )
+                  ];
+                }
+              ];
+              specialArgs = {
+                argand = {
+                  inletTag = "CALLER";
+                };
+              };
+            }).fleet.options.hostName.default;
+          viaOption =
+            (evalSchema {
+              modules = [
+                {
+                  config.schema.fleet.options.hostName = genMerge.mkOption {
+                    type = genMerge.types.str;
+                    default = "plain";
+                  };
+                }
+              ];
+              schemaOption = mkSchemaOption { };
+            }).fleet.options.hostName.default;
+        in
+        "${viaArgs}/${viaOption}";
+      expected = "CALLER/plain";
+    };
+  };
 }

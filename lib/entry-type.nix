@@ -317,6 +317,22 @@ let
       mkType ? null,
       strict ? true,
       keySemantics ? { },
+      # BASE MODULE ARGS for the KIND TREE — `introspect` below, and nothing else in this file.
+      #
+      # ★ A KIND'S OWN OPTION TREE RECURSES WITHOUT ANY INSTANCE, which is why this is a separate
+      # channel from `mkInstanceType`'s and not a duplicate of it. A kind module that forces an
+      # argument WHILE DECLARING an option is applied by `introspect`'s `evalModuleTree`, on a kind
+      # with no instances anywhere — so the instance constructor is not on that path at all and
+      # threading it alone leaves this arm diverging.
+      #
+      # ★ NO `withArgs` HERE, AND THAT IS THE DESIGN RATHER THAN AN EXCEPTION TO IT. The type-level
+      # inlet exists because at a `types.submodule` site the args would otherwise have to arrive as
+      # a constructor ATTRSET, and `isModuleValue` admits any attrset, so the misread is silent.
+      # `introspect` calls the engine DIRECTLY — there is no type for a method to hang on and no
+      # module/parameter ambiguity to resolve — so the channel is `evalModuleTree`'s own published
+      # `specialArgs ? { }` formal, reached by an ordinary named formal. One vocabulary, two shapes,
+      # each forced by what is in the way at its site.
+      specialArgs ? { },
     }:
     let
       base = merge.types.deferredModule;
@@ -565,7 +581,10 @@ let
               # Uses the locally-built merged module, not config.${k}, to avoid circularity.
               introspect =
                 let
-                  dummy = merge.evalModuleTree { modules = [ merged ]; };
+                  dummy = merge.evalModuleTree {
+                    modules = [ merged ];
+                    inherit specialArgs;
+                  };
                   userOptions = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) dummy.options;
                 in
                 {
@@ -619,6 +638,10 @@ let
       mixins ? [ ],
       mkType ? null,
       keySemantics ? { },
+      # Forwarded VERBATIM to the entry type, which is what builds the kind tree. Same formal, same
+      # name, one hop — the schema option itself needs no args, because its own submodule declares
+      # only this library's introspection options and never a caller's module.
+      specialArgs ? { },
     }:
     merge.mkOption {
       description = "Schema — typed record registry with extension points";
@@ -635,6 +658,7 @@ let
               mkType
               strict
               keySemantics
+              specialArgs
               ;
           });
 
