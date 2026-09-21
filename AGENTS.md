@@ -194,13 +194,30 @@ surface by the one authority (`gen-identity`'s `hashIdentity`, ADR-0016 ruling 5
 `"schemakind"`; it is what `mkInstanceType`, `mkInstanceRegistry`, `validateInstances` and `mkCodec`
 read to decide a value is a kind value, replacing the `? kind && ? options` presence test that
 admitted any hand-written attrset. It is LAZY and the admission read never forces it — see
-`lib/entry-type.nix`'s `isSchemaKind`. `__mint` is reserved as a collection key and as a computed
-field, both refused by name. Schema-level introspection sits alongside the kinds: `_kindNames`, `_topology`
+`lib/entry-type.nix`'s `isSchemaKind`. `__mint` is reserved as a collection key, as a computed
+field and as a DECLARATION key, all three refused by name. Schema-level introspection sits alongside the kinds: `_kindNames`, `_topology`
 (`{ parent; children; }` per kind), `_refEdges` (`{ from; field; to; }`), `_edges` (parent edges plus
 ref edges, each tagged `type`), `_roots`, `_leaves`, `_collectionKeys` (the collection keys
 extracted from kind defs — built-ins plus this schema's declared `collections`; a computed
 field of the same name wins on the kind result, so reading a key through the published set
-may return the computed value).
+may return the computed value) and `_declarationKeys` (the admissible non-collection keys of a kind
+declaration — gen-merge's five structural markers plus `key`).
+
+**A key on a STRUCTURED kind declaration that no reader consumes is refused by name**
+(`lib/entry-type.nix`, bindings `surplusDeclarationKeys` and `checkDeclarationKeys`; owner-ruled
+2026-08-19, `den-hoag-nn4`). A declaration is structured when it carries a module marker; on an
+unstructured one gen-merge's `configOf` reads every key as config, so nothing is unread and nothing
+is refused. Admissible: `_declarationKeys`, `_collectionKeys`, any `_`-prefixed key, and — when the
+declaration carries no `options` key — a value that is itself an option declaration, which
+`extractedRefinements`' flat-style branch reads. The guard **stands down entirely** for a schema
+constructed with `computed` or `mkType`: both hand raw or stripped defs to a caller-supplied
+function, and gen-aspects' `mkType` consumes the whole def as a module, so that key space is
+unbounded rather than merely unknown to gen-schema. ★ Two exceptions to the `_` prefix, refused by
+their own door because gen-schema writes them onto every kind value: `__mint` always, `__functor`
+where `mkType` is null. Measured before the guard existed — a declared `__mint` did not survive and
+the kind's own mark was byte-identical with and without it; a declared `__functor` was applied by
+gen-merge's module classifier and **deleted the rest of the declaration** (`options` ⇒ `[ ]` against
+`[ "role" ]` on the clean twin).
 
 **Instance value shape**: `{ _identity; id_hash; name; <declared options>; <methods>; }`. `name`
 defaults to the registry key.

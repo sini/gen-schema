@@ -66,6 +66,23 @@ let
       ++ hostModules
       ++ [ { config._identity.keys = [ k ]; } ];
     }).config.id_hash;
+
+  # A kind reached through `mkSchemaOption`'s own construction, for the declaration-key cells below.
+  # Going through the published option is what makes those cells measure the guard's PLACEMENT
+  # inside `mkSchemaEntryType`'s merge rather than a predicate a test wrapped from outside.
+  kindOf =
+    args: decl:
+    (genMerge.evalModuleTree {
+      modules = [
+        { options.schema = mkSchemaOption args; }
+        { config.schema.host = decl; }
+      ];
+    }).config.schema.host;
+
+  strOpt = genMerge.mkOption {
+    type = genMerge.types.str;
+    default = "none";
+  };
 in
 {
   # evalSchema's two refusals, and the capability the relocation removes. All three are here rather
@@ -254,6 +271,156 @@ in
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType$";
+      };
+    };
+  };
+
+  # THE KIND-DECLARATION KEY SPACE (den-hoag-nn4). A key on a structured kind declaration that no
+  # reader consumes was discarded unread, and the discard was invisible to every instrument this
+  # library owns — a typo'd key produced an instance byte-identical to one declared without it,
+  # `id_hash` included. Owner-ruled 2026-08-19: `mkSchemaOption` aborts on an unknown kind key, by
+  # name. These cells are here rather than under ./tests because `tryEval` discards the message and
+  # WHICH key was named is the whole subject: a refusal that misdiagnoses passes a `.success` cell
+  # perfectly. The keys the guard must NOT refuse are in `ci/tests/declaration-keys.nix`.
+  flake.testsError.declaration-key-refusals = {
+    # O1. The key no reader consumes, named — and the live control in the same cell is what makes
+    # the green mean something: a guard that refused EVERY declaration would satisfy the
+    # `expectedError` below on its own. `tryEval` is load-bearing rather than defensive, because a
+    # bare control's own refusal would throw a message this cell's pattern could match.
+    test-structured-surplus-key-refuses-by-name = {
+      expr =
+        assert
+          let
+            control = builtins.tryEval (builtins.attrNames (kindOf { } { options.role = strOpt; }).options);
+          in
+          control.success && control.value == [ "role" ];
+        builtins.attrNames
+          (kindOf { } {
+            options.role = strOpt;
+            roel = "web";
+          }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': unrecognised declaration key 'roel'";
+      };
+    };
+
+    # O1d · PLACEMENT. The guard sits on the merge RESULT, so forcing ANY field of the kind meets
+    # it — here `parent`, a read that never touches `.options`. A guard sited on the options
+    # introspection instead would leave this cell green on the wrong grounds while O1 still passed.
+    test-refusal-fires-without-touching-options = {
+      expr =
+        (kindOf { } {
+          options.role = strOpt;
+          parent = "env";
+          roel = "web";
+        }).parent;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': unrecognised declaration key 'roel'";
+      };
+    };
+
+    # Every offending key is named, not just the first: a three-typo migration is otherwise three
+    # round trips. The plural form is a different code path from O1's singular one.
+    test-every-offending-key-is-named = {
+      expr =
+        builtins.attrNames
+          (kindOf { } {
+            options.role = strOpt;
+            roel = "web";
+            hsot = "a";
+          }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': unrecognised declaration keys 'hsot', 'roel'";
+      };
+    };
+  };
+
+  # ★ THE RESERVED DECLARATION KEYS. These two are the exception to the `_` prefix rule, and they
+  # are an exception because they are the names gen-schema writes onto the kind value ITSELF — the
+  # opposite of the consumer-private metadata the prefix admits. The population is read off the
+  # merge result's own key set: `__functor` and `__mint` on the default branch, `__mint` alone on
+  # the `mkType` branch, which declares no functor. Measured before the guard existed: a declared
+  # `__mint` did not survive and the kind's own mark was byte-identical with and without it, while
+  # a declared `__functor` was applied by gen-merge's module classifier and DELETED the rest of the
+  # declaration. Same class, same strength and same shape as the three reserved COLLECTION keys
+  # `mkAllCollections` already refuses.
+  flake.testsError.reserved-declaration-key-refusals = {
+    test-mint-is-a-reserved-declaration-key = {
+      expr =
+        assert
+          let
+            control = builtins.tryEval (builtins.attrNames (kindOf { } { options.role = strOpt; }).options);
+          in
+          control.success && control.value == [ "role" ];
+        builtins.attrNames
+          (kindOf { } {
+            options.role = strOpt;
+            __mint = "forged";
+          }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': declaration key '__mint' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread$";
+      };
+    };
+
+    # The `mkType` branch mints too, so the reserved door is live there even though clause A stands
+    # the unknown-key predicate down for a caller-supplied function. The control is the same schema
+    # WITHOUT the reserved key: its caller-owned surplus key must still come through untouched,
+    # which is what proves the door is reserved-name-specific rather than a second unknown-key guard.
+    test-mint-is-reserved-on-the-mkType-branch-too = {
+      expr =
+        let
+          args = {
+            mkType =
+              { kind, ... }:
+              {
+                inherit kind;
+                custom = true;
+              };
+          };
+        in
+        assert
+          let
+            control =
+              builtins.tryEval
+                (kindOf args {
+                  options.role = strOpt;
+                  unreadByGenSchema = "kept";
+                }).custom;
+          in
+          control.success && control.value;
+        (kindOf args {
+          options.role = strOpt;
+          __mint = "forged";
+        }).custom;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': declaration key '__mint' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread$";
+      };
+    };
+
+    # `__functor` is the second member of the population, and its failure mode is worse than a
+    # silent overwrite: gen-merge's module classifier APPLIES a declared one, so the rest of the
+    # declaration is deleted. The control below is the same declaration without it, whose option
+    # does land — the two arms of that deletion, in one cell.
+    test-functor-is-a-reserved-declaration-key = {
+      expr =
+        assert
+          let
+            control = builtins.tryEval (builtins.attrNames (kindOf { } { options.role = strOpt; }).options);
+          in
+          control.success && control.value == [ "role" ];
+        builtins.attrNames
+          (kindOf { } {
+            options.role = strOpt;
+            __functor = _: _: { };
+          }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': declaration key '__functor' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread$";
       };
     };
   };

@@ -984,6 +984,7 @@ Every schema has flat `_`-prefixed options for programmatic access:
 ```nix
 config.schema._kindNames                # → [ "host" "service" "user" ]
 config.schema._collectionKeys           # → [ "includes" "methods" "parent" "validators" ]
+config.schema._declarationKeys          # → [ "config" "disabledModules" "freeformType" "imports" "key" "options" ]
 
 # Per-kind introspection — available on each kind value
 config.schema.host.options          # → full option declarations (filtered, no _module.*)
@@ -1006,8 +1007,41 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 **Scope.** That idiom reads collection values on the **default entry-type path**. Two caveats, both
 real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
-with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `kind`) is refused
-when `_collectionKeys` is read, exactly as it is refused when a kind is merged.
+with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `kind`, `__mint`)
+is refused when `_collectionKeys` is read, exactly as it is refused when a kind is merged.
+
+### Unrecognised declaration keys are refused by name
+
+A key on a **structured** kind declaration that no reader consumes used to be discarded unread — a
+typo'd `roel` produced an instance byte-identical to one declared without it, `id_hash` included. It
+now aborts, naming every offending key and printing the recognised sets:
+
+```nix
+config.schema.host = {
+  options.role = mkOption { type = types.str; };
+  roel = "web";                       # typo
+};
+# → gen-schema: kind 'host': unrecognised declaration key 'roel' (declared in <…>). This declaration
+#   is structured — it carries a module marker — so gen-schema reads only: option declarations, this
+#   schema's collection keys […] (published as `schema._collectionKeys`), the module keys […]
+#   (published as `schema._declarationKeys`), and any `_`-prefixed key. …
+```
+
+A declaration is **structured** when it carries a module marker (`imports`, `options`, `config`,
+`freeformType`, `disabledModules`). An unstructured one is config shorthand: gen-merge reads every
+key of it, so nothing is unread and nothing is refused. Beside `_declarationKeys` and
+`_collectionKeys`, two rules that are not lists: any `_`-prefixed key is admitted as
+consumer-private metadata gen-schema must not read, and a value that is itself an option declaration
+is admitted when the declaration carries no `options` key — the flat-style option form, which
+gen-schema's own refinement reader consumes.
+
+The guard **stands down entirely** for a schema built with `computed` or `mkType`. Both hand the raw
+or stripped defs to a caller-supplied function — gen-aspects' `mkType` consumes the whole def as a
+module — so the key space is unbounded and not gen-schema's to close.
+
+Two exceptions to the `_` prefix, because gen-schema writes them onto every kind value and a
+declared one is discarded unread: **`__mint`** always, and **`__functor`** on a schema built without
+`mkType`. Both refuse by name, as they already do as collection keys.
 
 ### Schema Validators
 
