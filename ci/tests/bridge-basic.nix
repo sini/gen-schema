@@ -3,13 +3,17 @@
   genSchema,
   genMerge,
   genAlgebra,
+  genIdentity,
   prelude,
   ...
 }:
 let
   R = genAlgebra.record;
   record = R;
-  refinedLib = import ../../lib/refined.nix { merge = genMerge; };
+  refinedLib = import ../../lib/refined.nix {
+    merge = genMerge;
+    identity = genIdentity;
+  };
   bridgeLib = import ../../lib/bridge.nix {
     inherit prelude record;
     inherit (refinedLib) isRefined getRefinements;

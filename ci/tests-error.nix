@@ -635,4 +635,73 @@ in
       expected = "CALLER/plain";
     };
   };
+
+  # A refined type's identity refusals, and the merge refusal's wording. All three are here for this
+  # file's own reason: `tryEval` discards the message, and WHICH refusal fired is the subject.
+  flake.testsError.refined-identity-refusals = {
+    # Demanding `__id` of a refined type over a NULLARY base reaches gen-identity's OWN refusal — the
+    # refinement's `check` is a caller lambda, and the encoder refuses a lambda in an identity
+    # position by name at any depth. gen-schema states no second predicate about lambdas; the
+    # encoder's answer IS the classification, so this message is the substrate's and not a paraphrase
+    # this library keeps in step by hand.
+    test-id-of-a-refined-type-refuses-by-name = {
+      expr = (genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ]).__id;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^identity: a lambda in an identity position$";
+      };
+    };
+
+    # A refined type over a PARAMETRIC base refuses for a DIFFERENT and stated reason: every
+    # structural type gen-merge ships carries no `__mint` key at all, so there is no base identity to
+    # compose from. The message names what is true of that base rather than borrowing the sealed-arm
+    # wording, which would suggest a tagged sum that is not there.
+    test-id-of-a-refined-parametric-type-names-the-missing-mint = {
+      expr =
+        (genSchema.refined (genMerge.types.listOf genMerge.types.str) [ genSchema.refinements.nonEmpty ])
+        .__id;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: refined: base type `listOf' carries no mint at all, so a refinement of it has no base identity to compose from$";
+      };
+    };
+
+    # ★ THE WORDING AT THE MERGE DOOR IS NON-DISCRIMINATING BY CONSTRUCTION, and this cell pins that
+    # rather than pretending otherwise. `foreignRel` builds the refusal from a template interpolating
+    # `t.name`, and a refined type deliberately keeps the BASE's name — so a refined type refused
+    # against a DIFFERENT REFINEMENT of one base and against its BARE BASE produce the same string,
+    # byte for byte. An oracle pinning only this message therefore cannot tell the new refusal from
+    # the one that already shipped; the discrimination is carried by the answer-and-survivors tables
+    # in `ci/tests/refined-identity.nix`, never by the wording. Authoring a discriminating message
+    # needs a channel gen-merge does not publish — `callerTypeMerge` admits a type-or-`null` and
+    # nothing else.
+    test-the-merge-refusal-names-the-unreconciled-pair = {
+      expr =
+        let
+          port = genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ];
+          positive = genSchema.refined genMerge.types.int [ genSchema.refinements.positive ];
+        in
+        throw (port.typeMergeRel positive).refused;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^`int' and `int', which the first type's own `functor' does not reconcile$";
+      };
+    };
+
+    # The control for the cell above, and the reason it is not vacuous: where the two base NAMES
+    # differ the template DOES discriminate. So the byte-identity pinned above is specific to the
+    # same-base pair rather than the template being a constant.
+    test-control-the-merge-refusal-discriminates-different-bases = {
+      expr =
+        let
+          port = genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ];
+          other = genSchema.refined genMerge.types.str [ genSchema.refinements.positive ];
+        in
+        throw (port.typeMergeRel other).refused;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^`int' and `string', which the first type's own `functor' does not reconcile$";
+      };
+    };
+  };
 }

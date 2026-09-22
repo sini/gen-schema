@@ -3,10 +3,14 @@
   genSchema,
   genMerge,
   genAlgebra,
+  genIdentity,
   ...
 }:
 let
-  refinedLib = import ../../lib/refined.nix { merge = genMerge; };
+  refinedLib = import ../../lib/refined.nix {
+    merge = genMerge;
+    identity = genIdentity;
+  };
   inherit (refinedLib)
     types
     isRefined

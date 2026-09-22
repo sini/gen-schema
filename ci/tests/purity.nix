@@ -162,7 +162,8 @@ let
   # The live counterpart to `forbidden`: the name this library reaches for where a tether would reach
   # for nixpkgs. Every gen-schema source but THREE carries it, and all three exclusions are modules
   # that take no `prelude` formal — `lib/blame.nix` is a bare attrset of blame constructors taking no
-  # argument at all, `lib/mixin.nix` takes `{ record }` and `lib/refined.nix` takes `{ merge }`.
+  # argument at all, `lib/mixin.nix` takes `{ record }` and `lib/refined.nix` takes
+  # `{ merge, identity }`.
   # Those exclusions are what give the assertion its teeth: the expected list is a PROPER SUBSET of
   # the manifest, so a read returning one fixed text for every file lands outside it either way —
   # without the token the list collapses toward empty, with it the list swells to every source.
