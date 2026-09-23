@@ -504,10 +504,15 @@ let
               # LAZY, and load-bearing: one `evalModuleTree` per `mkType` kind, memoised in the
               # kind record and forced only by a read of `refinements` — never by `kind` or
               # `__mint.minted`.
+              #
+              # The module is named for its kind, so a refusal of its syntax (a surplus key beside
+              # the published `options`) says which kind to fix; a `_file` of the result's own wins.
               customOptions =
                 prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n))
                   (merge.evalModuleTree {
-                    modules = [ (custom // published // computedFields) ];
+                    modules = [
+                      ({ _file = "<gen-schema mkType kind ${kind}>"; } // custom // published // computedFields)
+                    ];
                     inherit specialArgs;
                   }).options;
             in

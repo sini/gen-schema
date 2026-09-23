@@ -73,38 +73,6 @@ in
           }).refinements;
       expected = [ ];
     };
-    # Totality over a caller whose `mkType` result is NOT a module functor (den-hoag-g8lo): the
-    # derivation answers { } rather than throwing.
-    test-mktype-non-module-result-is-total = {
-      expr =
-        builtins.attrNames
-          (kindOf {
-            mkType =
-              { kind, ... }:
-              {
-                inherit kind;
-                custom = true;
-              };
-          } refinedDecl).refinements;
-      expected = [ ];
-    };
-    # The derivation reads the value an instance IMPORTS, not the raw `mkType` result. A non-functor
-    # result carrying its own `options.myPort` has that key overwritten by the published `options = { }`,
-    # so its instances declare no `myPort` and the kind must publish no contract on it.
-    test-mktype-derives-from-the-published-value = {
-      expr =
-        builtins.attrNames
-          (kindOf {
-            mkType =
-              { kind, ... }:
-              {
-                inherit kind;
-                options.myPort = genMerge.mkOption { type = rp; };
-              };
-            strict = false;
-          } refinedDecl).refinements;
-      expected = [ ];
-    };
     # The `mkType` arm's mark does not read the option plane: a refined and a bare `mkType` kind mint
     # EQUAL. Whether that plane enters the preimage is an owner ruling not yet made (mx07b §4 Q1); this
     # cell is the one to rewrite deliberately if it is.
@@ -120,6 +88,47 @@ in
   # WHICH refusal fired is the subject, so it lives on testsError (see ci/tests-error.nix's header).
   # The message is the one a non-`mkType` kind gives for the same declaration.
   flake.testsError.mktype-refinements-refusal = {
+    # A caller whose `mkType` result is NOT a module functor (den-hoag-g8lo): the published value
+    # carries its keys beside `options`, a module syntax gen-merge refuses on its first read, so
+    # `refinements` refuses by name, as an instance of the kind does. Its door-or-falsifier is the
+    # refusal, naming the kind and the first surplus key.
+    test-mktype-non-module-result-refuses-by-name = {
+      expr =
+        builtins.attrNames
+          (kindOf {
+            mkType =
+              { kind, ... }:
+              {
+                inherit kind;
+                custom = true;
+              };
+          } refinedDecl).refinements;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-merge: module `<gen-schema mkType kind host>' has an unsupported attribute `custom'[.] ";
+      };
+    };
+    # The derivation reads the value an instance IMPORTS, not the raw `mkType` result: the raw result
+    # `{ kind; options.myPort; }` would be refused naming `kind`, while the published value (its
+    # `options` overwritten by `options = { }`) is refused naming `keySemantics`. The KEY is what
+    # tells the two apart, so it is pinned.
+    test-mktype-published-value-refusal-names-its-key = {
+      expr =
+        builtins.attrNames
+          (kindOf {
+            mkType =
+              { kind, ... }:
+              {
+                inherit kind;
+                options.myPort = genMerge.mkOption { type = rp; };
+              };
+            strict = false;
+          } refinedDecl).refinements;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-merge: module `<gen-schema mkType kind host>' has an unsupported attribute `keySemantics'[.] ";
+      };
+    };
     test-mktype-refined-option-refuses-by-name = {
       expr = hostsWith mkKind 70000;
       expectedError = {
