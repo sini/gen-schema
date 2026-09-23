@@ -17,9 +17,9 @@ let
   # declared twice) and `substSubModules`. Either path hands back the bare base with __schema
   # gone and the refinements silently unenforced, which is the fail-open answer this construction
   # exists to prevent. Re-completing WITHOUT the base's functor and typeMerge is what breaks the
-  # inheritance. The relation stated below then answers the base's half by ASKING THE BASE
-  # (`typeMergeRel`), so the part of the decision that is gen-merge's stays gen-merge's rather than
-  # becoming a copy of it living here.
+  # inheritance. The relation stated below then answers the base's half by asking gen-merge's one
+  # merge relation (`mergeTypes`), so the part of the decision that is gen-merge's stays gen-merge's
+  # rather than becoming a copy of it living here.
   #
   # The FUNCTOR carries the distinguishing name; the type keeps the base's. They are separate
   # axes: `name` is the value vocabulary a refined int still speaks in its error messages, while
@@ -93,52 +93,39 @@ let
       #   refinements — SEALED. Caller lambdas admit no total preimage, so this is the ruling's
       #                 "where it decides rather than mints, it compares the reified value itself"
       #                 under Nix `==`.
-      #   baseType    — NOT sealed. It is a substrate-constructed type that ANSWERS ITS OWN MERGE
-      #                 QUESTION, so it is asked: `typeMergeRel`. Taking `==` over the base record
-      #                 instead would be "a copy of the relation living here", which this file's
-      #                 header already rules out, and would refuse every base rebuilt per
+      #   baseType    — NOT sealed. It is a type that STATES ITS OWN MERGE RELATION, so the
+      #                 relation is asked, through `merge.mergeTypes`. Taking `==` over the base
+      #                 record instead would be "a copy of the relation living here", which this
+      #                 file's header already rules out, and would refuse every base rebuilt per
       #                 declaration — `(listOf str) == (listOf str)` is `false` while
-      #                 `(listOf str).typeMergeRel (listOf str)` answers `merged`, because the
-      #                 base's own relation compares the ELEMENT type rather than the container.
+      #                 `mergeTypes (listOf str) (listOf str)` merges, because the base's own
+      #                 relation compares the ELEMENT type rather than the container.
       #
       # The NAME GATE stays this relation's first clause. Stating `typeMerge` replaces the
       # derivation `mkOptionType` would have supplied, so the name comparison `protoTypeMerge` did
       # becomes this relation's to make; it is what keeps a refined type and its BARE base from
       # reconciling, in both directions.
       #
-      # ★★ A BASE CARRYING NO `typeMergeRel` FALLS BACK TO THE NAME GATE ALREADY PASSED — it neither
-      # aborts nor refuses. The delegation target is gen-merge's SYNTHESISED field, and a RAW NIXPKGS
-      # type has none: `examples/demo`'s own network kind declares `refined lib.types.str …` and
-      # `refined lib.types.int …`, so the population is live and not hypothetical.
+      # ★★ THE BASE'S HALF IS `merge.mergeTypes`, the binding gen-merge's declaration and element
+      # strata both answer through: the base's own `typeMergeRel` where it has one, and otherwise the
+      # foreign protocol's own `a.typeMerge b.functor`, behind gen-merge's type-walk fuel guard. A RAW
+      # NIXPKGS base is therefore discriminated at its PARAMETER — `refined (lib.types.listOf
+      # lib.types.str) r` and `refined (lib.types.listOf lib.types.int) r` do not merge — exactly as
+      # the same pair declared bare is refused. `examples/demo`'s network kind declares `refined
+      # lib.types.str …` and `refined lib.types.int …`, so the foreign population is live.
       #
-      # Three candidates were measured over that population, and two are wrong.
-      #   · a bare `baseType.typeMergeRel` is an evaluator abort about a missing attribute, raised at
-      #     whatever forced it — neither a value nor a named refusal.
-      #   · REFUSING, or comparing the reified base under Nix `==`, makes two IDENTICAL declarations
-      #     over a foreign base REFUSE where the shipped constructor MERGED them. Measured: `refined
-      #     lib.types.str [r]` against itself merges today and refuses under either; with `==` the
-      #     nullary leaves survive only because nixpkgs shares them, while a foreign PARAMETRIC base
-      #     rebuilt per declaration still refuses. That is a REGRESSION, not a tightening.
-      #   · falling through to `result` is the FOREIGN PROTOCOL'S OWN DEFAULT for the population the
-      #     protocol governs — `protoTypeMerge`'s name equality, which is exactly what this type got
-      #     before a relation was stated. The decision stays gen-merge's rather than becoming a copy
-      #     of it living here, which is this file's standing position.
+      # The property is PARITY: a refined pair whose refinements agree answers what its bare bases
+      # answer under `mergeTypes`, so a refinement is never more mergeable than its base. Two
+      # IDENTICAL foreign bases are refused where the base's own relation refuses them — a
+      # `coercedTo` twin (its coercion is a caller lambda, and ADR-0034's sealed-component clause
+      # replaces that component's collapse with a refusal), a `json` or `attrListOf` twin, and a
+      # nest deeper than the fuel — because the bare pair is refused the same way. Copying the
+      # foreign relation here instead would drop the fuel guard and answer the question twice.
       #
-      # So for a foreign base the relation is "the names gate AND the refinements agree" — strictly
-      # STRONGER than what shipped, never weaker, so it cannot refuse a pair whose content is
-      # identical. And `==` is not owed here: ADR-0034 scopes the reified-value comparison to a SEALED
-      # component, one whose distinguishing content is a caller-supplied lambda. That is the
-      # REFINEMENTS, which do get it above. A foreign base is substrate-constructed and merely mute in
-      # gen's protocol; handing it the sealed limb's remedy is the per-component error the ruling names
-      # — "one sealed component drags a whole kind onto the comparison limb".
-      #
-      # RESIDUE, stated rather than hidden: a foreign PARAMETRIC base is still discriminated by NAME
-      # alone, so `refined (lib.types.listOf lib.types.str) r` and `refined (lib.types.listOf
-      # lib.types.int) r` merge. That is UNCHANGED from what shipped — this construction leaves that
-      # population exactly as it found it — and closing it needs a published gen-merge door to adopt a
-      # foreign type into the protocol, which does not exist (measured: no `importLeaf`, `importType`
-      # or `interface` on gen-merge's public lib). A gen-merge base gets the full element-level
-      # discrimination through the delegation below.
+      # RESIDUE, stated rather than hidden: this relation can only answer `null`, so a refused
+      # refined twin is reported with gen-merge's generic "functor does not reconcile" wording
+      # even where the bare pair would name the exhausted fuel. The reason channel is gen-merge's
+      # wording door, not this constructor's.
       relation =
         f:
         let
@@ -150,9 +137,7 @@ let
           null
         else if partner.__schema.refinements != normalized then
           null
-        else if !(baseType ? typeMergeRel) then
-          result
-        else if (baseType.typeMergeRel partner.__schema.baseType) ? merged then
+        else if merge.mergeTypes baseType partner.__schema.baseType != null then
           result
         else
           null;

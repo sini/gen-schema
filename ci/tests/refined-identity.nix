@@ -384,14 +384,12 @@ in
       };
     };
 
-    # ── the delegation target is NOT total, and this is the fallback ───────────────────────────
-    # The base's half is answered by asking the base its own `typeMergeRel`. That field is
-    # gen-merge's SYNTHESISED one, and a RAW NIXPKGS type carries none — `examples/demo`'s network
-    # kind declares `refined lib.types.str …` and `refined lib.types.int …`, so the population is
-    # live. The fallback is the NAME GATE already passed, which is the foreign protocol's own
-    # default for exactly the types the foreign protocol governs, so the relation over a mute base
-    # is "the names gate AND the refinements agree" — strictly stronger than what shipped, hence
-    # incapable of refusing a pair whose content is identical.
+    # ── a base with no `typeMergeRel` keeps the foreign protocol's own relation ────────────────
+    # The base's half is answered by `genMerge.mergeTypes`. A RAW NIXPKGS type carries no
+    # `typeMergeRel`, so it is answered by its own `typeMerge` over the partner's functor — the
+    # foreign protocol's default for exactly the types that protocol governs. `examples/demo`'s
+    # network kind declares `refined lib.types.str …` and `refined lib.types.int …`, so the
+    # population is live. Identical content whose bare pair merges must merge here too.
     test-a-base-with-no-merge-relation-keeps-the-protocol-default = {
       expr =
         let
@@ -416,9 +414,9 @@ in
           foreignDifferentRefinement = direct (refined f.int [ refinements.tcpPort ]) (
             refined f.int [ refinements.positive ]
           );
-          # CONTROL, same instrument: a gen-merge base takes the DELEGATION instead, which
-          # discriminates at the element type where the name-gate fallback cannot. The two regimes
-          # sit side by side, so a construction that collapsed them fails one of these rows.
+          # CONTROL, same instrument: a gen-merge base is answered by its own `typeMergeRel`, which
+          # discriminates at the element type. The two vocabularies sit side by side, so a
+          # construction that collapsed them fails one of these rows.
           genMergeTwin = direct (refined (t.listOf t.str) [ refinements.nonEmpty ]) (
             refined (t.listOf t.str) [ refinements.nonEmpty ]
           );
@@ -444,6 +442,55 @@ in
           survivors = [ "must not be empty" ];
         };
         genMergeDifferentElement = {
+          answer = "null";
+          survivors = [ ];
+        };
+      };
+    };
+
+    # ── a FOREIGN base is asked through gen-merge's one merge relation ────────────────────────
+    # The base's half is `genMerge.mergeTypes`, the binding gen-merge's declaration and element
+    # strata both answer through: the base's own `typeMergeRel` where it has one, the foreign
+    # protocol's own `typeMerge` over the partner's functor where it has not. A raw nixpkgs
+    # container is therefore discriminated at its PARAMETER, exactly as it is when declared bare.
+    test-a-foreign-parametric-base-is-discriminated-at-its-parameter = {
+      expr =
+        let
+          f = lib.types;
+        in
+        {
+          # the row this cell exists for: same container, same refinement, different element
+          foreignDifferentElement = direct (refined (f.listOf f.str) [ refinements.nonEmpty ]) (
+            refined (f.listOf f.int) [ refinements.nonEmpty ]
+          );
+          # one level down, so a relation that stopped at the outer container fails it
+          foreignDifferentNestedElement = direct (refined (f.attrsOf (f.listOf f.str)) [
+            refinements.nonEmpty
+          ]) (refined (f.attrsOf (f.listOf f.int)) [ refinements.nonEmpty ]);
+          # a twin rebuilt per declaration still merges, with the refinement intact
+          foreignTwin = direct (refined (f.attrsOf (f.listOf f.str)) [ refinements.nonEmpty ]) (
+            refined (f.attrsOf (f.listOf f.str)) [ refinements.nonEmpty ]
+          );
+          # a base that refuses its OWN twin is refused under a refinement too: `coercedTo` carries a
+          # caller function nixpkgs' relation will not compare, and the bare pair refuses the same way
+          foreignBaseRefusingItsTwin = direct (refined (f.coercedTo f.int toString f.str) [
+            refinements.nonEmpty
+          ]) (refined (f.coercedTo f.int toString f.str) [ refinements.nonEmpty ]);
+        };
+      expected = {
+        foreignDifferentElement = {
+          answer = "null";
+          survivors = [ ];
+        };
+        foreignDifferentNestedElement = {
+          answer = "null";
+          survivors = [ ];
+        };
+        foreignTwin = {
+          answer = "merged";
+          survivors = [ "must not be empty" ];
+        };
+        foreignBaseRefusingItsTwin = {
           answer = "null";
           survivors = [ ];
         };
