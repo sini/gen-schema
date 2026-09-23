@@ -1,11 +1,12 @@
 # THE KIND-DECLARATION KEY SPACE (den-hoag-nn4) — the cells that must stay GREEN.
 #
 # The refusal's own by-name cells live in `ci/tests-error.nix`, because `tryEval` discards a message
-# and WHICH key was named is the whole subject. These three are the other half: every one of them is
-# a key the guard must NOT refuse, and each names the reader that consumes it.
+# and WHICH key was named is the whole subject. These two are the other half: each is a key the guard
+# must NOT refuse, and each names the reader that consumes it. The false-refusal control for an
+# option key — one the option plane reads — is the `reverse-half-read` group in `auto-integration.nix`.
 #
-# ★ A guard that refuses everything passes every by-name cell in the sibling file and fails all
-# three of these. That is what makes them the discriminating half rather than decoration.
+# ★ A guard that refuses everything passes every by-name cell in the sibling file and fails
+# both of these. That is what makes them the discriminating half rather than decoration.
 {
   genSchema,
   genMerge,
@@ -52,25 +53,6 @@ in
         options = [ "role" ];
         parent = "env";
       };
-    };
-
-    # O5 · THE FALSE-REFUSAL CONTROL. `imports` makes the def structured and `options` is absent, so
-    # `extractedRefinements`' flat-style fallback reads `myPort` and its refinement contract lands on
-    # the kind. A predicate reasoned from gen-merge's `configOf` alone refuses this key — `configOf`
-    # never sees it — which is the false-refusal direction ADR-0008 §3 names.
-    #
-    # The refinement's `check` is a lambda and nix-unit compares values, so the cell asserts the
-    # MESSAGES: that is the part which proves the contract arrived rather than that something did.
-    test-reader-consumed-key-is-not-refused = {
-      expr =
-        map (r: r.message)
-          (kindOf { } {
-            imports = [ { } ];
-            myPort = genMerge.mkOption {
-              type = genSchema.refined genMerge.types.int genSchema.refinements.tcpPort;
-            };
-          }).refinements.myPort;
-      expected = [ "must be a valid TCP port (1-65535)" ];
     };
 
     # O6 · THE CALLER-FUNCTION EXEMPTION. `computed` receives the RAW defs, so the key space is not

@@ -106,6 +106,20 @@ let
   # ELEMENT throws escapes the wrapper and the throw then lands outside the `assert` — where the
   # cell's `expectedError` pattern can match it and a refuse-everything implementation scores green.
   forced = v: builtins.tryEval (builtins.deepSeq v v);
+
+  # den-hoag-zijk1. A refined port option, and one instance's `myPort` under a kind declared as
+  # `decl` — the instance plane is where a refinement contract is enforced or silently is not.
+  portOpt = genMerge.mkOption {
+    type = genSchema.refined genMerge.types.int genSchema.refinements.tcpPort;
+  };
+  portOf =
+    decl: port:
+    (genMerge.evalModuleTree {
+      modules = [
+        { options.hosts = mkInstanceRegistry (kindOf { } decl) { }; }
+        { config.hosts.a.myPort = port; }
+      ];
+    }).config.hosts.a.myPort;
 in
 {
   # evalSchema's two refusals, and the capability the relocation removes. All three are here rather
@@ -359,6 +373,94 @@ in
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kind 'host': unrecognised declaration keys 'hsot', 'roel'";
+      };
+    };
+
+    # den-hoag-zijk1. A top-level `mkOption` on a structured kind is no option declaration: neither
+    # module engine collects one, so it is an unread key and refuses by name. The control is the
+    # module-style twin, which must land `myPort` — without it a refuse-everything guard satisfies
+    # the pattern.
+    test-flat-option-on-structured-kind-refuses-by-name = {
+      expr =
+        assert
+          let
+            control = forced (builtins.attrNames (kindOf { } { options.myPort = portOpt; }).options);
+          in
+          control.success && control.value == [ "myPort" ];
+        builtins.attrNames
+          (kindOf { } {
+            imports = [ { } ];
+            myPort = portOpt;
+          }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': unrecognised declaration key 'myPort'";
+      };
+    };
+
+    # The same key under `freeformType`, the one flat shape that evaluated end to end before: the
+    # option record sat on the freeform plane as a VALUE while the refinement reader read it as a
+    # declaration.
+    test-flat-option-under-freeform-refuses-by-name = {
+      expr =
+        assert
+          let
+            control = forced (builtins.attrNames (kindOf { } { options.myPort = portOpt; }).options);
+          in
+          control.success && control.value == [ "myPort" ];
+        builtins.attrNames
+          (kindOf { } {
+            freeformType = genMerge.types.lazyAttrsOf genMerge.types.anything;
+            myPort = portOpt;
+          }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': unrecognised declaration key 'myPort'";
+      };
+    };
+  };
+
+  # den-hoag-zijk1 · the REVERSE half-read, by name. An option the engine collects through `imports`
+  # lands its refinement contract too, so an out-of-contract value is refused as the refinement,
+  # naming the field. The control is the in-contract value on the same shape.
+  flake.testsError.reverse-half-read-refusals = {
+    test-imported-refined-option-is-enforced = {
+      expr =
+        assert
+          let
+            control = forced (portOf { imports = [ { options.myPort = portOpt; } ]; } 8080);
+          in
+          control.success && control.value == 8080;
+        portOf { imports = [ { options.myPort = portOpt; } ]; } 70000;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: refinement failed at host:a.myPort";
+      };
+    };
+
+    # A bare `int` declared FIRST and the refined type SECOND must not merge down to `int` and drop
+    # the contract (den-hoag-efepm): the refinement plane is read off the engine's merged type, so a
+    # swallow there would accept 70000. The control is the refined-first order, refused the same way.
+    test-bare-first-refined-second-does-not-swallow = {
+      expr =
+        assert
+          !(forced (
+            portOf {
+              imports = [
+                { options.myPort = portOpt; }
+                { options.myPort = genMerge.mkOption { type = genMerge.types.int; }; }
+              ];
+            } 70000
+          )).success;
+        portOf {
+          imports = [
+            { options.myPort = genMerge.mkOption { type = genMerge.types.int; }; }
+            { options.myPort = portOpt; }
+          ];
+        } 70000;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-merge: option `myPort' is declared with types that do not merge";
       };
     };
   };

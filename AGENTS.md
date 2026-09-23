@@ -209,9 +209,10 @@ names rather than writing them).
 (`lib/entry-type.nix`, bindings `surplusDeclarationKeys` and `checkDeclarationKeys`; owner-ruled
 2026-08-19, `den-hoag-nn4`). A declaration is structured when it carries a module marker; on an
 unstructured one gen-merge's `configOf` reads every key as config, so nothing is unread and nothing
-is refused. Admissible: `_declarationKeys`, `_collectionKeys`, any `_`-prefixed key, and — when the
-declaration carries no `options` key — a value that is itself an option declaration, which
-`extractedRefinements`' flat-style branch reads. The guard **stands down entirely** for a schema
+is refused. Admissible: `_declarationKeys`, `_collectionKeys` and any `_`-prefixed key. A bare top-level option
+declaration is not among them: an option is declared under `options`, and `extractedRefinements` is a
+projection of `introspect.options`, so refinements land exactly where options do (`den-hoag-zijk1`).
+The guard **stands down entirely** for a schema
 constructed with `computed` or `mkType`: both hand raw or stripped defs to a caller-supplied
 function, and gen-aspects' `mkType` consumes the whole def as a module, so that key space is
 unbounded rather than merely unknown to gen-schema. ★ Two exceptions to the `_` prefix, refused by

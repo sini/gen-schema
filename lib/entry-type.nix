@@ -271,19 +271,11 @@ let
     else if !(isStructuredDecl v) then
       [ ]
     else
-      let
-        # RULE 5 · a value that is itself an option declaration, when `d.value` carries no `options`
-        # key — `extractedRefinements`' flat-style fallback, `d.value.options or (filterAttrs
-        # isOptionDecl d.value)`, which fires exactly when `options` is absent.
-        # ★ THE CARVE-OUT, named rather than glossed: the reader's full condition is
-        # `mixinResult == null && !(d.value ? options)` and this mirrors only the SECOND conjunct.
-        # On the MIXIN path the bridge supplies the refinements and this fallback never runs, so
-        # there the rule admits a key no reader consumes — an UNDER-fire, which is the safe
-        # direction, and the reason it is not tightened is that a mixin's own emitted module can
-        # reintroduce the key.
-        readAsOptionDecls =
-          if v ? options then [ ] else prelude.attrNames (prelude.filterAttrs (_: isOptionDecl) v);
-      in
+      # A top-level option declaration is NOT among the read keys: a kind entry is a module, and
+      # neither gen-merge nor nixpkgs collects a top-level `mkOption` as a declaration, so it is
+      # refused here like any other unread key. `options` is the one place an option is declared.
+      # Scoped to the kind entry: a mixin `baseModule` is a RECORD, and `bridge.nix`'s `emitModule`
+      # is the typed record→module boundary that lifts its flat option records soundly.
       builtins.filter (
         k:
         # RULE 4 · any key beginning with `_` is consumer-private metadata this library must not
@@ -295,7 +287,7 @@ let
         # RULES 1-3 · this schema's collection keys (reader: `extractedCollections`), gen-merge's
         # five structural markers (readers: `configOf`, `optionsOf`, `importsOf`, `topFreeformOf`)
         # and the `key` metadata name (reader: `configOf`'s unstructured strip list).
-        && !(builtins.elem k (declarationKeys ++ collectionKeys ++ readAsOptionDecls))
+        && !(builtins.elem k (declarationKeys ++ collectionKeys))
       ) (prelude.attrNames v);
 
   # Names EVERY offending key on the first offending def, never just the first — a three-typo
@@ -310,7 +302,7 @@ let
     in
     "gen-schema: kind '${kind}': unrecognised declaration ${noun} ${named} (declared in ${file}). "
     + "This declaration is structured — it carries a module marker — so gen-schema reads only: "
-    + "option declarations, this schema's collection keys "
+    + "this schema's collection keys "
     + "[${builtins.concatStringsSep ", " collectionKeys}] (published as `schema._collectionKeys`), "
     + "the module keys [${builtins.concatStringsSep ", " declarationKeys}] "
     + "(published as `schema._declarationKeys`), and any `_`-prefixed key. Every other key is "
@@ -561,35 +553,21 @@ let
               # Effective base module: bridge output when mixins applied, original otherwise
               effectiveBase = if mixinResult != null then mixinResult.module else resolvedBase;
 
-              # Refinements extracted from option declarations.
-              # Mixin path: bridge already extracted them.
-              # Non-mixin path: scan all defs for mkOption values with __schema metadata.
+              # Refinements are a PROJECTION of the option plane, read off the same `introspect.options`
+              # `refs` is, so `attrNames refinements ⊆ attrNames options` holds by construction and no
+              # option can land without its contract, nor a contract without its option. A second,
+              # syntactic reader of the raw defs is what let the two planes disagree. On the mixin path
+              # the bridge's record refinements are unioned in: its keys are lifted into `options`, so
+              # the inclusion still holds, and a contract declared in the kind entry itself is read too.
+              # Lazy: forced only when `refinements` is, and that must stay so.
               # Stored on the kind result so mkInstanceRegistry can consume them automatically.
               extractedRefinements =
-                if mixinResult != null then
-                  mixinResult.refinements
-                else
-                  let
-                    # Collect option declarations from all defs (inline attrsets only).
-                    # Tries d.value.options first (module-style { options.x = mkOption ...; })
-                    # then falls back to scanning d.value for mkOption values directly
-                    # (flat-style { x = mkOption ...; }). Assumes a user field named "options"
-                    # won't contain mkOption values — this is safe because mkOption produces
-                    # attrsets with _type = "option" which user data never has.
-                    allOptionDecls = builtins.foldl' (
-                      acc: d:
-                      if builtins.isAttrs d.value then
-                        let
-                          opts = d.value.options or (prelude.filterAttrs (_: isOptionDecl) d.value);
-                        in
-                        acc // (prelude.filterAttrs (_: v: isOptionDecl v && v ? type && v.type ? __schema) opts)
-                      else
-                        acc
-                    ) { } defs;
-                  in
-                  prelude.filterAttrs (_: v: v != [ ]) (
-                    prelude.mapAttrs (_: v: getRefinements v.type) allOptionDecls
-                  );
+                (if mixinResult != null then mixinResult.refinements else { })
+                // prelude.filterAttrs (_: v: v != [ ]) (
+                  prelude.mapAttrs (_: o: getRefinements o.type) (
+                    prelude.filterAttrs (_: o: isOptionDecl o && o ? type) introspect.options
+                  )
+                );
 
               # Merge bridge-extracted collections into the collection results
               bridgeCollections =
@@ -772,7 +750,7 @@ let
             # over the RAW source, comments included — because its comment stripper is line-based
             # and a multi-line string is where that premise could break. Matching `_collectionKeys`
             # above costs nothing and leaves that census's population where it was.
-            description = "The admissible non-collection keys of a kind declaration: gen-merge's five structural markers plus the `key` metadata name. A structured declaration — one carrying any of those markers — is read ONLY through this set, this schema's `_collectionKeys`, and two rules that are not lists: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read, and a value that is itself an option declaration is admitted when the declaration carries no `options` key (the flat-style option form). Every other key on a structured declaration is refused by name. Two exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. An UNSTRUCTURED declaration carries no marker, every key of it is read as config, and none is refused.";
+            description = "The admissible non-collection keys of a kind declaration: gen-merge's five structural markers plus the `key` metadata name. A structured declaration — one carrying any of those markers — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. An option is declared under `options`; a bare top-level option declaration is not read, because neither module engine collects one, and is refused like any other key. Every other key on a structured declaration is refused by name. Two exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. An UNSTRUCTURED declaration carries no marker, every key of it is read as config, and none is refused.";
           };
           config =
             let

@@ -1022,18 +1022,20 @@ config.schema.host = {
   roel = "web";                       # typo
 };
 # → gen-schema: kind 'host': unrecognised declaration key 'roel' (declared in <…>). This declaration
-#   is structured — it carries a module marker — so gen-schema reads only: option declarations, this
-#   schema's collection keys […] (published as `schema._collectionKeys`), the module keys […]
+#   is structured — it carries a module marker — so gen-schema reads only: this schema's
+#   collection keys […] (published as `schema._collectionKeys`), the module keys […]
 #   (published as `schema._declarationKeys`), and any `_`-prefixed key. …
 ```
 
 A declaration is **structured** when it carries a module marker (`imports`, `options`, `config`,
 `freeformType`, `disabledModules`). An unstructured one is config shorthand: gen-merge reads every
 key of it, so nothing is unread and nothing is refused. Beside `_declarationKeys` and
-`_collectionKeys`, two rules that are not lists: any `_`-prefixed key is admitted as
-consumer-private metadata gen-schema must not read, and a value that is itself an option declaration
-is admitted when the declaration carries no `options` key — the flat-style option form, which
-gen-schema's own refinement reader consumes.
+`_collectionKeys`, one rule that is not a list: any `_`-prefixed key is admitted as
+consumer-private metadata gen-schema must not read. An option is declared under `options`; a bare
+top-level `myPort = mkOption { … }` is refused like any other unread key, because a kind entry is a
+module and neither gen-merge nor nixpkgs collects a top-level `mkOption` as a declaration. A
+kind's refinement contracts are read off its option plane, so a refined option declared through
+`imports`, `baseModule` or a function module is enforced exactly as a module-style one is.
 
 The guard **stands down entirely** for a schema built with `computed` or `mkType`. Both hand the raw
 or stripped defs to a caller-supplied function — gen-aspects' `mkType` consumes the whole def as a

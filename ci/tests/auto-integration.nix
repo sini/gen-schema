@@ -111,6 +111,47 @@ let
       }
     ];
   };
+
+  # --- den-hoag-zijk1: the refinement plane is a projection of the option plane ---
+  # Wherever the engine collects a refined option — `imports`, `baseModule`, a function module, a
+  # kind with mixins — its contract lands and is enforced. Before, a second syntactic reader of
+  # the raw defs saw only an inline `options` key, and 70000 passed a `tcpPort` contract.
+
+  portOpt = genMerge.mkOption {
+    type = genSchema.refined genMerge.types.int genSchema.refinements.tcpPort;
+  };
+  tcpMsg = [ "must be a valid TCP port (1-65535)" ];
+  hostKind =
+    args: decl:
+    (genMerge.evalModuleTree {
+      modules = [
+        { options.schema = mkSchemaOption args; }
+        { config.schema.host = decl; }
+      ];
+    }).config.schema.host;
+  messages = k: builtins.mapAttrs (_: map (r: r.message)) k.refinements;
+  portAccepted =
+    args: decl: port:
+    builtins.tryEval
+      (genMerge.evalModuleTree {
+        modules = [
+          { options.hosts = mkInstanceRegistry (hostKind args decl) { }; }
+          { config.hosts.a.myPort = port; }
+        ];
+      }).config.hosts.a.myPort;
+  imported = {
+    imports = [ { options.myPort = portOpt; } ];
+  };
+  moduleStyle = {
+    options.myPort = portOpt;
+  };
+  mixinArgs = {
+    mixins = [ monitorable ];
+    baseModule.port = genMerge.mkOption {
+      type = genMerge.types.int;
+      default = 8080;
+    };
+  };
 in
 {
   # Auto-extracted refinements: valid value passes
@@ -150,5 +191,61 @@ in
   flake.tests.auto-integration.test-auto-mixin-base-preserved = {
     expr = mixinEval.config.services.web.hostname;
     expected = "localhost";
+  };
+
+  flake.tests.reverse-half-read = {
+    test-imported-option-lands-its-refinement = {
+      expr = messages (hostKind { } imported);
+      expected.myPort = tcpMsg;
+    };
+    test-baseModule-option-lands-its-refinement = {
+      expr = messages (hostKind { baseModule.options.myPort = portOpt; } { });
+      expected.myPort = tcpMsg;
+    };
+    test-function-module-option-lands-its-refinement = {
+      expr = messages (hostKind { } ({ ... }: moduleStyle));
+      expected.myPort = tcpMsg;
+    };
+    test-imported-option-refuses-out-of-contract = {
+      expr = (portAccepted { } imported 70000).success;
+      expected = false;
+    };
+    # CONTROL: the in-contract value on the same shape is accepted, so the refusal above is the
+    # contract and not a shape that refuses everything.
+    test-imported-option-accepts-in-contract = {
+      expr = portAccepted { } imported 8080;
+      expected = {
+        success = true;
+        value = 8080;
+      };
+    };
+    # CONTROL: the module-style shape, which both readers always saw.
+    test-module-style-control = {
+      expr = {
+        messages = messages (hostKind { } moduleStyle);
+        accepted = (portAccepted { } moduleStyle 70000).success;
+      };
+      expected = {
+        messages.myPort = tcpMsg;
+        accepted = false;
+      };
+    };
+    # The mixin branch: a contract declared in the kind entry itself, beside the bridge's record.
+    test-mixin-kind-entry-option-refuses-out-of-contract = {
+      expr = (portAccepted mixinArgs moduleStyle 70000).success;
+      expected = false;
+    };
+    test-mixin-kind-entry-option-accepts-in-contract = {
+      expr = portAccepted mixinArgs moduleStyle 8080;
+      expected = {
+        success = true;
+        value = 8080;
+      };
+    };
+    # An unstructured top-level `mkOption` is config to the engine, so it lands neither plane.
+    test-flat-unstructured-lands-no-refinement = {
+      expr = builtins.attrNames (hostKind { } { myPort = portOpt; }).refinements;
+      expected = [ ];
+    };
   };
 }
