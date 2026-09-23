@@ -215,6 +215,63 @@ in
       };
     };
 
+    # A refinement redeclared against its BARE base refuses whichever declaration comes first, and
+    # under a gen container as directly (gen-merge's declared-type fold: the earlier gen relation's
+    # refusal is never overruled, and the later declaration decides). Before it, the bare base
+    # declared first merged and dropped every refinement (`no-refinements`, nothing said).
+    test-redeclaration-refuses-a-refinement-against-its-bare-base-declared-first =
+      let
+        R = refined t.int [ refinements.tcpPort ];
+        redeclareAll =
+          ts:
+          let
+            attempt = builtins.tryEval (
+              let
+                opt =
+                  (genMerge.evalModuleTree {
+                    modules = map (ty: { options.probe = genMerge.mkOption { type = ty; }; }) ts;
+                  }).options.probe;
+                msgs = map (r: r.message) (opt.type.__schema.refinements or [ ]);
+              in
+              builtins.deepSeq msgs msgs
+            );
+          in
+          if attempt.success then
+            {
+              answer = "merged";
+              survivors = attempt.value;
+            }
+          else
+            {
+              answer = "refused";
+              survivors = [ ];
+            };
+        refused = {
+          answer = "refused";
+          survivors = [ ];
+        };
+      in
+      {
+        expr = {
+          bareFirst = redeclare t.int R;
+          listOfBareFirst = redeclare (t.listOf t.int) (t.listOf R);
+          attrsOfBareFirst = redeclare (t.attrsOf t.int) (t.attrsOf R);
+          nullOrBareFirst = redeclare (t.nullOr t.int) (t.nullOr R);
+          threeBareBareRefined = redeclareAll [
+            t.int
+            t.int
+            R
+          ];
+        };
+        expected = {
+          bareFirst = refused;
+          listOfBareFirst = refused;
+          attrsOfBareFirst = refused;
+          nullOrBareFirst = refused;
+          threeBareBareRefined = refused;
+        };
+      };
+
     # The in-cell controls: these three refuse in BOTH states, so they show the entry is reached and
     # the pairs are distinguishable rather than the relation being uniformly closed.
     test-control-redeclaration-refuses-across-different-bases = {
