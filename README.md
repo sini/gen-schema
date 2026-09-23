@@ -1214,7 +1214,7 @@ Returns `lib.mkOption` — use as `options.schema = mkSchemaOption { ... }`.
 
 #### `mkSchemaEntryType` `mkType` parameter
 
-`mkType` replaces the standard deferredModule merge with a custom entry type constructor. When `null` (the default), kinds produce the standard deferred module with `__functor` wrapping, mixin pipeline, and refinement extraction. When provided, collection extraction still runs first, but `mkType` controls the merged result — the mixin pipeline, `__functor` wrapping, and refinement extraction are all skipped.
+`mkType` replaces the standard deferredModule merge with a custom entry type constructor. When `null` (the default), kinds produce the standard deferred module with `__functor` wrapping, mixin pipeline, and refinement extraction. When provided, collection extraction still runs first, but `mkType` controls the merged result — the mixin pipeline and `__functor` wrapping are skipped. `refinements` is still derived: it is read from the option plane of the published kind value (the `mkType` result with the published `options = { }`, `refs = { }` and computed fields applied), which is the module an instance imports, so a refined option the `mkType` result's module declares is enforced by the instance registry exactly as on the default branch. The evaluation is lazy — one module evaluation per `mkType` kind, forced at the first read of `refinements`. The kind's provenance mark does not read that option plane on this branch.
 
 ```nix
 mkSchemaEntryType {

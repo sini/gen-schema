@@ -75,6 +75,17 @@ let
   # mintable identity has `__mint` present and `minted` absent, and that read aborts uncatchably.
   isSchemaKind = v: builtins.isAttrs v && v ? kind && v ? __mint && v.__mint ? minted;
 
+  # THE REFINEMENT PLANE IS A PROJECTION OF AN OPTION PLANE (ADR-0013: a derivable fact is derived,
+  # once). Every arm that publishes `refinements` from an evaluated option plane reads it through this
+  # one binding, so two arms cannot disagree on what a refined option contributes.
+  refinementsOfOptions =
+    opts:
+    prelude.filterAttrs (_: v: v != [ ]) (
+      prelude.mapAttrs (_: o: getRefinements o.type) (
+        prelude.filterAttrs (_: o: isOptionDecl o && o ? type) opts
+      )
+    );
+
   # methods is a built-in collection — user collections are additional.
   #
   # Hoisted out of mkSchemaEntryType so the entry type and mkSchemaOption's published
@@ -171,7 +182,7 @@ let
     "keySemantics" # the `keySemantics` formal, both branches
     "options" # `introspect.options`, both branches
     "refs" # `introspect.refs`, both branches
-    "refinements" # `extractedRefinements`, both branches
+    "refinements" # `extractedRefinements` default branch, `refinementsOfOptions customOptions` mkType branch
     # Written AFTER `// finalCollections` and refused for the REVERSE reason: the mark is applied
     # last, so a collection of that name is SILENTLY OVERWRITTEN — something vanishes and nothing
     # says so. Kept verbatim from the door's own third clause.
@@ -317,7 +328,8 @@ let
       mkType ? null,
       strict ? true,
       keySemantics ? { },
-      # BASE MODULE ARGS for the KIND TREE — `introspect` below, and nothing else in this file.
+      # BASE MODULE ARGS for the KIND TREE — `introspect` and the `mkType` arm's `customOptions`
+      # below, and nothing else in this file.
       #
       # ★ A KIND'S OWN OPTION TREE RECURSES WITHOUT ANY INSTANCE, which is why this is a separate
       # channel from `mkInstanceType`'s and not a duplicate of it. A kind module that forces an
@@ -463,30 +475,56 @@ let
         checkDeclarationKeys (
           if mkType != null then
             # Custom entry type: collection extraction runs first (above),
-            # then mkType controls the result. Mixin pipeline, __functor
-            # wrapping, and extractedRefinements are all skipped.
+            # then mkType controls the result. The mixin pipeline and __functor
+            # wrapping are skipped; `refinements` is DERIVED, from the option plane
+            # of the value an instance of this kind imports.
             # Precedence: computedFields wins over mkType result for same-named keys,
             # so computed topology/meta fields remain authoritative.
             # strippedDefs are passed so mkType implementations can wire user-declared
             # options/config from the schema kind entry into their own type systems.
-            mkType {
-              kindModule = resolvedBase;
-              collections = extractedCollections;
-              defs = strippedDefs;
-              inherit kind;
-            }
+            let
+              custom = mkType {
+                kindModule = resolvedBase;
+                collections = extractedCollections;
+                defs = strippedDefs;
+                inherit kind;
+              };
+              published = {
+                inherit strict keySemantics;
+                options = { };
+                refs = { };
+              };
+              # The option plane an instance sees: `mkInstanceType` imports the PUBLISHED kind
+              # value, so the plane is evaluated over the `mkType` result with the published
+              # literals and computed fields applied — never over the raw result, whose own
+              # `options` key the published `options = { }` overwrites. `specialArgs` and the
+              # `_module` filter as `introspect` threads them. The two derived fields
+              # (`refinements`, `__mint`) are left out; neither is a module declaration.
+              #
+              # LAZY, and load-bearing: one `evalModuleTree` per `mkType` kind, memoised in the
+              # kind record and forced only by a read of `refinements` — never by `kind` or
+              # `__mint.minted`.
+              customOptions =
+                prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n))
+                  (merge.evalModuleTree {
+                    modules = [ (custom // published // computedFields) ];
+                    inherit specialArgs;
+                  }).options;
+            in
+            custom
+            // published
             // {
-              inherit strict keySemantics;
-              options = { };
-              refs = { };
-              refinements = { };
+              refinements = refinementsOfOptions customOptions;
             }
             // computedFields
             // {
               # `kind` is the LET-BOUND `prelude.last loc` — the option path, which is
               # authoritative — never the `mkType` result's echo of it, which is caller data.
-              # This arm declares no options, refs or refinements (the three literals above), so
-              # those components of the preimage are empty by construction, not by omission.
+              # The arm publishes `options` and `refs` as the literals above, so those components
+              # of the preimage are empty by construction. `refinements` is derived above, but its
+              # preimage component stays `[ ]` on this arm: the mark does not read the option
+              # plane here, and whether it should is an owner ruling not yet made (den-hoag-mx07b
+              # §4 Q1). `ci/tests/mktype-refinements.nix` pins that state.
               __mint = {
                 minted = markOf {
                   inherit kind strict;
