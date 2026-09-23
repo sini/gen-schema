@@ -703,5 +703,21 @@ in
         msg = "^`int' and `string', which the first type's own `functor' does not reconcile$";
       };
     };
+
+    # a refinement chain past the type-identity bound refuses with gen-types' own named refusal,
+    # single-sourced, where it used to overflow the stack
+    test-refined-chain-past-the-bound-names-it = {
+      expr =
+        let
+          chain =
+            n:
+            if n == 0 then genSchema.refined genMerge.types.int [ ] else genSchema.refined (chain (n - 1)) [ ];
+        in
+        (chain 1500).__id;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^identity: a type nests deeper than the type-identity depth bound \\(128 levels\\); a self-referential type has no identity$";
+      };
+    };
   };
 }

@@ -20,6 +20,7 @@
   lib,
   genSchema,
   genMerge,
+  genTypes,
   ...
 }:
 let
@@ -555,6 +556,44 @@ in
     };
 
     # ── §2.5 · what does NOT change, so the readers of `__schema` are shown untouched ──────────
+    # ── O3 · type nesting is bounded, by the base's guard AND by this constructor's own step ──
+    # `refined` mints over its base's mint, so it steps gen-types' type-identity index itself: a
+    # chain of refinements over `int` 1500 deep never meets a gen-types composite, and on the tree
+    # before it overflowed the stack about 830 deep, uncatchably. A cycle through a gen-types
+    # composite (`sref`, `sself`) re-entered its own mint. All are refused by name now, catchably.
+    test-refined-bounds-type-nesting = {
+      expr =
+        let
+          r = genTypes.union [
+            genTypes.int
+            (genTypes.listOf r)
+          ];
+          sself = refined (genTypes.listOf sself) [ ];
+          chain = n: if n == 0 then refined t.int [ ] else refined (chain (n - 1)) [ ];
+        in
+        {
+          overCycle = regime (refined r [ ]);
+          selfCycle = regime sself;
+          chain100 = regime (chain 100);
+          chain1500 = regime (chain 1500);
+          chain1500Answers = answers (chain 1500).__id;
+          flat = regime (
+            refined (genTypes.union [
+              genTypes.int
+              (genTypes.listOf genTypes.int)
+            ]) [ ]
+          );
+        };
+      expected = {
+        overCycle = "unmintable";
+        selfCycle = "unmintable";
+        chain100 = "minted";
+        chain1500 = "unmintable";
+        chain1500Answers = false;
+        flat = "minted";
+      };
+    };
+
     test-refinement-checking-is-unchanged = {
       expr =
         let

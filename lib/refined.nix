@@ -49,7 +49,8 @@ let
 
       # The base enters the preimage as an IDENTITY, never as a value — `gen-types`' `idOf` is the
       # binding matched, and it is what keeps type NESTING off the encoder's depth bound, since an
-      # identity is a fixed width whatever it stands for.
+      # identity is a fixed width whatever it stands for — and onto gen-types' type-identity bound,
+      # which `guard` below steps.
       #
       # ★ THE BASE HAS THREE STATES AND THE THIRD IS THE COMMON ONE, so the missing attribute is
       # refused HERE rather than left to an `or` that would name something false. Every structural
@@ -81,7 +82,18 @@ let
             }
             .${l}
           );
-      attempt = builtins.tryEval mint;
+      # ★ THIS CONSTRUCTOR MINTS OVER ITS BASE'S MINT, SO IT STEPS gen-types' TYPE-IDENTITY INDEX
+      # ITSELF (`identityGuard`, reached through gen-merge's injected leaf vocabulary so the bound and
+      # its refusal stay single-sourced). Passing the base's `__okAt` through unstepped is sound for a
+      # cycle, which always crosses a gen-types composite, and unsound for depth: a chain of
+      # refinements never meets a guarded node and overflows the stack about 830 deep, uncatchably.
+      # A leaf vocabulary without the guard refuses by name here rather than as a missing attribute.
+      guard =
+        (merge.types.identityGuard
+          or (throw "gen-schema: refined: the leaf vocabulary behind this gen-merge exports no `identityGuard`, so a refinement cannot bound its type nesting; wire a gen-types that exports it")
+        )
+          [ baseType ];
+      attempt = if guard.ok then builtins.tryEval mint else { success = false; };
 
       functorName = "refined<${baseType.name or "?"}>";
 
@@ -169,7 +181,8 @@ let
                   reason = "the mint refuses this construction's arguments; demand `__id` for its named refusal";
                 };
               };
-          __id = mint;
+          __id = if guard.ok then mint else guard.refusal;
+          __okAt = guard.okAt;
 
           typeMerge = relation;
           # payload null is the honest shape for a metadata decoration: there is nothing to fold
