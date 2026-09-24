@@ -128,14 +128,14 @@ let
       # other (gen-merge README `### typeMergeRel` clause (a), "the type-level form of a dropped
       # definition"). The rebuilt type is itself a `mkRefinedType`, so the fold stays closed.
       #
-      # ★ WHAT THIS MERGES THAT A NAME GATE REFUSED: every addCheck-family base pair whose foreign
-      # functors coincide, refinements equal. `refined port ∥ refined int` merges to `refined<int>`
-      # and its `.check 70000` is true; `refined ints.u8 ∥ refined ints.u16` accepts 300; `refined
-      # (between 0 1) ∥ refined int` merges. Each is what the BARE pair answers today, because
-      # gen-merge's foreign relation joins a check-family type to its underlying type and drops the
-      # check. The name gate never guarded that class — `refined (between 0 10) ∥ refined (between
-      # 100 200)` shares a name and already dropped a range silently — and the loss is fixed where it
-      # lives, in the bare relation (den-hoag-0lq9s), which repairs both surfaces at once.
+      # ★ NO NAME GATE, AND NONE NEEDED FOR THE CHECK FAMILY: an addCheck-family base pair answers
+      # what its BARE pair answers. gen-merge's foreign relation refuses a join that drops a name an
+      # operand states, so `refined port ∥ refined int`, `refined ints.u8 ∥ refined ints.u16`,
+      # `refined (between 0 1) ∥ refined int` and `refined (between 0 10) ∥ refined (between 100
+      # 200)` all refuse as their bare pairs do, and one shared `between` value redeclared keeps
+      # `intBetween`. A name gate here never guarded that class — the two `between` ranges share a
+      # name — and the loss is fixed where it lives, in the bare relation, which repairs both
+      # surfaces at once.
       #
       # ★★ THE BASE'S HALF IS `merge.mergeTypes`, the binding gen-merge's declaration and element
       # strata both answer through: the base's own `typeMergeRel` where it has one, and otherwise the

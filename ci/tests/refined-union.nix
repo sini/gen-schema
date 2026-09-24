@@ -94,8 +94,9 @@ in
       expr = map (x: x.message) (typeOf (R subA) (R subB)).__schema.refinements;
       expected = [ refinements.positive.message ];
     };
-    # Guard on the relation having no name gate: `between`'s join RENAMES it (`intBetween` to `int`),
-    # so a relation gated on the base's name refuses the third declaration the bare fold merges.
+    # Guard on the relation having no name gate: three declarations of ONE shared `between` value,
+    # whose bare fold keeps the operand (gen-merge's sealed-limb twin), so the refined fold stays
+    # closed and keeps `intBetween` with its refinements.
     test-a-renaming-join-stays-closed-over-three-declarations = {
       expr =
         let
@@ -120,7 +121,7 @@ in
         in
         if attempt.success then attempt.value else "refused";
       expected = {
-        name = "int";
+        name = "intBetween";
         refinements = [ refinements.positive.message ];
       };
     };
