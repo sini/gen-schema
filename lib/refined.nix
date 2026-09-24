@@ -23,11 +23,10 @@ let
   #
   # The FUNCTOR carries the distinguishing name; the type keeps the base's. They are separate
   # axes: `name` is the value vocabulary a refined int still speaks in its error messages, while
-  # the functor name is what a redeclaration is GATED on. That gate alone fails CLOSED between a
-  # refined type and its bare base — "not mergeable", a stated conflict rather than a silent drop
-  # to the unrefined type — but it carries only the BASE, so it cannot separate two DIFFERENT
-  # refinements of one base. That pair is what the stated relation below decides, and leaving it to
-  # the name alone is what let a refinement be silently dropped from a merged declaration.
+  # the functor name `refined<…>` is what a FOREIGN relation sees: a bare base asked to reconcile
+  # with a refined partner compares that name and refuses, so from that side a refined type never
+  # silently drops to its unrefined base. The relation below is NOT gated on the name; it decides
+  # both components structurally (see its comment).
   #
   # IDENTITY. A refinement's distinguishing content is a caller-supplied lambda, so ADR-0034 puts
   # this constructor on the arm where "that component's collapse is replaced by a refusal rather
@@ -113,10 +112,30 @@ let
       #                 `mergeTypes (listOf str) (listOf str)` merges, because the base's own
       #                 relation compares the ELEMENT type rather than the container.
       #
-      # The NAME GATE stays this relation's first clause. Stating `typeMerge` replaces the
-      # derivation `mkOptionType` would have supplied, so the name comparison `protoTypeMerge` did
-      # becomes this relation's to make; it is what keeps a refined type and its BARE base from
-      # reconciling, in both directions.
+      # THERE IS NO NAME GATE. `functorName` carries only the base's NAME, so gating on it would be
+      # a second, name-keyed answer to the base question `mergeTypes` already answers structurally —
+      # gen-merge README `### typeMergeRel` clause (b): keeping a copy of the relation "would answer
+      # the question twice with two answers that could disagree". They do disagree wherever the
+      # base's join RENAMES (nixpkgs `ints.between` is `intBetween` and joins to `int`), and a gated
+      # fold then refuses its own third declaration. What still keeps a refined type and its BARE
+      # base apart: here, the `partner ? __schema` clause; in the foreign direction, the published
+      # `functor.name` above, which the bare type's own relation compares and refuses.
+      #
+      # ★ THE MERGED TYPE IS THE BASE RELATION'S JOIN, REFINED AGAIN — never this declaration's own
+      # `result`. A base relation that JOINS (two `submodule`s to one carrying both option sets, two
+      # `enum`s to their union) would otherwise have its answer used only as a yes/no and the
+      # partner's base dropped: silently in one presentation order, as an unrelated error in the
+      # other (gen-merge README `### typeMergeRel` clause (a), "the type-level form of a dropped
+      # definition"). The rebuilt type is itself a `mkRefinedType`, so the fold stays closed.
+      #
+      # ★ WHAT THIS MERGES THAT A NAME GATE REFUSED: every addCheck-family base pair whose foreign
+      # functors coincide, refinements equal. `refined port ∥ refined int` merges to `refined<int>`
+      # and its `.check 70000` is true; `refined ints.u8 ∥ refined ints.u16` accepts 300; `refined
+      # (between 0 1) ∥ refined int` merges. Each is what the BARE pair answers today, because
+      # gen-merge's foreign relation joins a check-family type to its underlying type and drops the
+      # check. The name gate never guarded that class — `refined (between 0 10) ∥ refined (between
+      # 100 200)` shares a name and already dropped a range silently — and the loss is fixed where it
+      # lives, in the bare relation (den-hoag-0lq9s), which repairs both surfaces at once.
       #
       # ★★ THE BASE'S HALF IS `merge.mergeTypes`, the binding gen-merge's declaration and element
       # strata both answer through: the base's own `typeMergeRel` where it has one, and otherwise the
@@ -143,16 +162,15 @@ let
         let
           partner = f.type or null;
         in
-        if (f.name or null) != functorName then
-          null
-        else if !(builtins.isAttrs partner && partner ? __schema) then
+        if !(builtins.isAttrs partner && partner ? __schema) then
           null
         else if partner.__schema.refinements != normalized then
           null
-        else if merge.mergeTypes baseType partner.__schema.baseType != null then
-          result
         else
-          null;
+          let
+            joined = merge.mergeTypes baseType partner.__schema.baseType;
+          in
+          if joined == null then null else mkRefinedType joined normalized;
 
       result = merge.mkOptionType (
         builtins.removeAttrs baseType [
