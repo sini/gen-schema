@@ -768,15 +768,15 @@ in
       };
     };
 
-    # ★ THE WORDING AT THE MERGE DOOR IS NON-DISCRIMINATING BY CONSTRUCTION, and this cell pins that
-    # rather than pretending otherwise. `foreignRel` builds the refusal from a template interpolating
-    # `t.name`, and a refined type deliberately keeps the BASE's name — so a refined type refused
-    # against a DIFFERENT REFINEMENT of one base and against its BARE BASE produce the same string,
-    # byte for byte. An oracle pinning only this message therefore cannot tell the new refusal from
-    # the one that already shipped; the discrimination is carried by the answer-and-survivors tables
-    # in `ci/tests/refined-identity.nix`, never by the wording. Authoring a discriminating message
-    # needs a channel gen-merge does not publish — `callerTypeMerge` admits a type-or-`null` and
-    # nothing else.
+    # ★ THE WORDING AT THE MERGE DOOR IS NON-DISCRIMINATING FOR REFINEMENTS THAT SHARE A BASE, and
+    # this cell pins that rather than pretending otherwise. `foreignRel` names the pair by `t.name`,
+    # and a refined type deliberately keeps the BASE's name. It also names the two FUNCTOR names, but
+    # only where they differ (gen-merge `interface.functorNamesOf`), and two refinements of one base
+    # share the functor name `refined<int>'. So two refinements of one base produce the same string
+    # whichever refinements they carry, and an oracle pinning only this message cannot tell them
+    # apart; that discrimination is carried by the answer-and-survivors tables in
+    # `ci/tests/refined-identity.nix`, never by the wording. A refined type against its BARE base, or
+    # against a refinement of a different base, differs in functor name and is named by it.
     test-the-merge-refusal-names-the-unreconciled-pair = {
       expr =
         let
@@ -790,9 +790,10 @@ in
       };
     };
 
-    # The control for the cell above, and the reason it is not vacuous: where the two base NAMES
-    # differ the template DOES discriminate. So the byte-identity pinned above is specific to the
-    # same-base pair rather than the template being a constant.
+    # The control for the cell above, and the reason it is not vacuous: where the two bases differ
+    # the message DOES discriminate, by the type names and by the two functor names the refusal now
+    # carries. So the byte-identity pinned above is specific to the same-base pair rather than the
+    # template being a constant.
     test-control-the-merge-refusal-discriminates-different-bases = {
       expr =
         let
@@ -802,7 +803,7 @@ in
         throw (port.typeMergeRel other).refused;
       expectedError = {
         type = "ThrownError";
-        msg = "^`int' and `string', which the first type's own `functor' does not reconcile$";
+        msg = "^`int' and `string', which the first type's own `functor' \\(named `refined<int>'\\) does not reconcile with the second's \\(named `refined<string>'\\)$";
       };
     };
 
