@@ -116,10 +116,15 @@ let
       # a second, name-keyed answer to the base question `mergeTypes` already answers structurally —
       # gen-merge README `### typeMergeRel` clause (b): keeping a copy of the relation "would answer
       # the question twice with two answers that could disagree". They do disagree wherever the
-      # base's join RENAMES (nixpkgs `ints.between` is `intBetween` and joins to `int`), and a gated
-      # fold then refuses its own third declaration. What still keeps a refined type and its BARE
-      # base apart: here, the `partner ? __schema` clause; in the foreign direction, the published
-      # `functor.name` above, which the bare type's own relation compares and refuses.
+      # base's join legitimately RENAMES: a gen-native relation is free to answer a type keeping
+      # neither operand's name, and a gated fold then refuses a third declaration the ungated one
+      # still closes over (`ci/tests/refined-union.nix`'s `renameA`/`renameB`/`renameC` fixture).
+      # nixpkgs' own check family no longer supplies a live example of that disagreement: gen-merge's
+      # witness (`lib/interface.nix`) now refuses a foreign join that drops an operand's own name —
+      # `ints.between` included — rather than silently renaming past it, so a name gate and the
+      # witness would agree on every check-family pair, not disagree. What still keeps a refined type
+      # and its BARE base apart: here, the `partner ? __schema` clause; in the foreign direction, the
+      # published `functor.name` above, which the bare type's own relation compares and refuses.
       #
       # ★ THE MERGED TYPE IS THE BASE RELATION'S JOIN, REFINED AGAIN — never this declaration's own
       # `result`. A base relation that JOINS (two `submodule`s to one carrying both option sets, two

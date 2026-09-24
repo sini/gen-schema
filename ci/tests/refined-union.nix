@@ -57,6 +57,44 @@ let
     }).options.p.type;
 
   between = nt.ints.between 0 1;
+
+  # A GEN-NATIVE relation that renames on every successful join, over three declarations whose OWN
+  # names all differ from each other and from the joined answer — unlike a nixpkgs check family
+  # (`port`, `ints.between`), which the witness now refuses rather than renames past both operands'
+  # names (`lib/refined.nix`'s header). A name gate comparing `baseType.name` across the fold would
+  # refuse at the first step, where the real relation (asked structurally, through `mergeTypes`)
+  # legitimately renames and keeps folding.
+  renamed = {
+    name = "renamed";
+    typeMergeRel =
+      other:
+      if
+        builtins.elem (other.name or null) [
+          "renameA"
+          "renameB"
+          "renameC"
+          "renamed"
+        ]
+      then
+        { merged = renamed; }
+      else
+        { refused = "types do not merge: 'renamed' and '${other.name or "<unnamed>"}'"; };
+  };
+  renameA = {
+    name = "renameA";
+    typeMergeRel =
+      other: if (other.name or null) == "renameB" then { merged = renamed; } else { refused = "no"; };
+  };
+  renameB = {
+    name = "renameB";
+    typeMergeRel =
+      other: if (other.name or null) == "renameA" then { merged = renamed; } else { refused = "no"; };
+  };
+  renameC = {
+    name = "renameC";
+    typeMergeRel =
+      other: if (other.name or null) == "renamed" then { merged = renamed; } else { refused = "no"; };
+  };
 in
 {
   flake.tests.refined-union = {
@@ -94,10 +132,12 @@ in
       expr = map (x: x.message) (typeOf (R subA) (R subB)).__schema.refinements;
       expected = [ refinements.positive.message ];
     };
-    # Guard on the relation having no name gate: three declarations of ONE shared `between` value,
-    # whose bare fold keeps the operand (gen-merge's sealed-limb twin), so the refined fold stays
-    # closed and keeps `intBetween` with its refinements.
-    test-a-renaming-join-stays-closed-over-three-declarations = {
+    # A shared value's fold stays closed: three declarations of ONE shared `between` value, whose
+    # bare fold keeps the operand (gen-merge's sealed-limb twin), so the refined fold stays closed
+    # and keeps `intBetween` with its refinements. This construction never renames (all three
+    # declarations, and the joined answer, already share one name), so it cannot tell a name gate
+    # apart from no gate at all — see the row below for that.
+    test-a-shared-value-fold-stays-closed-over-three-declarations = {
       expr =
         let
           attempt = builtins.tryEval (
@@ -122,6 +162,31 @@ in
         if attempt.success then attempt.value else "refused";
       expected = {
         name = "intBetween";
+        refinements = [ refinements.positive.message ];
+      };
+    };
+
+    # Guard on the relation having no name gate, over three declarations that DO rename: `renameA`
+    # and `renameB` share no name with each other or with their joined answer, and `renameC` shares
+    # no name with that answer either. `relation` (`lib/refined.nix`) asks `mergeTypes` structurally
+    # and never compares `baseType.name` to the partner's, so the fold stays closed and renames
+    # twice, keeping the refinements. A `baseType.name`-keyed gate would refuse at the first join,
+    # where `renameA' and `renameB' disagree.
+    test-a-renaming-join-stays-closed-over-three-declarations = {
+      expr =
+        let
+          step1 = (R renameA).typeMerge { type = R renameB; };
+          step2 = if step1 == null then null else step1.typeMerge { type = R renameC; };
+        in
+        if step2 == null then
+          "refused"
+        else
+          {
+            name = step2.__schema.baseType.name;
+            refinements = map (x: x.message) step2.__schema.refinements;
+          };
+      expected = {
+        name = "renamed";
         refinements = [ refinements.positive.message ];
       };
     };
