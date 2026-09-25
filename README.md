@@ -498,7 +498,7 @@ The identity is the **kind tag joined to a digest of the identity pairs**:
 id_hash = "<kind>:" + sha256(<the ⟨key, value⟩ pairs, as a JSON attrset>)
 ```
 
-The pairs are all non-internal primitive options (str, int, bool, float) minus the declared opt-outs. Two hosts with the same values hash identically. A host and a user with the same name hash differently — the tag separates them, so `id_hash` says what it is and the kind is recoverable by splitting on the first colon. Because the tag rides outside the digest, `:` is refused in a kind name; values are unconstrained, since JSON quotes and escapes them.
+The pairs are all primitive options (str, int, bool, float) minus the declared opt-outs. `internal = true` is presentation only (hidden from generated docs) and does not exclude an option from identity; among primitive options `identity = false` is the one exclusion channel, and a non-primitive option is never a key. Two hosts with the same values hash identically. A host and a user with the same name hash differently — the tag separates them, so `id_hash` says what it is and the kind is recoverable by splitting on the first colon. Because the tag rides outside the digest, `:` is refused in a kind name; values are unconstrained, since JSON quotes and escapes them.
 
 Order does not enter. The pairs are rendered as an attrset and attrsets carry no order, so a caller supplying keys in any order mints the same node — there is no sort for a caller to get wrong.
 
@@ -515,19 +515,19 @@ Order does not enter. The pairs are rendered as an attrset and attrsets carry no
 lib.findFirst (kv: genSchema.identityHashForKind kv inst == inst.id_hash) null candidateKinds
 ```
 
-It reflects the kind's own primitive options — honoring `internal` and `identity = false` — and routes through the same `hashIdentity` as `mkIdentityModule`, so the two cannot drift. A non-match reliably means "not this kind"; a wrong-kind false match would need a sha256 collision across different preimages.
+It reflects the kind's own primitive options — honoring `identity = false` — and routes through the same `hashIdentity` as `mkIdentityModule`, so the two cannot drift. A non-match reliably means "not this kind"; a wrong-kind false match would need a sha256 collision across different preimages.
 
 A candidate whose identity keys the instance does not carry answers **`null`** — *not this kind* — so the loop above passes over it rather than aborting. `null` is not an identity and mints nothing; `null == inst.id_hash` is plain `false`.
 
 A candidate whose identity key the instance *does* carry, at a value the mint refuses — a lambda, a path, a derivation, at any depth — still propagates the mint's named refusal, because the value domain belongs to the mint and not to this reflection. A consumer iterating over candidates of unknown shape therefore wraps the call in `builtins.tryEval`, which catches that refusal.
 
-There is deliberately **no value-only form**. Reflecting an instance value's own primitive attributes cannot honour the commitment above: a value carries no option metadata, so it sees neither `internal` nor the opt-out, and a method's return is just a primitive attribute in `config` that it would admit. One substrate has one minting authority, and two derivations that can disagree is one too many.
+There is deliberately **no value-only form**. Reflecting an instance value's own primitive attributes cannot honour the commitment above: a value carries no option metadata, so it sees neither the declared type nor the opt-out, and a method's return is just a primitive attribute in `config` that it would admit. One substrate has one minting authority, and two derivations that can disagree is one too many.
 
 **Three-layer precedence for key selection:**
 
 1. **Explicit `_identity.keys`** — list the exact keys. Multiple modules can contribute via `mkMerge`.
 2. **`identity = false`** — exclude individual options from reflection.
-3. **Auto-reflection** — all non-internal primitives included (default).
+3. **Auto-reflection** — all primitives included (default), `internal` ones too.
 
 ```nix
 # Layer 1: explicit keys — composable across modules
@@ -540,13 +540,13 @@ config.schema.host.config._identity.keys = [ "vpnAlias" ];
 # Layer 2: exclude an option from reflection
 options.description = lib.mkOption { type = str; } // { identity = false; };
 
-# Layer 3: automatic (default) — all non-internal str/int/bool/float options
+# Layer 3: automatic (default) — all str/int/bool/float options, `internal` or not
 ```
 
 Explicit keys are validated against the identity-key set closed at the kind boundary — a name outside
 it refuses. The set excludes for three different reasons (nothing declares it, what declares it is not
-primitive, or it is declared primitive but excluded via `internal`, `identity = false`, or contributed
-on the instance side), and the refusal names membership rather than which of the three applied,
+primitive, or it is declared primitive but excluded via `identity = false` or contributed on the
+instance side), and the refusal names membership rather than which of the three applied,
 printing the closed set alongside the excluded name. The exact wording is pinned by the
 `identity-refusals` cells in `ci/tests-error.nix` — read it there rather than retyped here, since a
 hand-copied error string is a second copy that decays independently of its source.
@@ -1104,7 +1104,7 @@ options.fleet.users = genSchema.mkInstanceRegistry config.schema.user {
 config.fleet.users.tux.uid  # → 34213 (deterministic from id_hash)
 ```
 
-Derive can read `id_hash` and all instance config — it runs after full module system evaluation. Derived fields must be `internal = true` (excluded from `id_hash` to avoid cycles) and `readOnly = true` (the derive hook is the only writer).
+Derive can read `id_hash` and all instance config — it runs after full module system evaluation. A derived field must stay out of `id_hash` (derive reads it, so admitting the field would be a cycle): declare it through `extraModules`, which has nowhere to attach to the kind's identity-key set, as above, or on the kind with `identity = false`. `internal = true` only hides it from generated docs. Mark it `readOnly = true` (the derive hook is the only writer).
 
 **`deriveEither`** — returns Either with configurable error handling:
 

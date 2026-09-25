@@ -13,8 +13,7 @@ let
         merge.mkOption {
           inherit (m) description type;
           readOnly = true;
-          # A method is not a declared field — internal = true is the same shared marker
-          # id-hash.nix's isPrimitiveOption reads to exclude derived options from reflection.
+          # A method is not a declared field — internal = true is the shared presentation marker.
           # mkCodec and renderDocs both filter on it, so a method is excluded from serialized
           # shape and rendered docs by the SAME representation, not by two independently
           # re-derived notions of "is this a method".

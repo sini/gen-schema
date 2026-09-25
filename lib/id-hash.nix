@@ -3,8 +3,8 @@
 # Injects `id_hash`, a read-only `"<kind>:" + SHA-256` over a kind's primitive
 # option values, so two instances are equal iff their identifying fields are.
 # Identity keys are discovered by reflection over the kind's primitive options
-# (str/int/bool/float), excluding internals and the declared `identity = false`
-# opt-outs, or pinned explicitly via `_identity.keys`.
+# (str/int/bool/float), excluding the declared `identity = false` opt-outs, or
+# pinned explicitly via `_identity.keys`.
 #
 # ★ THE MINT IS NOT HERE. `hashIdentity` — the substrate's one minting authority,
 # ADR-0016 ruling 5 — lives in `gen-identity`, a dependency-free leaf, and arrives
@@ -15,7 +15,7 @@
 # What this file owns is the half that is a MODULE-SYSTEM concern in every part —
 # deciding WHICH of a kind's declared options are identity keys, recomputing an
 # instance's hash from a kind value, and stamping `id_hash`. It reads option
-# metadata (`opt.type.name`, `opt.internal`, the `identity = false` opt-out) and
+# metadata (`opt.type.name`, the `identity = false` opt-out) and
 # builds options with `merge.mkOption`. It CONSTRUCTS with the injected mint inside
 # gen-schema's own evaluation, which is ADR-0014's constructing arm.
 #
@@ -43,6 +43,12 @@ let
   # follows the language's `==`, and a float-typed option is a declared field two instances can
   # differ in. Both type systems spell it "float". The encoder's strict |v| < 2^53 domain is
   # therefore reachable from an ordinary declaration, and refuses by name at mint time.
+  #
+  # `internal` is NOT read. It is presentation only (nixpkgs' meaning: hidden from generated docs),
+  # so a system-owned field declared `internal = true` is an identity key like any other primitive.
+  # Among primitive-typed options the declared `identity = false` is the one exclusion channel
+  # (ADR-0016 ruling 5's declared exception). The type filter is a second, standing exclusion: a
+  # non-primitive option is never a key, and `identity` on one is inert.
   primitiveTypeNames = [
     "string"
     "str"
@@ -52,10 +58,7 @@ let
   ];
   isPrimitiveOption =
     _name: opt:
-    (opt ? type)
-    && prelude.elem (opt.type.name or "") primitiveTypeNames
-    && !(opt.internal or false)
-    && (opt.identity or true);
+    (opt ? type) && prelude.elem (opt.type.name or "") primitiveTypeNames && (opt.identity or true);
 
   # ★ THE IDENTITY-KEY SET, DERIVED AT THE KIND BOUNDARY — the one derivation, and the boundary is
   # the point. An entity's identity is a function of its KIND's option set (ADR-0016 ruling 5), and a
@@ -130,7 +133,7 @@ in
   # It is the SOLE recompute path because there is one minting authority and a second derivation that can
   # disagree with the first is one derivation too many. A value-reflecting twin — keeping any attribute whose
   # VALUE is primitive — cannot honour that: an instance value carries no option metadata, so it can see
-  # neither `internal` nor the `identity = false` opt-out, and a method's return is a plain primitive
+  # neither the declared type nor the `identity = false` opt-out, and a method's return is a plain primitive
   # attribute in `config` that it would admit as an identity key. Kind-DISCOVERY (recompute per candidate
   # kind, match the carried `id_hash`) is served here, by a caller holding the kind value.
   #
@@ -208,8 +211,8 @@ in
             # THE MESSAGE NAMES MEMBERSHIP, NOT A CAUSE, because the closed set excludes for three
             # different reasons and the module holds only the set. A name can be outside it because
             # nothing declares it, because what declares it is not primitive, or because it is
-            # declared primitive and excluded (`internal`, `identity = false`, or contributed on the
-            # instance side). The predecessor said "is not declared on kind", which is FALSE on the
+            # declared primitive and excluded (`identity = false`, or contributed on the instance
+            # side). The predecessor said "is not declared on kind", which is FALSE on the
             # second and third — a kind declaring `tags : listOf str` was told `tags` is undeclared.
             # Membership is true on all three, and the set is printed so the reader sees which.
             validatedExplicitKeys = map (

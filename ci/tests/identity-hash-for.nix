@@ -4,7 +4,7 @@
 # drift; these tests pin that equivalence + the kind-discrimination the discovery relies on.
 #
 # It is the SOLE recompute path. A value-reflecting twin cannot honour the preimage commitment — an
-# instance value carries no option metadata, so it can see neither `internal` nor `identity = false` — and
+# instance value carries no option metadata, so it can see neither the declared type nor `identity = false` — and
 # one minting authority means two derivations that can disagree is one derivation too many.
 {
   lib,

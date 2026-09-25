@@ -11,8 +11,8 @@ in
         kind:
         let
           opts = schema.${kind}.options;
-          # `internal` is the shared per-option marker (also read by id-hash.nix's
-          # isPrimitiveOption) for a derived option — includes methods, which mkCodec
+          # `internal` is the shared per-option presentation marker (never an identity
+          # input; see id-hash.nix) for a derived option — includes methods, which mkCodec
           # already excludes from serialized shape on the same flag. No name-prefix
           # heuristic here: a user field is never dropped from docs just for being
           # named with a leading underscore, only for actually being marked internal.

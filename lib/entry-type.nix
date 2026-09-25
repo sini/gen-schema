@@ -756,8 +756,8 @@ let
             let
               # A kind name is any config key that is not one of this submodule's own
               # declared introspection options (_kindNames, _topology, etc. above) — those
-              # carry `internal = true`, the same shared per-option marker id-hash.nix's
-              # isPrimitiveOption and docs.nix read to separate internal fields from user
+              # carry `internal = true`, the same shared per-option marker docs.nix and
+              # codec.nix read to separate internal fields from user
               # ones, reused here at the kind-name granularity instead of a re-derived name
               # prefix. A freeform kind has no declared option, so `options.${n}` is absent
               # and the check falls through to `false` — never internal by construction.

@@ -260,7 +260,7 @@ fleet.users.tux.uid   → 4866  (deterministic from id_hash)
 fleet.users.yeti.uid  → 5388  (different hash → different UID)
 ```
 
-Derive reads `id_hash` from each instance to compute collision-free UIDs. Derived fields are `internal = true` (excluded from `id_hash`) and `readOnly = true` (only the derive hook writes them).
+Derive reads `id_hash` from each instance to compute collision-free UIDs. `uid` stays out of `id_hash` because `nullOr int` is not a primitive type; a primitive derived field would declare `identity = false`. `internal = true` only hides it from generated docs.
 
 The two numbers above are **pin-dependent** and are the only values in this README that are: they fall out of the `id_hash` digest, so they move whenever the pinned gen-schema changes how it mints. Everything else documented here is declared data, or computed from declared data, and holds across pins. Regenerate them with `nix eval .#fleet.tuxUid` and `nix eval .#fleet.yetiUid` rather than trusting the transcription.
 

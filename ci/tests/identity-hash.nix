@@ -77,8 +77,8 @@ let
 
   # den-hoag-376hw. A leading underscore is not a reservation in FIELD space: the schema's
   # reserved-name mechanism ranges over KIND names (`lib/entry-type.nix`, `reservedKindNames`),
-  # while a kind's own options are discriminated by the `internal = true` flag -- the same marker
-  # `docs.nix` and `codec.nix` already read. A declared, non-`internal`, primitive `_legacyId` is
+  # while a kind's primitive options leave identity only by the declared `identity = false` opt-out
+  # (`internal` is presentation only, den-hoag-udh9m). A declared primitive `_legacyId` is
   # distinguishing content and must enter the preimage; before the prefix clause left
   # `isPrimitiveOption` these two instances hashed identically, and identically to
   # `evalNoUnderscore` below, which never declares the field at all.
@@ -181,21 +181,21 @@ in
     expected = true;
   };
 
-  # A `_`-prefixed field is reflected when it is a declared, non-`internal` primitive: two instances
-  # differing only in it hash differently.
+  # A `_`-prefixed field is reflected when it is a declared primitive: two instances differing only
+  # in it hash differently.
   flake.tests.identity-hash.test-underscore-nonint-field-reflected = {
     expr =
       (mkUnderscoreEval underscoreOpt "A").config.id_hash == (mkUnderscoreEval underscoreOpt "B")
       .config.id_hash;
     expected = false;
   };
-  # Control: the SAME field marked `internal = true` is excluded -- the flag is what discriminates,
-  # and it exercises the predicate at an input the cell above never reaches.
-  flake.tests.identity-hash.test-control-underscore-internal-field-not-reflected = {
+  # Control: the SAME field marked `internal = true` is still reflected -- `internal` is not an
+  # identity input, and it exercises the predicate at an input the cell above never reaches.
+  flake.tests.identity-hash.test-control-underscore-internal-field-reflected = {
     expr =
       (mkUnderscoreEval underscoreInternalOpt "A").config.id_hash
       == (mkUnderscoreEval underscoreInternalOpt "B").config.id_hash;
-    expected = true;
+    expected = false;
   };
   # Control: a kind with no underscore field anywhere hashes to a pinned literal, byte-identical
   # across the reflection change. This is the blast-radius arm -- an already-minted identity that
