@@ -73,15 +73,15 @@ in
           }).refinements;
       expected = [ ];
     };
-    # The `mkType` arm's mark does not read the option plane: a refined and a bare `mkType` kind mint
-    # EQUAL. Whether that plane enters the preimage is an owner ruling not yet made (mx07b §4 Q1); this
-    # cell is the one to rewrite deliberately if it is.
-    test-mktype-mark-is-blind-to-the-option-plane = {
+    # The `mkType` arm's mark reads the option plane an instance imports (mx07b §4 Q1 ruled (b),
+    # den-hoag-88cfa; paid by (c+), den-hoag-markof-partial-preimage-znfjq): a refined and a bare
+    # `mkType` kind mint APART.
+    test-mktype-mark-reads-the-option-plane = {
       expr =
         mkKind.__mint.minted == (kindOf { mkType = aspectShaped; } {
           options.myPort = genMerge.mkOption { type = genMerge.types.int; };
         }).__mint.minted;
-      expected = true;
+      expected = false;
     };
   };
 

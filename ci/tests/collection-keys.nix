@@ -93,7 +93,7 @@ let
     };
   };
 
-  # den-hoag-6vgwm. THE ANTI-OVER-FIRE CENSUS. `mkAllCollections` refuses fourteen names that
+  # den-hoag-6vgwm. THE ANTI-OVER-FIRE CENSUS. `mkAllCollections` refuses fifteen names that
   # collide with gen-schema's own vocabulary, and a door that refuses too much is exactly as much a
   # failure as one that refuses too little — a guard that threw on every collection would satisfy
   # every error-plane cell of that class and fail only here. These six are the census of every
@@ -260,6 +260,7 @@ in
     expected = [
       "__functor"
       "__mint"
+      "__sealed"
       "config"
       "disabledModules"
       "freeformType"

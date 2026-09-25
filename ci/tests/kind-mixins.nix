@@ -14,6 +14,7 @@ let
   refinedLib = import ../../lib/refined.nix {
     merge = genMerge;
     identity = genIdentity;
+    inherit (genAlgebra) preimageTagOf;
   };
   bridgeLib = import ../../lib/bridge.nix {
     inherit prelude record;

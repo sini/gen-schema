@@ -16,6 +16,7 @@ let
   refinedLib = import ../../lib/refined.nix {
     merge = genMerge;
     identity = genIdentity;
+    inherit (genAlgebra) preimageTagOf;
   };
 
   # --- Test 1: Auto-extracted refinements from inline type declarations ---

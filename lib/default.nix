@@ -17,7 +17,10 @@ let
   # LIBRARY called gen-identity is a reader's trap rather than a tidy-up.
   idHashLib = import ./id-hash.nix { inherit prelude merge identity; };
   strictLib = import ./strict.nix { inherit prelude merge; };
-  refinedLib = import ./refined.nix { inherit merge identity; };
+  refinedLib = import ./refined.nix {
+    inherit merge identity;
+    inherit (algebra) preimageTagOf;
+  };
   blameLib = import ./blame.nix;
   mixinLib = import ./mixin.nix { inherit record; };
   bridgeLib = import ./bridge.nix {
@@ -44,6 +47,7 @@ let
     inherit (mixinLib) applyMixin;
     inherit (bridgeLib) emitModule isOptionDecl;
     inherit (refinedLib) getRefinements;
+    inherit (algebra) componentsPreimage sealedCollisionEq identityOf;
   };
   evalSchemaLib = import ./eval-schema.nix {
     inherit prelude merge;
@@ -91,7 +95,7 @@ in
     defaultOnError
     ;
   inherit (methods) schemaFn;
-  inherit (entryType) mkSchemaOption mkSchemaEntryType;
+  inherit (entryType) mkSchemaOption mkSchemaEntryType kindEq;
   inherit (evalSchemaLib) evalSchema;
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (validate) validateInstances mkFieldValidator filterValidators;

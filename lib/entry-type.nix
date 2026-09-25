@@ -18,6 +18,9 @@
   emitModule,
   isOptionDecl,
   getRefinements,
+  componentsPreimage,
+  sealedCollisionEq,
+  identityOf,
 }:
 let
   # ★ THE PROVENANCE MARK (ADR-0034), minted at the ONE site every kind value reaches — both
@@ -27,15 +30,13 @@ let
   # replaces admitted any hand-written attrset, so every message naming a kind value named a
   # provenance its own predicate never looked at.
   #
-  # MINTED over the kind's declared INERT surface — its name, the NAME SETS of its options, refs,
-  # refinements and collections, its `strict` flag and its `keySemantics` key set. The option
-  # `type` checkers and merges, `methods`, `validators`, `mixins`, `computed`, `mkType` and
-  # `__functor` are lambdas: the mint refuses them at any depth and there is no substitute
-  # (ADR-0034's REFUSED regime). So the mark is an identity over the kind's DECLARED SURFACE and
-  # not over its behaviour, and ADR-0013's argued impossibility is written here at the
-  # declaration — a lambda's body and captured environment are exposed by no builtin. Two kinds
-  # sharing a name and a surface but differing in an option's checker share a mark; within one
-  # schema they cannot, because the kind name is in the preimage and names are unique in a schema.
+  # MINTED over the kind's name, its `strict` flag and its distinguishing CONTENT as per-component
+  # preimage tags (`planeOf` below): a minted component by its digest, an inert one whole, one
+  # with no value at WHNF as `undefined`, and a lambda, an unmigrated type or anything else the
+  # mint refuses as the SEALED MARKER (ADR-0034's REFUSED regime, applied per component). A
+  # lambda's body and captured environment are exposed by no builtin (ADR-0013), so two kinds
+  # differing only at a sealed component share a mark; `kindEq` then refuses the pair BY NAME
+  # rather than calling them one kind, reading the sealed subjects the same call produced.
   #
   # NO SECOND MINTING AUTHORITY (ADR-0016 ruling 5). This CONSTRUCTS with the injected mint inside
   # gen-schema's own evaluation, which is ADR-0014's constructing arm; nothing here re-derives an
@@ -50,17 +51,196 @@ let
   # Hoisted beside `mkAllCollections` for the reason that one is: the label list is ONE derivation
   # read by both arms of the merge, not two spellings of one preimage. `attrNames` is already
   # sorted, so no sort is added.
+  # ★ (c+), den-hoag-markof-partial-preimage-znfjq. THE KIND'S DISTINGUISHING CONTENT, as
+  # components, from ONE plane per arm — the option tree, its kind-level config, the
+  # collections, `keySemantics`, `refs` and the computed fields. `markOf` mints over the
+  # components' TAGS and the kind value carries their SEALED subjects (`__sealed`) for `kindEq`;
+  # both come out of one `componentsPreimage` call, so the two cannot read different planes.
+  #
+  # EVERY attribute of an option declaration is a component, the presentation keys (`description`,
+  # `example`, `defaultText`, …) included: an instance module is handed `options` and can read
+  # `options.port.description` into its config, so no attribute is outside the merged result (the
+  # a0gc standard: exclusion owes that argument, and none holds). The declaration's `freeformType`,
+  # at either site (top-level or `_module.freeformType`), is a component too: it decides which
+  # undeclared instance keys are accepted. Four exclusions, each a projection of a
+  # component already present (ADR-0013, a derivable fact is derived once): `refinements`
+  # (`refinementsOfOptions` of the option types), `mixins` (their whole effect is the option and
+  # config plane the bridge emits, and any function it carries is walked as an opaque module),
+  # `baseModule` (its value for THIS kind is the resolved module, walked below) and `specialArgs`
+  # (they reach a kind only through a function module, and every function module is a sealed
+  # component). `mkType` and `computed` are components, sealed by constructor: what they add that
+  # the plane cannot evaluate lives only in their bodies.
+  #
+  # A TYPE carrying no `__mint` (a field's, a freeform's) is UNMIGRATED and declared sealed here
+  # rather than handed to the encoder, so no type record is forced to decide it.
+  #
+  # A declaration's modules, found through `imports` at any depth, split by whether the plane can
+  # see into them. An OPAQUE module — a function module, a functor, a path — is one the plane
+  # cannot see into: what it contributes that the kind level cannot evaluate (a definition reading
+  # an instance's config) lives only in its body, so the body is a component. An attrset module
+  # is not opaque: its `options` and `config` are the option plane and the kind-level values
+  # themselves, and its `freeformType` is read off it here (the evaluated tree does not publish
+  # the resolved one).
+  modulesOf = prelude.concatMap (
+    v:
+    if v == null then
+      [ ]
+    else if builtins.isAttrs v && !(v ? __functor) then
+      [ { open = v; } ] ++ modulesOf (v.imports or [ ])
+    else
+      [ { opaque = v; } ]
+  );
+  isUnmigrated = t: !(builtins.isAttrs t) || identityOf t ? unmigrated;
+
+  planeOf =
+    {
+      options,
+      config,
+      collections,
+      keySemantics,
+      refs,
+      computed,
+      modules,
+      functions,
+    }:
+    let
+      optionComponents =
+        prefix: opts: cfg:
+        prelude.concatMap (
+          n:
+          let
+            o = opts.${n};
+            p = prefix ++ [ n ];
+          in
+          if isOptionDecl o then
+            map (a: {
+              path = [ "options" ] ++ p ++ [ a ];
+              value = o.${a};
+              sealed = a == "type" && isUnmigrated o.type;
+            }) (prelude.attrNames o)
+            ++ [
+              {
+                path = [ "value" ] ++ p;
+                value = cfg.${n};
+              }
+            ]
+          else
+            optionComponents p o cfg.${n}
+        ) (prelude.attrNames opts);
+      # An attrset-valued component is spread one level, so a refusal names the member (a method,
+      # a category) rather than the whole collection; its key set stays a component of its own.
+      spread =
+        prefix: v:
+        let
+          isRecord = builtins.tryEval (
+            builtins.isAttrs v && identityOf v ? unmigrated && (v.type or null) != "derivation"
+          );
+        in
+        if isRecord.success && isRecord.value then
+          [
+            {
+              path = prefix;
+              value = prelude.attrNames v;
+            }
+          ]
+          ++ map (k: {
+            path = prefix ++ [ k ];
+            value = v.${k};
+          }) (prelude.attrNames v)
+        else
+          [
+            {
+              path = prefix;
+              value = v;
+            }
+          ];
+      walked = modulesOf modules;
+      open = map (m: m.open) (builtins.filter (m: m ? open) walked);
+      freeforms = builtins.filter (t: t != null) (
+        prelude.concatMap (m: [
+          (m.freeformType or null)
+          ((m._module or { }).freeformType or null)
+          (((m.config or { })._module or { }).freeformType or null)
+        ]) open
+      );
+    in
+    componentsPreimage identity.hashIdentity (
+      optionComponents [ ] options config
+      ++ [
+        {
+          path = [ "collectionNames" ];
+          value = prelude.attrNames collections;
+        }
+      ]
+      ++ prelude.concatMap (c: spread [ "collections" c ] collections.${c}) (
+        prelude.attrNames collections
+      )
+      ++ spread [ "keySemantics" ] keySemantics
+      ++ spread [ "refs" ] refs
+      ++ spread [ "computed" ] computed
+      ++ [
+        {
+          path = [ "modules" ];
+          value = map (m: m.opaque) (builtins.filter (m: m ? opaque) walked);
+        }
+        {
+          path = [ "freeformType" ];
+          value = freeforms;
+          sealed = builtins.any isUnmigrated freeforms;
+        }
+      ]
+      # The schema's own functions are sealed BY CONSTRUCTOR — declared, never forced.
+      ++ map (n: {
+        path = [
+          "functions"
+          n
+        ];
+        value = functions.${n};
+        sealed = functions.${n} != null;
+      }) (prelude.attrNames functions)
+    );
+
   markOf =
-    components:
-    identity.hashIdentity "schemakind" [
-      "collections"
-      "keySemantics"
-      "kind"
-      "options"
-      "refinements"
-      "refs"
-      "strict"
-    ] (l: components.${l});
+    {
+      kind,
+      strict,
+      plane,
+    }:
+    identity.hashIdentity "schemakind"
+      [
+        "kind"
+        "plane"
+        "strict"
+      ]
+      (
+        l:
+        {
+          inherit kind strict;
+          plane = plane.tags;
+        }
+        .${l}
+      );
+
+  # THE DOOR a consumer compares kinds through (c+): `true` iff two kind values carry one identity,
+  # `false` if two, and a refusal BY NAME where they mint one identity and differ only at a sealed
+  # component (ADR-0034: "that component's collapse is replaced by a refusal"). An operand that is
+  # not a kind value is refused by name, as the four admission guards refuse it.
+  kindEq =
+    let
+      subject =
+        k:
+        if isSchemaKind k && k ? __sealed then
+          {
+            name = k.kind;
+            mark = k.__mint.minted;
+            sealed = k.__sealed;
+          }
+        else
+          throw "gen-schema: kindEq: expected a kind value carrying a mint-backed mark (`__mint.minted`); got ${
+            if builtins.isAttrs k then "an attrset with no mark" else builtins.typeOf k
+          }";
+    in
+    a: b: sealedCollisionEq "gen-schema: kindEq" (subject a) (subject b);
 
   # THE READER of the mark, and the seam's whole admission test. FOUR READS, NONE OF WHICH FORCES
   # THE DIGEST: `v ? __mint` forces `v` to WHNF, and `v.__mint ? minted` forces the mark RECORD and
@@ -187,6 +367,8 @@ let
     # last, so a collection of that name is SILENTLY OVERWRITTEN — something vanishes and nothing
     # says so. Kept verbatim from the door's own third clause.
     "__mint"
+    # Written beside `__mint` and refused for the same reason: the sealed subjects `kindEq` reads.
+    "__sealed"
   ];
 
   # ★ THE COLLECTION KEY SPACE'S RESERVED SET (den-hoag-6vgwm). A caller-supplied collection NAME
@@ -210,7 +392,7 @@ let
   # sound input rather than a checked one.
   #
   # The refusal names ONE key and says nothing about WHY it is reserved: the reason is per-name
-  # (two of them, fourteen names) and the caller's remedy is the same for all — rename the
+  # (two of them, fifteen names) and the caller's remedy is the same for all — rename the
   # collection. A maintainer reads the reason here, at the site they would edit.
   #
   # ★ UNIFORM ACROSS BOTH BRANCHES, at a stated cost. On the `mkType` branch `finalCollections` is
@@ -246,9 +428,13 @@ let
       [
         "__functor"
         "__mint"
+        "__sealed"
       ]
     else
-      [ "__mint" ];
+      [
+        "__mint"
+        "__sealed"
+      ];
 
   # The surplus keys of ONE def value — the keys no reader consumes. Each clause names the reader
   # that earns it; `mkSchemaOption`'s `_declarationKeys` option below publishes the same contract.
@@ -401,6 +587,8 @@ let
             # without saying so.
             if fields ? __mint then
               throw "gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType"
+            else if fields ? __sealed then
+              throw "gen-schema: computed field '__sealed' is reserved — the sealed subjects are written by mkSchemaEntryType"
             else
               fields;
 
@@ -499,14 +687,25 @@ let
               #
               # The module is named for its kind, so a refusal of its syntax (a surplus key beside
               # the published `options`) says which kind to fix; a `_file` of the result's own wins.
-              customOptions =
-                prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n))
-                  (merge.evalModuleTree {
-                    modules = [
-                      ({ _file = "<gen-schema mkType kind ${kind}>"; } // custom // published // computedFields)
-                    ];
-                    inherit specialArgs;
-                  }).options;
+              customTree = merge.evalModuleTree {
+                modules = [
+                  ({ _file = "<gen-schema mkType kind ${kind}>"; } // custom // published // computedFields)
+                ];
+                inherit specialArgs;
+              };
+              customOptions = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) customTree.options;
+              # ONE plane for the mark and for `kindEq` (c+): this arm's option plane is the tree an
+              # instance imports, so it enters the preimage (den-hoag-88cfa's ruled price, paid here).
+              plane = planeOf {
+                options = customOptions;
+                inherit (customTree) config;
+                collections = extractedCollections;
+                inherit keySemantics;
+                refs = refsFromOptionsWithTypes customOptions;
+                computed = computedFields;
+                modules = map (d: d.value) strippedDefs ++ [ resolvedBase ];
+                functions = { inherit mkType computed; };
+              };
             in
             custom
             // published
@@ -517,21 +716,14 @@ let
             // {
               # `kind` is the LET-BOUND `prelude.last loc` — the option path, which is
               # authoritative — never the `mkType` result's echo of it, which is caller data.
-              # The arm publishes `options` and `refs` as the literals above, so those components
-              # of the preimage are empty by construction. `refinements` is derived above, but its
-              # preimage component stays `[ ]` on this arm: the mark does not read the option
-              # plane here, and whether it should is an owner ruling not yet made (den-hoag-mx07b
-              # §4 Q1). `ci/tests/mktype-refinements.nix` pins that state.
+              # The arm still PUBLISHES `options` and `refs` as the literals above, but the mark
+              # reads `plane`, built from `customTree`: the option plane an instance imports enters
+              # the preimage (den-hoag-mx07b §4 Q1 ruled; publishing that plane is den-hoag-88cfa's).
+              # `ci/tests/mktype-refinements.nix` pins that the mark reads it.
               __mint = {
-                minted = markOf {
-                  inherit kind strict;
-                  options = [ ];
-                  refs = [ ];
-                  refinements = [ ];
-                  collections = prelude.attrNames extractedCollections;
-                  keySemantics = prelude.attrNames keySemantics;
-                };
+                minted = markOf { inherit kind strict plane; };
               };
+              __sealed = plane.sealed;
             }
           else
             let
@@ -610,8 +802,17 @@ let
                 in
                 {
                   options = userOptions;
+                  inherit (dummy) config;
                   refs = refsFromOptionsWithTypes userOptions;
                 };
+              plane = planeOf {
+                inherit (introspect) options config refs;
+                collections = finalCollections;
+                inherit keySemantics;
+                computed = computedFields;
+                modules = map (d: d.value) strippedDefs ++ [ effectiveBase ];
+                functions = { inherit mkType computed; };
+              };
             in
             # Precedence: computed overrides collections of the same name.
             # __functor is reserved — collections/computed must not use it as a key.
@@ -637,15 +838,9 @@ let
               # Applied LAST so the mark cannot be shadowed by a collection or a computed field;
               # both are refused by name above rather than left to win silently here.
               __mint = {
-                minted = markOf {
-                  inherit kind strict;
-                  options = prelude.attrNames introspect.options;
-                  refs = prelude.attrNames introspect.refs;
-                  refinements = prelude.attrNames extractedRefinements;
-                  collections = prelude.attrNames finalCollections;
-                  keySemantics = prelude.attrNames keySemantics;
-                };
+                minted = markOf { inherit kind strict plane; };
               };
+              __sealed = plane.sealed;
             }
         );
     };
@@ -875,5 +1070,10 @@ let
     };
 in
 {
-  inherit mkSchemaEntryType mkSchemaOption isSchemaKind;
+  inherit
+    mkSchemaEntryType
+    mkSchemaOption
+    isSchemaKind
+    kindEq
+    ;
 }

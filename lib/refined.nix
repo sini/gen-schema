@@ -5,9 +5,24 @@
 # CONSTRUCTED with — gen-schema does not re-export `hashIdentity`, which is the discipline
 # `./id-hash.nix` and `./entry-type.nix` are already under and the reason ADR-0034's "no second
 # minting authority" holds with the count of authorities still at one.
-{ merge, identity }:
+{
+  merge,
+  identity,
+  preimageTagOf,
+}:
 let
   normalizeRefinements = r: if builtins.isList r then r else [ r ];
+
+  # A refinement whose `check` is a REGISTERED construction (gen-algebra `mkIntensional`) enters
+  # the preimage by its minted identity, read through gen-algebra's one reader of the tagged sum;
+  # any other `check` enters as itself, so a caller lambda still reaches the encoder and is refused
+  # there (ADR-0034's migration: minted once it is a term, a refusal until then).
+  refinementPreimage =
+    r:
+    let
+      tag = preimageTagOf identity.hashIdentity (r.check or null);
+    in
+    if tag ? minted then r // { check = tag; } else r;
 
   # A refined type is DERIVED from its base rather than described from scratch: it keeps the
   # base's value behaviour and adds the predicate metadata. That derivation still has to go
@@ -76,7 +91,7 @@ let
               ctor = "refined";
               args = {
                 base = baseIdentity;
-                refinements = normalized;
+                refinements = map refinementPreimage normalized;
               };
             }
             .${l}
