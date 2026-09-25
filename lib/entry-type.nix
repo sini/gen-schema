@@ -603,6 +603,11 @@ let
           computedFields =
             let
               fields = if computed != null then computed extractedCollections defs else { };
+              # Every other name this library writes onto the kind value, read off `kindResultKeys`
+              # so the door moves with the record. The computed fields are splatted OVER the written
+              # record on both branches, so a computed `options` or `refs` silently replaced the
+              # published plane (den-hoag-ciu4r, ADR-0025).
+              shadowing = builtins.filter (k: fields ? ${k}) kindResultKeys;
             in
             # `__mint` is refused here for the reason `mkAllCollections` refuses it as a collection
             # key: the stamp is applied last and would overwrite a computed field of that name
@@ -611,6 +616,8 @@ let
               throw "gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType"
             else if fields ? __sealed then
               throw "gen-schema: computed field '__sealed' is reserved — the sealed subjects are written by mkSchemaEntryType"
+            else if shadowing != [ ] then
+              throw "gen-schema: computed field '${builtins.head shadowing}' is reserved — mkSchemaEntryType writes it onto every kind value and a computed field of that name would shadow it; reserved computed-field names: ${builtins.concatStringsSep ", " kindResultKeys}"
             else
               fields;
 

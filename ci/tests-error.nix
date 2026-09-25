@@ -314,6 +314,60 @@ in
     };
   };
 
+  # den-hoag-ciu4r (ADR-0025). The computed fields are splatted OVER the record mkSchemaEntryType
+  # writes, on both branches, so a computed `options` or `refs` replaced the published plane with no
+  # signal. Measured at a90bc54: `(kind with computed options = "COMPUTED").options` ⇒ "COMPUTED" on
+  # both arms. The class cell over every `kindResultKeys` name is `ci/tests/computed-field-keys.nix`.
+  flake.testsError.computed-field-shadow-refusals = {
+    # The default branch, with the live control inside the cell: a computed field with a free name is
+    # still accepted, so a door that refused every computed field cannot score this green.
+    test-computed-options-is-refused-by-name = {
+      expr =
+        assert
+          let
+            control =
+              forced
+                (kindOf { computed = _: _: { freeName = 1; }; } { options.role = strOpt; }).freeName;
+          in
+          control.success && control.value == 1;
+        (kindOf { computed = _: _: { options = "COMPUTED"; }; } { options.role = strOpt; }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: computed field 'options' is reserved — mkSchemaEntryType writes it onto every kind value and a computed field of that name would shadow it; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed$";
+      };
+    };
+
+    # The `mkType` branch, where the computed fields are applied over the `mkType` result too.
+    test-computed-refs-is-refused-on-the-mkType-arm = {
+      expr =
+        let
+          mkType =
+            { ... }:
+            {
+              options.role = strOpt;
+            };
+        in
+        assert
+          let
+            control =
+              forced
+                (kindOf {
+                  inherit mkType;
+                  computed = _: _: { freeName = 1; };
+                } { }).freeName;
+          in
+          control.success && control.value == 1;
+        (kindOf {
+          inherit mkType;
+          computed = _: _: { refs = "COMPUTED"; };
+        } { }).refs;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: computed field 'refs' is reserved — mkSchemaEntryType writes it onto every kind value and a computed field of that name would shadow it; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed$";
+      };
+    };
+  };
+
   # THE KIND-DECLARATION KEY SPACE (den-hoag-nn4). A key on a structured kind declaration that no
   # reader consumes was discarded unread, and the discard was invisible to every instrument this
   # library owns — a typo'd key produced an instance byte-identical to one declared without it,
