@@ -1625,19 +1625,22 @@ than hand-maintained prose: `nix-unit --flake ./ci#tests` ⇒ `511/511 successfu
 `git ls-tree --name-only HEAD ci/tests/ | grep -c '\.nix$'` ⇒ `112`, which is also the number of
 distinct suites the runner reports. Covering kinds, extension, strict validation, instances, identity hashing, cross-instance refs (deferred/direct/self-referential coerce, `listOf`/`setOf`/`nullOr` wrappers), collections and computed fields, methods, mixins, refinement contracts, blame, validators, derive hooks, codec round-trips, topology/edges introspection, and docs generation.
 
-Run the itemized suite (from `ci/`):
+Run the itemized suite, behind the read-roots guard:
 
 ```bash
-cd ci
-nix-unit --flake .#tests
+nix develop ./ci --command ci
 ```
 
-Or build the aggregated check derivation:
+Or build the aggregated check derivation (unguarded):
 
 ```bash
-cd ci
-nix flake check
+nix flake check ./ci
 ```
+
+`ci` refuses when anything under a declared read root is unknown to git — any extension or name,
+`_`-prefixed included — and the remedy is `git add` or a move. The bare `nix-unit --flake ./ci#tests`
+and `nix flake check ./ci` are unguarded: they read a git-filtered copy of the tree, so an untracked
+cell is silently absent and the run stays green.
 
 gen-schema runs on the pure-gen stack — gen-merge REPLACES `lib.evalModules` + `lib.types`, so gen-schema carries no `nixpkgs.lib` dependency.
 
