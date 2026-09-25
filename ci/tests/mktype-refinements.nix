@@ -73,6 +73,90 @@ in
           }).refinements;
       expected = [ ];
     };
+    # ONE plane: the `mkType` arm publishes as `options` and `refs` the option plane an instance
+    # imports, which is the plane its `refinements` and its mark read. The standard arm, same
+    # declaration, is the control.
+    test-mktype-arm-publishes-the-plane-it-reads = {
+      expr =
+        let
+          decl = {
+            options.myPort = genMerge.mkOption { type = rp; };
+            options.owner = genMerge.mkOption { type = genSchema.ref "user"; };
+          };
+          k = kindOf { mkType = aspectShaped; } decl;
+          std = kindOf { } decl;
+          names = kv: builtins.attrNames kv.options;
+          imported = builtins.filter (n: builtins.substring 0 7 n != "_module") (
+            builtins.attrNames (genMerge.evalModuleTree { modules = [ k ]; }).options
+          );
+        in
+        {
+          published = names k;
+          inherit imported;
+          refinementsWithinOptions = builtins.all (n: k.options ? ${n}) (builtins.attrNames k.refinements);
+          refs = builtins.mapAttrs (_: r: r.refKind) k.refs;
+          sameAsStandardArm =
+            names k == names std && builtins.attrNames k.refs == builtins.attrNames std.refs;
+        };
+      expected = {
+        published = [
+          "myPort"
+          "owner"
+        ];
+        imported = [
+          "myPort"
+          "owner"
+        ];
+        refinementsWithinOptions = true;
+        refs.owner = "user";
+        sameAsStandardArm = true;
+      };
+    };
+    # A functor that READS its `self` declares from what the kind value publishes: here one `x`,
+    # plus an `<n>_mirror` for every option `self.options` names. The tree the arm's plane is read
+    # from and an instance must hand it the same `self`, or the instance declares `x_mirror` outside
+    # the published plane, the mark and `refinements`, and the identity keys read the instance's.
+    test-mktype-self-reading-functor-sees-one-plane = {
+      expr =
+        let
+          mirror =
+            { kind, ... }:
+            {
+              inherit kind;
+              __functor = self: _: {
+                options = {
+                  x = genMerge.mkOption {
+                    type = genMerge.types.str;
+                    default = "x";
+                  };
+                }
+                // builtins.listToAttrs (
+                  map (n: {
+                    name = "${n}_mirror";
+                    value = genMerge.mkOption {
+                      type = genMerge.types.str;
+                      default = "m";
+                    };
+                  }) (builtins.attrNames (self.options or { }))
+                );
+              };
+            };
+          k = kindOf { mkType = mirror; } { };
+          published = builtins.attrNames k.options;
+        in
+        {
+          inherit published;
+          imported = builtins.filter (n: builtins.substring 0 7 n != "_module") (
+            builtins.attrNames (genMerge.evalModuleTree { modules = [ k ]; }).options
+          );
+          identityKeysArePublished = genSchema.identityKeysForKind { } k == [ "name" ] ++ published;
+        };
+      expected = {
+        published = [ "x" ];
+        imported = [ "x" ];
+        identityKeysArePublished = true;
+      };
+    };
     # The `mkType` arm's mark reads the option plane an instance imports (mx07b §4 Q1 ruled (b),
     # den-hoag-88cfa; paid by (c+), den-hoag-markof-partial-preimage-znfjq): a refined and a bare
     # `mkType` kind mint APART.

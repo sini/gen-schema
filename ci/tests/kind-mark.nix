@@ -27,8 +27,8 @@ let
   };
   hostKind = standardTree.config.schema.host;
 
-  # The mkTYPE arm — the door gen-aspects goes through (`gen-aspects/lib/schema.nix:26`), where the
-  # arm supplies `options = { }` itself and the declarations live in the `__functor`'s imports. Both
+  # The mkTYPE arm — the door gen-aspects goes through (`gen-aspects/lib/schema.nix`, binding
+  # `schemaOpt`), where the declarations live in the `__functor`'s imports. Both
   # shapes are covered because both reach ONE merge; the stamp is in that merge and nowhere else.
   mkTypeTree = genMerge.evalModuleTree {
     modules = [
@@ -70,9 +70,8 @@ in
       # The two arms mint DIFFERENT marks — a stamp that emitted one constant would satisfy every
       # presence arm above and separate nothing.
       armsDiffer = hostKind.__mint.minted != widgetKind.__mint.minted;
-      # The mkType arm's `options` is empty by construction, so its mark is over `options = [ ]`.
-      # Recorded here because it is the one component a reader would expect to be populated.
-      mkTypeOptionsEmpty = widgetKind.options == { };
+      # The mkType arm publishes the option plane its mark reads.
+      mkTypeOptions = builtins.attrNames widgetKind.options;
     };
     expected = {
       standardHasMark = true;
@@ -80,7 +79,7 @@ in
       standardPrefix = "schemakind:";
       mkTypePrefix = "schemakind:";
       armsDiffer = true;
-      mkTypeOptionsEmpty = true;
+      mkTypeOptions = [ "facet" ];
     };
   };
 

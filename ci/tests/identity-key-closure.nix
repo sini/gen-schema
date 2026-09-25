@@ -57,11 +57,11 @@ let
   otherRole = instanceWith [ ] "db";
 
   # The kind-value shape gen-aspects' `schemaOption` produces: the declarations live in the module the
-  # `__functor` imports and `options` is EMPTY. gen-aspects is not an input here — it depends on this
-  # library — so the shape is reproduced through THE DOOR GEN-ASPECTS ITSELF GOES THROUGH,
-  # `mkSchemaOption { mkType = …; }` (`gen-aspects/lib/schema.nix:26`), which is the entry type's
-  # mkType ARM — the arm that sets `options = { }`. What the cell measures is the SHAPE, which is
-  # what the derivation has to be total over; the library that emits it is incidental.
+  # `__functor` imports, and `options` publishes the plane that module declares. gen-aspects is not
+  # an input here — it depends on this library — so the shape is reproduced through THE DOOR
+  # GEN-ASPECTS ITSELF GOES THROUGH, `mkSchemaOption { mkType = …; }` (`gen-aspects/lib/schema.nix`,
+  # binding `schemaOpt`), which is the entry type's mkType ARM. What the cell measures is the SHAPE,
+  # which is what the derivation has to be total over; the library that emits it is incidental.
   #
   # ★ IT USED TO BE A HAND-WRITTEN LITERAL, and ADR-0034's mark is why it can no longer be one: a
   # kind value's provenance is now CHECKED, so a literal of that shape is refused by
@@ -218,7 +218,7 @@ in
   flake.tests.identity-key-closure.test-forKind-agrees-with-stamp-on-an-imports-declared-kind = {
     expr = {
       keys = genSchema.identityKeysForKind { } aspectShapedKind;
-      kindValueOptionsIsEmpty = aspectShapedKind.options == { };
+      kindValueOptions = builtins.attrNames aspectShapedKind.options;
       recomputeMatchesStamp =
         (genSchema.identityHashForKind aspectShapedKind aspectInstance) == aspectInstance.id_hash;
       # Pinned by CONTENTS, not by equality alone: two derivations that both select nothing agree
@@ -230,7 +230,7 @@ in
         "name"
         "spool"
       ];
-      kindValueOptionsIsEmpty = true;
+      kindValueOptions = [ "spool" ];
       recomputeMatchesStamp = true;
       stamped = "thimble:80c707ba87d89d936a86bdbd3068070ed68704582a357225f750ed83078f2788";
     };

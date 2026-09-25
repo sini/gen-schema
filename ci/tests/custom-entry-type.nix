@@ -270,10 +270,17 @@ in
       "user"
     ];
   };
-  # Custom mkType kinds have empty .options (introspection is skipped for custom types)
-  flake.tests.custom-entry-type.test-custom-type-no-introspection = {
-    expr = introEval.config.schema.host.options;
-    expected = { };
+  # A custom mkType kind publishes the option plane its result imports: here the resolved base's
+  # `name`, and per kind, so `user` publishes its own.
+  flake.tests.custom-entry-type.test-custom-type-publishes-its-option-plane = {
+    expr = {
+      host = builtins.attrNames introEval.config.schema.host.options;
+      user = builtins.attrNames introEval.config.schema.user.options;
+    };
+    expected = {
+      host = [ "name" ];
+      user = [ "userName" ];
+    };
   };
   flake.tests.custom-entry-type.test-mixin-skipped = {
     expr = !(mixinSkipHost ? extraField);

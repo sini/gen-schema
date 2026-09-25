@@ -362,7 +362,7 @@ let
     "keySemantics" # the `keySemantics` formal, both branches
     "options" # `introspect.options`, both branches
     "refs" # `introspect.refs`, both branches
-    "refinements" # `extractedRefinements` default branch, `refinementsOfOptions customOptions` mkType branch
+    "refinements" # `extractedRefinements` default branch, `refinementsOfOptions introspect.options` mkType branch
     # Written AFTER `// finalCollections` and refused for the REVERSE reason: the mark is applied
     # last, so a collection of that name is SILENTLY OVERWRITTEN — something vanishes and nothing
     # says so. Kept verbatim from the door's own third clause.
@@ -506,8 +506,8 @@ let
       mkType ? null,
       strict ? true,
       keySemantics ? { },
-      # BASE MODULE ARGS for the KIND TREE — `introspect` and the `mkType` arm's `customOptions`
-      # below, and nothing else in this file.
+      # BASE MODULE ARGS for the KIND TREE — `introspectOf` below, which both arms read, and
+      # nothing else in this file.
       #
       # ★ A KIND'S OWN OPTION TREE RECURSES WITHOUT ANY INSTANCE, which is why this is a separate
       # channel from `mkInstanceType`'s and not a duplicate of it. A kind module that forces an
@@ -526,6 +526,28 @@ let
     }:
     let
       base = merge.types.deferredModule;
+
+      # ONE introspection for both arms: the option tree an instance imports, its kind-level config
+      # and its refs, from one `evalModuleTree` over the module an instance imports. Each arm
+      # publishes `options` and `refs` from it and `planeOf` and `refinements` read the same
+      # binding, so the published plane, the mark and `__sealed` are one plane.
+      #
+      # Lazy: evaluated on first access of `options`, `refs`, `refinements` or the mark. Each arm
+      # passes a locally-built module, never `config.${k}`, to avoid circularity.
+      introspectOf =
+        module:
+        let
+          tree = merge.evalModuleTree {
+            modules = [ module ];
+            inherit specialArgs;
+          };
+          options = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) tree.options;
+        in
+        {
+          inherit options;
+          inherit (tree) config;
+          refs = refsFromOptionsWithTypes options;
+        };
 
       allCollections = mkAllCollections collections;
 
@@ -656,8 +678,8 @@ let
           if mkType != null then
             # Custom entry type: collection extraction runs first (above),
             # then mkType controls the result. The mixin pipeline and __functor
-            # wrapping are skipped; `refinements` is DERIVED, from the option plane
-            # of the value an instance of this kind imports.
+            # wrapping are skipped; `options`, `refs` and `refinements` are DERIVED, from the
+            # option plane of the value an instance of this kind imports.
             # Precedence: computedFields wins over mkType result for same-named keys,
             # so computed topology/meta fields remain authoritative.
             # strippedDefs are passed so mkType implementations can wire user-declared
@@ -669,39 +691,40 @@ let
                 defs = strippedDefs;
                 inherit kind;
               };
+              # The keys the arm applies over the `mkType` result. `options = { }` and `refs = { }`
+              # stand in the TREE MODULE only: the kind value publishes the evaluated plane under
+              # those names, and a module built over the kind value itself would be circular for any
+              # reader of `options` (gen-merge's reader of a non-functor module, or a functor that
+              # reads its `self`). The pinned refusal of a non-functor result names `keySemantics`
+              # from exactly this module.
               published = {
                 inherit strict keySemantics;
                 options = { };
                 refs = { };
               };
-              # The option plane an instance sees: `mkInstanceType` imports the PUBLISHED kind
-              # value, so the plane is evaluated over the `mkType` result with the published
-              # literals and computed fields applied — never over the raw result, whose own
-              # `options` key the published `options = { }` overwrites. `specialArgs` and the
-              # `_module` filter as `introspect` threads them. The two derived fields
-              # (`refinements`, `__mint`) are left out; neither is a module declaration.
+              # The module an instance imports: the `mkType` result with the published keys and
+              # computed fields applied. The derived fields (`options`, `refs`, `refinements`,
+              # `__mint`, `__sealed`) are left out; none is a module declaration.
               #
               # LAZY, and load-bearing: one `evalModuleTree` per `mkType` kind, memoised in the
-              # kind record and forced only by a read of `refinements` — never by `kind` or
-              # `__mint.minted`.
+              # kind record and forced only by a read of `options`, `refs`, `refinements` or the
+              # mark — never by `kind` or `strict`.
               #
               # The module is named for its kind, so a refusal of its syntax (a surplus key beside
               # the published `options`) says which kind to fix; a `_file` of the result's own wins.
-              customTree = merge.evalModuleTree {
-                modules = [
-                  ({ _file = "<gen-schema mkType kind ${kind}>"; } // custom // published // computedFields)
-                ];
-                inherit specialArgs;
-              };
-              customOptions = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) customTree.options;
-              # ONE plane for the mark and for `kindEq` (c+): this arm's option plane is the tree an
-              # instance imports, so it enters the preimage (den-hoag-88cfa's ruled price, paid here).
+              treeModule = {
+                _file = "<gen-schema mkType kind ${kind}>";
+              }
+              // custom
+              // published
+              // computedFields;
+              introspect = introspectOf treeModule;
+              # ONE plane for the published fields, the mark and `kindEq` (c+): this arm's option
+              # plane is the tree an instance imports, so it enters the preimage.
               plane = planeOf {
-                options = customOptions;
-                inherit (customTree) config;
+                inherit (introspect) options config refs;
                 collections = extractedCollections;
                 inherit keySemantics;
-                refs = refsFromOptionsWithTypes customOptions;
                 computed = computedFields;
                 modules = map (d: d.value) strippedDefs ++ [ resolvedBase ];
                 functions = { inherit mkType computed; };
@@ -710,16 +733,20 @@ let
             custom
             // published
             // {
-              refinements = refinementsOfOptions customOptions;
+              inherit (introspect) options refs;
+              refinements = refinementsOfOptions introspect.options;
             }
+            # The result's functor is applied to `treeModule`, so the tree and an instance hand it
+            # the same `self` and a functor that reads `self.options` declares one plane in both.
+            # Applied before the computed fields, which still win for same-named keys.
+            // prelude.optionalAttrs (custom ? __functor) { __functor = _: custom.__functor treeModule; }
             // computedFields
             // {
               # `kind` is the LET-BOUND `prelude.last loc` — the option path, which is
               # authoritative — never the `mkType` result's echo of it, which is caller data.
-              # The arm still PUBLISHES `options` and `refs` as the literals above, but the mark
-              # reads `plane`, built from `customTree`: the option plane an instance imports enters
-              # the preimage (den-hoag-mx07b §4 Q1 ruled; publishing that plane is den-hoag-88cfa's).
-              # `ci/tests/mktype-refinements.nix` pins that the mark reads it.
+              # The mark reads `plane`, the one plane the arm publishes as `options` and `refs`
+              # (den-hoag-mx07b §4 Q1 ruled). `ci/tests/mktype-refinements.nix` pins that the mark
+              # reads it.
               __mint = {
                 minted = markOf { inherit kind strict plane; };
               };
@@ -790,21 +817,7 @@ let
 
               merged = base.merge loc (strippedDefs ++ injected);
 
-              # Lazy introspection — evaluated on first access of .options or .refs.
-              # Uses the locally-built merged module, not config.${k}, to avoid circularity.
-              introspect =
-                let
-                  dummy = merge.evalModuleTree {
-                    modules = [ merged ];
-                    inherit specialArgs;
-                  };
-                  userOptions = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) dummy.options;
-                in
-                {
-                  options = userOptions;
-                  inherit (dummy) config;
-                  refs = refsFromOptionsWithTypes userOptions;
-                };
+              introspect = introspectOf merged;
               plane = planeOf {
                 inherit (introspect) options config refs;
                 collections = finalCollections;

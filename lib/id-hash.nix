@@ -76,13 +76,13 @@ let
   # with its `kinds` argument, whose comment states the same reach ("an expression with nowhere to
   # attach", "what is owed is dataflow and not a check").
   #
-  # ★ THE SOURCE IS THE KIND'S OWN EVALUATION, NOT `kindValue.options`, AND THAT IS A MEASUREMENT.
-  # `options` is populated on a kind declared through `mkSchemaOption` and EMPTY on one declared
-  # through gen-aspects' `schemaOption`, which keeps its declarations in `__defsModule.imports`. A
-  # derivation reading `kindValue.options` therefore mints over `[ "name" ]` alone for every
-  # aspect-declared kind — silently disagreeing with the stamp those instances carry, and collapsing
-  # two instances differing only in a kind option onto one identity. Both shapes answer `__functor`,
-  # so both evaluate here, and the two agree.
+  # ★ THE SOURCE IS THE KIND'S OWN EVALUATION: the module an instance imports, not a published
+  # field about it. Both entry arms publish that same plane as `kindValue.options` — a kind declared
+  # through gen-aspects' `schemaOption`, which keeps its declarations in `__defsModule.imports`,
+  # included — and both answer `__functor`, so both evaluate here and the two agree. Reading the
+  # import keeps this derivation's reach the instance's by construction: a derivation over a field
+  # that disagreed with the import would mint over a different key set than the stamp those
+  # instances carry, collapsing two instances differing only in a kind option onto one identity.
   #
   # `name` is prepended because `mkInstanceType` injects it at INSTANCE eval: it is an identity key
   # by construction and is not in the kind's own option set to be reflected out of it. A kind whose

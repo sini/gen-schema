@@ -67,7 +67,9 @@ gen-merge exports became unreachable.
 
 `baseModule` may be a module or `kindName -> module`. `computed : collections -> defs -> attrset`
 (wins over collections of the same name). `mkType : { kindModule, collections, defs, kind } -> attrset`
-is the escape hatch — it skips the mixin pipeline, `__functor` wrapping, and refinement extraction.
+is the escape hatch — it skips the mixin pipeline and the `__functor` wrapping. `options`, `refs` and
+`refinements` are still published, from one evaluation of the module an instance imports (the plane
+the mark reads), and the result's own `__functor` is applied to that same module.
 
 **Instances and registries** — `lib/instance.nix`
 
