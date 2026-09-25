@@ -333,7 +333,7 @@ in
         (kindOf { computed = _: _: { options = "COMPUTED"; }; } { options.role = strOpt; }).options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'options' is reserved — mkSchemaEntryType writes it onto every kind value and a computed field of that name would shadow it; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed$";
+        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed$";
       };
     };
 
@@ -363,7 +363,7 @@ in
         } { }).refs;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'refs' is reserved — mkSchemaEntryType writes it onto every kind value and a computed field of that name would shadow it; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed$";
+        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed$";
       };
     };
   };

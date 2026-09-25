@@ -203,10 +203,13 @@ and differs only at sealed components. The mark is what `mkInstanceType`, `mkIns
 read to decide a value is a kind value, replacing the `? kind && ? options` presence test that
 admitted any hand-written attrset. It is LAZY and the admission read never forces it — see
 `lib/entry-type.nix`'s `isSchemaKind`. `__mint` and `__sealed` are reserved as collection keys, as
-computed fields and as DECLARATION keys, all refused by name. A computed field may take NO name
-gen-schema writes onto the kind value — `lib/entry-type.nix`'s `kindResultKeys` (`__functor kind mixins strict keySemantics options refs refinements __mint __sealed`), refused by name on both
-branches, because the computed fields are applied over that record and a computed `options` or
-`refs` silently replaced the published plane (`den-hoag-ciu4r`; tests
+computed fields and as DECLARATION keys, all refused by name. A computed field may take no name
+from `lib/entry-type.nix`'s `kindResultKeys` (`__functor kind mixins strict keySemantics options refs refinements __mint __sealed`) — refused by name UNIFORMLY on both branches, at a stated
+over-fire cost on the `mkType` branch: `mixins` is never written there (always over-fires) and
+`__functor` only when the `mkType` result is itself a functor (over-fires otherwise); `kind` is
+written unconditionally on both branches (den-hoag-3x3bi) and is not in that set. The computed
+fields are applied over the written record on both branches, so a computed `options` or `refs`
+would otherwise silently replace the published plane (`den-hoag-ciu4r`; tests
 `computed-field-shadow-refusals.*` in `ci/tests-error.nix`, `ci/tests/computed-field-keys.nix`). Schema-level introspection sits alongside the kinds: `_kindNames`, `_topology`
 (`{ parent; children; }` per kind), `_refEdges` (`{ from; field; to; }`), `_edges` (parent edges plus
 ref edges, each tagged `type`), `_roots`, `_leaves`, `_collectionKeys` (the collection keys

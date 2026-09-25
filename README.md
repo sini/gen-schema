@@ -1007,7 +1007,9 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 **Scope.** That idiom reads collection values on the **default entry-type path**. Two caveats, both
 real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
-with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `kind`, `__mint`, `__sealed`)
+with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__mint`, `__sealed`,
+`config`, `disabledModules`, `freeformType`, `imports`, `key`, `keySemantics`, `kind`, `mixins`,
+`options`, `refinements`, `refs`, `strict` — `schema._reservedCollectionKeys`, 15 names)
 is refused when `_collectionKeys` is read, exactly as it is refused when a kind is merged.
 
 ### Unrecognised declaration keys are refused by name
@@ -1233,7 +1235,7 @@ mkSchemaEntryType {
 | `defs`        | Stripped definitions (collection keys removed) for wiring into the custom type   |
 | `kind`        | The kind name (last element of the option path)                                  |
 
-The return value is merged with `computedFields` (computed wins for same-named keys), so topology and introspection fields remain authoritative.
+The return value is merged with `computedFields` (computed wins for same-named keys — except a name in `kindResultKeys`, the kind-value contract `lib/entry-type.nix` reserves and refuses by name on both branches; `computed` may not use one of those at all), so topology and introspection fields remain authoritative.
 
 #### `keySemantics` — opaque per-key category surface
 

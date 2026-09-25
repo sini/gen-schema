@@ -607,6 +607,18 @@ let
               # so the door moves with the record. The computed fields are splatted OVER the written
               # record on both branches, so a computed `options` or `refs` silently replaced the
               # published plane (den-hoag-ciu4r, ADR-0025).
+              #
+              # ★ UNIFORM ACROSS BOTH BRANCHES, at a stated cost — the same shape as
+              # `reservedCollectionKeys` above (den-hoag-ciu4r P1, den-hoag-3x3bi). On the `mkType`
+              # branch `mkSchemaEntryType` never writes `mixins` (the mixin pipeline runs only on
+              # the default branch), so refusing a computed `mixins` there over-fires ALWAYS: it
+              # protects nothing this library wrote. `__functor` is written on that branch only
+              # when the `mkType` result is itself a functor (`custom ? __functor`, above), so
+              # refusing a computed `__functor` over-fires whenever it is not. `kind` is written
+              # UNCONDITIONALLY on both branches (the `inherit kind;` beside `__mint`, below) — it
+              # is NOT in the over-fire set. One list is taken over two rather than a per-branch
+              # set, so a computed `mixins` cannot read back differently between branches for a
+              # reason no caller could see.
               shadowing = builtins.filter (k: fields ? ${k}) kindResultKeys;
             in
             # `__mint` is refused here for the reason `mkAllCollections` refuses it as a collection
@@ -617,7 +629,7 @@ let
             else if fields ? __sealed then
               throw "gen-schema: computed field '__sealed' is reserved — the sealed subjects are written by mkSchemaEntryType"
             else if shadowing != [ ] then
-              throw "gen-schema: computed field '${builtins.head shadowing}' is reserved — mkSchemaEntryType writes it onto every kind value and a computed field of that name would shadow it; reserved computed-field names: ${builtins.concatStringsSep ", " kindResultKeys}"
+              throw "gen-schema: computed field '${builtins.head shadowing}' is reserved — it is part of the kind-value contract; reserved computed-field names: ${builtins.concatStringsSep ", " kindResultKeys}"
             else
               fields;
 
@@ -751,9 +763,18 @@ let
             // {
               # `kind` is the LET-BOUND `prelude.last loc` — the option path, which is
               # authoritative — never the `mkType` result's echo of it, which is caller data.
+              # WRITTEN here (den-hoag-3x3bi, ADR-0025): before this, nothing on this arm wrote
+              # `kind` at all, so a result carrying none made `.kind` abort uncatchably
+              # (`attribute 'kind' missing`, not a `throw` `tryEval` can catch) and
+              # `mkInstanceType` refused with the FALSE reason "no mark" (`isSchemaKind` reads
+              # `v ? kind` first); a result echoing a WRONG name published that name while the
+              # mark stayed keyed to the option path, silently disagreeing with it. Applied AFTER
+              # `// computedFields`, beside `__mint`, so a computed `kind` cannot re-open what this
+              # write closes — `kind` is refused as a computed-field name below regardless.
               # The mark reads `plane`, the one plane the arm publishes as `options` and `refs`
               # (den-hoag-mx07b §4 Q1 ruled). `ci/tests/mktype-refinements.nix` pins that the mark
               # reads it.
+              inherit kind;
               __mint = {
                 minted = markOf { inherit kind strict plane; };
               };
