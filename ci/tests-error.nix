@@ -861,7 +861,7 @@ in
       expr = (genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ]).__id;
       expectedError = {
         type = "ThrownError";
-        msg = "^identity: a lambda in an identity position$";
+        msg = "^identity: a lambda in an identity position; kind \"type\", label \"args\"$";
       };
     };
 
