@@ -55,19 +55,31 @@ let
     }
   ];
 
-  keysNaming =
-    k:
+  # The door takes the KIND DECLARATION: the head of `hostModules` is declared as the kind `host`
+  # through `evalSchema`, and the tail is the instance's definitions (ci/tests/identity-hash.nix).
+  kindOfModules =
+    decl:
+    (evalSchema {
+      modules = [ { config.schema.host = decl; } ];
+    }).host;
+  identityEval =
+    modules: extra:
+    let
+      kindValue = kindOfModules (builtins.head modules);
+    in
+    genMerge.evalModuleTree {
+      modules = [ (mkIdentityModule kindValue (identityKeysForKind { } kindValue)) ] ++ modules ++ extra;
+    };
+
+  keysNaming = k: (identityEval hostModules [ { config._identity.keys = [ k ]; } ]).config.id_hash;
+
+  # The same door handed a NAME. `stamp` forces `id_hash`; `keys` reads only `_identity.keys`,
+  # which never reaches the stamp — the shape on which a door refusing only at the stamp would
+  # admit the name silently.
+  byName =
     (genMerge.evalModuleTree {
-      modules = [
-        (mkIdentityModule "host" (
-          identityKeysForKind { } {
-            imports = hostModules;
-          }
-        ))
-      ]
-      ++ hostModules
-      ++ [ { config._identity.keys = [ k ]; } ];
-    }).config.id_hash;
+      modules = [ (mkIdentityModule "host" [ "name" ]) ] ++ hostModules;
+    }).config;
 
   # A kind reached through `mkSchemaOption`'s own construction, for the declaration-key cells below.
   # Going through the published option is what makes those cells measure the guard's PLACEMENT
@@ -183,6 +195,60 @@ in
   };
 
   flake.testsError.identity-refusals = {
+    # R1. The door takes the kind DECLARATION and refuses a NAME by name: the stamp's preimage
+    # carries the kind's minted identity, which a name does not have. Before this door a name was
+    # the tag and the preimage alike, so two different declarations sharing a name minted one
+    # identity. The control is the same door handed the kind value, which mints.
+    test-kind-name-refused-at-the-stamp = {
+      expr =
+        assert
+          let
+            control = forced (keysNaming "name");
+          in
+          control.success && builtins.match "host:[0-9a-f]{64}" control.value != null;
+        byName.id_hash;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: mkIdentityModule: a kind name is a reference, and this door takes the kind declaration \\(a kind value carrying `__mint\\.minted`\\); got the string 'host'$";
+      };
+    };
+    # R1b. The refusal is EAGER: it fires when the module is applied, so a read that never forces
+    # the stamp is refused too. A door judging its operand only at `id_hash` admits the name here.
+    test-kind-name-refused-without-forcing-the-stamp = {
+      expr = byName._identity.keys;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: mkIdentityModule: a kind name is a reference, and this door takes the kind declaration \\(a kind value carrying `__mint\\.minted`\\); got the string 'host'$";
+      };
+    };
+    # An attrset that is not a kind value is refused with the admission wording `kindEq` and
+    # `mkInstanceType` use.
+    test-unmarked-attrset-refused = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            (mkIdentityModule {
+              kind = "host";
+              options = { };
+            } [ "name" ])
+          ]
+          ++ hostModules;
+        }).config.id_hash;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: mkIdentityModule: expected a kind value carrying a mint-backed mark \\(`__mint\\.minted`\\); got an attrset with no mark$";
+      };
+    };
+    # The recompute takes the same operand and refuses a name the same way; without the guard it
+    # reached `.__mint.minted` on a string and aborted uncatchably.
+    test-recompute-refuses-a-kind-name = {
+      expr = genSchema.identityHashForKind "host" { name = "igloo"; };
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: identityHashForKind: a kind name is a reference, and this door takes the kind declaration \\(a kind value carrying `__mint\\.minted`\\); got the string 'host'$";
+      };
+    };
+
     # P3, on the input that made the predecessor false. `tags` IS declared on this kind, so the
     # message may not say it is not; it names membership and prints the set instead.
     test-explicit-key-declared-but-not-an-identity-key-names-membership = {
@@ -219,16 +285,7 @@ in
             }
           ];
         in
-        (genMerge.evalModuleTree {
-          modules = [
-            (mkIdentityModule "host" (
-              identityKeysForKind { } {
-                imports = noName;
-              }
-            ))
-          ]
-          ++ noName;
-        }).config.id_hash;
+        (identityEval noName [ ]).config.id_hash;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: mkIdentityModule: kind 'host' identifies instances by 'name', which this instance does not declare \\(identity keys: load, name\\); 'name' is reserved and is declared by mkInstanceType$";
@@ -664,7 +721,7 @@ in
             keys = forced clean._identityKeys;
           in
           id.success
-          && id.value == "host:6405e005e418788c6ed366500451c25899c6b853ce1046952d3d6244622a792b"
+          && id.value == "host:d82e725bea6bf137376a1b5a0920c7aab041b83b6c42829d5a43b90889f5a40e"
           && keys.success
           &&
             keys.value == [
@@ -700,7 +757,7 @@ in
             role = forced clean.role;
           in
           id.success
-          && id.value == "host:5c5feebf2beb3af5429ab36de21bb24c78491ba8eece8534eb69627111464850"
+          && id.value == "host:634aaa727e7738c11843ac4167ef5a2f8e532644447e27682b3a1e04ff837744"
           && role.success
           && role.value == "web";
         (instanceOf

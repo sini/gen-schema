@@ -1,10 +1,29 @@
 # mkIdentityModule — content-addressed instance identity, the REFLECTION half.
 #
 # Injects `id_hash`, a read-only `"<kind>:" + SHA-256` over a kind's primitive
-# option values, so two instances are equal iff their identifying fields are.
-# Identity keys are discovered by reflection over the kind's primitive options
-# (str/int/bool/float), excluding the declared `identity = false` opt-outs, or
-# pinned explicitly via `_identity.keys`.
+# option values AND the kind's minted identity, so two instances are equal iff they
+# are instances of one declaration with equal identifying fields. Identity keys are
+# discovered by reflection over the kind's primitive options (str/int/bool/float),
+# excluding the declared `identity = false` opt-outs, or pinned explicitly via
+# `_identity.keys`.
+#
+# ★ THE KIND ENTERS AS A LABELLED COMPONENT, `_identity`, whose value is the kind's
+# mark (`__mint.minted`) — the relatum's value is its derived identity, never its
+# identifier (ADR-0016 ruling 4). A NAME keys nothing here (ADR-0034): two
+# declarations sharing a name are two kinds, and their instances mint two
+# identities. The tag stays the display name, so `<kind>:<64 hex>` splits on its
+# first colon as before; the mark cannot be the tag because gen-identity refuses a
+# `:` in one. `_identity` cannot collide with an identity key: this module declares
+# it as a submodule, and `canonicalPreimage` refuses a duplicate label by name.
+#
+# ★ THE STAMP INHERITS THE MARK'S DOMAIN. `id_hash` is defined only where the
+# kind's mark is: the mark is minted over the declaration's inert content, so a
+# kind whose declaration reads an instance's identity (an option description or
+# default that interpolates an `id_hash` of its own kind, directly or through a
+# cycle of kinds) has no well-founded stamp and diverges — loud and uncatchable,
+# the standing ADR-0033 gives any read of a stratum's in-flight output, and the
+# same standing `kind-mark.nix` states for the declaration-time cycle. A name-only
+# stamp answered there because it never forced the mark.
 #
 # ★ THE MINT IS NOT HERE. `hashIdentity` — the substrate's one minting authority,
 # ADR-0016 ruling 5 — lives in `gen-identity`, a dependency-free leaf, and arrives
@@ -25,6 +44,7 @@
   prelude,
   merge,
   identity,
+  isSchemaKind,
 }:
 let
   # THE identity-key predicate. It used to need a warning about two derivations agreeing; it no
@@ -121,6 +141,16 @@ let
         )
       )
     );
+  kindOperand =
+    who: v:
+    if isSchemaKind v then
+      v
+    else if builtins.isString v then
+      throw "gen-schema: ${who}: a kind name is a reference, and this door takes the kind declaration (a kind value carrying `__mint.minted`); got the string '${v}'"
+    else
+      throw "gen-schema: ${who}: expected a kind value carrying a mint-backed mark (`__mint.minted`); got ${
+        if builtins.isAttrs v then "an attrset with no mark" else builtins.typeOf v
+      }";
 in
 {
   inherit identityKeysForKind;
@@ -159,8 +189,9 @@ in
   # `_identity.keys` (the instance carries those, not the kind-value), and the `null` answer above, which
   # a stamp computed over an instance of its own kind has no counterpart for.
   identityHashForKind =
-    kindValue: instance:
+    kindValue0: instance:
     let
+      kindValue = kindOperand "identityHashForKind" kindValue0;
       # No base args: this path takes only a kind value and an instance, so it has none to pass and
       # nowhere to accept them. A kind whose modules need an argument is therefore still refused
       # HERE, unchanged by the thread above — giving this path a channel cascades to its own callers
@@ -168,76 +199,97 @@ in
       keys = identityKeysForKind { } kindValue;
     in
     if prelude.all (k: instance ? ${k}) keys then
-      identity.hashIdentity kindValue.kind keys (k: instance.${k})
+      identity.hashIdentity kindValue.kind ([ "_identity" ] ++ keys) (
+        k: if k == "_identity" then kindValue.__mint.minted else instance.${k}
+      )
     else
       null;
 
+  # The first operand is the kind DECLARATION (a kind value carrying `__mint.minted`). A name is a
+  # reference, and this door has no registry to resolve one in, so a string is refused by name, as
+  # is an attrset with no mark.
+  #
   # `identityKeys` is the CLOSED key set, derived once at the kind boundary by `mkInstanceType` and
   # handed in as data. This module reflects nothing: the instance's merged `options` is the in-flight
   # output this construction exists to stop reading, and it is not an argument here any more.
   mkIdentityModule =
-    kind: identityKeys:
-    { config, ... }:
-    {
-      # `_identity` is a submodule option (not a bare nested `options._identity.keys`):
-      # gen-merge collects declared options with a flat `//` and does not descend into
-      # nested option sets, so the `keys` sub-option must live inside a submodule to get
-      # its listOf-merge + `apply = unique` semantics. Reads stay `config._identity.keys`.
-      options._identity = merge.mkOption {
-        default = { };
-        description = "Identity configuration.";
-        type = merge.types.submodule {
-          options.keys = merge.mkOption {
-            type = merge.types.listOf merge.types.str;
-            default = [ ];
-            description = "Explicit identity keys. Empty = use reflection.";
-            apply = prelude.unique;
+    kindValue0: identityKeys:
+    let
+      kindValue = kindOperand "mkIdentityModule" kindValue0;
+      kind = kindValue.kind;
+    in
+    # The operand is judged when the module is APPLIED, not when `id_hash` is forced: a door that
+    # refused only on the stamp would admit a name through every fixture that never reads it. On
+    # the `mkInstanceType` path this forces nothing new — its own admission guard forces the kind
+    # value at the same point, and it binds this module once per TYPE. A DIRECT caller that hands
+    # over a kind read from the tree being declared (`imports = [ (mkIdentityModule
+    # config.schema.host …) ]`) now forces that read while the module's declarations are folded,
+    # which gen-merge refuses by name under ADR-0033; the lazy door had hidden that read.
+    builtins.seq kindValue (
+      { config, ... }:
+      {
+        # `_identity` is a submodule option (not a bare nested `options._identity.keys`):
+        # gen-merge collects declared options with a flat `//` and does not descend into
+        # nested option sets, so the `keys` sub-option must live inside a submodule to get
+        # its listOf-merge + `apply = unique` semantics. Reads stay `config._identity.keys`.
+        options._identity = merge.mkOption {
+          default = { };
+          description = "Identity configuration.";
+          type = merge.types.submodule {
+            options.keys = merge.mkOption {
+              type = merge.types.listOf merge.types.str;
+              default = [ ];
+              description = "Explicit identity keys. Empty = use reflection.";
+              apply = prelude.unique;
+            };
           };
         };
-      };
 
-      options.id_hash = merge.mkOption {
-        readOnly = true;
-        internal = true;
-        type = merge.types.str;
-        default =
-          let
-            explicitKeys = config._identity.keys;
-            # Explicit keys are user intent, and they are validated AGAINST THE CLOSED SET — the same
-            # boundary the reflection now respects, so the two cannot disagree about what a key is.
-            # This is a behaviour change and it is the intended one: `_identity.keys` naming an option
-            # contributed on the instance side used to succeed.
-            #
-            # THE MESSAGE NAMES MEMBERSHIP, NOT A CAUSE, because the closed set excludes for three
-            # different reasons and the module holds only the set. A name can be outside it because
-            # nothing declares it, because what declares it is not primitive, or because it is
-            # declared primitive and excluded (`identity = false`, or contributed on the instance
-            # side). The predecessor said "is not declared on kind", which is FALSE on the
-            # second and third — a kind declaring `tags : listOf str` was told `tags` is undeclared.
-            # Membership is true on all three, and the set is printed so the reader sees which.
-            validatedExplicitKeys = map (
+        options.id_hash = merge.mkOption {
+          readOnly = true;
+          internal = true;
+          type = merge.types.str;
+          default =
+            let
+              explicitKeys = config._identity.keys;
+              # Explicit keys are user intent, and they are validated AGAINST THE CLOSED SET — the same
+              # boundary the reflection now respects, so the two cannot disagree about what a key is.
+              # This is a behaviour change and it is the intended one: `_identity.keys` naming an option
+              # contributed on the instance side used to succeed.
+              #
+              # THE MESSAGE NAMES MEMBERSHIP, NOT A CAUSE, because the closed set excludes for three
+              # different reasons and the module holds only the set. A name can be outside it because
+              # nothing declares it, because what declares it is not primitive, or because it is
+              # declared primitive and excluded (`identity = false`, or contributed on the instance
+              # side). The predecessor said "is not declared on kind", which is FALSE on the
+              # second and third — a kind declaring `tags : listOf str` was told `tags` is undeclared.
+              # Membership is true on all three, and the set is printed so the reader sees which.
+              validatedExplicitKeys = map (
+                k:
+                if prelude.elem k identityKeys then
+                  k
+                else
+                  throw "_identity.keys: '${k}' is not an identity key of kind '${kind}' (identity keys: ${prelude.concatStringsSep ", " identityKeys})"
+              ) (prelude.sort (a: b: a < b) explicitKeys);
+              keys = if explicitKeys != [ ] then validatedExplicitKeys else identityKeys;
+            in
+            # ADR-0034: a value or a NAMED refusal, never an abort. The accessor is partial — a key in
+            # the set that the instance carries no value for used to reach `config.${k}` and die on a
+            # raw missing-attribute error naming a line in this file. `name` is the reachable case and
+            # the guard is not written for it alone: `name` is RESERVED rather than declared, injected
+            # at instance eval by `mkInstanceType`, so a caller reaching `mkIdentityModule` directly is
+            # the one party that can hand over an instance without it. Guarding the accessor rather
+            # than that one key costs the same and is total over the whole set.
+            identity.hashIdentity kind ([ "_identity" ] ++ keys) (
               k:
-              if prelude.elem k identityKeys then
-                k
+              if k == "_identity" then
+                kindValue.__mint.minted
+              else if config ? ${k} then
+                config.${k}
               else
-                throw "_identity.keys: '${k}' is not an identity key of kind '${kind}' (identity keys: ${prelude.concatStringsSep ", " identityKeys})"
-            ) (prelude.sort (a: b: a < b) explicitKeys);
-            keys = if explicitKeys != [ ] then validatedExplicitKeys else identityKeys;
-          in
-          # ADR-0034: a value or a NAMED refusal, never an abort. The accessor is partial — a key in
-          # the set that the instance carries no value for used to reach `config.${k}` and die on a
-          # raw missing-attribute error naming a line in this file. `name` is the reachable case and
-          # the guard is not written for it alone: `name` is RESERVED rather than declared, injected
-          # at instance eval by `mkInstanceType`, so a caller reaching `mkIdentityModule` directly is
-          # the one party that can hand over an instance without it. Guarding the accessor rather
-          # than that one key costs the same and is total over the whole set.
-          identity.hashIdentity kind keys (
-            k:
-            if config ? ${k} then
-              config.${k}
-            else
-              throw "gen-schema: mkIdentityModule: kind '${kind}' identifies instances by '${k}', which this instance does not declare (identity keys: ${prelude.concatStringsSep ", " keys}); 'name' is reserved and is declared by mkInstanceType"
-          );
-      };
-    };
+                throw "gen-schema: mkIdentityModule: kind '${kind}' identifies instances by '${k}', which this instance does not declare (identity keys: ${prelude.concatStringsSep ", " keys}); 'name' is reserved and is declared by mkInstanceType"
+            );
+        };
+      }
+    );
 }

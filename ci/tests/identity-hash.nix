@@ -5,28 +5,38 @@
   ...
 }:
 let
-  inherit (genSchema) mkIdentityModule identityKeysForKind;
-  # The key set closes at the KIND boundary and reaches the identity module as data — what
-  # `mkInstanceType` does in production. Here ONE module list plays both parts: it is the kind whose
-  # own evaluation the set is derived from, and it is imported into the instance eval beside the
-  # identity module. So every fixture below still exercises `isPrimitiveOption` over its own
-  # declarations, at the stratum that now owns the reflection.
+  inherit (genSchema) mkIdentityModule identityKeysForKind identityHashForKind;
+  # The door takes the KIND DECLARATION, never its name: a name is a reference, and the stamp's
+  # preimage carries the kind's minted identity (`__mint.minted`), which only a kind value has. So
+  # every fixture below is a real kind. `mkEval kind modules` reads its list in two parts: the HEAD
+  # is the kind's declarations, evaluated through `evalSchema` as the kind `kind`, and the TAIL is
+  # the instance's definitions. The key set closes at that kind's boundary and reaches the identity
+  # module as data — what `mkInstanceType` does in production — so every fixture still exercises
+  # `isPrimitiveOption` over its own declarations, at the stratum that owns the reflection.
+  #
+  # Two fixtures that share a declaration build two kind values from two evaluations. Equal
+  # declarations mint one mark, so their instances compare on their values alone; DIFFERENT
+  # declarations are different kinds, whose stamps differ whatever the values are. A cell comparing
+  # content across two declarations therefore recomputes under ONE kind (`identityHashForKind`) and
+  # compares key sets, rather than comparing two stamps.
   #
   # `name` is declared here because `mkInstanceType` declares it in production and the key set
   # prepends it unconditionally — a kind whose instances differ only in `name` must not collapse to
   # one identity. A fixture below that mints without declaring `name` is not a kind this library can
-  # be handed through its own constructor, so the stand-in supplies what the constructor would. It
-  # moves no pinned hash: the fixtures that already declare `name` merge with this and keep their
-  # value, and the paired fixtures that did not carry the same default on both arms.
+  # be handed through its own constructor, so the stand-in supplies what the constructor would.
+  mkKind =
+    kind: decl:
+    (genSchema.evalSchema {
+      modules = [ { config.schema.${kind} = decl; } ];
+    }).${kind};
   mkEval =
     kind: modules:
+    let
+      kindValue = mkKind kind (builtins.head modules);
+    in
     genMerge.evalModuleTree {
       modules = [
-        (mkIdentityModule kind (
-          identityKeysForKind { } {
-            imports = modules;
-          }
-        ))
+        (mkIdentityModule kindValue (identityKeysForKind { } kindValue))
         {
           options.name = genMerge.mkOption {
             type = genMerge.types.str;
@@ -35,6 +45,9 @@ let
         }
       ]
       ++ modules;
+    }
+    // {
+      inherit kindValue;
     };
 
   evalA = mkEval "host" [
@@ -74,6 +87,10 @@ let
     ];
   genFloatOpt = genMerge.mkOption { type = genMerge.types.float; };
   nixFloatOpt = lib.mkOption { type = lib.types.float; };
+  genIntOpt = genMerge.mkOption { type = genMerge.types.int; };
+  floatAt2 = mkFloatEval genFloatOpt 2.0;
+  intAt2 = mkFloatEval genIntOpt 2;
+  intAt3 = mkFloatEval genIntOpt 3;
 
   # den-hoag-376hw. A leading underscore is not a reservation in FIELD space: the schema's
   # reserved-name mechanism ranges over KIND names (`lib/entry-type.nix`, `reservedKindNames`),
@@ -157,15 +174,21 @@ in
         (mkFloatEval nixFloatOpt 1.5).config.id_hash == (mkFloatEval nixFloatOpt 2.5).config.id_hash;
       # …and it merges with the `==`-equal int, which is the whole point of admitting it: the
       # reference relation is the language's, so `1.0` and `1` are ONE value in an identity
-      # position even though `toJSON` renders them differently.
+      # position even though `toJSON` renders them differently. A float-typed and an int-typed
+      # `load` are two declarations, so the int instance is recomputed under the FLOAT kind: the
+      # content is what merges, and the stamps of two kinds never would.
       integralFloatMergesWithInt =
-        (mkFloatEval genFloatOpt 2.0).config.id_hash
-        == (mkFloatEval (genMerge.mkOption { type = genMerge.types.int; }) 2).config.id_hash;
+        identityHashForKind floatAt2.kindValue intAt2.config == floatAt2.config.id_hash;
+      # The live arm: a moved value does not merge, so the recompute is not answering one hash for
+      # every instance.
+      movedIntDoesNotMerge =
+        identityHashForKind floatAt2.kindValue intAt3.config == floatAt2.config.id_hash;
     };
     expected = {
       genTyped = false;
       nixpkgsTyped = false;
       integralFloatMergesWithInt = true;
+      movedIntDoesNotMerge = false;
     };
   };
 
@@ -202,6 +225,6 @@ in
   # moved would red here.
   flake.tests.identity-hash.test-control-no-underscore-field-hash-unchanged = {
     expr = evalNoUnderscore.config.id_hash;
-    expected = "host:813217e3cf0b6bc979121615b67c75532bc05e7742b0b5ebf9897a14aa8a6e43";
+    expected = "host:e08f0782c298d4dcc2bd1c28ec6ea7f3a44615f52dc1d56bcd237f65d9ab3805";
   };
 }

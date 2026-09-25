@@ -23,30 +23,33 @@ let
     schemaFn
     ;
 
-  # One arm of the fixture: a kind with an opted-out `secret`, optionally read by a
-  # primitive-typed method, instantiated once with the given secret value.
-  mkArm =
-    { withMethod, secretValue }:
-    let
-      schema = evalSchema {
-        modules = [
-          {
-            config.schema.host = {
-              options.secret = genMerge.mkOption { type = genMerge.types.str; } // {
-                identity = false;
-              };
-            }
-            // lib.optionalAttrs withMethod {
-              methods.leak = schemaFn "reads the opted-out field" genMerge.types.str ({ secret, ... }: secret);
+  # The two kinds of the fixture: one with an opted-out `secret`, and one that also declares a
+  # primitive-typed method reading it. Each arm instantiates one of them with the given secret value.
+  kindOf =
+    withMethod:
+    (evalSchema {
+      modules = [
+        {
+          config.schema.host = {
+            options.secret = genMerge.mkOption { type = genMerge.types.str; } // {
+              identity = false;
             };
           }
-        ];
-      };
-    in
+          // lib.optionalAttrs withMethod {
+            methods.leak = schemaFn "reads the opted-out field" genMerge.types.str ({ secret, ... }: secret);
+          };
+        }
+      ];
+    }).host;
+  plainKind = kindOf false;
+  methodKind = kindOf true;
+
+  mkArm =
+    { withMethod, secretValue }:
     (genMerge.evalModuleTree {
       modules = [
         {
-          options.hosts = mkInstanceRegistry schema.host { };
+          options.hosts = mkInstanceRegistry (if withMethod then methodKind else plainKind) { };
           config.hosts.igloo.secret = secretValue;
         }
       ];
@@ -84,10 +87,21 @@ in
     expected = false;
   };
 
-  # Declaring a method does not move an instance's identity: a method is not an identity key.
+  # Declaring a method does not move an instance's identity CONTENT: a method is not an identity
+  # key. With and without the method are two declarations, so their stamps differ by the kind; the
+  # property is that the key set is unmoved and the method instance, recomputed under the plain
+  # kind, is the plain instance.
   flake.tests.identity-method-optout.test-declaring-a-method-does-not-move-identity = {
-    expr = plainA.id_hash != methodA.id_hash;
-    expected = false;
+    expr = {
+      keySetUnmoved = methodA._identityKeys == plainA._identityKeys;
+      contentUnderPlainKind = genSchema.identityHashForKind plainKind methodA == plainA.id_hash;
+      stampFollowsKindEq = (plainA.id_hash == methodA.id_hash) == genSchema.kindEq plainKind methodKind;
+    };
+    expected = {
+      keySetUnmoved = true;
+      contentUnderPlainKind = true;
+      stampFollowsKindEq = true;
+    };
   };
 
   # The method still evaluates — the option is excluded from IDENTITY, not from the instance.

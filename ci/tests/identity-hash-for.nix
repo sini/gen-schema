@@ -158,16 +158,21 @@ in
       # The KEY SET, pinned by contents. Equality alone is satisfied if BOTH sides degenerate
       # together — two reflections that select nothing agree perfectly while every instance collapses
       # to a name-only hash. Pinning what was actually hashed is what separates agreement from
-      # shared blindness.
+      # shared blindness. The preimage carries the KIND as a labelled component whose value is its
+      # minted identity, beside the keys; the tag stays the display name.
       stamped = homeInst.id_hash;
-      overNameAndSystem =
-        "home:" + builtins.hashString "sha256" ''{"name":s"ben","system":s"x86_64-linux",}'';
+      # The live arm: the preimage WITHOUT the kind component is not what was hashed, so the cell
+      # separates a stamp keyed by the declaration from one keyed by the name alone.
+      nameOnlyPreimageIsNotTheStamp =
+        homeInst.id_hash
+        == "home:" + builtins.hashString "sha256" ''{"name":s"ben","system":s"x86_64-linux",}'';
     };
     expected = {
       recomputeMatchesStamp = true;
-      stamped = "home:" + builtins.hashString "sha256" ''{"name":s"ben","system":s"x86_64-linux",}'';
-      overNameAndSystem =
-        "home:" + builtins.hashString "sha256" ''{"name":s"ben","system":s"x86_64-linux",}'';
+      stamped =
+        "home:"
+        + builtins.hashString "sha256" ''{"_identity":s"${homeKv.__mint.minted}","name":s"ben","system":s"x86_64-linux",}'';
+      nameOnlyPreimageIsNotTheStamp = false;
     };
   };
   # identityHashForKind (option-level) equals the id_hash the module stamped — the EXACT twin.
@@ -227,7 +232,7 @@ in
         wrongKind = null;
         checked = 3;
         discovered = "host";
-        rightKind = "host:7a1847c6ceea7a285adb586989da79a769bf29d408c572e011f79ddee05a8e1a";
+        rightKind = "host:68f4e0d5b8f248b114d7b39eb48568fae20d6c7a0edd471b0acfc876c4ec24ac";
       };
     };
   # THE GUARD TESTS PRESENCE AND NOTHING ELSE. A value predicate re-derived here would be a second copy
@@ -249,8 +254,8 @@ in
       ];
       tagType = "list";
       zoneType = "string";
-      ownKindRecompute = "widget:f36919cea13ef0dd3cd04208ee807a987fc596b07ef368e8cf18423705eda679";
-      stamped = "widget:f36919cea13ef0dd3cd04208ee807a987fc596b07ef368e8cf18423705eda679";
+      ownKindRecompute = "widget:2ac90deb8d5301173437184da67ad8b380acb2dfb1222fe30d39d80120b38a08";
+      stamped = "widget:2ac90deb8d5301173437184da67ad8b380acb2dfb1222fe30d39d80120b38a08";
     };
   };
   # THE BOUNDARY. Where the instance CARRIES the candidate's identity key at a value the mint refuses,

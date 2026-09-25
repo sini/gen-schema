@@ -6,19 +6,25 @@
 }:
 let
   inherit (genSchema) mkIdentityModule identityKeysForKind;
-  # One module list plays both parts — the kind whose own evaluation closes the key set, and the
-  # modules imported beside the identity module. See ci/tests/identity-hash.nix for the full note.
+  # The door takes the KIND DECLARATION, never its name. `mkEval kind modules`: the HEAD of the list
+  # is the kind's declarations, evaluated through `evalSchema` as the kind `kind`; the TAIL is the
+  # instance's definitions. See ci/tests/identity-hash.nix for the full note, including why a cell
+  # comparing two DECLARATIONS recomputes under one kind rather than comparing two stamps.
+  mkKind =
+    kind: decl:
+    (genSchema.evalSchema {
+      modules = [ { config.schema.${kind} = decl; } ];
+    }).${kind};
   mkEval =
     kind: modules:
+    let
+      kindValue = mkKind kind (builtins.head modules);
+    in
     genMerge.evalModuleTree {
-      modules = [
-        (mkIdentityModule kind (
-          identityKeysForKind { } {
-            imports = modules;
-          }
-        ))
-      ]
-      ++ modules;
+      modules = [ (mkIdentityModule kindValue (identityKeysForKind { } kindValue)) ] ++ modules;
+    }
+    // {
+      inherit kindValue;
     };
 
   evalReflected = mkEval "host" [

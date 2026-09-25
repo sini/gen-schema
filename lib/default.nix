@@ -15,7 +15,10 @@ let
   # Named for the field it produces, and for the one thing both its bindings agree on. It was
   # `identity.nix` while it contained the mint; it does not, and a file called that beside a
   # LIBRARY called gen-identity is a reader's trap rather than a tidy-up.
-  idHashLib = import ./id-hash.nix { inherit prelude merge identity; };
+  idHashLib = import ./id-hash.nix {
+    inherit prelude merge identity;
+    inherit (entryType) isSchemaKind;
+  };
   strictLib = import ./strict.nix { inherit prelude merge; };
   refinedLib = import ./refined.nix {
     inherit merge identity;

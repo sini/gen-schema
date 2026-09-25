@@ -12,7 +12,13 @@
   ...
 }:
 let
-  inherit (genSchema) evalSchema mkSchemaOption mkInstanceRegistry;
+  inherit (genSchema)
+    evalSchema
+    mkSchemaOption
+    mkInstanceRegistry
+    identityHashForKind
+    kindEq
+    ;
 
   str =
     default:
@@ -258,17 +264,46 @@ in
     # `attribute 'knob' missing`, and that message IS the cell — the knob is not refused, it is
     # inexpressible. It does not survive `tryEval`, so it cannot be asserted from here.
 
-    # C11 — the identity stamp does not move, and the oracle can see it move. Asserted
-    # RELATIONALLY rather than against a literal digest: the literals in the spec were measured
-    # at a different lock, and a hash pinned across a rev boundary is a relayed figure.
-    test-c11-stamp-is-unmoved-by-the-relocation = {
-      expr = (instanceOf rel.derived { }).id_hash;
-      expected = (instanceOf headSpelling.derived { }).id_hash;
+    # C11 — the relocation preserves the kind's identity CONTENT, and the oracle can see it move.
+    # Asserted RELATIONALLY rather than against a literal digest: a hash pinned across a rev
+    # boundary is a relayed figure.
+    #
+    # The two spellings are two DECLARATIONS (`kindEq` has always called them distinct), and the
+    # stamp carries the declaration's minted identity, so the stamps follow `kindEq` rather than
+    # agreeing. What the relocation preserves is the content: the relocated instance, recomputed
+    # under the head-spelled kind, is the head instance, over one closed key set.
+    test-c11-relocation-preserves-identity-content = {
+      expr = {
+        contentUnderHeadKind =
+          identityHashForKind headSpelling.derived (instanceOf rel.derived { })
+          == (instanceOf headSpelling.derived { }).id_hash;
+        keySetsEqual =
+          (instanceOf rel.derived { })._identityKeys == (instanceOf headSpelling.derived { })._identityKeys;
+        stampFollowsKindEq =
+          ((instanceOf rel.derived { }).id_hash == (instanceOf headSpelling.derived { }).id_hash)
+          == kindEq headSpelling.derived rel.derived;
+      };
+      expected = {
+        contentUnderHeadKind = true;
+        keySetsEqual = true;
+        stampFollowsKindEq = true;
+      };
     };
+    # The discriminator is on the KEY plane: dropping the inheritance drops `description` from the
+    # key set. Two declarations' stamps differ whatever their keys are, so the stamp inequality
+    # beside it can no longer be driven red by a key-set change and is kept only as a reading.
     test-c11-discriminator-the-stamp-can-move = {
-      expr =
-        (instanceOf relNoInherit.derived { }).id_hash == (instanceOf headSpelling.derived { }).id_hash;
-      expected = false;
+      expr = {
+        keySetMoves =
+          (instanceOf relNoInherit.derived { })._identityKeys != (instanceOf headSpelling.derived { })
+          ._identityKeys;
+        stampMoves =
+          (instanceOf relNoInherit.derived { }).id_hash != (instanceOf headSpelling.derived { }).id_hash;
+      };
+      expected = {
+        keySetMoves = true;
+        stampMoves = true;
+      };
     };
 
     # C14 — the inheritance relation is QUERYABLE, which is the arc's own requirement that every

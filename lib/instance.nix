@@ -58,6 +58,8 @@ let
       # under ADR-0033 here while evaluating perfectly through the inlet. That is why an instance
       # could read every declared option and still not be stampable.
       identityKeys = identityKeysForKind { inherit specialArgs; } kindValue;
+      # Once per TYPE, not once per instance: the operand check and the module value are shared.
+      identityModule = mkIdentityModule kindValue identityKeys;
     in
     # ★ THE INLET IS ON THE TYPE, NOT THE CONSTRUCTOR, and it is applied UNCONDITIONALLY rather than
     # behind an `if specialArgs == { }` — one path, so every instance gen-schema builds goes through
@@ -77,7 +79,7 @@ let
             else
               { config._module.freeformType = merge.types.attrsOf merge.types.anything; }
           )
-          (mkIdentityModule kind identityKeys)
+          identityModule
         ]
         ++ extraModules;
         config._module.args.${kind} = config;

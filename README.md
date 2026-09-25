@@ -495,8 +495,12 @@ lib.elem target.id_hash (map (h: h.id_hash) candidates)
 The identity is the **kind tag joined to a digest of the identity pairs**:
 
 ```
-id_hash = "<kind>:" + sha256(<the ⟨key, value⟩ pairs, as a JSON attrset>)
+id_hash = "<kind>:" + sha256(<the ⟨key, value⟩ pairs plus ⟨_identity, the kind's mark⟩, as a JSON attrset>)
 ```
+
+The kind enters the digest as one more pair, `_identity`, whose value is the kind's minted identity (`__mint.minted`), never its name. Two kinds that share a name but are different declarations — the ones `kindEq` calls distinct — therefore mint different identities for instances with equal values. The tag stays the kind's name, for display and for splitting on the first colon. What a relocation or a respelling of a kind preserves is the identity CONTENT: `identityHashForKind oldKind newInstance == oldInstance.id_hash`, over one `_identityKeys` set. The stamp itself follows `kindEq`.
+
+**The stamp is defined only where the kind's mark is.** The mark is minted over the declaration's inert content, so a kind whose declaration reads an instance identity — an option description or default interpolating an `id_hash` of its own kind, directly or through a cycle of kinds — has no well-founded stamp, and evaluating it recurses infinitely (uncatchably, like any read of a stratum's in-flight output). An instance's own non-key field reading its `id_hash`, and the self-referential `mkInstanceRegistry config.schema.host` idiom, are unaffected.
 
 The pairs are all primitive options (str, int, bool, float) minus the declared opt-outs. `internal = true` is presentation only (hidden from generated docs) and does not exclude an option from identity; among primitive options `identity = false` is the one exclusion channel, and a non-primitive option is never a key. Two hosts with the same values hash identically. A host and a user with the same name hash differently — the tag separates them, so `id_hash` says what it is and the kind is recoverable by splitting on the first colon. Because the tag rides outside the digest, `:` is refused in a kind name; values are unconstrained, since JSON quotes and escapes them.
 
@@ -1390,11 +1394,11 @@ The base validator constructors, **gen-schema-owned** (relocated from [gen-algeb
 ### `mkIdentityModule` / `mkStrictModule`
 
 ```nix
-genSchema.mkIdentityModule kind   # NixOS module: injects id_hash + _identity.keys
+genSchema.mkIdentityModule kindValue identityKeys   # NixOS module: injects id_hash + _identity.keys
 genSchema.mkStrictModule kind     # NixOS module: rejects undeclared keys (closed-world)
 ```
 
-The module-system constructors `mkInstanceType` injects into every instance (relocated from gen-algebra on 2026-06-26). `mkIdentityModule` derives a content-addressed `id_hash` by reflecting over a kind's primitive options (str/int/bool/float); `_identity.keys` pins the identifying fields explicitly. `mkStrictModule` sets a freeform type that throws on any key not declared as an option.
+The module-system constructors `mkInstanceType` injects into every instance (relocated from gen-algebra on 2026-06-26). `mkIdentityModule` derives a content-addressed `id_hash` from a kind's primitive options (str/int/bool/float) and its mark; `_identity.keys` pins the identifying fields explicitly. Its first operand is the kind **value** — a kind name is a reference, and the door refuses a string (and an attrset without a mark) by name when the module is applied, not only when `id_hash` is read. `identityHashForKind` takes the same operand and refuses the same way. `mkStrictModule` sets a freeform type that throws on any key not declared as an option.
 
 ### `validateInstances`
 

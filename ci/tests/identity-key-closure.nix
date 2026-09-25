@@ -145,8 +145,8 @@ in
       closedKeys = base._identityKeys;
     };
     expected = {
-      base = "host:43e504a4894537c1dca627f34c55980b160fbbc6b3e864e2f29f2d5b7aa4f64f";
-      withExtra = "host:43e504a4894537c1dca627f34c55980b160fbbc6b3e864e2f29f2d5b7aa4f64f";
+      base = "host:568a01c7719445b4fc776270ae9baae39c11bd50d7ccf718a3028d7c0a78c869";
+      withExtra = "host:568a01c7719445b4fc776270ae9baae39c11bd50d7ccf718a3028d7c0a78c869";
       agree = true;
       closedKeys = [
         "name"
@@ -178,7 +178,7 @@ in
     };
     expected = {
       moved = true;
-      otherRole = "host:1c39fb8c3711a3e199ba0dd6140364461035de7f343eb165ea9790d47826eb45";
+      otherRole = "host:189f15d989c34bcb8eb98bc0209c57574c4f3dff4e66ddcc5808c6577fdfed0e";
     };
   };
 
@@ -232,7 +232,7 @@ in
       ];
       kindValueOptions = [ "spool" ];
       recomputeMatchesStamp = true;
-      stamped = "thimble:80c707ba87d89d936a86bdbd3068070ed68704582a357225f750ed83078f2788";
+      stamped = "thimble:15c832bc881510c21e80a9635924fc768b837a7ce5544f7a91d82d03d10bf3a8";
     };
   };
 
@@ -245,7 +245,16 @@ in
       kindValueOptionsIsPopulated = builtins.attrNames schemaShapedKind.options;
       recomputeMatchesStamp =
         (genSchema.identityHashForKind schemaShapedKind schemaInstance) == schemaInstance.id_hash;
-      shapesAgree = aspectInstance.id_hash == schemaInstance.id_hash;
+      # The two shapes are two DECLARATIONS, and the stamp carries the declaration's minted identity,
+      # so what the shapes agree on is the identity CONTENT: the aspect-shaped instance, recomputed
+      # under the schema-shaped kind, is the schema-shaped instance, over one closed key set.
+      shapesAgreeOnContent =
+        genSchema.identityHashForKind schemaShapedKind aspectInstance == schemaInstance.id_hash;
+      shapesAgreeOnKeys = aspectInstance._identityKeys == schemaInstance._identityKeys;
+      # …and the stamps decide exactly as `kindEq` does on the pair.
+      stampFollowsKindEq =
+        (aspectInstance.id_hash == schemaInstance.id_hash)
+        == genSchema.kindEq aspectShapedKind schemaShapedKind;
     };
     expected = {
       keys = [
@@ -254,7 +263,9 @@ in
       ];
       kindValueOptionsIsPopulated = [ "spool" ];
       recomputeMatchesStamp = true;
-      shapesAgree = true;
+      shapesAgreeOnContent = true;
+      shapesAgreeOnKeys = true;
+      stampFollowsKindEq = true;
     };
   };
 }
