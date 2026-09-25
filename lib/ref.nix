@@ -82,13 +82,11 @@ let
 
   # Set type: deduplicates by id_hash, preserving first-seen order.
   # Only meaningful with ref element types — setOf requires instance refs.
-  # nestedTypes.elemType is set directly so getRefKind traverses through setOf like listOf
-  # against the pin still in ci/flake.lock — completeType there predates lib/interface.nix and
-  # passes nestedTypes straight through unread. The functor below states the same element the
-  # way gen-merge's own listOf/nullOr do (name/payload/binOp/type): gen-merge's boundary reads
-  # only functor.payload, so a bare nestedTypes field alone is silently recomputed to `{ }` on
-  # export under it, and a functor missing name/binOp crashes the first typeMerge (e.g. a
-  # redeclared option) that reaches it.
+  # The element is stated where a type says what it CARRIES, `nestedTypes.elemType`, so getRefKind
+  # traverses through setOf like listOf and gen-merge's boundary reads it into `carries`. The functor
+  # is setOf's MERGE relation (name/payload/binOp/type, the shape gen-merge's own listOf/nullOr
+  # publish): its payload is what two setOfs merge on, and it is owed because a type that carries
+  # something states how two of it merge — without one the boundary refuses it by name.
   #
   # Built THROUGH mkOptionType rather than as `listType // { … }`. An override over an already
   # completed type answers the protocol as its LEFT operand: every field the override does not
