@@ -681,15 +681,15 @@ let
     # Built THROUGH mkOptionType rather than as `base // { merge = …; }`. An override over an
     # already completed type answers the protocol as its LEFT operand, so the entry type would
     # carry deferredModule's name, its description and — the one that bites — its functor, whose
-    # `type` points back at the plain deferredModule. A typeMerge over two declarations of the
-    # same schema option then rebuilds a bare deferredModule and the collection-extracting merge
-    # below is gone, silently, with the defs falling through to a plain module import. The entry
-    # type is not a deferredModule; it DELEGATES to one (`base.merge`, called inside), and that
+    # `type` points back at the plain deferredModule. A typeMerge over two declarations of one
+    # `lazyAttrsOf` of this type then rebuilds a bare deferredModule and the collection-extracting
+    # merge below is gone, silently, with the defs falling through to a plain module import. The
+    # entry type is not a deferredModule; it DELEGATES to one (`base.merge`, called inside), and that
     # delegation is the only thing it takes from it.
     #
-    # Built per call, and per EVALUATION when `mkSchemaOption`'s submodule declares it, so a
-    # redeclared schema option meets a second record: `functor` is the relation that merges the two
-    # when they are one construction.
+    # Built per call (`mkSchemaOption` builds one per call and states its own type's relation with
+    # this one's payload and binOp), so a redeclared option typed by it meets a second record:
+    # `functor` is the relation that merges the two when they are one construction.
     let
       self = merge.mkOptionType {
         name = "schemaKindEntry";
@@ -1021,13 +1021,19 @@ let
       # only this library's introspection options and never a caller's module.
       specialArgs ? { },
     }:
-    merge.mkOption {
-      description = "Schema — typed record registry with extension points";
-      default = { };
-      type = merge.types.submodule (
-        { config, options, ... }:
-        {
-          freeformType = merge.types.lazyAttrsOf (mkSchemaEntryType {
+    let
+      # Built once per call. The option's type below is a function of exactly these formals, so
+      # the entry's construction IS the option's construction — a premise refused by name if a
+      # formal is ever added to one constructor and not the other, since a formal the entry does not
+      # take would be absent from its components, and two option types differing only in it would
+      # merge silently.
+      entry =
+        let
+          optionFormals = builtins.functionArgs mkSchemaOption;
+          entryFormals = builtins.functionArgs mkSchemaEntryType;
+        in
+        if optionFormals == entryFormals then
+          mkSchemaEntryType {
             inherit
               baseModule
               computed
@@ -1038,8 +1044,20 @@ let
               keySemantics
               specialArgs
               ;
-          });
+          }
+        else
+          throw "gen-schema: mkSchemaOption's formals [${builtins.concatStringsSep ", " (prelude.attrNames optionFormals)}] are not mkSchemaEntryType's [${builtins.concatStringsSep ", " (prelude.attrNames entryFormals)}]; the schema option's type is its entry type's construction, so the two must take one set";
+      inner = merge.types.submodule (
+        { config, options, ... }:
+        {
+          freeformType = merge.types.lazyAttrsOf entry;
 
+          # READ-ONLY, on two measured bases (den-hoag-px98p): a well-typed write to a derived output
+          # (`config.schema._collectionKeys = [ "fake" ]`) would otherwise be published silently, and
+          # a doubly-imported introspection module would concatenate its `listOf` fields
+          # (`[ "k" "k" ]`). A KIND named after one of these options is refused by its type, not by
+          # this flag (den-hoag-collectionkeys-collision-oracle-25mae, O6: a companion, not a
+          # discriminator).
           options._kindNames = merge.mkOption {
             type = merge.types.listOf merge.types.str;
             internal = true;
@@ -1229,6 +1247,44 @@ let
             };
         }
       );
+      # ★ THE OPTION'S TYPE STATES ITS OWN MERGE RELATION (den-hoag-px98p). Declared twice, a plain
+      # `submodule` concatenates its module lists, so one construction declared twice imported the
+      # introspection module twice and every read-only `_`-field refused "defined 2 times". This type
+      # DELEGATES to `inner` (check, merge, emptyValue, sub-options) and takes its relation from the
+      # entry type's `constructionRelation` payload and binOp: two schema option types are one type
+      # exactly when their entry types are one construction (ADR-0034, t ⊔ t = t), and the merge
+      # answers with that one type, so every `_`-field is defined once (ADR-0012 item 2: a
+      # materialized view of the record, computed once). A pair of different constructions is
+      # refused by name at `schema`, within `closuresFirst`'s enumerated exception (a per-call type
+      # in module content can still abort; bfc0k gate v1 residual (b), den-hoag-6b5ia).
+      #
+      # Stated departures: the type is named `schema`, not `submodule`, so a plain `submodule`
+      # declared beside it is refused by name, in both orders (it used to union in and have its
+      # option misread as a kind); and it carries no `getSubModules`/`substSubModules`, so a foreign
+      # engine's `substSubModules` cannot rebuild a plain submodule and drop the relation — gen-merge's
+      # declaration-stratum route over `getSubModules` no longer applies to it. The idempotence is a
+      # property of gen-merge's engine: nixpkgs `lib.evalModules` still refuses the second
+      # declaration.
+      self = merge.mkOptionType {
+        name = "schema";
+        description = "schema — typed record registry";
+        inherit (inner)
+          check
+          merge
+          emptyValue
+          getSubOptions
+          ;
+        functor = {
+          name = "schema";
+          inherit (entry.functor) payload binOp;
+          type = _: self;
+        };
+      };
+    in
+    merge.mkOption {
+      description = "Schema — typed record registry with extension points";
+      default = { };
+      type = self;
     };
 in
 {

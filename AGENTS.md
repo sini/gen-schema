@@ -61,7 +61,7 @@ gen-merge exports became unreachable.
 
 | Export              | Signature                                                                                                                                                                                            |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mkSchemaOption`    | `{ strict ? true, baseModule ? null, collections ? {}, computed ? null, mixins ? [], mkType ? null, keySemantics ? {} } -> option`                                                                   |
+| `mkSchemaOption`    | `{ strict ? true, baseModule ? null, collections ? {}, computed ? null, mixins ? [], mkType ? null, keySemantics ? {}, specialArgs ? {} } -> option` (typed `schema`)                                |
 | `mkSchemaEntryType` | same argument set `-> type` (the `lazyAttrsOf` element type behind `mkSchemaOption`)                                                                                                                 |
 | `kindEq`            | `kind -> kind -> bool`: `false` on distinct marks, `true` on one mark with `==` sealed subjects, a by-name refusal on one mark with differing sealed subjects; a non-kind operand is refused by name |
 

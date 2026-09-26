@@ -106,7 +106,7 @@ in
       };
     };
 
-    # ── schemaKindEntry, per evaluation: `mkSchemaOption`'s submodule builds it every time ──
+    # ── schemaKindEntry, per `mkSchemaOption` call: its `schema` type carries the entry's relation ──
     test-schema-option-redeclared-reads-its-kinds = {
       expr =
         let
