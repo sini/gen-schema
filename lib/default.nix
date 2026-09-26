@@ -133,7 +133,6 @@ let
         [ ]
     ) (builtins.attrValues ks);
 
-  strictLib = import ./strict.nix { inherit prelude merge constructionRelation; };
   refinedLib = import ./refined.nix {
     inherit merge identity;
     inherit (algebra) preimageTagOf;
@@ -143,6 +142,10 @@ let
   bridgeLib = import ./bridge.nix {
     inherit prelude record;
     inherit (refinedLib) isRefined getRefinements;
+  };
+  strictLib = import ./strict.nix {
+    inherit prelude merge constructionRelation;
+    inherit (bridgeLib) isOptionDecl;
   };
   refLib = import ./ref.nix { inherit prelude merge constructionRelation; };
   # The VALUE-level reference vocabulary, kin to refLib's type-level one — see field-ref.nix's

@@ -322,11 +322,12 @@ in
   # multi-line string block carries string content across line boundaries, where a per-line quote
   # count cannot follow it, so those files are written down rather than trusted in silence. The first
   # file to grow one arrives as a red that has to be READ, exactly as a new library file arrives as a
-  # red on a membership manifest.
+  # red on a membership manifest. The manifest is empty: `lib/strict.nix`, its one member, left the
+  # class when its refusal stopped being an indented string (den-hoag-0y9nr).
   flake.tests.purity.test-strip-premise-multiline-strings = {
     expr = map (s: lib.removePrefix "${toString ../..}/" s.name) (
       lib.filter (s: genPrelude.hasInfix "''" s.text) rawSources
     );
-    expected = [ "lib/strict.nix" ];
+    expected = [ ];
   };
 }

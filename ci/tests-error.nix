@@ -18,6 +18,7 @@
 {
   genSchema,
   genMerge,
+  prelude,
   ...
 }:
 let
@@ -934,4 +935,226 @@ in
       };
     };
   };
+
+  # den-hoag-0y9nr. `mkStrictModule`'s refusal names the undeclared KEY — never the instance, which
+  # is all the freeform site's `path` can name — and its printed remedy is shown to be the one that
+  # works: each control declares exactly what the `Fix:` line prints and reads the value back.
+  # Self-labelling names: KINDNAME, INSTANCENAME, OFFENDINGKEY, DECLAREDOPTION, GROUPNAME,
+  # DECLAREDINNER.
+  flake.testsError.strict-mode-refusals =
+    let
+      opt = genMerge.mkOption { type = genMerge.types.anything; };
+      kindWith =
+        decls:
+        (genMerge.evalModuleTree {
+          modules = [
+            { options.schema = mkSchemaOption { }; }
+          ]
+          ++ map (d: { config.schema.KINDNAME = d; }) decls;
+        }).config.schema.KINDNAME;
+      strictInstance =
+        decls: insts:
+        (genMerge.evalModuleTree {
+          modules = [
+            { options.registry = mkInstanceRegistry (kindWith decls) { }; }
+          ]
+          ++ map (i: { config.registry.INSTANCENAME = i; }) insts;
+        }).config.registry.INSTANCENAME;
+      instanceOf = decls: inst: strictInstance decls [ inst ];
+      flat = [ { options.DECLAREDOPTION = opt; } ];
+      grouped = [ { options.GROUPNAME.DECLAREDINNER = opt; } ];
+      fixLine = k: "Fix: schema\\.KINDNAME\\.options\\.${k} = mkOption \\{ \\.\\.\\. \\};";
+      # The refusal's exact text, anchored, from its literal lines.
+      refusal = lines: "^${prelude.escapeRegex (builtins.concatStringsSep "\n" lines)}$";
+      # The strict type itself, for the arms no module evaluation reaches: its `merge` handed defs
+      # directly, under a level whose options declare DECLAREDOPTION.
+      strictMerge =
+        (genSchema.mkStrictModule "KINDNAME" {
+          options.DECLAREDOPTION = opt;
+        }).config._module.freeformType.content.merge
+          [
+            "registry"
+            "INSTANCENAME"
+          ];
+    in
+    {
+      # S1. One undeclared key at depth 1: the refusal names the KEY and the instance's location, and
+      # its remedy declares the KEY. The control is the same kind with the remedy APPLIED, which must
+      # evaluate and carry the value — so the printed fix is shown to be the one that works.
+      test-strict-names-the-key-not-the-instance = {
+        expr =
+          assert
+            let
+              c = forced (
+                instanceOf (flat ++ [ { options.OFFENDINGKEY = opt; } ]) {
+                  DECLAREDOPTION = 1;
+                  OFFENDINGKEY = 2;
+                }
+              );
+            in
+            c.success && c.value.OFFENDINGKEY == 2;
+          builtins.deepSeq (instanceOf flat {
+            DECLAREDOPTION = 1;
+            OFFENDINGKEY = 2;
+          }) null;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME \\(instance at registry\\.INSTANCENAME, defined in <gen-merge>\\)\\.\n${fixLine "OFFENDINGKEY"}$";
+        };
+      };
+      # S2. An undeclared key UNDER a declared group: the blamed name is the capture path, not the
+      # group, and the remedy extends the group (the control applies it) rather than colliding with it.
+      test-strict-names-the-capture-path-under-a-group = {
+        expr =
+          assert
+            let
+              c = forced (
+                instanceOf (grouped ++ [ { options.GROUPNAME.OFFENDINGKEY = opt; } ]) {
+                  GROUPNAME = {
+                    DECLAREDINNER = 1;
+                    OFFENDINGKEY = 2;
+                  };
+                }
+              );
+            in
+            c.success && c.value.GROUPNAME.OFFENDINGKEY == 2;
+          builtins.deepSeq (instanceOf grouped {
+            GROUPNAME = {
+              DECLAREDINNER = 1;
+              OFFENDINGKEY = 2;
+            };
+          }) null;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^STRICT MODE: \"GROUPNAME\\.OFFENDINGKEY\" is not declared on KINDNAME \\(instance at registry\\.INSTANCENAME, defined in <gen-merge>\\)\\.\n${fixLine "GROUPNAME\\.OFFENDINGKEY"}$";
+        };
+      };
+      # S3. Two undeclared keys: both named, one remedy each.
+      test-strict-names-every-undeclared-key = {
+        expr = builtins.deepSeq (instanceOf flat {
+          DECLAREDOPTION = 1;
+          OFFENDINGKEYA = 2;
+          OFFENDINGKEYB = 3;
+        }) null;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^STRICT MODE: \"OFFENDINGKEYA\", \"OFFENDINGKEYB\" are not declared on KINDNAME \\(instance at registry\\.INSTANCENAME, defined in <gen-merge>\\)\\.\n${fixLine "OFFENDINGKEYA"}\n${fixLine "OFFENDINGKEYB"}$";
+        };
+      };
+      # S4. mkStrictModule at a ROOT evaluation (prefix = [ ]), `ci/tests/strict-module.nix`'s shape:
+      # the refusal is the strict one, not an unrelated failure of the blame read itself.
+      test-strict-at-a-root-evaluation = {
+        expr =
+          builtins.deepSeq
+            (genMerge.evalModuleTree {
+              modules = [
+                (genSchema.mkStrictModule "KINDNAME")
+                { options.DECLAREDOPTION = opt; }
+                {
+                  config.DECLAREDOPTION = 1;
+                  config.OFFENDINGKEY = 2;
+                }
+              ];
+            }).config
+            null;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME \\(defined in <gen-merge>\\)\\.\n${fixLine "OFFENDINGKEY"}$";
+        };
+      };
+      # S5. The same undeclared key defined by two modules is ONE key: named once, one remedy. Two
+      # copies of the remedy would not parse (`attribute already defined`).
+      test-strict-names-a-key-defined-twice-once = {
+        expr = builtins.deepSeq (strictInstance flat [
+          {
+            DECLAREDOPTION = 1;
+            OFFENDINGKEY = 2;
+          }
+          { OFFENDINGKEY = 2; }
+        ]) null;
+        expectedError = {
+          type = "ThrownError";
+          msg = refusal [
+            "STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME (instance at registry.INSTANCENAME, defined in <gen-merge>)."
+            "Fix: schema.KINDNAME.options.OFFENDINGKEY = mkOption { ... };"
+          ];
+        };
+      };
+      # S6. Keys that are not bare Nix identifiers — a dot, a quote, a leading digit — print QUOTED, so
+      # the remedy parses and declares the key rather than a nested path. The control declares
+      # exactly the printed attribute paths and reads every value back.
+      test-strict-quotes-a-key-that-is-not-an-identifier = {
+        expr =
+          assert
+            let
+              c = forced (
+                instanceOf
+                  (
+                    flat
+                    ++ [
+                      {
+                        options."1DIGITKEY" = opt;
+                        options."KEY\"QUOTE" = opt;
+                        options."KEY.WITH.DOT" = opt;
+                      }
+                    ]
+                  )
+                  {
+                    DECLAREDOPTION = 1;
+                    "1DIGITKEY" = 2;
+                    "KEY\"QUOTE" = 3;
+                    "KEY.WITH.DOT" = 4;
+                  }
+              );
+            in
+            c.success && c.value."1DIGITKEY" == 2 && c.value."KEY\"QUOTE" == 3 && c.value."KEY.WITH.DOT" == 4;
+          builtins.deepSeq (instanceOf flat {
+            DECLAREDOPTION = 1;
+            "1DIGITKEY" = 2;
+            "KEY\"QUOTE" = 3;
+            "KEY.WITH.DOT" = 4;
+          }) null;
+        expectedError = {
+          type = "ThrownError";
+          msg = refusal [
+            "STRICT MODE: \"\"1DIGITKEY\"\", \"\"KEY\\\"QUOTE\"\", \"\"KEY.WITH.DOT\"\" are not declared on KINDNAME (instance at registry.INSTANCENAME, defined in <gen-merge>)."
+            "Fix: schema.KINDNAME.options.\"1DIGITKEY\" = mkOption { ... };"
+            "Fix: schema.KINDNAME.options.\"KEY\\\"QUOTE\" = mkOption { ... };"
+            "Fix: schema.KINDNAME.options.\"KEY.WITH.DOT\" = mkOption { ... };"
+          ];
+        };
+      };
+      # S7. The fallback no module evaluation reaches: defs whose names the walk finds all declared
+      # still refuse by naming their top-level names, never with an empty list.
+      test-strict-falls-back-to-top-level-names = {
+        expr = strictMerge [
+          {
+            file = "FILENAME";
+            value.DECLAREDOPTION = 1;
+          }
+        ];
+        expectedError = {
+          type = "ThrownError";
+          msg = refusal [
+            "STRICT MODE: \"DECLAREDOPTION\" is not declared on KINDNAME (instance at registry.INSTANCENAME, defined in FILENAME)."
+            "Fix: schema.KINDNAME.options.DECLAREDOPTION = mkOption { ... };"
+          ];
+        };
+      };
+      # S8. And with no name at all, the refusal still reads as a sentence.
+      test-strict-with-no-name-still-refuses-in-words = {
+        expr = strictMerge [
+          {
+            file = "FILENAME";
+            value = { };
+          }
+        ];
+        expectedError = {
+          type = "ThrownError";
+          msg = refusal [
+            "STRICT MODE: a definition is not declared on KINDNAME (instance at registry.INSTANCENAME, defined in FILENAME)."
+          ];
+        };
+      };
+    };
 }

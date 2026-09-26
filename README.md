@@ -384,11 +384,12 @@ This is standard module-system priority behavior (gen-merge reproduces it byte-f
 
 ### Strict Validation
 
-Kinds are **strict by default** — undeclared keys error immediately with a fix suggestion:
+Kinds are **strict by default** — undeclared keys error immediately, every one named at its path under the instance, with one fix suggestion each (a key that is not a bare Nix identifier prints quoted, so the fix parses as written):
 
 ```
-STRICT MODE: "addrr" is not declared on host.
-Fix: schema.host.options.addrr = lib.mkOption { ... };
+STRICT MODE: "addrr", "net.mtuu" are not declared on host (instance at hosts.web, defined in /etc/nixos/hosts.nix).
+Fix: schema.host.options.addrr = mkOption { ... };
+Fix: schema.host.options.net.mtuu = mkOption { ... };
 ```
 
 Opt out per-kind:
