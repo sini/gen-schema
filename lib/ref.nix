@@ -4,7 +4,11 @@
 # Direct:   schema.ref config.fleet.hosts → resolved immediately
 #
 # Both modes accept string keys ("igloo") or instance values (config.fleet.hosts.igloo).
-{ prelude, merge }:
+{
+  prelude,
+  merge,
+  constructionRelation,
+}:
 let
   # Resolved ref type with string/instance coercion.
   mkCoercingRefType =
@@ -36,15 +40,22 @@ let
   # mints points back at that completed record — so a `// { refKind = …; }` over the finished
   # type leaves every protocol answer, typeMerge's rebuild included, describing a ref WITHOUT
   # its kind. An answer the construction owns has to be present before the completion runs.
+  #
+  # The construction is the kind name alone, so two `ref "host"`s are one type and merge, and a
+  # `ref "host"` against a `ref "user"` is refused (`constructionRelation`, den-hoag-bfc0k).
   mkDeferredRef =
     kindName:
-    merge.mkOptionType {
-      name = "ref(${kindName})";
-      description = "reference to a ${kindName} instance";
-      check = v: builtins.isString v || builtins.isAttrs v;
-      merge = loc: defs: merge.mergeOneOption loc defs;
-      refKind = kindName;
-    };
+    let
+      self = merge.mkOptionType {
+        name = "ref(${kindName})";
+        description = "reference to a ${kindName} instance";
+        check = v: builtins.isString v || builtins.isAttrs v;
+        merge = loc: defs: merge.mergeOneOption loc defs;
+        refKind = kindName;
+        functor = constructionRelation "ref(${kindName})" { minted.kind = kindName; } self;
+      };
+    in
+    self;
 
   # Extract refKind from a type, traversing nullOr/listOf wrappers safely.
   # Returns the target kind name string, or null if not a ref type.
