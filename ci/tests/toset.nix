@@ -8,7 +8,7 @@ let
   inherit (genSchema)
     evalSchema
     mkInstanceRegistry
-    ref
+    declarationOf
     setOf
     toSet
     ;
@@ -21,7 +21,7 @@ let
         };
         config.schema.group = {
           options.members = genMerge.mkOption {
-            type = setOf (ref "host");
+            type = setOf (declarationOf "host");
             default = [ ];
           };
         };

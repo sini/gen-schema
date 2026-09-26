@@ -12,7 +12,7 @@ let
     mkInstanceRegistry
     renderDocs
     ;
-  inherit (genSchema) ref;
+  inherit (genSchema) declarationOf;
 
   # Empty schema — zero kinds
   emptyEval = genMerge.evalModuleTree {
@@ -64,7 +64,7 @@ let
               { ... }:
               {
                 options.host = genMerge.mkOption {
-                  type = ref refConflictEval.config.hosts;
+                  type = declarationOf refConflictEval.config.hosts;
                 };
               }
             )

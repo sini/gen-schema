@@ -5,7 +5,7 @@
   ...
 }:
 let
-  inherit (genSchema) evalSchema mkInstanceRegistry ref;
+  inherit (genSchema) evalSchema mkInstanceRegistry declarationOf;
 
   serviceSchema = evalSchema {
     modules = [
@@ -13,7 +13,7 @@ let
         config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
         config.schema.service = {
           options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = ref "host"; };
+          options.host = genMerge.mkOption { type = declarationOf "host"; };
         };
       }
     ];
@@ -27,7 +27,7 @@ let
         };
         config.schema.group = {
           options.members = genMerge.mkOption {
-            type = genMerge.types.listOf (ref "host");
+            type = genMerge.types.listOf (declarationOf "host");
             default = [ ];
           };
         };
@@ -177,7 +177,7 @@ in
             modules = [
               {
                 config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-                config.schema.thing.options.host = genMerge.mkOption { type = ref "host"; };
+                config.schema.thing.options.host = genMerge.mkOption { type = declarationOf "host"; };
               }
             ];
           };

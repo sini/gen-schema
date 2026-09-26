@@ -148,7 +148,7 @@ let
             result = customCoerce (defaultCoerce v) v;
           in
           if builtins.isList result then
-            throw "gen-schema: ref field '${field}' on kind '${kind}': custom coerce returned a list in scalar context (use listOf ref for 1-to-many expansion)"
+            throw "gen-schema: ref field '${field}' on kind '${kind}': custom coerce returned a list in scalar context (use listOf declarationOf for 1-to-many expansion)"
           else
             result;
 

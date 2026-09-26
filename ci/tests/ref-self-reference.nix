@@ -5,7 +5,7 @@
   ...
 }:
 let
-  inherit (genSchema) evalSchema mkInstanceRegistry ref;
+  inherit (genSchema) evalSchema mkInstanceRegistry declarationOf;
 
   schema = evalSchema {
     modules = [
@@ -26,7 +26,7 @@ let
               { ... }:
               {
                 options.upstream = genMerge.mkOption {
-                  type = genMerge.types.nullOr (ref eval.config.services);
+                  type = genMerge.types.nullOr (declarationOf eval.config.services);
                   default = null;
                 };
               }

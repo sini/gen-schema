@@ -6,8 +6,8 @@
 #
 # ★ THE DISCRIMINATOR CARRIES ITS BACK-EDGE UNDER `description`, a key the evaluator interns at
 # startup, so `==` reaches it before any closure in every context: a pair of plain records answers
-# or aborts depending on what text was parsed first, and would not red here. A `ref`-carrying type sits
-# in two sealed components, the option's `type` and `refs.x`; `hasRefsSubject` names `refs.x` in this
+# or aborts depending on what text was parsed first, and would not red here. A
+# `declarationOf`-carrying type sits in two sealed components, the option's `type` and `refs.x`; `hasRefsSubject` names `refs.x` in this
 # file's text, which interns it at parse, ahead of `options.x.type`, so `==` meets the refs component
 # first. Each cell answers `true`, `false` or REFUSED under tryEval; the twins share one construction
 # and must stay `true`.
@@ -66,7 +66,9 @@ in
         option = verdict (optionKind (tension 1)) (optionKind (tension 2));
         freeform = verdict (freeformKind (tension 1)) (freeformKind (tension 2));
         facet = verdict (facetKind (tension 1)) (facetKind (tension 2));
-        ref = verdict (optionKind (genSchema.ref "host")) (optionKind (genSchema.ref "host"));
+        declarationOf = verdict (optionKind (genSchema.declarationOf "host")) (
+          optionKind (genSchema.declarationOf "host")
+        );
         refs = verdict (optionKind (refTension 1)) (optionKind (refTension 2));
         hasRefsSubject = (optionKind sharedRef).__sealed ? "refs.x";
       };
@@ -74,7 +76,7 @@ in
         option = "REFUSED";
         freeform = "REFUSED";
         facet = "REFUSED";
-        ref = "REFUSED";
+        declarationOf = "REFUSED";
         refs = "REFUSED";
         hasRefsSubject = true;
       };

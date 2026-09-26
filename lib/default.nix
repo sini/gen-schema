@@ -21,7 +21,7 @@ let
     inherit (entryType) isSchemaKind;
   };
   # THE MERGE RELATION OF A TYPE BUILT PER CONSTRUCTION (den-hoag-bfc0k). `schemaKindEntry`,
-  # `ref(<kind>)` and `strict` are built fresh on every call — the entry type and `strict` on every
+  # `declarationOf(<kind>)` and `strict` are built fresh on every call — the entry type and `strict` on every
   # EVALUATION of the module function declaring them — so a redeclared option meets two records of
   # one name, and gen-merge refuses a same-named pair that is not one value unless the type states
   # its own relation (`functor.binOp`). This is that statement: two such types are one type exactly
@@ -228,7 +228,12 @@ in
   inherit (evalSchemaLib) evalSchema;
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (validate) validateInstances mkFieldValidator filterValidators;
-  inherit (refLib) ref setOf toSet;
+  inherit (refLib)
+    declarationOf
+    ref
+    setOf
+    toSet
+    ;
   inherit (fieldRefLib)
     fieldRef
     isFieldRef

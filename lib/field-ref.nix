@@ -5,19 +5,19 @@
 # (Mokhov, Mitchell & Peyton Jones, *Build Systems à la Carte*, ICFP 2018, §3 — static/applicative
 # task dependencies, known before any value is produced, not dynamic/monadic ones).
 #
-# ── KINSHIP with `ref` (./ref.nix), the other reference vocabulary in this library ──
+# ── KINSHIP with `declarationOf` (./ref.nix), the other reference vocabulary in this library ──
 #
 # The two are not variants of one construct; they sit on opposite sides of the type/value axis:
 #
-#   `ref`       — an option TYPE on a field, DECLARING that the field points at an instance of some
-#                 kind. Lives in the kind's schema. Derives kind -> kind edges (`_refEdges`).
-#   `fieldRef`  — a VALUE inhabiting such a position, NAMING which instance, and which field of it.
-#                 Lives in a default or a contributed value. Derives (instance, field) ->
-#                 (instance, field) edges, from the values a scan finds.
+#   `declarationOf` — an option TYPE on a field, DECLARING that the field points at an instance of
+#                     some kind. Lives in the kind's schema. Derives kind -> kind edges (`_refEdges`).
+#   `fieldRef`      — a VALUE inhabiting such a position, NAMING which instance, and which field of
+#                     it. Lives in a default or a contributed value. Derives (instance, field) ->
+#                     (instance, field) edges, from the values a scan finds.
 #
 # So the type declares that a dependence exists and the value says what it is; and neither DECLARES
 # the dependence FACT — both derive it from structure that is present for another reason. Their
-# refusals differ accordingly: `ref` refuses an unresolvable key at merge time, `fieldRef` refuses a
+# refusals differ accordingly: `declarationOf` refuses an unresolvable key at merge time, `fieldRef` refuses a
 # non-identity target at application time.
 { prelude }:
 let

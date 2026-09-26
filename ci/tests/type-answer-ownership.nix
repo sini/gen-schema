@@ -19,11 +19,11 @@
 let
   inherit (genSchema)
     mkSchemaEntryType
-    ref
+    declarationOf
     setOf
     ;
 
-  refHost = ref "host";
+  refHost = declarationOf "host";
   setType = setOf refHost;
   entryType = mkSchemaEntryType { };
   tcpPort = genSchema.refinements.tcpPort;
@@ -81,7 +81,7 @@ in
           elem = r.nestedTypes.elemType.refKind or null;
         };
       expected = {
-        name = "setOf(ref(host))";
+        name = "setOf(declarationOf(host))";
         isSetOf = true;
         elem = "host";
       };
@@ -97,7 +97,7 @@ in
           isSetOf = r.isSetOf or false;
         };
       expected = {
-        name = "setOf(ref(host))";
+        name = "setOf(declarationOf(host))";
         isSetOf = true;
       };
     };

@@ -42,7 +42,9 @@
       # the check still exited 0 (measured — den-hoag-z1ta6). Hanging the force on that spine is what
       # makes the green mean "the surface evaluates", and a library needs no new output name for it.
       # The depth is each member's WHNF and no deeper: a retirement tombstone is a published `throw`
-      # by design (gen-scope's `buildNodes`), so a deep force is red on a healthy tree.
+      # by design (gen-scope's `buildNodes`), so a deep force is red on a healthy tree — and for the
+      # same reason a tombstone of this library's own (`ref`, lib/ref.nix) is excluded from the force:
+      # forcing its WHNF would take the whole `lib` output down with it.
       lib =
         let
           surface = import ./. {
@@ -53,7 +55,9 @@
             graph = gen-graph.lib;
           };
         in
-        builtins.deepSeq (builtins.mapAttrs (_: builtins.typeOf) surface) surface;
+        builtins.deepSeq (builtins.mapAttrs (_: builtins.typeOf) (
+          builtins.removeAttrs surface [ "ref" ]
+        )) surface;
       flakeModules.default = ./flakeModule.nix;
     };
 }

@@ -8,7 +8,7 @@ let
   inherit (genSchema)
     evalSchema
     mkInstanceRegistry
-    ref
+    declarationOf
     setOf
     ;
 
@@ -21,7 +21,7 @@ let
             default = 100;
           };
           options.needs = genMerge.mkOption {
-            type = genMerge.types.listOf (ref "trait");
+            type = genMerge.types.listOf (declarationOf "trait");
             default = [ ];
           };
         };
@@ -99,7 +99,7 @@ let
       {
         config.schema.trait = {
           options.deps = genMerge.mkOption {
-            type = setOf (ref "trait");
+            type = setOf (declarationOf "trait");
             default = [ ];
           };
         };
@@ -137,7 +137,7 @@ let
         config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
         config.schema.service = {
           options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = ref "host"; };
+          options.host = genMerge.mkOption { type = declarationOf "host"; };
         };
       }
     ];
@@ -173,9 +173,9 @@ let
         config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
         config.schema.service = {
           options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = ref "host"; };
+          options.host = genMerge.mkOption { type = declarationOf "host"; };
           options.depends = genMerge.mkOption {
-            type = genMerge.types.listOf (ref "service");
+            type = genMerge.types.listOf (declarationOf "service");
             default = [ ];
           };
         };

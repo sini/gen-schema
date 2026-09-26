@@ -9,7 +9,7 @@ let
     evalSchema
     mkInstanceRegistry
     mkCodec
-    ref
+    declarationOf
     ;
 
   schema = evalSchema {
@@ -26,7 +26,7 @@ let
             default = "s3cret";
           };
           options.peer = genMerge.mkOption {
-            type = genMerge.types.nullOr (ref "peer");
+            type = genMerge.types.nullOr (declarationOf "peer");
             default = null;
           };
           options.meta = genMerge.mkOption {

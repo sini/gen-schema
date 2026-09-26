@@ -81,7 +81,7 @@ in
         let
           decl = {
             options.myPort = genMerge.mkOption { type = rp; };
-            options.owner = genMerge.mkOption { type = genSchema.ref "user"; };
+            options.owner = genMerge.mkOption { type = genSchema.declarationOf "user"; };
           };
           k = kindOf { mkType = aspectShaped; } decl;
           std = kindOf { } decl;

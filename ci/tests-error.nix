@@ -1301,4 +1301,28 @@ in
         };
       };
     };
+
+  # The retired name `ref` (lib/ref.nix, THE RETIRED NAME): applying it refuses with the message
+  # that names `declarationOf`, and a lambda argument meets the same refusal rather than a coercion
+  # abort, because the message interpolates nothing.
+  flake.testsError.declaration-of-refusals =
+    let
+      msg = "^gen-schema: `ref` is renamed `declarationOf`\\. A value denoting a node is a declaration and the name written at a use site is a reference \\(Neron et al\\. 2015\\), so the type of a field holding either is `declarationOf <kind-or-registry>`; the argument and the behaviour are unchanged\\.$";
+    in
+    {
+      test-ref-applied-refuses-by-name = {
+        expr = genSchema.ref "host";
+        expectedError = {
+          type = "ThrownError";
+          inherit msg;
+        };
+      };
+      test-ref-lambda-argument-refuses-by-name = {
+        expr = genSchema.ref (x: x);
+        expectedError = {
+          type = "ThrownError";
+          inherit msg;
+        };
+      };
+    };
 }

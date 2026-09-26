@@ -1,7 +1,8 @@
-# schema.ref — dual-mode cross-instance references.
+# schema.declarationOf — the type of a field holding a declaration (Neron et al. 2015: a reference
+# resolves to a declaration), in two modes.
 #
-# Deferred: schema.ref "host" → marker type, bound via refs on mkInstanceRegistry
-# Direct:   schema.ref config.fleet.hosts → resolved immediately
+# Deferred: schema.declarationOf "host" → marker type, bound via refs on mkInstanceRegistry
+# Direct:   schema.declarationOf config.fleet.hosts → resolved immediately
 #
 # Both modes accept string keys ("igloo") or instance values (config.fleet.hosts.igloo).
 {
@@ -14,7 +15,7 @@ let
   mkCoercingRefType =
     instances:
     merge.mkOptionType {
-      name = "ref";
+      name = "declarationOf";
       description = "reference to an instance (key or value)";
       check = v: builtins.isString v || builtins.isAttrs v;
       merge =
@@ -41,18 +42,19 @@ let
   # type leaves every protocol answer, typeMerge's rebuild included, describing a ref WITHOUT
   # its kind. An answer the construction owns has to be present before the completion runs.
   #
-  # The construction is the kind name alone, so two `ref "host"`s are one type and merge, and a
-  # `ref "host"` against a `ref "user"` is refused (`constructionRelation`, den-hoag-bfc0k).
+  # The construction is the kind name alone, so two `declarationOf "host"`s are one type and merge,
+  # and a `declarationOf "host"` against a `declarationOf "user"` is refused (`constructionRelation`,
+  # den-hoag-bfc0k).
   mkDeferredRef =
     kindName:
     let
       self = merge.mkOptionType {
-        name = "ref(${kindName})";
+        name = "declarationOf(${kindName})";
         description = "reference to a ${kindName} instance";
         check = v: builtins.isString v || builtins.isAttrs v;
         merge = loc: defs: merge.mergeOneOption loc defs;
         refKind = kindName;
-        functor = constructionRelation "ref(${kindName})" { minted.kind = kindName; } self;
+        functor = constructionRelation "declarationOf(${kindName})" { minted.kind = kindName; } self;
       };
     in
     self;
@@ -111,7 +113,7 @@ let
     elemType:
     assert
       (getRefKind elemType != null)
-      || throw "gen-schema: setOf: element type must be a ref type (e.g., setOf (ref \"host\")), got ${elemType.name or "unknown"}";
+      || throw "gen-schema: setOf: element type must be a ref type (e.g., setOf (declarationOf \"host\")), got ${elemType.name or "unknown"}";
     let
       listType = merge.types.listOf elemType;
     in
@@ -163,7 +165,15 @@ let
     };
 in
 {
-  ref = target: if builtins.isString target then mkDeferredRef target else mkCoercingRefType target;
+  declarationOf =
+    target: if builtins.isString target then mkDeferredRef target else mkCoercingRefType target;
+
+  # ── THE RETIRED NAME ──
+  # A tombstone rather than a silent alias: the old name inverted the primary (the values of this
+  # type are declarations, and `ref` names the use side), so it is refused by name and the refusal
+  # names the new one. A published value, not a lambda, so reaching the name refuses as well as
+  # applying it; the message interpolates nothing, so no argument can turn it into a coercion abort.
+  ref = throw "gen-schema: `ref` is renamed `declarationOf`. A value denoting a node is a declaration and the name written at a use site is a reference (Neron et al. 2015), so the type of a field holding either is `declarationOf <kind-or-registry>`; the argument and the behaviour are unchanged.";
 
   inherit getRefKind dedupByHash setOf;
 

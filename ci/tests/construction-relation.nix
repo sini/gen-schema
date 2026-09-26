@@ -16,7 +16,7 @@ let
     mkSchemaEntryType
     mkSchemaOption
     mkStrictModule
-    ref
+    declarationOf
     setOf
     ;
   t = genMerge.types;
@@ -136,9 +136,9 @@ in
     # ── ref(<kind>) and the setOf over it ──
     test-ref-kind-is-its-construction = {
       expr = {
-        twoCalls = x (ref "host") (ref "host") "a";
-        setOfTwoCalls = x (setOf (ref "host")) (setOf (ref "host")) [ ];
-        differing = x (ref "host") (ref "user") "a";
+        twoCalls = x (declarationOf "host") (declarationOf "host") "a";
+        setOfTwoCalls = x (setOf (declarationOf "host")) (setOf (declarationOf "host")) [ ];
+        differing = x (declarationOf "host") (declarationOf "user") "a";
       };
       expected = {
         twoCalls = "MERGED";

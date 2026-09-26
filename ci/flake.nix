@@ -48,7 +48,16 @@
       # MESSAGE is the subject cannot live under `./tests`. `tryEval` discards the message
       # (`{ success = false; value = false; }`), so the cells that assert WHICH refusal fired have
       # nowhere else to go. Same wiring as gen-merge's and gen-memo's.
-      extraModules = [ ./tests-error.nix ];
+      extraModules = [
+        ./tests-error.nix
+        # `ref` is a TOMBSTONE (lib/ref.nix, THE RETIRED NAME; den-hoag-2zjg1): `checks.root-surface`
+        # excludes it from the walk, and the generated `root-surface-retired.test-retired-ref` cell pins
+        # this exact message at the root seam, so a resurrected or reworded tombstone reds.
+        {
+          gen.ci.rootSurface.retired.ref =
+            "gen-schema: `ref` is renamed `declarationOf`. A value denoting a node is a declaration and the name written at a use site is a reference (Neron et al. 2015), so the type of a field holding either is `declarationOf <kind-or-registry>`; the argument and the behaviour are unchanged.";
+        }
+      ];
       specialArgs = {
         inherit
           genIdentity

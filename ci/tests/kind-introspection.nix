@@ -7,7 +7,7 @@
   ...
 }:
 let
-  inherit (genSchema) mkSchemaOption ref;
+  inherit (genSchema) mkSchemaOption declarationOf;
 
   eval = genMerge.evalModuleTree {
     modules = [
@@ -19,7 +19,7 @@ let
         };
         config.schema.service = {
           options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = ref "host"; };
+          options.host = genMerge.mkOption { type = declarationOf "host"; };
         };
       }
     ];

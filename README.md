@@ -69,16 +69,16 @@ The mental model has two layers. A **kind** is a schema-level type — a deferre
 
 The authoring surface is small — most schemas are built from these constructors:
 
-| Constructor                        | Role                                                                                                               |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `mkSchemaOption`                   | Declares the `schema` option (holds all kinds; carries `strict`, `baseModule`, `collections`, `computed` settings) |
-| `mkInstanceRegistry`               | Turns a kind into an `attrsOf` registry of instances, with `refs`, `derive`, and validator pipeline                |
-| `mkInstanceType`                   | The single-instance submodule type (identity + strict injected), used by registries                                |
-| `ref` / `setOf` / `toSet`          | Cross-instance references (deferred or direct) and identity-deduplicated collections                               |
-| `schemaFn`                         | Declarative methods on a kind, with named args auto-resolved from instance config                                  |
-| `mkValidator` / `mkFieldValidator` | Cross-field constraints that travel with a kind and fire on every registry                                         |
-| `refined` / `blame` / `mkMixin`    | Refinement contracts, blame records, and first-class mixin fragments                                               |
-| `mkCodec` / `renderDocs`           | Serialization round-trips and markdown reference generation                                                        |
+| Constructor                         | Role                                                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `mkSchemaOption`                    | Declares the `schema` option (holds all kinds; carries `strict`, `baseModule`, `collections`, `computed` settings) |
+| `mkInstanceRegistry`                | Turns a kind into an `attrsOf` registry of instances, with `refs`, `derive`, and validator pipeline                |
+| `mkInstanceType`                    | The single-instance submodule type (identity + strict injected), used by registries                                |
+| `declarationOf` / `setOf` / `toSet` | Cross-instance references (deferred or direct) and identity-deduplicated collections                               |
+| `schemaFn`                          | Declarative methods on a kind, with named args auto-resolved from instance config                                  |
+| `mkValidator` / `mkFieldValidator`  | Cross-field constraints that travel with a kind and fire on every registry                                         |
+| `refined` / `blame` / `mkMixin`     | Refinement contracts, blame records, and first-class mixin fragments                                               |
+| `mkCodec` / `renderDocs`            | Serialization round-trips and markdown reference generation                                                        |
 
 Everything above the instance layer is pure schema — no validation or hashing happens at the kind level, which is what lets kinds compose via `imports` without duplicate-module conflicts. Instances are where the infrastructure (strict rejection, `id_hash`, ref binding, derive) is injected. Registries expose flat `_`-prefixed introspection (`_kindNames`, `_topology`, `_edges`, `_refEdges`, `_roots`, `_leaves`, `_collectionKeys`) that consumers read to build whatever graph format their evaluator needs.
 
@@ -213,7 +213,7 @@ config.schema.service = {
 options.services = genSchema.mkInstanceRegistry config.schema.service {
   extraModules = [({ ... }: {
     options.upstream = lib.mkOption {
-      type = lib.types.nullOr (genSchema.ref config.services);
+      type = lib.types.nullOr (genSchema.declarationOf config.services);
       default = null;
       description = "Upstream service this proxies to";
     };
@@ -247,7 +247,7 @@ config.schema.service = {
 
 # Deployments reference their namespace (deferred ref on kind + binding)
 config.schema.deployment.options.namespace = lib.mkOption {
-  type = genSchema.ref "namespace";
+  type = genSchema.declarationOf "namespace";
 };
 options.deployments = genSchema.mkInstanceRegistry config.schema.deployment {
   refs.namespace = config.namespaces;
@@ -291,7 +291,7 @@ config.schema.network = {
 
 # Hosts reference their network (deferred ref)
 config.schema.host.options.network = lib.mkOption {
-  type = genSchema.ref "network";
+  type = genSchema.declarationOf "network";
 };
 options.hosts = genSchema.mkInstanceRegistry config.schema.host {
   refs.network = config.networks;
@@ -558,14 +558,14 @@ hand-copied error string is a second copy that decays independently of its sourc
 
 ### Cross-Instance References
 
-`schema.ref` declares a reference to another kind's instances. Two modes:
+`schema.declarationOf` types a field whose value is a declaration: another kind's instance, written either as a reference (its identifier) or as the instance itself (Neron et al. 2015: a reference resolves to a declaration). Two modes:
 
 **Deferred ref** — declare on the kind, bind at registry time:
 
 ```nix
 # Kind declares referential intent
 config.schema.service.options.host = lib.mkOption {
-  type = genSchema.ref "host";
+  type = genSchema.declarationOf "host";
 };
 
 # Registry binds the ref to a concrete registry
@@ -580,7 +580,7 @@ options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
 options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
   extraModules = [({ ... }: {
     options.upstream = lib.mkOption {
-      type = lib.types.nullOr (genSchema.ref config.fleet.services);
+      type = lib.types.nullOr (genSchema.declarationOf config.fleet.services);
       default = null;
     };
   })];
@@ -605,11 +605,11 @@ ref field 'host' on kind 'service': reference 'nonexistent' not found in instanc
 
 ### Refs in Collections
 
-`ref` works inside `listOf` and `nullOr` wrappers at any nesting depth:
+`declarationOf` works inside `listOf` and `nullOr` wrappers at any nesting depth:
 
 ```nix
 config.schema.service.options.replicas = lib.mkOption {
-  type = lib.types.listOf (genSchema.ref "host");
+  type = lib.types.listOf (genSchema.declarationOf "host");
   default = [];
 };
 
@@ -618,7 +618,7 @@ config.fleet.services.nginx.replicas = [ "igloo" "iceberg" ];
 config.fleet.services.nginx.replicas = [ config.fleet.hosts.igloo "iceberg" ];
 
 # Nullable and nested wrappers:
-type = lib.types.nullOr (lib.types.listOf (genSchema.ref "host"));
+type = lib.types.nullOr (lib.types.listOf (genSchema.declarationOf "host"));
 ```
 
 ### Custom Ref Coercion
@@ -667,7 +667,7 @@ Deferred coerce runs before validators in `applyPipeline`, so validators see res
 
 ```nix
 config.schema.group.options.members = lib.mkOption {
-  type = genSchema.setOf (genSchema.ref "host");
+  type = genSchema.setOf (genSchema.declarationOf "host");
   default = [];
 };
 
@@ -679,7 +679,7 @@ Composes with custom coerce hooks — expansion produces duplicates, `setOf` rem
 
 ### Field References (Values)
 
-`ref` is a **type**: it declares that a field points at an instance. `fieldRef` is the matching
+`declarationOf` is a **type**: it declares that a field points at an instance. `fieldRef` is the matching
 **value**: an inert record naming which instance, and which field of it.
 
 ```nix
@@ -698,7 +698,7 @@ was itself a ref.
 
 The two levels are complementary and both are *derived*, never declared:
 
-|            | `ref`                              | `fieldRef`                                 |
+|            | `declarationOf`                    | `fieldRef`                                 |
 | ---------- | ---------------------------------- | ------------------------------------------ |
 | what it is | an option **type** on a field      | a **value** inhabiting such a field        |
 | lives in   | the kind's schema                  | a default or a contributed value           |
@@ -805,7 +805,7 @@ config.schema._collectionKeys
 # → [ "includes" "methods" "parent" "validators" ]
 ```
 
-`_edges` combines parent edges (from topology) and ref edges (from `schema.ref` declarations) into a single typed list. Every edge has `{ from, to, type, field }` — `field` is `null` for parent edges and the option name for ref edges.
+`_edges` combines parent edges (from topology) and ref edges (from `schema.declarationOf` declarations) into a single typed list. Every edge has `{ from, to, type, field }` — `field` is `null` for parent edges and the option name for ref edges.
 
 ### Scope Graph Bridge (Consumer-Side)
 
@@ -1223,7 +1223,7 @@ Returns `lib.mkOption` — use as `options.schema = mkSchemaOption { ... }`.
 
 **The schema option's type is `schema`, not a plain `submodule`.** `mkSchemaOption` builds its entry type once per call and returns an option typed by `schema`, which delegates its check, merge and sub-options to the introspection submodule and states its merge relation with the entry type's `constructionRelation` payload and binOp. One construction declared twice (one value, or two calls with equal arguments) is one option, and its introspection reads as declared once; two constructions are refused by name at `schema`, within `closuresFirst`'s enumerated exception. A plain `submodule` declared beside it is refused by name in both orders. The type carries no `getSubModules`/`substSubModules`, and the idempotence holds under gen-merge's engine only: nixpkgs `lib.evalModules` still refuses the second declaration (`ci/tests/schema-option-redeclaration.nix`).
 
-**Redeclaration: one construction merges, two are refused.** The entry type, `ref(<kind>)` and `strict` are built per call, so an option redeclared across modules meets two records of one name. Each states its merge relation through `constructionRelation` (exported, beside `keySemanticsRecords`): two such types merge exactly when their constructions are one construction, decided per component, and every other same-named pair is refused by name at the option. `constructionRelation name { minted ? {}; compared ? {}; } self` takes each `minted.<k>` into one mark, and each `compared.<k>` must be exactly `{ records = [ … ]; value; }`: `value` is compared under Nix `==` through gen-merge's `closuresFirst records value`, which decides on the listed type records' closures before it can reach a cyclic record's back-edge. An entry without `records` is refused by name. Stated limits:
+**Redeclaration: one construction merges, two are refused.** The entry type, `declarationOf(<kind>)` and `strict` are built per call, so an option redeclared across modules meets two records of one name. Each states its merge relation through `constructionRelation` (exported, beside `keySemanticsRecords`): two such types merge exactly when their constructions are one construction, decided per component, and every other same-named pair is refused by name at the option. `constructionRelation name { minted ? {}; compared ? {}; } self` takes each `minted.<k>` into one mark, and each `compared.<k>` must be exactly `{ records = [ … ]; value; }`: `value` is compared under Nix `==` through gen-merge's `closuresFirst records value`, which decides on the listed type records' closures before it can reach a cyclic record's back-edge. An entry without `records` is refused by name. Stated limits:
 
 - `records = [ ]` is an **unchecked assertion** that the grammar fixes no type-record position in that component. Stating it over a value that does hold a record is the silent spelling of an omission, and two knotted constructions then abort uncatchably. `mkSchemaEntryType` declares `keySemantics` through `keySemanticsRecords` (an entry's `option.type`, the one position that grammar fixes) and every other formal with `records = [ ]`.
 - **Module content is outside `records`.** A module in `mixins`, `baseModule` or `specialArgs`, or a facet's `module`, that declares an option typed by a per-call `mkOptionType` aborts when two constructions are compared in the order that interns `functor` first, and in every order when that type carries a back-edge under `description` (gen-merge `closuresFirst`, enumerated exception).
@@ -1306,7 +1306,7 @@ Returns `lib.mkOption` with `type = attrsOf (mkInstanceType ...)` and an `apply`
 
 `derive` and `deriveEither` are mutually exclusive.
 
-`refs` binds deferred `ref` fields to concrete registries. Three forms:
+`refs` binds deferred `declarationOf` fields to concrete registries. Three forms:
 
 ```nix
 # Simple — registry directly:
@@ -1328,15 +1328,17 @@ refs.needs = {
 
 `deferred = true` runs coercion inside `applyPipeline` (after instances are materialized) instead of at option-apply time. The custom hook receives the raw instances as `registry` — use this instead of capturing the config value in the closure. Required when the ref field points back to the same registry being defined.
 
-### `ref`
+### `declarationOf`
 
 ```nix
-ref target
+declarationOf target
 ```
 
 `target` is a string -> deferred ref (kind name, bound via `refs` on `mkInstanceRegistry`). `target` is an attrset -> direct ref (resolved immediately). Both modes accept string keys or instance values.
 
-The deferred ref's `refKind` sits inside the descriptor handed to `mkOptionType`, not stapled onto the finished type afterwards. `mkOptionType` stamps the protocol onto the record it is handed and mints a functor pointing back at that completed record, so a `// { refKind = ...; }` over a completed type leaves every protocol answer — `typeMerge`'s rebuild included — describing a `ref` without its kind. Declaring the same option twice as `ref "host"` therefore merges to a `ref(host)` that `getRefKind` still reads through any `nullOr` / `listOf` / `setOf` wrapper and `mkCoerceChain` still builds a coercion for, rather than to a bare `ref` whose string keys reach the instance unresolved.
+The former name `ref` is retired: it is a published `throw` that names `declarationOf`, so reaching it or applying it refuses by name, catchably. The rename follows Néron et al. 2015 (*A Theory of Name Resolution*): a reference resolves to a declaration, and this type's values are declarations.
+
+The deferred ref's `refKind` sits inside the descriptor handed to `mkOptionType`, not stapled onto the finished type afterwards. `mkOptionType` stamps the protocol onto the record it is handed and mints a functor pointing back at that completed record, so a `// { refKind = ...; }` over a completed type leaves every protocol answer — `typeMerge`'s rebuild included — describing a `declarationOf` without its kind. Declaring the same option twice as `declarationOf "host"` therefore merges to a `declarationOf(host)` that `getRefKind` still reads through any `nullOr` / `listOf` / `setOf` wrapper and `mkCoerceChain` still builds a coercion for, rather than to a bare `declarationOf` whose string keys reach the instance unresolved.
 
 ### `setOf`
 
@@ -1344,7 +1346,7 @@ The deferred ref's `refKind` sits inside the descriptor handed to `mkOptionType`
 setOf elemType
 ```
 
-A list type that deduplicates by `id_hash`, preserving first-seen order. Only meaningful with `ref` element types — `setOf` requires instance refs. Composes with custom coerce hooks: expansion produces duplicates, `setOf` removes them. Uses `nestedTypes.elemType` so `getRefKind` traverses through it like `listOf`.
+A list type that deduplicates by `id_hash`, preserving first-seen order. Only meaningful with `declarationOf` element types — `setOf` requires instance refs. Composes with custom coerce hooks: expansion produces duplicates, `setOf` removes them. Uses `nestedTypes.elemType` so `getRefKind` traverses through it like `listOf`.
 
 `setOf` borrows `listOf`'s value behaviour — the merge, the check — but is built through `mkOptionType` rather than as an override over a completed `listOf`, so it answers the option-type protocol as itself. A rebuild through `substSubModules`, and a `typeMerge` against a second declaration of the same option, both return a `setOf` with the `isSetOf` discriminator that `mkCoerceChain` and the codec dispatch on. A `setOf` and a plain `listOf` of the same element are different types and do not merge.
 
@@ -1372,7 +1374,7 @@ isFieldRef v                        # → bool
 fieldRefsIn v                       # → [ { at; aspect; path; } ]
 ```
 
-The value-level counterpart of `ref` — see [Field References (Values)](#field-references-values).
+The value-level counterpart of `declarationOf` — see [Field References (Values)](#field-references-values).
 `fieldRef` throws unless the target carries `id_hash` and the path is a non-empty list of strings;
 the record carries the caller's own instance, so identity in ≡ identity out.
 
@@ -1591,7 +1593,7 @@ Instance types (submodules with strict + identity injected)
 Instance registries (attrsOf instance type, ref binding via apply)
   ↓ referenced by             ↓ introspected by
 Cross-instance refs        _topology, _edges, _roots, _leaves
-  (schema.ref)
+  (schema.declarationOf)
 ```
 
 **Kinds are pure schema** — options, config, defaults, methods, collections. No strict validation or identity hashing at the kind level.
@@ -1610,7 +1612,7 @@ lib/
   id-hash.nix        — mkIdentityModule (id_hash via primitive-option reflection) + identityHashForKind.
                        The MINT is not here: `hashIdentity` lives in gen-identity and arrives injected
   strict.nix         — mkStrictModule (closed-world freeform rejection)
-  ref.nix            — schema.ref (dual-mode cross-instance references, getRefKind)
+  ref.nix            — schema.declarationOf (dual-mode cross-instance references, getRefKind)
   methods.nix        — schemaFn, mkMethodsModule (method option/config generation)
   validate.nix       — mkValidator, runValidators, formatErrors, defaultOnError (base) + validateInstances, mkFieldValidator, filterValidators (schema-specific)
   refined.nix        — refined (refinement contracts, § Findler 2002 / § Rondon 2008)
@@ -1621,7 +1623,7 @@ lib/
 flakeModule.nix      — flake-parts integration (provides schema option + genSchema)
 ```
 
-Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), and validators (`mkValidator`, `runValidators`, `formatErrors`, `defaultOnError`) are **gen-schema-owned** module-system constructors — they relocated here from [gen-algebra](https://github.com/sini/gen-algebra) on 2026-06-26 (which is now fully pure). They are exported on the public API and consumed internally by `instance.nix`. Cross-instance references use `schema.ref` (see [`ref.nix`](lib/ref.nix)); the older `mkRefType` was retired in favor of `ref`'s direct mode, which is a behavioral superset. gen-schema imports only gen-algebra's pure `record` algebra.
+Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), and validators (`mkValidator`, `runValidators`, `formatErrors`, `defaultOnError`) are **gen-schema-owned** module-system constructors — they relocated here from [gen-algebra](https://github.com/sini/gen-algebra) on 2026-06-26 (which is now fully pure). They are exported on the public API and consumed internally by `instance.nix`. Cross-instance references use `schema.declarationOf` (see [`ref.nix`](lib/ref.nix)); the older `mkRefType` was retired in favor of its direct mode, which is a behavioral superset. gen-schema imports only gen-algebra's pure `record` algebra.
 
 ## Demo
 

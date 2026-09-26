@@ -9,7 +9,7 @@ let
     evalSchema
     mkInstanceRegistry
     mkCodec
-    ref
+    declarationOf
     setOf
     ;
 
@@ -21,17 +21,17 @@ let
         };
         config.schema.service = {
           options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = ref "host"; };
+          options.host = genMerge.mkOption { type = declarationOf "host"; };
           options.replicas = genMerge.mkOption {
-            type = genMerge.types.listOf (ref "host");
+            type = genMerge.types.listOf (declarationOf "host");
             default = [ ];
           };
           options.primary = genMerge.mkOption {
-            type = genMerge.types.nullOr (ref "host");
+            type = genMerge.types.nullOr (declarationOf "host");
             default = null;
           };
           options.backends = genMerge.mkOption {
-            type = setOf (ref "host");
+            type = setOf (declarationOf "host");
             default = [ ];
           };
         };

@@ -10,7 +10,7 @@ let
     evalSchema
     mkInstanceRegistry
     mkCodec
-    ref
+    declarationOf
     ;
 
   schema = evalSchema {
@@ -35,7 +35,7 @@ let
         };
         config.schema.service = {
           options.name = genMerge.mkOption { type = genMerge.types.str; };
-          options.host = genMerge.mkOption { type = ref "host"; };
+          options.host = genMerge.mkOption { type = declarationOf "host"; };
         };
       }
     ];

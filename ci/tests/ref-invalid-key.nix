@@ -5,7 +5,7 @@
   ...
 }:
 let
-  inherit (genSchema) evalSchema mkInstanceRegistry ref;
+  inherit (genSchema) evalSchema mkInstanceRegistry declarationOf;
 
   schema = evalSchema {
     modules = [
@@ -14,7 +14,7 @@ let
           options.addr = genMerge.mkOption { type = genMerge.types.str; };
         };
         config.schema.service = {
-          options.host = genMerge.mkOption { type = ref "host"; };
+          options.host = genMerge.mkOption { type = declarationOf "host"; };
         };
       }
     ];

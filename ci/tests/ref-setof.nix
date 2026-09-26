@@ -8,7 +8,7 @@ let
   inherit (genSchema)
     evalSchema
     mkInstanceRegistry
-    ref
+    declarationOf
     setOf
     ;
 
@@ -20,7 +20,7 @@ let
         };
         config.schema.group = {
           options.members = genMerge.mkOption {
-            type = setOf (ref "host");
+            type = setOf (declarationOf "host");
             default = [ ];
           };
         };
@@ -106,7 +106,7 @@ let
         config.schema.service = {
           options.port = genMerge.mkOption { type = genMerge.types.int; };
           options.hosts = genMerge.mkOption {
-            type = genMerge.types.nullOr (setOf (ref "host"));
+            type = genMerge.types.nullOr (setOf (declarationOf "host"));
             default = null;
           };
         };
@@ -114,7 +114,7 @@ let
     ];
   };
 
-  # --- nullOr (setOf (ref "kind")) ---
+  # --- nullOr (setOf (declarationOf "kind")) ---
   evalNullable = genMerge.evalModuleTree {
     modules = [
       {
