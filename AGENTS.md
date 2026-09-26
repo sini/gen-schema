@@ -247,6 +247,17 @@ otherwise exempt them for carrying the prefix that marks a key as none of gen-sc
 **Instance value shape**: `{ _identity; id_hash; name; <declared options>; <methods>; }`. `name`
 defaults to the registry key.
 
+**`__` keys crossing the boundary** (R12 stated contracts; the census that reads these lines takes the
+first line of each). This library also co-writes gen-types' checker fields `__id` and `__okAt`
+(`lib/refined.nix`) and writes gen-algebra's `__mint` sum; their owners state those contracts.
+
+- `__sealed` — writer `mkSchemaEntryType` (`lib/entry-type.nix`), reader `kindEq` (same file); read by gen-select (`lib/default.nix`, its kind comparison):
+  the sealed subjects of a kind value, a thunk forced only when two kinds are compared. Kind values
+  also carry caller-computed fields, so the key stays under `__` to stay disjoint from them.
+- `__schema` — writer `types.refined` (`lib/refined.nix`), readers `getRefinements`, `isRefined` and the bridge (`lib/refined.nix`, `lib/bridge.nix`):
+  refinement metadata added onto a FOREIGN option-type record, so it must stay disjoint from that
+  record's own keys.
+
 ## Entry points by task
 
 | Task                                                       | Reach for                                                                                                                                                                                                                                                                                         |
