@@ -21,6 +21,7 @@
   componentsPreimage,
   sealedCollisionEq,
   identityOf,
+  comparisonSubject,
   constructionRelation,
   keySemanticsRecords,
 }:
@@ -73,8 +74,9 @@ let
   # component). `mkType` and `computed` are components, sealed by constructor: what they add that
   # the plane cannot evaluate lives only in their bodies.
   #
-  # A TYPE carrying no `__mint` (a field's, a freeform's) is UNMIGRATED and declared sealed here
-  # rather than handed to the encoder, so no type record is forced to decide it.
+  # A TYPE the mint cannot mint (a field's, a freeform's, a facet's, a ref's: unmigrated, or carrying
+  # no minted identity) is sealed here rather than handed to the encoder, so no type record is forced
+  # to decide it, and it is compared through `comparedTyped` below.
   #
   # A declaration's modules, found through `imports` at any depth, split by whether the plane can
   # see into them. An OPAQUE module — a function module, a functor, a path — is one the plane
@@ -92,7 +94,40 @@ let
     else
       [ { opaque = v; } ]
   );
-  isUnmigrated = t: !(builtins.isAttrs t) || identityOf t ? unmigrated;
+  # A type record with no minted identity, unmigrated or unmintable: the mint refuses it either way,
+  # so declaring it sealed moves no tag. The REGIME is still the mint's per-component tag
+  # (den-hoag-markof-partial-preimage-znfjq, ruling (c+): decided by the mint unless the constructor
+  # declares it) — this reads it, it does not declare it; what the grammar declares is the POSITION
+  # of the records (`recordsOf` below), which is what `comparedTyped` needs.
+  isSealedType = t: !(builtins.isAttrs t) || !(identityOf t ? minted);
+
+  # ★ THE COMPARED SUBJECT OF A SEALED COMPONENT HOLDING TYPE RECORDS (den-hoag-6b5ia). A type record
+  # is cyclic (`functor.type`), so a bare `==` between two constructions can recurse until the
+  # evaluator aborts, uncatchably, past `sealedCollisionEq`'s `tryEval`. `records` are the type
+  # records this plane's grammar places in `v`; gen-merge's `closuresFirst` decides on their closures
+  # first, the subject `constructionRelation` compares by (den-hoag-bfc0k). A member of `records`
+  # that is not a record (`type = "str"`) contributes no closures there. The accessor `__id` is
+  # dropped as `componentsPreimage` drops it from a bare value. The four positions: an option's
+  # `type`, the declaration's `freeformType`, a `keySemantics` entry's `option.type`
+  # (`keySemanticsRecords`) and a `refs` entry's `type`.
+  #
+  # COST: tags and marks are unchanged. The subject is a thunk in `__sealed`, forced only on the
+  # equal-mark path of `kindEq` (and gen-select's `selectorEq`), where `closuresOf` allocates one
+  # attrset per record.
+  #
+  # ★ ENUMERATED EXCEPTION TO TOTALITY (ADR-0025 item 1). `kindEq` can still abort where the closures
+  # prefix is EQUAL and the value reaches a back-edge before a difference: (1) a GRAFT sharing every
+  # closure slot and holding distinct cyclic data elsewhere (`closuresFirst`'s exception 1); (2) a
+  # cyclic value at a position this grammar does not fix — an option's `description`, `default`
+  # (a type record there included) or `example`; content of a `keySemantics` entry outside
+  # `option.type` (the option's own `description`, a type under any other key); a collection member;
+  # a functor module. Closing it without moving a value needs an evaluator-observable value identity
+  # (a visited set), which pure Nix does not expose; a bounded finiteness walk closes it at a value
+  # move (den-hoag-8owed arm G, owed an owner reading). This enumeration is 8owed's arm (A),
+  # defaulted, reversible.
+  comparedTyped =
+    records: v:
+    merge.closuresFirst records (if builtins.isAttrs v && v ? __id then comparisonSubject v else v);
 
   planeOf =
     {
@@ -115,11 +150,20 @@ let
             p = prefix ++ [ n ];
           in
           if isOptionDecl o then
-            map (a: {
-              path = [ "options" ] ++ p ++ [ a ];
-              value = o.${a};
-              sealed = a == "type" && isUnmigrated o.type;
-            }) (prelude.attrNames o)
+            map (
+              a:
+              if a == "type" && isSealedType o.type then
+                {
+                  path = [ "options" ] ++ p ++ [ a ];
+                  value = comparedTyped [ o.type ] o.type;
+                  sealed = true;
+                }
+              else
+                {
+                  path = [ "options" ] ++ p ++ [ a ];
+                  value = o.${a};
+                }
+            ) (prelude.attrNames o)
             ++ [
               {
                 path = [ "value" ] ++ p;
@@ -131,8 +175,10 @@ let
         ) (prelude.attrNames opts);
       # An attrset-valued component is spread one level, so a refusal names the member (a method,
       # a category) rather than the whole collection; its key set stays a component of its own.
+      # `recordsOf` names the type records a member's grammar holds; a member holding a sealed one is
+      # declared sealed and compared through `comparedTyped`, and every other member is left to the mint.
       spread =
-        prefix: v:
+        prefix: recordsOf: v:
         let
           isRecord = builtins.tryEval (
             builtins.isAttrs v && identityOf v ? unmigrated && (v.type or null) != "derivation"
@@ -145,10 +191,24 @@ let
               value = prelude.attrNames v;
             }
           ]
-          ++ map (k: {
-            path = prefix ++ [ k ];
-            value = v.${k};
-          }) (prelude.attrNames v)
+          ++ map (
+            k:
+            let
+              records = recordsOf v.${k};
+              typed = builtins.tryEval (builtins.any isSealedType records);
+            in
+            if typed.success && typed.value then
+              {
+                path = prefix ++ [ k ];
+                value = comparedTyped records v.${k};
+                sealed = true;
+              }
+            else
+              {
+                path = prefix ++ [ k ];
+                value = v.${k};
+              }
+          ) (prelude.attrNames v)
         else
           [
             {
@@ -174,22 +234,31 @@ let
           value = prelude.attrNames collections;
         }
       ]
-      ++ prelude.concatMap (c: spread [ "collections" c ] collections.${c}) (
+      ++ prelude.concatMap (c: spread [ "collections" c ] (_: [ ]) collections.${c}) (
         prelude.attrNames collections
       )
-      ++ spread [ "keySemantics" ] keySemantics
-      ++ spread [ "refs" ] refs
-      ++ spread [ "computed" ] computed
+      ++ spread [ "keySemantics" ] (e: keySemanticsRecords { inherit e; }) keySemantics
+      # A ref entry is `{ refKind; type; }` (ref.nix `refsFromOptionsWithTypes`).
+      ++ spread [ "refs" ] (e: [ e.type ]) refs
+      ++ spread [ "computed" ] (_: [ ]) computed
       ++ [
         {
           path = [ "modules" ];
           value = map (m: m.opaque) (builtins.filter (m: m ? opaque) walked);
         }
-        {
-          path = [ "freeformType" ];
-          value = freeforms;
-          sealed = builtins.any isUnmigrated freeforms;
-        }
+        (
+          if builtins.any isSealedType freeforms then
+            {
+              path = [ "freeformType" ];
+              value = comparedTyped freeforms freeforms;
+              sealed = true;
+            }
+          else
+            {
+              path = [ "freeformType" ];
+              value = freeforms;
+            }
+        )
       ]
       # The schema's own functions are sealed BY CONSTRUCTOR — declared, never forced.
       ++ map (n: {

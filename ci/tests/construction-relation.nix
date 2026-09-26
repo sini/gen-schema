@@ -206,5 +206,33 @@ in
       };
     };
 
+    # ── a facet typed by a non-record (den-hoag-6b5ia) ──
+    # `type = "gauge"` is the NixOS spelling, and `keySemanticsRecords` hands it to `closuresFirst` as
+    # a record. gen-merge's `closuresOf` ran `intersectAttrs` over it, an evaluator type error that
+    # `tryEval` does not catch, so both rows aborted the suite (☢️); a non-record now contributes no
+    # closures and the value decides.
+    test-a-facet-typed-by-a-string-answers = {
+      expr =
+        let
+          facet = ty: {
+            gauge = {
+              category = "facet";
+              option = genMerge.mkOption { type = ty; };
+            };
+          };
+        in
+        {
+          oneString = entry (mkSchemaEntryType { keySemantics = facet "gauge"; }) (mkSchemaEntryType {
+            keySemantics = facet "gauge";
+          });
+          twoStrings = entry (mkSchemaEntryType { keySemantics = facet "gauge"; }) (mkSchemaEntryType {
+            keySemantics = facet "meter";
+          });
+        };
+      expected = {
+        oneString = "MERGED";
+        twoStrings = "REFUSED";
+      };
+    };
   };
 }

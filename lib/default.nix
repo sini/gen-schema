@@ -166,7 +166,12 @@ let
     inherit (mixinLib) applyMixin;
     inherit (bridgeLib) emitModule isOptionDecl;
     inherit (refinedLib) getRefinements;
-    inherit (algebra) componentsPreimage sealedCollisionEq identityOf;
+    inherit (algebra)
+      componentsPreimage
+      sealedCollisionEq
+      identityOf
+      comparisonSubject
+      ;
   };
   evalSchemaLib = import ./eval-schema.nix {
     inherit prelude merge;

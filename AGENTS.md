@@ -199,7 +199,11 @@ option-declaration attribute, each option's kind-level value, the declaration's 
 the collection values, `keySemantics`, `refs`, the computed fields, the opaque (function) modules
 and the schema's `mkType`/`computed`. `__sealed` carries the sealed components' subjects from the
 same call; `kindEq` compares two kinds through both and refuses BY NAME a pair that mints one mark
-and differs only at sealed components. The mark is what `mkInstanceType`, `mkInstanceRegistry`, `validateInstances` and `mkCodec`
+and differs only at sealed components. A sealed component holding type records (an option's
+`type`, `freeformType`, a `keySemantics` entry's `option.type`, a `refs` entry's `type`) publishes
+gen-merge's `closuresFirst records value` as its subject, so two constructions of one cyclic type
+record refuse rather than overflow `==` (`ci/tests/kind-eq-typed-components.nix`; the enumerated
+residue is stated at `comparedTyped`). The mark is what `mkInstanceType`, `mkInstanceRegistry`, `validateInstances` and `mkCodec`
 read to decide a value is a kind value, replacing the `? kind && ? options` presence test that
 admitted any hand-written attrset. It is LAZY and the admission read never forces it — see
 `lib/entry-type.nix`'s `isSchemaKind`. `__mint` and `__sealed` are reserved as collection keys, as
