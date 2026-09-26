@@ -20,6 +20,11 @@
     # id_hash — and builds values WITH the injected mint inside its own evaluation, which is
     # ADR-0014's constructing arm rather than a re-hand.
     gen-identity.url = "github:sini/gen-identity";
+    # The containment topology (`_topology`, `_roots`, `_leaves`) is gen-graph's computation, read
+    # through one accessor (ADR-0012: one graph notion). Its gen-prelude follows this lock's own, so
+    # the closure holds one prelude rather than a second instance that happens to agree.
+    gen-graph.url = "github:sini/gen-graph";
+    gen-graph.inputs.gen-prelude.follows = "gen-prelude";
   };
 
   outputs =
@@ -28,6 +33,7 @@
       gen-merge,
       gen-algebra,
       gen-identity,
+      gen-graph,
       ...
     }:
     {
@@ -44,6 +50,7 @@
             merge = gen-merge.lib;
             algebra = gen-algebra.lib;
             identity = gen-identity.lib;
+            graph = gen-graph.lib;
           };
         in
         builtins.deepSeq (builtins.mapAttrs (_: builtins.typeOf) surface) surface;

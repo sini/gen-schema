@@ -1,9 +1,9 @@
 # Standalone (non-flake) entry. Flake consumers should use the `.lib` output.
 #
-# gen-schema is a function of four named values — gen-prelude (the pure utility base),
+# gen-schema is a function of five named values — gen-prelude (the pure utility base),
 # gen-merge (the byte-mode module MERGE engine that REPLACES lib.evalModules + lib.types),
-# gen-algebra (the pure record algebra), and gen-identity (the one minting authority for
-# identity keys).
+# gen-algebra (the pure record algebra), gen-identity (the one minting authority for
+# identity keys), and gen-graph (the graph computations the containment topology is read off).
 #
 # THREE CHANNELS, ONE PRECEDENCE, AND NONE OF THEM IS A PROBE. A named formal per dependency wins;
 # the `inputs` bag is next, tested by attrset membership so a supplied-but-throwing value throws as
@@ -14,7 +14,7 @@
 # library's dependency graph and its test/oracle graph are SEPARATE, and the second must not enter
 # the first — "whatever the optimal pattern is, it can no longer be DEFER TO THE TEST LOCK". The
 # ci lock keeps every input it has, including any cycle it carries, and is the TEST graph's own
-# pin source; no library code reads it any more. All 4 dependencies are root inputs of the root
+# pin source; no library code reads it any more. All 5 dependencies are root inputs of the root
 # lock, so every path below is one segment.
 #
 # `src` AND `dep` ARE FORMALS, NOT `let` BINDINGS, AND THAT IS THE INJECTABLE RESOLVER SEAM — the
@@ -84,6 +84,7 @@ in
   merge ? inputs.gen-merge or (dep [ "gen-merge" ]),
   algebra ? inputs.gen-algebra or (dep [ "gen-algebra" ]),
   identity ? inputs.gen-identity or (dep [ "gen-identity" ]),
+  graph ? inputs.gen-graph or (dep [ "gen-graph" ]),
 }:
 # THE BODY IS EAGER, AND THAT IS WHAT MAKES THE ENTRY CELL TOTAL RATHER THAN PARTIAL. `forced` forces
 # every wired dependency to WHNF before `./lib` sees it, so a default that cannot resolve is loud AT
@@ -101,6 +102,7 @@ let
       merge
       algebra
       identity
+      graph
       ;
   };
   forced = builtins.deepSeq (builtins.mapAttrs (_: builtins.typeOf) deps) null;

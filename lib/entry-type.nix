@@ -10,6 +10,7 @@
 {
   prelude,
   merge,
+  graph,
   identity,
   mkMethodsModule,
   refsFromOptionsWithTypes,
@@ -1153,38 +1154,42 @@ let
                 else
                   prelude.sort (a: b: a < b) (prelude.filter (n: !(isInternalField n)) (prelude.attrNames config));
 
-              # Derive topology from parent collections on each kind.
-              # Each kind can declare `parent = "host";` as a collection.
-              topology =
-                let
-                  # Read parent collection from each kind
-                  parentMap = prelude.foldl' (
-                    acc: k:
-                    let
-                      p = config.${k}.parent or null;
-                    in
-                    if p != null then
-                      if !(builtins.elem p kindNames) then
-                        throw "gen-schema: kind '${k}' declares parent '${p}' which is not a declared kind"
-                      else
-                        acc // { ${k} = p; }
-                    else
-                      acc
-                  ) { } kindNames;
-
-                  # Derive children from parent map (inverse)
-                  childrenMap = prelude.foldl' (
-                    acc: k:
-                    let
-                      p = parentMap.${k} or null;
-                    in
-                    if p != null then acc // { ${p} = (acc.${p} or [ ]) ++ [ k ]; } else acc
-                  ) { } kindNames;
-                in
-                prelude.genAttrs kindNames (k: {
-                  parent = parentMap.${k} or null;
-                  children = childrenMap.${k} or [ ];
-                });
+              # Containment, read off gen-graph (ADR-0012: one graph notion). `parent` is validated
+              # here — the refusal is this library's — and the relation is then handed to gen-graph
+              # oriented container -> contained, the orientation of its own `contains` fixture, so
+              # `children`, `_roots` and `_leaves` are all answers over ONE accessor.
+              kindSet = prelude.genAttrs kindNames (_: true);
+              # `materializeParents` is gen-graph's parent map; building it reads every kind's
+              # `parent`, so ANY topology read refuses an undeclared parent — the timing the fold
+              # this replaced had, kept rather than weakened to a per-kind check.
+              parentMap = graph.materializeParents {
+                nodes = kindNames;
+                parent =
+                  k:
+                  let
+                    p = config.${k}.parent or null;
+                  in
+                  if p != null && !(kindSet ? ${p}) then
+                    throw "gen-schema: kind '${k}' declares parent '${p}' which is not a declared kind"
+                  else
+                    p;
+              };
+              childrenMap = graph.directDependents {
+                nodes = kindNames;
+                edges = k: prelude.optional (parentMap ? ${k}) parentMap.${k};
+              };
+              # A complete gen-graph accessor: containment also rides gen-graph's own `parent`
+              # dimension (`mkGraph`'s `parents`, `ancestorsOf`), beside the `edges` roots and leaves
+              # read.
+              containment = {
+                nodes = kindNames;
+                edges = k: childrenMap.${k} or [ ];
+                parent = k: parentMap.${k} or null;
+              };
+              topology = prelude.genAttrs kindNames (k: {
+                parent = containment.parent k;
+                children = containment.edges k;
+              });
 
               # Materialize all ref edges from kind.refs across all kinds
               refEdges = prelude.concatMap (
@@ -1227,8 +1232,8 @@ let
 
               edges = parentEdges ++ inheritsEdges ++ map (e: e // { type = "ref"; }) refEdges;
 
-              roots = builtins.filter (k: topology.${k}.parent == null) kindNames;
-              leaves = builtins.filter (k: topology.${k}.children == [ ]) kindNames;
+              roots = graph.roots containment;
+              leaves = graph.leaves containment;
 
             in
             {

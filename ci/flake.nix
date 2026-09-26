@@ -6,6 +6,8 @@
     gen-merge.url = "github:sini/gen-merge";
     gen-algebra.url = "github:sini/gen-algebra";
     gen-identity.url = "github:sini/gen-identity";
+    gen-graph.url = "github:sini/gen-graph";
+    gen-graph.inputs.gen-prelude.follows = "gen-prelude";
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
   };
 
@@ -27,8 +29,10 @@
       genMerge = gen-merge.lib;
       genAlgebra = gen-algebra.lib;
       genIdentity = gen-identity.lib;
+      genGraph = inputs.gen-graph.lib;
       genSchema = import ../lib {
         inherit prelude;
+        graph = genGraph;
         merge = genMerge;
         algebra = genAlgebra;
         identity = genIdentity;
@@ -48,6 +52,7 @@
       specialArgs = {
         inherit
           genIdentity
+          genGraph
           genSchema
           genMerge
           genTypes

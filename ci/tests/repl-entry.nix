@@ -13,6 +13,7 @@
   genMerge,
   genAlgebra,
   genIdentity,
+  genGraph,
   prelude,
   ...
 }:
@@ -22,6 +23,7 @@ let
     merge = genMerge;
     algebra = genAlgebra;
     identity = genIdentity;
+    graph = genGraph;
   };
 in
 {

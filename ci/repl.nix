@@ -7,6 +7,7 @@
   merge ? (builtins.getFlake "github:sini/gen-merge").lib,
   algebra ? (builtins.getFlake "github:sini/gen-algebra").lib,
   identity ? (builtins.getFlake "github:sini/gen-identity").lib,
+  graph ? (builtins.getFlake "github:sini/gen-graph").lib,
 }:
 let
   genSchema = import ../lib {
@@ -15,6 +16,7 @@ let
       merge
       algebra
       identity
+      graph
       ;
   };
 in

@@ -3,6 +3,7 @@
   merge,
   algebra,
   identity,
+  graph,
 }:
 let
   inherit (algebra) record;
@@ -159,6 +160,7 @@ let
     inherit
       prelude
       merge
+      graph
       record
       identity
       constructionRelation

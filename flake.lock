@@ -17,6 +17,26 @@
     },
     "gen-graph": {
       "inputs": {
+        "gen-prelude": [
+          "gen-prelude"
+        ]
+      },
+      "locked": {
+        "lastModified": 1790413260,
+        "narHash": "sha256-AUAbV2yCyL2FVSTvHd6bGA1YPX4r2dS3kca6Pnt3fa4=",
+        "owner": "sini",
+        "repo": "gen-graph",
+        "rev": "28fc4c4809733e20cc4a1d4cd7f15cfca7bc5912",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sini",
+        "repo": "gen-graph",
+        "type": "github"
+      }
+    },
+    "gen-graph_2": {
+      "inputs": {
         "gen-prelude": "gen-prelude"
       },
       "locked": {
@@ -33,7 +53,7 @@
         "type": "github"
       }
     },
-    "gen-graph_2": {
+    "gen-graph_3": {
       "inputs": {
         "gen-prelude": "gen-prelude_4"
       },
@@ -98,7 +118,7 @@
     },
     "gen-memo": {
       "inputs": {
-        "gen-graph": "gen-graph",
+        "gen-graph": "gen-graph_2",
         "gen-prelude": "gen-prelude_2"
       },
       "locked": {
@@ -243,7 +263,7 @@
     },
     "gen-scope": {
       "inputs": {
-        "gen-graph": "gen-graph_2",
+        "gen-graph": "gen-graph_3",
         "gen-identity": "gen-identity_2",
         "gen-prelude": "gen-prelude_5"
       },
@@ -283,6 +303,7 @@
     "root": {
       "inputs": {
         "gen-algebra": "gen-algebra",
+        "gen-graph": "gen-graph",
         "gen-identity": "gen-identity",
         "gen-merge": "gen-merge",
         "gen-prelude": "gen-prelude_7"
