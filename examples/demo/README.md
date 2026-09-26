@@ -27,7 +27,7 @@ Kind definitions live in `gen-modules/schema/` and are plain modules setting `co
 | Strict validation                            | `gen-modules/schema/host.nix`              | Try adding `fleet.hosts.igloo.badKey = "x";` — errors with fix guidance                                                  |
 | Default propagation                          | `gen-modules/schema/host.nix`              | `system = mkDefault "x86_64-linux"` — igloo inherits it, iceberg overrides                                               |
 | Identity hashing                             | `modules/outputs.nix`                      | `iglooHash` — deterministic SHA-256 from primitive options + kind prefix                                                 |
-| Cross-instance refs                          | `gen-modules/fleet/registries.nix`         | `ref` on service's `host` option                                                                                         |
+| Cross-instance refs                          | `gen-modules/fleet/registries.nix`         | `declarationOf` on service's `host` option                                                                               |
 | Ref resolution                               | `gen-modules/fleet/services.nix`           | `host = "igloo"` resolves to the full host instance                                                                      |
 | Schema composition                           | `gen-modules/schema/monitoring-plugin.nix` | Extends host + service kinds from a separate module — merges cleanly                                                     |
 | Kind mix-ins                                 | `gen-modules/schema/admin-user.nix`        | Imports user kind — inherits userName, shell, adds sudoPrivileges, sshKeys                                               |
@@ -339,7 +339,7 @@ Both contributions merge through `deferredModule` — the kind type is open, not
 
 **Identity comparison.** Nix's `==` on module system values does deep structural comparison that can diverge or infinitely recurse across different thunks of the same entity. With bare submodules, comparing two references to the same host requires careful workarounds. gen-schema auto-computes `id_hash` from primitive options — a cheap string comparison that's safe across module system boundaries.
 
-**Cross-instance references.** Bare submodules have no notion of references between registries. If a service needs to point at a host, you'd use a string and manually look it up. gen-schema's `ref` validates the reference at eval time and resolves it to the target instance — `config.services.nginx.host.addr` works directly.
+**Cross-instance references.** Bare submodules have no notion of references between registries. If a service needs to point at a host, you'd use a string and manually look it up. gen-schema's `declarationOf` validates the reference at eval time and resolves it to the target instance — `config.services.nginx.host.addr` works directly.
 
 **Introspection.** With bare submodules, there's no way to ask "what kinds exist?" or "what options does a host have?" without evaluating an instance. gen-schema's `_kindNames` and per-kind `.options`/`.refs` provide this at the schema level — the foundation for documentation generation, tooling, and diag.
 
@@ -350,7 +350,7 @@ Both contributions merge through `deferredModule` — the kind type is open, not
 | Type definition     | Closed value in one file                    | Open — any module can extend via `config.schema.<kind>`     |
 | Undeclared keys     | Silently accepted (freeform default)        | Error with fix guidance (strict default)                    |
 | Entity comparison   | `==` (fragile, can diverge)                 | `id_hash` (cheap, deterministic)                            |
-| Cross-references    | Manual string lookup                        | `ref` — validated, resolves to instance                     |
+| Cross-references    | Manual string lookup                        | `declarationOf` — validated, resolves to instance           |
 | Defaults            | `config.x = mkDefault val` (same)           | Same — deferred module merge preserves this                 |
 | Introspection       | None without evaluating instances           | `_kindNames`, per-kind `.options`/`.refs`                   |
 | Declarative methods | Manual `functionTo` options + config wiring | `schemaFn` — auto-resolves config args                      |
@@ -364,7 +364,7 @@ Both contributions merge through `deferredModule` — the kind type is open, not
 
 **gen-schema:** multi-module projects, types extended across flake inputs, entity registries where typos matter, anything where you need safe cross-instance references or introspection.
 
-gen-schema doesn't replace the module system — it's a pattern library on top of it. Every `mkSchemaOption`, `mkInstanceType`, and `ref` produces standard module system types. You can mix gen-schema kinds with bare submodules in the same project.
+gen-schema doesn't replace the module system — it's a pattern library on top of it. Every `mkSchemaOption`, `mkInstanceType`, and `declarationOf` produces standard module system types. You can mix gen-schema kinds with bare submodules in the same project.
 
 ## Extending
 

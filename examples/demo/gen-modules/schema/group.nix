@@ -4,7 +4,7 @@
 {
   config.schema.group = {
     options.members = lib.mkOption {
-      type = genSchema.setOf (genSchema.ref "host");
+      type = genSchema.setOf (genSchema.declarationOf "host");
       default = [ ];
       description = "Unique set of hosts in this group.";
     };

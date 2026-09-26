@@ -12,7 +12,7 @@
   ...
 }:
 let
-  inherit (genSchema) mkInstanceRegistry ref evalSchema;
+  inherit (genSchema) mkInstanceRegistry declarationOf evalSchema;
   inherit (genAlgebra) either;
 
   # The frozen kind set. Kind declarations that used to reach `config.schema.<k>` through this
@@ -234,7 +234,7 @@ in
         {
           # Direct ref: upstream is optional self-reference, registry in scope
           options.upstream = lib.mkOption {
-            type = lib.types.nullOr (ref config.fleet.services);
+            type = lib.types.nullOr (declarationOf config.fleet.services);
             default = null;
             description = "Upstream service this proxies to (direct ref).";
           };

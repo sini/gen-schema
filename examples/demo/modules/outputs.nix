@@ -49,13 +49,13 @@ in
       # Identity hash
       iglooHash = fleet.hosts.igloo.id_hash;
 
-      # --- Cross-instance references (schema.ref) ---
-      # Deferred ref: host declared as ref "host" on service kind, bound via refs
+      # --- Cross-instance references (schema.declarationOf) ---
+      # Deferred ref: host declared as declarationOf "host" on service kind, bound via refs
       nginxHost = fleet.services.nginx.host.name;
       nginxHostAddr = fleet.services.nginx.host.addr;
       postgresHost = fleet.services.postgres.host.name;
 
-      # Direct ref: upstream declared as ref config.fleet.services in extraModules
+      # Direct ref: upstream declared as declarationOf config.fleet.services in extraModules
       gatewayUpstreamPort = fleet.services.gateway.upstream.port;
       gatewayUpstreamIsNginx = fleet.services.gateway.upstream.name == "nginx";
       standaloneUpstreamNull = fleet.services.nginx.upstream == null;
