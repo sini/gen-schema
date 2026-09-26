@@ -18,6 +18,9 @@
 {
   genSchema,
   genMerge,
+  genAlgebra,
+  genIdentity,
+  genGraph,
   prelude,
   ...
 }:
@@ -1154,6 +1157,147 @@ in
           msg = refusal [
             "STRICT MODE: a definition is not declared on KINDNAME (instance at registry.INSTANCENAME, defined in FILENAME)."
           ];
+        };
+      };
+    };
+
+  # Containment is well-founded and a parent is a kind NAME (den-hoag-4bqim, den-hoag-jvcgq). Each
+  # refusal was an interpreter abort or a silent drop; `type = "ThrownError"` is what pins that it is
+  # now a `throw`, which `tryEval` catches, and `msg` pins which one.
+  flake.testsError.schema-containment-refusals =
+    let
+      schemaOf =
+        modules:
+        (genMerge.evalModuleTree {
+          modules = [ { options.schema = mkSchemaOption { }; } ] ++ modules;
+        }).config.schema;
+      cycleMsg = "^gen-schema: containment cycle among kinds \\[a b\\] — a kind may not be its own ancestor$";
+      looped = schemaOf [
+        {
+          config.schema = {
+            a.parent = "b";
+            b.parent = "a";
+            c = { };
+          };
+        }
+      ];
+    in
+    {
+      # a <-> b admitted silently: both kinds were in neither `_roots` nor `_leaves`
+      test-parent-cycle-refuses-by-name = {
+        expr = looped._roots;
+        expectedError = {
+          type = "ThrownError";
+          msg = cycleMsg;
+        };
+      };
+      test-self-parent-refuses-by-name = {
+        expr =
+          (schemaOf [
+            {
+              config.schema = {
+                a.parent = "a";
+                b = { };
+              };
+            }
+          ])._leaves;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: containment cycle among kinds \\[a\\] — a kind may not be its own ancestor$";
+        };
+      };
+      # Every containment read refuses, not only `_roots`/`_leaves`: an unrelated kind's topology
+      # entry, and the unified edge view whose parent edges are read through it.
+      test-parent-cycle-refuses-an-unrelated-topology-read = {
+        expr = looped._topology.c.parent;
+        expectedError = {
+          type = "ThrownError";
+          msg = cycleMsg;
+        };
+      };
+      test-parent-cycle-refuses-the-edge-view = {
+        expr = looped._edges;
+        expectedError = {
+          type = "ThrownError";
+          msg = cycleMsg;
+        };
+      };
+      # the collection is untyped: an integer parent was indexed as a name and aborted uncatchably
+      test-non-string-parent-refuses-by-name = {
+        expr =
+          (schemaOf [
+            {
+              config.schema = {
+                a.parent = 5;
+                b = { };
+              };
+            }
+          ])._topology;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'a' declares a parent of type int, not a kind name$";
+        };
+      };
+      # a string with store context cannot index the kind set; it aborted uncatchably
+      test-context-parent-refuses-by-name = {
+        expr =
+          (schemaOf [
+            {
+              config.schema = {
+                a.parent = "${builtins.toFile "b" "b"}";
+                b = { };
+              };
+            }
+          ])._roots;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'a' declares a parent carrying string context, not a kind name$";
+        };
+      };
+      # The guard's answer is gen-graph's: built with a `cycles` that returns a sentinel on a forest,
+      # the refusal names the sentinel. A cycle detector computed here instead answers `[ ]` and reads
+      # a value.
+      test-cycle-guard-delegates-to-gen-graph =
+        let
+          stubbed = import ../lib {
+            inherit prelude;
+            merge = genMerge;
+            algebra = genAlgebra;
+            identity = genIdentity;
+            graph = genGraph // {
+              cycles = _: [ "CYCLE-SENTINEL" ];
+            };
+          };
+        in
+        {
+          expr =
+            (genMerge.evalModuleTree {
+              modules = [
+                { options.schema = stubbed.mkSchemaOption { }; }
+                {
+                  config.schema = {
+                    a = { };
+                    b.parent = "a";
+                  };
+                }
+              ];
+            }).config.schema._roots;
+          expectedError = {
+            type = "ThrownError";
+            msg = "^gen-schema: containment cycle among kinds \\[CYCLE-SENTINEL\\] — a kind may not be its own ancestor$";
+          };
+        };
+      # the conflict refusal interpolated both sides, so a non-string side aborted in the act of refusing
+      test-conflicting-non-string-parent-refuses-by-name = {
+        expr =
+          (schemaOf [
+            { config.schema.a.parent = 5; }
+            { config.schema.a.parent = "b"; }
+            { config.schema.b = { }; }
+          ]).a.parent;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: conflicting parent declarations: <a int> vs 'b'$";
         };
       };
     };

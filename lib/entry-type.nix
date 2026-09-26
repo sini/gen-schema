@@ -357,10 +357,16 @@ let
         };
         parent = {
           default = null;
+          # The collection is untyped, so either side may be any value: a string is quoted, anything
+          # else is named by its type, as gen-graph's `renderId` does. Interpolating a non-string
+          # would abort in the act of refusing.
           merge =
             acc: val:
+            let
+              show = v: if builtins.isString v then "'${v}'" else "<a ${builtins.typeOf v}>";
+            in
             if acc != null && val != acc then
-              throw "gen-schema: conflicting parent declarations: '${acc}' vs '${val}'"
+              throw "gen-schema: conflicting parent declarations: ${show acc} vs ${show val}"
             else
               val;
         };
@@ -1169,7 +1175,17 @@ let
                   let
                     p = config.${k}.parent or null;
                   in
-                  if p != null && !(kindSet ? ${p}) then
+                  # The type is tested before the name: the collection is untyped, and a non-string
+                  # indexed or interpolated is an interpreter abort, not a refusal (ADR-0025 item 1).
+                  # The message names the type and never the value, as gen-graph's `renderId` does.
+                  # A string carrying store context is not a kind name either, and cannot index one.
+                  if p == null then
+                    null
+                  else if !(builtins.isString p) then
+                    throw "gen-schema: kind '${k}' declares a parent of type ${builtins.typeOf p}, not a kind name"
+                  else if builtins.hasContext p then
+                    throw "gen-schema: kind '${k}' declares a parent carrying string context, not a kind name"
+                  else if !(kindSet ? ${p}) then
                     throw "gen-schema: kind '${k}' declares parent '${p}' which is not a declared kind"
                   else
                     p;
@@ -1186,10 +1202,26 @@ let
                 edges = k: childrenMap.${k} or [ ];
                 parent = k: parentMap.${k} or null;
               };
-              topology = prelude.genAttrs kindNames (k: {
-                parent = containment.parent k;
-                children = containment.edges k;
-              });
+              # Containment is well-founded: a kind that is its own ancestor has no root to hang
+              # from, and `_roots`/`_leaves` would drop it without a word. gen-graph's `cycles`
+              # names exactly the kinds ON a cycle; a kind nested under one is not itself wrong.
+              # Every published read of the containment graph passes through this guard, so it
+              # refuses at the timing an undeclared parent does. `_topology` guards each ENTRY, not
+              # the set, so its spine (`attrNames`, `?`) answers as it did before the guard.
+              cyclic = graph.cycles containment;
+              wellFounded =
+                v:
+                if cyclic == [ ] then
+                  v
+                else
+                  throw "gen-schema: containment cycle among kinds [${prelude.concatStringsSep " " cyclic}] — a kind may not be its own ancestor";
+              topology = prelude.genAttrs kindNames (
+                k:
+                wellFounded {
+                  parent = containment.parent k;
+                  children = containment.edges k;
+                }
+              );
 
               # Materialize all ref edges from kind.refs across all kinds
               refEdges = prelude.concatMap (
@@ -1232,8 +1264,8 @@ let
 
               edges = parentEdges ++ inheritsEdges ++ map (e: e // { type = "ref"; }) refEdges;
 
-              roots = graph.roots containment;
-              leaves = graph.leaves containment;
+              roots = wellFounded (graph.roots containment);
+              leaves = wellFounded (graph.leaves containment);
 
             in
             {

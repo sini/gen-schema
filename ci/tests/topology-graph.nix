@@ -36,6 +36,8 @@ let
       directDependents = _: { host = [ "CHILD-SENTINEL" ]; };
       roots = _: [ "ROOT-SENTINEL" ];
       leaves = _: [ "LEAF-SENTINEL" ];
+      # The well-foundedness guard's surface; its delegation is pinned in ci/tests-error.nix.
+      cycles = _: [ ];
     };
   };
   delegated = schemaOf stubbed (kinds {
@@ -146,6 +148,21 @@ in
           value = null;
         }
       ];
+    };
+    # The well-foundedness guard sits on each ENTRY: the spine of `_topology` is the kind names and
+    # answers on a schema whose containment refuses, as it did before the guard.
+    test-undeclared-parent-leaves-the-topology-spine-answering = {
+      expr = {
+        names = builtins.attrNames ghost._topology;
+        has = ghost._topology ? x;
+      };
+      expected = {
+        names = [
+          "x"
+          "y"
+        ];
+        has = true;
+      };
     };
   };
 }
