@@ -1325,4 +1325,184 @@ in
         };
       };
     };
+
+  # ── the kind-tree channel's reserved keys (den-hoag-v9gjd, G5/G6) ────────────────────────────
+  # `evalSchema`, `mkSchemaOption` and `identityKeysForKind` forward `specialArgs` verbatim into
+  # `merge.evalModuleTree`'s own `baseArgs` (S2/S3/S4 in the spec's channel census). The gen-merge
+  # landing this row depends on (`f5a2420`, den-hoag-v9gjd) refuses a caller's `config`/`options`/
+  # `prefix` there by name, closing this channel BY CONSTRUCTION — no lib/ change on this side, only
+  # the cells that show it. Each refusal cell reads the TEXT, because `tryEval` alone would pass on
+  # any refusal anywhere in the construction.
+  flake.testsError.kind-tree-reserved-args =
+    let
+      # A kind needing no formal of its own — merely applying it during introspection is what
+      # forces `baseArgs` on `identityKeysForKind`'s path (the build report's S4 note: a
+      # names-only read already throws).
+      plainKind = {
+        options.tag = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "plain";
+        };
+      };
+      # `evalSchema`/`mkSchemaOption`'s own path only forces `baseArgs` for a module whose
+      # FORMAL NAMES the reserved key — `builtins.functionArgs` on a bare attrset or a
+      # non-pattern lambda returns `{ }`, and `intersectAttrs { } specialArgs` never touches
+      # `specialArgs` at all, so the guard's `throw` is never reached. Driven directly
+      # (`den-hoag-v9gjd` probe): a bare-attrset kind does NOT throw here even at f5a2420; a
+      # `{ config, ... }: …` kind does. One pattern-formal kind per reserved key, naming it but
+      # not reading it — the refusal fires on the DECLARATION, not on a use of the value.
+      configKind =
+        { config, ... }:
+        {
+          options.tag = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "plain";
+          };
+        };
+      optionsKind =
+        { options, ... }:
+        {
+          options.tag = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "plain";
+          };
+        };
+      prefixKind =
+        { prefix, ... }:
+        {
+          options.tag = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "plain";
+          };
+        };
+      viaEvalSchema =
+        mod: sa:
+        (evalSchema {
+          specialArgs = sa;
+          modules = [ { config.schema.fleet.imports = [ mod ]; } ];
+        }).fleet.options.tag.default;
+      viaMkSchemaOption =
+        mod: sa:
+        (evalSchema {
+          schemaOption = mkSchemaOption { specialArgs = sa; };
+          modules = [ { config.schema.fleet.imports = [ mod ]; } ];
+        }).fleet.options.tag.default;
+      viaIdentityKeysForKind = sa: identityKeysForKind { specialArgs = sa; } (kindOfModules plainKind);
+      msg =
+        keys:
+        "^gen-merge: `specialArgs' cannot supply the base module ${keys}; the engine injects its own value there, so the caller's would be discarded rather than used$";
+      refused = keys: {
+        type = "ThrownError";
+        msg = msg keys;
+      };
+      one = k: { ${k} = "CALLER"; };
+
+      # ── G6: the value plane, which must NOT flip ────────────────────────────────────────────
+      # `argand` (an ordinary caller key) and `name` (admitted here because Q1 = A, defaulted: the
+      # kind-tree channel refuses only E = {config, options, prefix}) both still deliver the
+      # caller's literal VALUE, on every channel — not merely "did not throw".
+      argandTagModule =
+        { argand, ... }:
+        {
+          options.tag = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = argand;
+          };
+        };
+      nameTagModule =
+        { name, ... }:
+        {
+          options.tag = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = name;
+          };
+        };
+      # `identityKeysForKind` returns option NAMES, not values (S4 note), so its probe is a
+      # conditional option: the key set carries `marker` only when the caller's value is exactly
+      # `"CALLER"`, and the returned key list is the observation.
+      argandGatedModule =
+        { argand, ... }:
+        if argand == "CALLER" then
+          {
+            options.marker = genMerge.mkOption {
+              type = genMerge.types.str;
+              default = "hit";
+            };
+          }
+        else
+          { };
+      nameGatedModule =
+        { name, ... }:
+        if name == "CALLER" then
+          {
+            options.marker = genMerge.mkOption {
+              type = genMerge.types.str;
+              default = "hit";
+            };
+          }
+        else
+          { };
+      viaIdentityKeysForKindGated =
+        mod: sa: builtins.elem "marker" (identityKeysForKind { specialArgs = sa; } (kindOfModules mod));
+    in
+    {
+      test-evalSchema-refuses-a-caller-config-by-name = {
+        expr = viaEvalSchema configKind (one "config");
+        expectedError = refused "argument `config'";
+      };
+      test-evalSchema-refuses-a-caller-options-by-name = {
+        expr = viaEvalSchema optionsKind (one "options");
+        expectedError = refused "argument `options'";
+      };
+      test-evalSchema-refuses-a-caller-prefix-by-name = {
+        expr = viaEvalSchema prefixKind (one "prefix");
+        expectedError = refused "argument `prefix'";
+      };
+      test-mkSchemaOption-refuses-a-caller-config-by-name = {
+        expr = viaMkSchemaOption configKind (one "config");
+        expectedError = refused "argument `config'";
+      };
+      test-mkSchemaOption-refuses-a-caller-options-by-name = {
+        expr = viaMkSchemaOption optionsKind (one "options");
+        expectedError = refused "argument `options'";
+      };
+      test-mkSchemaOption-refuses-a-caller-prefix-by-name = {
+        expr = viaMkSchemaOption prefixKind (one "prefix");
+        expectedError = refused "argument `prefix'";
+      };
+      test-identityKeysForKind-refuses-a-caller-prefix-by-name = {
+        expr = viaIdentityKeysForKind (one "prefix");
+        expectedError = refused "argument `prefix'";
+      };
+      test-kind-tree-channels-agree-argand-and-name-survive-control = {
+        expr = {
+          evalSchema = {
+            argand = viaEvalSchema argandTagModule (one "argand");
+            name = viaEvalSchema nameTagModule (one "name");
+          };
+          mkSchemaOption = {
+            argand = viaMkSchemaOption argandTagModule (one "argand");
+            name = viaMkSchemaOption nameTagModule (one "name");
+          };
+          identityKeysForKind = {
+            argand = viaIdentityKeysForKindGated argandGatedModule (one "argand");
+            name = viaIdentityKeysForKindGated nameGatedModule (one "name");
+          };
+        };
+        expected = {
+          evalSchema = {
+            argand = "CALLER";
+            name = "CALLER";
+          };
+          mkSchemaOption = {
+            argand = "CALLER";
+            name = "CALLER";
+          };
+          identityKeysForKind = {
+            argand = true;
+            name = true;
+          };
+        };
+      };
+    };
 }
