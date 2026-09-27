@@ -619,8 +619,8 @@ resolves).
 One class is not catchable. An identity key (including `name`) whose value is computed through a
 declaration-value resolution that must read that key aborts with `infinite recursion`: self-reference,
 a cycle through several members, or any member's `name` when the resolution takes the by-name path (a
-renamed or refused value). This is an in-stratum read of in-flight identity, the price ADR-0033 records
-and ADR-0025 item 1 requires to be enumerated. The identifier form (`"cabin"`) never reads identity and
+renamed or refused value). This is an in-stratum read of in-flight identity, a price the design records
+and requires to be enumerated. The identifier form (`"cabin"`) never reads identity and
 is the escape.
 
 ### Refs in Collections
