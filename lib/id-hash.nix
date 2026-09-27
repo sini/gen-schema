@@ -215,6 +215,24 @@ in
   mkIdentityModule =
     kindValue0: identityKeys:
     let
+      # One descriptor per `mkIdentityModule` application, so per instance TYPE, shared by every
+      # instance of it.
+      identityOption = merge.mkOption {
+        default = { };
+        description = "Identity configuration.";
+        type = merge.types.lazyAttrsOf (merge.types.listOf merge.types.str);
+        apply =
+          v:
+          let
+            extra = builtins.attrNames (builtins.removeAttrs v [ "keys" ]);
+          in
+          if extra != [ ] then
+            throw "gen-schema: `_identity' declares only `keys'; it does not declare ${
+              prelude.concatStringsSep ", " (map (k: "`${k}'") extra)
+            }"
+          else
+            { keys = prelude.unique (v.keys or [ ]); };
+      };
       kindValue = kindOperand "mkIdentityModule" kindValue0;
       kind = kindValue.kind;
     in
@@ -228,22 +246,14 @@ in
     builtins.seq kindValue (
       { config, ... }:
       {
-        # `_identity` is a submodule option (not a bare nested `options._identity.keys`):
-        # gen-merge collects declared options with a flat `//` and does not descend into
-        # nested option sets, so the `keys` sub-option must live inside a submodule to get
-        # its listOf-merge + `apply = unique` semantics. Reads stay `config._identity.keys`.
-        options._identity = merge.mkOption {
-          default = { };
-          description = "Identity configuration.";
-          type = merge.types.submodule {
-            options.keys = merge.mkOption {
-              type = merge.types.listOf merge.types.str;
-              default = [ ];
-              description = "Explicit identity keys. Empty = use reflection.";
-              apply = prelude.unique;
-            };
-          };
-        };
+        # `_identity` is a closed record held as one `lazyAttrsOf (listOf str)` leaf, not a
+        # submodule. A submodule evaluates a nested module per instance, with its own declaration
+        # guard and knot, to hold one list. The option's `apply` closes the record to `keys` by
+        # name and dedups it. The constructor is `lazyAttrsOf` because `attrsOf` drops a key whose
+        # definitions are all `mkIf false` before `apply` sees it, so a misspelt key would vanish
+        # silently. A module-shaped definition (a function or a path) is outside the leaf's
+        # domain, and gen-merge refuses it by name. Reads stay `config._identity.keys`.
+        options._identity = identityOption;
 
         options.id_hash = merge.mkOption {
           readOnly = true;

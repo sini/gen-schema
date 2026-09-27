@@ -1702,4 +1702,82 @@ in
         };
       };
     };
+
+  # den-hoag-xzchx arm 4. `_identity` is a closed `lazyAttrsOf (listOf str)` leaf; the refusals it
+  # owns, by message. ci/tests/identity-leaf.nix pins that each one fires, and this group pins WHICH
+  # one: a foreign key names the closed record, on a strict kind, on a lax one and under `mkIf false`,
+  # and a module-shaped definition refuses at the leaf's domain.
+  flake.testsError.identity-leaf-refusals =
+    let
+      leafHost =
+        (evalSchema {
+          modules = [
+
+            {
+              config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+              config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; };
+            }
+
+          ];
+        }).host;
+      identityOf =
+        regOpts: v:
+        (genMerge.evalModuleTree {
+          modules = [
+
+            {
+              options.hosts = mkInstanceRegistry leafHost regOpts;
+              config.hosts.h = {
+                addr = "10.0.0.1";
+                role = "web";
+              }
+              // v;
+            }
+
+          ];
+        }).config.hosts.h.id_hash;
+    in
+
+    {
+      test-foreign-key-names-the-closed-record = {
+        expr = identityOf { } { _identity.bogus = [ "x" ]; };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: `_identity' declares only `keys'; it does not declare `bogus'$";
+        };
+      };
+      test-foreign-key-on-a-lax-kind-names-the-closed-record = {
+        expr = identityOf { strict = false; } { _identity.bogus = [ "x" ]; };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: `_identity' declares only `keys'; it does not declare `bogus'$";
+        };
+      };
+      test-conditioned-away-foreign-key-names-the-closed-record = {
+        expr = identityOf { } {
+          _identity = {
+            keys = [ "addr" ];
+            bogus = genMerge.mkIf false [ "x" ];
+          };
+        };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: `_identity' declares only `keys'; it does not declare `bogus'$";
+        };
+      };
+      test-function-definition-refuses-at-the-domain = {
+        expr = identityOf { } { _identity = { config, ... }: { keys = [ "addr" ]; }; };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-merge: option `hosts\\.h\\._identity' has definitions `lazyAttrsOf' cannot consume";
+        };
+      };
+      test-path-definition-refuses-at-the-domain = {
+        expr = identityOf { } { _identity = ./test-fixtures/identity-path-definition.nix; };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-merge: option `hosts\\.h\\._identity' has definitions `lazyAttrsOf' cannot consume";
+        };
+      };
+    };
 }
