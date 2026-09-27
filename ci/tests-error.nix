@@ -1412,6 +1412,21 @@ in
           msg = "^links\\.main\\.target: declaration 'igloo' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
         };
       };
+      # Gate v1 C1: a hinted STAMPLESS value naming a REAL member — no stamp at all, unlike the
+      # override above (which keeps the stamp and moves a key). Without the `or null` guard on the
+      # stamp read in `isCanonicalOf`, this aborts uncatchably (`attribute 'id_hash' missing`)
+      # instead of refusing by name through this same "not a member" verdict.
+      test-stampless-real-member-refused-as-non-member = {
+        expr = fixture {
+          config.links.main.target = {
+            name = "igloo";
+          };
+        };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^links\\.main\\.target: declaration 'igloo' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
+        };
+      };
       test-non-instance-refused-by-form = {
         expr = fixture {
           config.links.main.target = {

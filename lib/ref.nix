@@ -48,7 +48,12 @@ let
     if !(c ? _identityKeys) then
       throw "gen-schema: registry member '${k}' carries no _identityKeys; a declaration value resolves only against gen-schema instances (use the identifier '${k}')"
     else
-      v.id_hash == (c.id_hash or null) && prelude.all (f: v ? ${f} && v.${f} == c.${f}) c._identityKeys;
+      # `or null` on BOTH sides (gate v1 C1): a hinted value that names a real member but carries no
+      # stamp at all (not an override — no stamp) must read as "not this member", not as an
+      # `attribute 'id_hash' missing` abort — `builtins.tryEval` does not hold that abort, so an
+      # unguarded read here would be uncatchable rather than a by-name refusal.
+      (v.id_hash or null) == (c.id_hash or null)
+      && prelude.all (f: v ? ${f} && v.${f} == c.${f}) c._identityKeys;
 
   # The form named in `prelude.resolve`'s own refusals ("a declaration must carry a string 'name' to
   # locate it (expected …)", "expected an identifier … or a declaration (…), got a <type>").
