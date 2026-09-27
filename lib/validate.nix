@@ -88,13 +88,29 @@ in
 
   # Wrap mkValidator with field requirements.
   # Validators with __fields are skipped when any required field is absent from the kind.
+  #
+  # RECORD door (P1, den-hoag-7gp66): all four fields are required, so R5 leaves it open — an
+  # extra field is admitted, the stated price of the open-record policy. The `assert` forces
+  # `checked` at the point the record is applied: the return below is an attrset LITERAL, whose
+  # own WHNF does not read `checked.fields` etc. merely to exist, so a lazy check left unforced
+  # would pass a bad call silently until some later reader happened to force one field.
   mkFieldValidator =
-    {
-      fields,
-      name,
-      check,
-      message,
-    }:
+    args:
+    let
+      checked = prelude.checkRequired "gen-schema.mkFieldValidator" [
+        "fields"
+        "name"
+        "check"
+        "message"
+      ] args;
+      inherit (checked)
+        fields
+        name
+        check
+        message
+        ;
+    in
+    assert builtins.isAttrs checked;
     (mkValidator name check message) // { __fields = fields; };
 
   # Filter validators by kind's option names.

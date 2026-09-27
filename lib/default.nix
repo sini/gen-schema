@@ -139,7 +139,7 @@ let
     inherit (algebra) preimageTagOf;
   };
   blameLib = import ./blame.nix;
-  mixinLib = import ./mixin.nix { inherit record; };
+  mixinLib = import ./mixin.nix { inherit prelude record; };
   bridgeLib = import ./bridge.nix {
     inherit prelude record;
     inherit (refinedLib) isRefined getRefinements;

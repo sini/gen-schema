@@ -1,17 +1,31 @@
 # First-class mixins (§ Bracha 1990).
 # Mixins operate on record-algebra records, not NixOS modules.
 {
+  prelude,
   record,
 }:
 let
+  # MIXED door (P1, den-hoag-7gp66): `define` is required, the rest optional — closed over the
+  # whole set (`checkOptions door (req++opt) (checkRequired door req args)`), transitional until
+  # P2 splits options off the record. The `assert` forces `checked` at the point of application:
+  # the return is an attrset literal, so its own WHNF would otherwise leave the check unforced.
   mkMixin =
-    {
-      requires ? [ ],
-      provides ? [ ],
-      kinds ? null,
-      define,
-      name ? "anonymous",
-    }:
+    args:
+    let
+      checked = prelude.checkOptions "gen-schema.mkMixin" [
+        "define"
+        "requires"
+        "provides"
+        "kinds"
+        "name"
+      ] (prelude.checkRequired "gen-schema.mkMixin" [ "define" ] args);
+      inherit (checked) define;
+      requires = checked.requires or [ ];
+      provides = checked.provides or [ ];
+      kinds = checked.kinds or null;
+      name = checked.name or "anonymous";
+    in
+    assert builtins.isAttrs checked;
     {
       __isMixin = true;
       __direction = "smalltalk";

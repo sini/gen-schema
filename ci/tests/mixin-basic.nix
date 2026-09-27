@@ -1,5 +1,6 @@
 {
   lib,
+  prelude,
   genSchema,
   genAlgebra,
   ...
@@ -7,7 +8,7 @@
 let
   R = genAlgebra.record;
   record = R;
-  mixinLib = import ../../lib/mixin.nix { inherit record; };
+  mixinLib = import ../../lib/mixin.nix { inherit prelude record; };
   inherit (mixinLib)
     mkMixin
     beta

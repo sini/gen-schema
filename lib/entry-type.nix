@@ -575,754 +575,803 @@ let
     + "consumer-private metadata gen-schema must not read, or `${first}` as a collection on "
     + "mkSchemaOption for schema-level data.";
 
+  # THE ACCEPTED SET FOR BOTH DOORS BELOW — ONE LIST, NOT TWO REFLECTIONS OF IT (P1, den-hoag-7gp66).
+  # Before P1 the two doors carried native attrset formals and `mkSchemaOption` asked
+  # `builtins.functionArgs` whether the two sets agreed at runtime; `functionArgs` reflects only a
+  # native attrset-pattern lambda, and a P1 door is a bare positional `args:` lambda, so that
+  # reflection would read `{}` for both and the invariant it existed to state ("the option's type is
+  # its entry type's construction", den-hoag-px98p) would hold vacuously rather than meaningfully.
+  # This list is what each door's own `checkOptions` closes over AND what `mkSchemaEntryType`'s own
+  # `components` self-check compares itself against below, so the invariant is true by construction
+  # — one list, read twice — and `mkSchemaOption` calls `mkSchemaEntryType` unconditionally rather
+  # than behind a runtime `==` of two reflections.
+  schemaEntryFormals = [
+    "baseModule"
+    "collections"
+    "computed"
+    "mixins"
+    "mkType"
+    "strict"
+    "keySemantics"
+    "specialArgs"
+  ];
+
+  # OPTIONS door (P1): every formal is optional, so `checkOptions` alone closes it. The `assert`
+  # forces `checked` where the record is applied — the door's own return is built through
+  # `merge.mkOptionType`, an external call whose own strictness this door does not want to depend
+  # on for its catchability.
   mkSchemaEntryType =
-    {
-      baseModule ? null,
-      collections ? { },
-      computed ? null,
-      mixins ? [ ],
-      mkType ? null,
-      strict ? true,
-      keySemantics ? { },
-      # BASE MODULE ARGS for the KIND TREE — `introspectOf` below, which both arms read, and
-      # nothing else in this file.
-      #
-      # ★ A KIND'S OWN OPTION TREE RECURSES WITHOUT ANY INSTANCE, which is why this is a separate
-      # channel from `mkInstanceType`'s and not a duplicate of it. A kind module that forces an
-      # argument WHILE DECLARING an option is applied by `introspect`'s `evalModuleTree`, on a kind
-      # with no instances anywhere — so the instance constructor is not on that path at all and
-      # threading it alone leaves this arm diverging.
-      #
-      # ★ NO `withArgs` HERE, AND THAT IS THE DESIGN RATHER THAN AN EXCEPTION TO IT. The type-level
-      # inlet exists because at a `types.submodule` site the args would otherwise have to arrive as
-      # a constructor ATTRSET, and `isModuleValue` admits any attrset, so the misread is silent.
-      # `introspect` calls the engine DIRECTLY — there is no type for a method to hang on and no
-      # module/parameter ambiguity to resolve — so the channel is `evalModuleTree`'s own published
-      # `specialArgs ? { }` formal, reached by an ordinary named formal. One vocabulary, two shapes,
-      # each forced by what is in the way at its site.
-      specialArgs ? { },
-    }:
+    args:
     let
-      base = merge.types.deferredModule;
-
-      # ONE introspection for both arms: the option tree an instance imports, its kind-level config
-      # and its refs, from one `evalModuleTree` over the module an instance imports. Each arm
-      # publishes `options` and `refs` from it and `planeOf` and `refinements` read the same
-      # binding, so the published plane, the mark and `__sealed` are one plane.
-      #
-      # Lazy: evaluated on first access of `options`, `refs`, `refinements` or the mark. Each arm
-      # passes a locally-built module, never `config.${k}`, to avoid circularity.
-      introspectOf =
-        module:
-        let
-          tree = merge.evalModuleTree {
-            modules = [ module ];
-            inherit specialArgs;
-          };
-          options = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) tree.options;
-        in
-        {
-          inherit options;
-          inherit (tree) config;
-          refs = refsFromOptionsWithTypes options;
-        };
-
-      allCollections = mkAllCollections collections;
-
-      # Infer merge strategy from default type
-      inferMerge =
-        name: collection:
-        if collection ? merge then
-          collection.merge
-        else if builtins.isList collection.default then
-          (acc: val: acc ++ val)
-        else if builtins.isAttrs collection.default then
-          (acc: val: acc // val)
-        else
-          throw "gen-schema: collection '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
-
-      collectionKeys = prelude.attrNames allCollections;
-
-      # THE CONSTRUCTION, for the entry type's merge relation (den-hoag-bfc0k). The type is a
-      # function of these formals and nothing else, so each is a component, and its regime is
-      # declared here, by constructor, never read off the value (ADR-0034). `strict` is inert by
-      # construction and is minted. Every other formal can carry a caller's function — a
-      # collection's `merge`, a mixin, a function `baseModule`, a facet module in `keySemantics`,
-      # anything in `specialArgs`, and `computed`/`mkType` themselves — so each is COMPARED, as
-      # its reified value under Nix `==`, which is structural over inert content and identity
-      # over a function. A formal missing here would be dropped from the relation and two
-      # different entry types would merge, so the list is checked against the formals. Each value
-      # is handed over as `{ records; value; }` and `constructionRelation` binds `value` by a
-      # formal, keeping the slot this constructor passed: upstream Nix `==` keeps a function's
-      # identity only for one slot, and a selection is a fresh one (den-hoag-jzatq), so one shared
-      # `computed` passed to two calls would otherwise be refused on Nix and merged on Lix.
-      components =
-        let
-          open = value: {
-            records = [ ];
-            inherit value;
-          };
-          cs = {
-            minted = { inherit strict; };
-            compared = {
-              keySemantics = {
-                records = keySemanticsRecords keySemantics;
-                value = keySemantics;
-              };
-              collections = open collections;
-              mixins = open mixins;
-              baseModule = open baseModule;
-              specialArgs = open specialArgs;
-              computed = open computed;
-              mkType = open mkType;
-            };
-          };
-          named = prelude.sort (a: b: a < b) (prelude.attrNames cs.minted ++ prelude.attrNames cs.compared);
-          formals = prelude.attrNames (builtins.functionArgs mkSchemaEntryType);
-        in
-        if named == formals then
-          cs
-        else
-          throw "gen-schema: mkSchemaEntryType's construction components [${builtins.concatStringsSep ", " named}] are not its formals [${builtins.concatStringsSep ", " formals}]";
+      checked = prelude.checkOptions "gen-schema.mkSchemaEntryType" schemaEntryFormals args;
     in
-    # Built THROUGH mkOptionType rather than as `base // { merge = …; }`. An override over an
-    # already completed type answers the protocol as its LEFT operand, so the entry type would
-    # carry deferredModule's name, its description and — the one that bites — its functor, whose
-    # `type` points back at the plain deferredModule. A typeMerge over two declarations of one
-    # `lazyAttrsOf` of this type then rebuilds a bare deferredModule and the collection-extracting
-    # merge below is gone, silently, with the defs falling through to a plain module import. The
-    # entry type is not a deferredModule; it DELEGATES to one (`base.merge`, called inside), and that
-    # delegation is the only thing it takes from it.
-    #
-    # Built per call (`mkSchemaOption` builds one per call and states its own type's relation with
-    # this one's payload and binOp), so a redeclared option typed by it meets a second record:
-    # `functor` is the relation that merges the two when they are one construction.
-    let
-      self = merge.mkOptionType {
-        name = "schemaKindEntry";
-        description = "schema kind entry — options, config, collections and computed fields";
-        functor = constructionRelation "schemaKindEntry" components self;
-        # deferredModule accepts any def value and lets the merge decide; so does this.
-        inherit (base) check;
-        merge =
-          loc: defs:
+    # `checked` is applied to a NATIVE attrset-pattern lambda rather than destructured field-by-field
+    # above: each field below becomes a `compared` component (see `components`, below) whose value
+    # `constructionRelation` must keep the SLOT this constructor was HANDED, not a fresh selection off
+    # it — upstream Nix `==` keeps a function's identity only for the one slot it was bound to, and a
+    # `let`-bound selection (`checked.computed or null`) allocates a fresh one per construction, so two
+    # calls sharing one `computed` would be refused (den-hoag-jzatq). A native formal, applied to
+    # `checked` (== `args`, unchanged by a successful `checkOptions`), binds the identical slot the
+    # pre-P1 door bound directly, so the door catches an unknown option (R6, above) without giving up
+    # the identity `constructionRelation` depends on.
+    (
+      {
+        baseModule ? null,
+        collections ? { },
+        computed ? null,
+        mixins ? [ ],
+        mkType ? null,
+        strict ? true,
+        keySemantics ? { },
+        # BASE MODULE ARGS for the KIND TREE — `introspectOf` below, which both arms read, and
+        # nothing else in this file.
+        #
+        # ★ A KIND'S OWN OPTION TREE RECURSES WITHOUT ANY INSTANCE, which is why this is a separate
+        # channel from `mkInstanceType`'s and not a duplicate of it. A kind module that forces an
+        # argument WHILE DECLARING an option is applied by `introspect`'s `evalModuleTree`, on a kind
+        # with no instances anywhere — so the instance constructor is not on that path at all and
+        # threading it alone leaves this arm diverging.
+        #
+        # ★ NO `withArgs` HERE, AND THAT IS THE DESIGN RATHER THAN AN EXCEPTION TO IT. The type-level
+        # inlet exists because at a `types.submodule` site the args would otherwise have to arrive as
+        # a constructor ATTRSET, and `isModuleValue` admits any attrset, so the misread is silent.
+        # `introspect` calls the engine DIRECTLY — there is no type for a method to hang on and no
+        # module/parameter ambiguity to resolve — so the channel is `evalModuleTree`'s own published
+        # `specialArgs ? { }` formal, reached by an ordinary named formal. One vocabulary, two shapes,
+        # each forced by what is in the way at its site.
+        specialArgs ? { },
+      }:
+      let
+        base = merge.types.deferredModule;
+
+        # ONE introspection for both arms: the option tree an instance imports, its kind-level config
+        # and its refs, from one `evalModuleTree` over the module an instance imports. Each arm
+        # publishes `options` and `refs` from it and `planeOf` and `refinements` read the same
+        # binding, so the published plane, the mark and `__sealed` are one plane.
+        #
+        # Lazy: evaluated on first access of `options`, `refs`, `refinements` or the mark. Each arm
+        # passes a locally-built module, never `config.${k}`, to avoid circularity.
+        introspectOf =
+          module:
           let
-            kind = prelude.last loc;
-
-            # Extract each collection from defs, merge with strategy.
-            # NOTE: collections must be declared via inline attrsets, not path modules.
-            # Path-based kind declarations pass through as paths — the isAttrs check
-            # skips them. If two modules declare the same collection key, they merge
-            # according to the collection's merge strategy.
-            extractedCollections = prelude.mapAttrs (
-              name: collection:
-              let
-                merge = inferMerge name collection;
-              in
-              prelude.foldl' (
-                acc: d: if builtins.isAttrs d.value && d.value ? ${name} then merge acc d.value.${name} else acc
-              ) collection.default defs
-            ) allCollections;
-
-            # Computed fields from extracted collections + raw defs
-            # kind (prelude.last loc) is passed so computed can produce entry-specific fields
-            computedFields =
-              let
-                fields = if computed != null then computed extractedCollections defs else { };
-                # Every other name this library writes onto the kind value, read off `kindResultKeys`
-                # so the door moves with the record. The computed fields are splatted OVER the written
-                # record on both branches, so a computed `options` or `refs` silently replaced the
-                # published plane (den-hoag-ciu4r, ADR-0025).
-                #
-                # ★ UNIFORM ACROSS BOTH BRANCHES, at a stated cost — the same shape as
-                # `reservedCollectionKeys` above (den-hoag-ciu4r P1, den-hoag-3x3bi). On the `mkType`
-                # branch `mkSchemaEntryType` never writes `mixins` (the mixin pipeline runs only on
-                # the default branch), so refusing a computed `mixins` there over-fires ALWAYS: it
-                # protects nothing this library wrote. `__functor` is written on that branch only
-                # when the `mkType` result is itself a functor (`custom ? __functor`, above), so
-                # refusing a computed `__functor` over-fires whenever it is not. `kind` is written
-                # UNCONDITIONALLY on both branches (the `inherit kind;` beside `__mint`, below) — it
-                # is NOT in the over-fire set. One list is taken over two rather than a per-branch
-                # set, so a computed `mixins` cannot read back differently between branches for a
-                # reason no caller could see.
-                shadowing = builtins.filter (k: fields ? ${k}) kindResultKeys;
-              in
-              # `__mint` is refused here for the reason `mkAllCollections` refuses it as a collection
-              # key: the stamp is applied last and would overwrite a computed field of that name
-              # without saying so.
-              if fields ? __mint then
-                throw "gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType"
-              else if fields ? __sealed then
-                throw "gen-schema: computed field '__sealed' is reserved — the sealed subjects are written by mkSchemaEntryType"
-              else if shadowing != [ ] then
-                throw "gen-schema: computed field '${builtins.head shadowing}' is reserved — it is part of the kind-value contract; reserved computed-field names: ${builtins.concatStringsSep ", " kindResultKeys}"
-              else
-                fields;
-
-            # Strip all collection keys before deferredModule merge
-            strippedDefs = map (
-              d:
-              if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
-                d // { value = builtins.removeAttrs d.value collectionKeys; }
-              else
-                d
-            ) defs;
-
-            # Resolve baseModule value (may be a function of kind name)
-            resolvedBase =
-              if baseModule == null then
-                null
-              else if builtins.isFunction baseModule then
-                baseModule kind
-              else
-                baseModule;
-
-            # ── THE DECLARATION-KEY GUARD (den-hoag-nn4) ──────────────────────────────────────────
-            #
-            # ★ PLACEMENT, which is what applying it to the merge RESULT buys — not coverage. The
-            # conditional IS the result, so forcing any field of the kind meets it, and both branches
-            # are reached the same way. It does not follow that both branches REFUSE: clause A stands
-            # the unknown-key predicate down whenever `computed` or `mkType` is present, so on the
-            # `mkType` branch no input is ever named. What is live on both branches is the reserved
-            # door below, because `__mint` is written there too.
-            #
-            # Forcing the result to WHNF forces the conditional, which is what makes a `builtins.seq`
-            # unnecessary. The guard is sited HERE, in the descriptor's own `merge` body, rather than
-            # on a completed type: gen-merge's `mkOptionType` maps a foreign descriptor's `merge` onto
-            # the internal `mergeDefs` and every container dispatches on that, so a `t // { merge = …; }`
-            # override is silently ignored.
-            reservedNamed = prelude.concatMap (
-              d:
-              if builtins.isAttrs d.value then
-                builtins.filter (k: d.value ? ${k}) (reservedDeclarationKeysFor mkType)
-              else
-                [ ]
-            ) defs;
-
-            surplusOffenders = builtins.filter (
-              d: surplusDeclarationKeys { inherit computed mkType; } collectionKeys d.value != [ ]
-            ) defs;
-
-            checkDeclarationKeys =
-              result:
-              if reservedNamed != [ ] then
-                throw "gen-schema: kind '${kind}': declaration key '${builtins.head reservedNamed}' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread"
-              else if surplusOffenders != [ ] then
-                let
-                  offender = builtins.head surplusOffenders;
-                in
-                throw (
-                  unknownDeclarationKeyRefusal kind collectionKeys (surplusDeclarationKeys {
-                    inherit computed mkType;
-                  } collectionKeys offender.value) (offender.file or "<unknown>")
-                )
-              else
-                result;
+            tree = merge.evalModuleTree {
+              modules = [ module ];
+              inherit specialArgs;
+            };
+            options = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) tree.options;
           in
-          checkDeclarationKeys (
-            if mkType != null then
-              # Custom entry type: collection extraction runs first (above),
-              # then mkType controls the result. The mixin pipeline and __functor
-              # wrapping are skipped; `options`, `refs` and `refinements` are DERIVED, from the
-              # option plane of the value an instance of this kind imports.
-              # Precedence: computedFields wins over mkType result for same-named keys,
-              # so computed topology/meta fields remain authoritative.
-              # strippedDefs are passed so mkType implementations can wire user-declared
-              # options/config from the schema kind entry into their own type systems.
-              let
-                custom = mkType {
-                  kindModule = resolvedBase;
-                  collections = extractedCollections;
-                  defs = strippedDefs;
-                  inherit kind;
+          {
+            inherit options;
+            inherit (tree) config;
+            refs = refsFromOptionsWithTypes options;
+          };
+
+        allCollections = mkAllCollections collections;
+
+        # Infer merge strategy from default type
+        inferMerge =
+          name: collection:
+          if collection ? merge then
+            collection.merge
+          else if builtins.isList collection.default then
+            (acc: val: acc ++ val)
+          else if builtins.isAttrs collection.default then
+            (acc: val: acc // val)
+          else
+            throw "gen-schema: collection '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
+
+        collectionKeys = prelude.attrNames allCollections;
+
+        # THE CONSTRUCTION, for the entry type's merge relation (den-hoag-bfc0k). The type is a
+        # function of these formals and nothing else, so each is a component, and its regime is
+        # declared here, by constructor, never read off the value (ADR-0034). `strict` is inert by
+        # construction and is minted. Every other formal can carry a caller's function — a
+        # collection's `merge`, a mixin, a function `baseModule`, a facet module in `keySemantics`,
+        # anything in `specialArgs`, and `computed`/`mkType` themselves — so each is COMPARED, as
+        # its reified value under Nix `==`, which is structural over inert content and identity
+        # over a function. A formal missing here would be dropped from the relation and two
+        # different entry types would merge, so the list is checked against the formals. Each value
+        # is handed over as `{ records; value; }` and `constructionRelation` binds `value` by a
+        # formal, keeping the slot this constructor passed: upstream Nix `==` keeps a function's
+        # identity only for one slot, and a selection is a fresh one (den-hoag-jzatq), so one shared
+        # `computed` passed to two calls would otherwise be refused on Nix and merged on Lix.
+        components =
+          let
+            open = value: {
+              records = [ ];
+              inherit value;
+            };
+            cs = {
+              minted = { inherit strict; };
+              compared = {
+                keySemantics = {
+                  records = keySemanticsRecords keySemantics;
+                  value = keySemantics;
                 };
-                # The keys the arm applies over the `mkType` result. `options = { }` and `refs = { }`
-                # stand in the TREE MODULE only: the kind value publishes the evaluated plane under
-                # those names, and a module built over the kind value itself would be circular for any
-                # reader of `options` (gen-merge's reader of a non-functor module, or a functor that
-                # reads its `self`). The pinned refusal of a non-functor result names `keySemantics`
-                # from exactly this module.
-                published = {
-                  inherit strict keySemantics;
-                  options = { };
-                  refs = { };
-                };
-                # The module an instance imports: the `mkType` result with the published keys and
-                # computed fields applied. The derived fields (`options`, `refs`, `refinements`,
-                # `__mint`, `__sealed`) are left out; none is a module declaration.
-                #
-                # LAZY, and load-bearing: one `evalModuleTree` per `mkType` kind, memoised in the
-                # kind record and forced only by a read of `options`, `refs`, `refinements` or the
-                # mark — never by `kind` or `strict`.
-                #
-                # The module is named for its kind, so a refusal of its syntax (a surplus key beside
-                # the published `options`) says which kind to fix; a `_file` of the result's own wins.
-                treeModule = {
-                  _file = "<gen-schema mkType kind ${kind}>";
-                }
-                // custom
-                // published
-                // computedFields;
-                introspect = introspectOf treeModule;
-                # ONE plane for the published fields, the mark and `kindEq` (c+): this arm's option
-                # plane is the tree an instance imports, so it enters the preimage.
-                plane = planeOf {
-                  inherit (introspect) options config refs;
-                  collections = extractedCollections;
-                  inherit keySemantics;
-                  computed = computedFields;
-                  modules = map (d: d.value) strippedDefs ++ [ resolvedBase ];
-                  functions = { inherit mkType computed; };
-                };
-              in
-              custom
-              // published
-              // {
-                inherit (introspect) options refs;
-                refinements = refinementsOfOptions introspect.options;
-              }
-              # The result's functor is applied to `treeModule`, so the tree and an instance hand it
-              # the same `self` and a functor that reads `self.options` declares one plane in both.
-              # Applied before the computed fields, which still win for same-named keys.
-              // prelude.optionalAttrs (custom ? __functor) { __functor = _: custom.__functor treeModule; }
-              // computedFields
-              // {
-                # `kind` is the LET-BOUND `prelude.last loc` — the option path, which is
-                # authoritative — never the `mkType` result's echo of it, which is caller data.
-                # WRITTEN here (den-hoag-3x3bi, ADR-0025): before this, nothing on this arm wrote
-                # `kind` at all, so a result carrying none made `.kind` abort uncatchably
-                # (`attribute 'kind' missing`, not a `throw` `tryEval` can catch) and
-                # `mkInstanceType` refused with the FALSE reason "no mark" (`isSchemaKind` reads
-                # `v ? kind` first); a result echoing a WRONG name published that name while the
-                # mark stayed keyed to the option path, silently disagreeing with it. Applied AFTER
-                # `// computedFields`, beside `__mint`, so a computed `kind` cannot re-open what this
-                # write closes — `kind` is refused as a computed-field name below regardless.
-                # The mark reads `plane`, the one plane the arm publishes as `options` and `refs`
-                # (den-hoag-mx07b §4 Q1 ruled). `ci/tests/mktype-refinements.nix` pins that the mark
-                # reads it.
-                inherit kind;
-                __mint = {
-                  minted = markOf { inherit kind strict plane; };
-                };
-                __sealed = plane.sealed;
-              }
-            else
-              let
-                # When mixins are present and baseModule is an inline attrset,
-                # apply mixins via the record algebra and emit through the bridge.
-                hasMixins = mixins != [ ] && resolvedBase != null && builtins.isAttrs resolvedBase;
-
-                mixinResult =
-                  if hasMixins then
-                    let
-                      baseRecord = record.fromAttrs resolvedBase;
-                      withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
-                      emitted = emitModule collectionKeys withMixins;
-                    in
-                    emitted
-                  else
-                    null;
-
-                # Effective base module: bridge output when mixins applied, original otherwise
-                effectiveBase = if mixinResult != null then mixinResult.module else resolvedBase;
-
-                # Refinements are a PROJECTION of the option plane, read off the same `introspect.options`
-                # `refs` is, so `attrNames refinements ⊆ attrNames options` holds by construction and no
-                # option can land without its contract, nor a contract without its option. A second,
-                # syntactic reader of the raw defs is what let the two planes disagree. On the mixin path
-                # the bridge's record refinements are unioned in: its keys are lifted into `options`, so
-                # the inclusion still holds, and a contract declared in the kind entry itself is read too.
-                # Lazy: forced only when `refinements` is, and that must stay so.
-                # Stored on the kind result so mkInstanceRegistry can consume them automatically.
-                extractedRefinements =
-                  (if mixinResult != null then mixinResult.refinements else { })
-                  // prelude.filterAttrs (_: v: v != [ ]) (
-                    prelude.mapAttrs (_: o: getRefinements o.type) (
-                      prelude.filterAttrs (_: o: isOptionDecl o && o ? type) introspect.options
-                    )
-                  );
-
-                # Merge bridge-extracted collections into the collection results
-                bridgeCollections =
-                  if mixinResult != null then
-                    prelude.mapAttrs (
-                      name: stacks:
-                      let
-                        merge = inferMerge name allCollections.${name};
-                      in
-                      builtins.foldl' merge (extractedCollections.${name} or allCollections.${name}.default) stacks
-                    ) (prelude.filterAttrs (n: _: allCollections ? ${n}) mixinResult.collections)
-                  else
-                    { };
-
-                finalCollections = extractedCollections // bridgeCollections;
-
-                # Inject baseModule + methods module (methods is the only collection
-                # that generates instance-level options via mkMethodsModule)
-                injected =
-                  prelude.optional (effectiveBase != null) {
-                    file = "gen-schema/base";
-                    value = effectiveBase;
-                  }
-                  ++ prelude.optional (finalCollections.methods != { }) {
-                    file = "gen-schema/methods";
-                    value = mkMethodsModule kind finalCollections.methods;
-                  };
-
-                merged = base.merge loc (strippedDefs ++ injected);
-
-                introspect = introspectOf merged;
-                plane = planeOf {
-                  inherit (introspect) options config refs;
-                  collections = finalCollections;
-                  inherit keySemantics;
-                  computed = computedFields;
-                  modules = map (d: d.value) strippedDefs ++ [ effectiveBase ];
-                  functions = { inherit mkType computed; };
-                };
-              in
-              # Precedence: computed overrides collections of the same name.
-              # __functor is reserved — collections/computed must not use it as a key.
-              {
-                __functor =
-                  _:
-                  { ... }:
-                  {
-                    imports = [ merged ];
-                  };
-                inherit
-                  kind
-                  mixins
-                  strict
-                  keySemantics
-                  ;
-                inherit (introspect) options refs;
-                refinements = extractedRefinements;
-              }
-              // finalCollections
-              // computedFields
-              // {
-                # Applied LAST so the mark cannot be shadowed by a collection or a computed field;
-                # both are refused by name above rather than left to win silently here.
-                __mint = {
-                  minted = markOf { inherit kind strict plane; };
-                };
-                __sealed = plane.sealed;
-              }
-          );
-      };
-    in
-    self;
-
-  mkSchemaOption =
-    {
-      strict ? true,
-      baseModule ? null,
-      collections ? { },
-      computed ? null,
-      mixins ? [ ],
-      mkType ? null,
-      keySemantics ? { },
-      # Forwarded VERBATIM to the entry type, which is what builds the kind tree. Same formal, same
-      # name, one hop — the schema option itself needs no args, because its own submodule declares
-      # only this library's introspection options and never a caller's module.
-      specialArgs ? { },
-    }:
-    let
-      # Built once per call. The option's type below is a function of exactly these formals, so
-      # the entry's construction IS the option's construction — a premise refused by name if a
-      # formal is ever added to one constructor and not the other, since a formal the entry does not
-      # take would be absent from its components, and two option types differing only in it would
-      # merge silently.
-      entry =
-        let
-          optionFormals = builtins.functionArgs mkSchemaOption;
-          entryFormals = builtins.functionArgs mkSchemaEntryType;
-        in
-        if optionFormals == entryFormals then
-          mkSchemaEntryType {
-            inherit
-              baseModule
-              computed
-              mixins
-              collections
-              mkType
-              strict
-              keySemantics
-              specialArgs
-              ;
-          }
-        else
-          throw "gen-schema: mkSchemaOption's formals [${builtins.concatStringsSep ", " (prelude.attrNames optionFormals)}] are not mkSchemaEntryType's [${builtins.concatStringsSep ", " (prelude.attrNames entryFormals)}]; the schema option's type is its entry type's construction, so the two must take one set";
-      inner = merge.types.submodule (
-        { config, options, ... }:
-        {
-          freeformType = merge.types.lazyAttrsOf entry;
-
-          # READ-ONLY, on two measured bases (den-hoag-px98p): a well-typed write to a derived output
-          # (`config.schema._collectionKeys = [ "fake" ]`) would otherwise be published silently, and
-          # a doubly-imported introspection module would concatenate its `listOf` fields
-          # (`[ "k" "k" ]`). A KIND named after one of these options is refused by its type, not by
-          # this flag (den-hoag-collectionkeys-collision-oracle-25mae, O6: a companion, not a
-          # discriminator).
-          options._kindNames = merge.mkOption {
-            type = merge.types.listOf merge.types.str;
-            internal = true;
-            readOnly = true;
-            description = "All kind names in the schema";
-          };
-          options._topology = merge.mkOption {
-            type = merge.types.raw;
-            internal = true;
-            readOnly = true;
-            description = "Parent-child nesting: { kind = { parent, children }; }";
-          };
-          options._refEdges = merge.mkOption {
-            type = merge.types.listOf merge.types.raw;
-            internal = true;
-            readOnly = true;
-            description = "All ref edges: [ { from, field, to } ]";
-          };
-          options._edges = merge.mkOption {
-            type = merge.types.listOf merge.types.raw;
-            internal = true;
-            readOnly = true;
-            description = "Unified edge view: parent (§ Neron 2015 P) + inherits + ref (§ Neron 2015 I) edges";
-          };
-          options._roots = merge.mkOption {
-            type = merge.types.listOf merge.types.str;
-            internal = true;
-            readOnly = true;
-            description = "Kinds with no parent in the topology";
-          };
-          options._leaves = merge.mkOption {
-            type = merge.types.listOf merge.types.str;
-            internal = true;
-            readOnly = true;
-            description = "Kinds with no children in the topology";
-          };
-          options._collectionKeys = merge.mkOption {
-            type = merge.types.listOf merge.types.str;
-            internal = true;
-            readOnly = true;
-            description = "Collection keys extracted from kind defs: built-ins plus this schema's declared collections; a computed field of the same name wins on the kind result, so reading a key through it may return the computed value";
-          };
-          # Published for the reason its two siblings are (`den-hoag-4kh.53.55`): consumers
-          # hardcode what a library does not publish, and a consumer that GENERATES collection
-          # names — which gen-aspects' caller-supplied cnf makes reachable — needs the set it must
-          # avoid without re-deriving it from this file. Single-line description for the reason
-          # `_declarationKeys`' is.
-          options._reservedCollectionKeys = merge.mkOption {
-            type = merge.types.listOf merge.types.str;
-            internal = true;
-            readOnly = true;
-            description = "The collection names `mkSchemaOption` refuses, by name, at construction: gen-merge's structural markers plus the `key` metadata name (a collection of that name would delete the key from every kind declaration before the module merge sees it) together with the names gen-schema writes onto the kind value itself (a collection of that name would shadow what this library wrote, or — for `__mint`, applied last — be silently overwritten by it). The remedy for all of them is the same: rename the collection.";
-          };
-          # Published for the reason `_collectionKeys` was (`den-hoag-4kh.53.55`): consumers
-          # hardcode what a library does not publish. The LIST is only the finite, enforced part of
-          # the contract; the two rules that are not lists are stated here and NOT published as
-          # lists, which is exactly the narrower-than-enforced defect that ruling rejected.
-          options._declarationKeys = merge.mkOption {
-            type = merge.types.listOf merge.types.str;
-            internal = true;
-            readOnly = true;
-            # A single-line string rather than a multi-line block, deliberately, and the comment
-            # avoids the block delimiter for the same reason: `ci/tests/purity.nix`'s
-            # `test-strip-premise-multiline-strings` enumerates the library files containing it —
-            # over the RAW source, comments included — because its comment stripper is line-based
-            # and a multi-line string is where that premise could break. Matching `_collectionKeys`
-            # above costs nothing and leaves that census's population where it was.
-            description = "The admissible non-collection keys of a kind declaration: gen-merge's five structural markers plus the `key` metadata name. A structured declaration — one carrying any of those markers — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. An option is declared under `options`; a bare top-level option declaration is not read, because neither module engine collects one, and is refused like any other key. Every other key on a structured declaration is refused by name. Two exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. An UNSTRUCTURED declaration carries no marker, every key of it is read as config, and none is refused.";
-          };
-          config =
+                collections = open collections;
+                mixins = open mixins;
+                baseModule = open baseModule;
+                specialArgs = open specialArgs;
+                computed = open computed;
+                mkType = open mkType;
+              };
+            };
+            named = prelude.sort (a: b: a < b) (prelude.attrNames cs.minted ++ prelude.attrNames cs.compared);
+            # `schemaEntryFormals` (above), not `builtins.functionArgs mkSchemaEntryType`: reflection
+            # over a bare positional `args:` lambda answers `{}` (P1, den-hoag-7gp66), which would
+            # make this check vacuously true rather than a live comparison against the door's accepted
+            # set.
+            formals = prelude.sort (a: b: a < b) schemaEntryFormals;
+          in
+          if named == formals then
+            cs
+          else
+            throw "gen-schema: mkSchemaEntryType's construction components [${builtins.concatStringsSep ", " named}] are not its formals [${builtins.concatStringsSep ", " formals}]";
+      in
+      # Built THROUGH mkOptionType rather than as `base // { merge = …; }`. An override over an
+      # already completed type answers the protocol as its LEFT operand, so the entry type would
+      # carry deferredModule's name, its description and — the one that bites — its functor, whose
+      # `type` points back at the plain deferredModule. A typeMerge over two declarations of one
+      # `lazyAttrsOf` of this type then rebuilds a bare deferredModule and the collection-extracting
+      # merge below is gone, silently, with the defs falling through to a plain module import. The
+      # entry type is not a deferredModule; it DELEGATES to one (`base.merge`, called inside), and that
+      # delegation is the only thing it takes from it.
+      #
+      # Built per call (`mkSchemaOption` builds one per call and states its own type's relation with
+      # this one's payload and binOp), so a redeclared option typed by it meets a second record:
+      # `functor` is the relation that merges the two when they are one construction.
+      let
+        self = merge.mkOptionType {
+          name = "schemaKindEntry";
+          description = "schema kind entry — options, config, collections and computed fields";
+          functor = constructionRelation "schemaKindEntry" components self;
+          # deferredModule accepts any def value and lets the merge decide; so does this.
+          inherit (base) check;
+          merge =
+            loc: defs:
             let
-              # A kind name is any config key that is not one of this submodule's own
-              # declared introspection options (_kindNames, _topology, etc. above) — those
-              # carry `internal = true`, the same shared per-option marker docs.nix and
-              # codec.nix read to separate internal fields from user
-              # ones, reused here at the kind-name granularity instead of a re-derived name
-              # prefix. A freeform kind has no declared option, so `options.${n}` is absent
-              # and the check falls through to `false` — never internal by construction.
-              isInternalField = n: options.${n}.internal or false;
+              kind = prelude.last loc;
 
-              # Reserving the `_` prefix (README: "kind names starting with `_` are
-              # reserved for internal use") must be enforced, not merely documented — a
-              # reserved name that silently vanished from _kindNames/_topology instead of
-              # being refused is exactly the absence-collapse this schema's own reserved
-              # collection keys (__functor, kind — above) already refuse loudly.
-              reservedKindNames = builtins.filter (n: !(isInternalField n) && prelude.hasPrefix "_" n) (
-                prelude.attrNames config
-              );
+              # Extract each collection from defs, merge with strategy.
+              # NOTE: collections must be declared via inline attrsets, not path modules.
+              # Path-based kind declarations pass through as paths — the isAttrs check
+              # skips them. If two modules declare the same collection key, they merge
+              # according to the collection's merge strategy.
+              extractedCollections = prelude.mapAttrs (
+                name: collection:
+                let
+                  merge = inferMerge name collection;
+                in
+                prelude.foldl' (
+                  acc: d: if builtins.isAttrs d.value && d.value ? ${name} then merge acc d.value.${name} else acc
+                ) collection.default defs
+              ) allCollections;
 
-              kindNames =
-                if reservedKindNames != [ ] then
-                  throw "gen-schema: kind name '${builtins.head reservedKindNames}' is reserved — names starting with '_' are internal use only (_kindNames, _topology, etc.)"
+              # Computed fields from extracted collections + raw defs
+              # kind (prelude.last loc) is passed so computed can produce entry-specific fields
+              computedFields =
+                let
+                  fields = if computed != null then computed extractedCollections defs else { };
+                  # Every other name this library writes onto the kind value, read off `kindResultKeys`
+                  # so the door moves with the record. The computed fields are splatted OVER the written
+                  # record on both branches, so a computed `options` or `refs` silently replaced the
+                  # published plane (den-hoag-ciu4r, ADR-0025).
+                  #
+                  # ★ UNIFORM ACROSS BOTH BRANCHES, at a stated cost — the same shape as
+                  # `reservedCollectionKeys` above (den-hoag-ciu4r P1, den-hoag-3x3bi). On the `mkType`
+                  # branch `mkSchemaEntryType` never writes `mixins` (the mixin pipeline runs only on
+                  # the default branch), so refusing a computed `mixins` there over-fires ALWAYS: it
+                  # protects nothing this library wrote. `__functor` is written on that branch only
+                  # when the `mkType` result is itself a functor (`custom ? __functor`, above), so
+                  # refusing a computed `__functor` over-fires whenever it is not. `kind` is written
+                  # UNCONDITIONALLY on both branches (the `inherit kind;` beside `__mint`, below) — it
+                  # is NOT in the over-fire set. One list is taken over two rather than a per-branch
+                  # set, so a computed `mixins` cannot read back differently between branches for a
+                  # reason no caller could see.
+                  shadowing = builtins.filter (k: fields ? ${k}) kindResultKeys;
+                in
+                # `__mint` is refused here for the reason `mkAllCollections` refuses it as a collection
+                # key: the stamp is applied last and would overwrite a computed field of that name
+                # without saying so.
+                if fields ? __mint then
+                  throw "gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType"
+                else if fields ? __sealed then
+                  throw "gen-schema: computed field '__sealed' is reserved — the sealed subjects are written by mkSchemaEntryType"
+                else if shadowing != [ ] then
+                  throw "gen-schema: computed field '${builtins.head shadowing}' is reserved — it is part of the kind-value contract; reserved computed-field names: ${builtins.concatStringsSep ", " kindResultKeys}"
                 else
-                  prelude.sort (a: b: a < b) (prelude.filter (n: !(isInternalField n)) (prelude.attrNames config));
+                  fields;
 
-              # Containment, read off gen-graph (ADR-0012: one graph notion). `parent` is validated
-              # here — the refusal is this library's — and the relation is then handed to gen-graph
-              # oriented container -> contained, the orientation of its own `contains` fixture, so
-              # `children`, `_roots` and `_leaves` are all answers over ONE accessor.
-              kindSet = prelude.genAttrs kindNames (_: true);
-              # `materializeParents` is gen-graph's parent map; building it reads every kind's
-              # `parent`, so ANY topology read refuses an undeclared parent — the timing the fold
-              # this replaced had, kept rather than weakened to a per-kind check.
-              parentMap = graph.materializeParents {
-                nodes = kindNames;
-                parent =
+              # Strip all collection keys before deferredModule merge
+              strippedDefs = map (
+                d:
+                if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
+                  d // { value = builtins.removeAttrs d.value collectionKeys; }
+                else
+                  d
+              ) defs;
+
+              # Resolve baseModule value (may be a function of kind name)
+              resolvedBase =
+                if baseModule == null then
+                  null
+                else if builtins.isFunction baseModule then
+                  baseModule kind
+                else
+                  baseModule;
+
+              # ── THE DECLARATION-KEY GUARD (den-hoag-nn4) ──────────────────────────────────────────
+              #
+              # ★ PLACEMENT, which is what applying it to the merge RESULT buys — not coverage. The
+              # conditional IS the result, so forcing any field of the kind meets it, and both branches
+              # are reached the same way. It does not follow that both branches REFUSE: clause A stands
+              # the unknown-key predicate down whenever `computed` or `mkType` is present, so on the
+              # `mkType` branch no input is ever named. What is live on both branches is the reserved
+              # door below, because `__mint` is written there too.
+              #
+              # Forcing the result to WHNF forces the conditional, which is what makes a `builtins.seq`
+              # unnecessary. The guard is sited HERE, in the descriptor's own `merge` body, rather than
+              # on a completed type: gen-merge's `mkOptionType` maps a foreign descriptor's `merge` onto
+              # the internal `mergeDefs` and every container dispatches on that, so a `t // { merge = …; }`
+              # override is silently ignored.
+              reservedNamed = prelude.concatMap (
+                d:
+                if builtins.isAttrs d.value then
+                  builtins.filter (k: d.value ? ${k}) (reservedDeclarationKeysFor mkType)
+                else
+                  [ ]
+              ) defs;
+
+              surplusOffenders = builtins.filter (
+                d: surplusDeclarationKeys { inherit computed mkType; } collectionKeys d.value != [ ]
+              ) defs;
+
+              checkDeclarationKeys =
+                result:
+                if reservedNamed != [ ] then
+                  throw "gen-schema: kind '${kind}': declaration key '${builtins.head reservedNamed}' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread"
+                else if surplusOffenders != [ ] then
+                  let
+                    offender = builtins.head surplusOffenders;
+                  in
+                  throw (
+                    unknownDeclarationKeyRefusal kind collectionKeys (surplusDeclarationKeys {
+                      inherit computed mkType;
+                    } collectionKeys offender.value) (offender.file or "<unknown>")
+                  )
+                else
+                  result;
+            in
+            checkDeclarationKeys (
+              if mkType != null then
+                # Custom entry type: collection extraction runs first (above),
+                # then mkType controls the result. The mixin pipeline and __functor
+                # wrapping are skipped; `options`, `refs` and `refinements` are DERIVED, from the
+                # option plane of the value an instance of this kind imports.
+                # Precedence: computedFields wins over mkType result for same-named keys,
+                # so computed topology/meta fields remain authoritative.
+                # strippedDefs are passed so mkType implementations can wire user-declared
+                # options/config from the schema kind entry into their own type systems.
+                let
+                  custom = mkType {
+                    kindModule = resolvedBase;
+                    collections = extractedCollections;
+                    defs = strippedDefs;
+                    inherit kind;
+                  };
+                  # The keys the arm applies over the `mkType` result. `options = { }` and `refs = { }`
+                  # stand in the TREE MODULE only: the kind value publishes the evaluated plane under
+                  # those names, and a module built over the kind value itself would be circular for any
+                  # reader of `options` (gen-merge's reader of a non-functor module, or a functor that
+                  # reads its `self`). The pinned refusal of a non-functor result names `keySemantics`
+                  # from exactly this module.
+                  published = {
+                    inherit strict keySemantics;
+                    options = { };
+                    refs = { };
+                  };
+                  # The module an instance imports: the `mkType` result with the published keys and
+                  # computed fields applied. The derived fields (`options`, `refs`, `refinements`,
+                  # `__mint`, `__sealed`) are left out; none is a module declaration.
+                  #
+                  # LAZY, and load-bearing: one `evalModuleTree` per `mkType` kind, memoised in the
+                  # kind record and forced only by a read of `options`, `refs`, `refinements` or the
+                  # mark — never by `kind` or `strict`.
+                  #
+                  # The module is named for its kind, so a refusal of its syntax (a surplus key beside
+                  # the published `options`) says which kind to fix; a `_file` of the result's own wins.
+                  treeModule = {
+                    _file = "<gen-schema mkType kind ${kind}>";
+                  }
+                  // custom
+                  // published
+                  // computedFields;
+                  introspect = introspectOf treeModule;
+                  # ONE plane for the published fields, the mark and `kindEq` (c+): this arm's option
+                  # plane is the tree an instance imports, so it enters the preimage.
+                  plane = planeOf {
+                    inherit (introspect) options config refs;
+                    collections = extractedCollections;
+                    inherit keySemantics;
+                    computed = computedFields;
+                    modules = map (d: d.value) strippedDefs ++ [ resolvedBase ];
+                    functions = { inherit mkType computed; };
+                  };
+                in
+                custom
+                // published
+                // {
+                  inherit (introspect) options refs;
+                  refinements = refinementsOfOptions introspect.options;
+                }
+                # The result's functor is applied to `treeModule`, so the tree and an instance hand it
+                # the same `self` and a functor that reads `self.options` declares one plane in both.
+                # Applied before the computed fields, which still win for same-named keys.
+                // prelude.optionalAttrs (custom ? __functor) { __functor = _: custom.__functor treeModule; }
+                // computedFields
+                // {
+                  # `kind` is the LET-BOUND `prelude.last loc` — the option path, which is
+                  # authoritative — never the `mkType` result's echo of it, which is caller data.
+                  # WRITTEN here (den-hoag-3x3bi, ADR-0025): before this, nothing on this arm wrote
+                  # `kind` at all, so a result carrying none made `.kind` abort uncatchably
+                  # (`attribute 'kind' missing`, not a `throw` `tryEval` can catch) and
+                  # `mkInstanceType` refused with the FALSE reason "no mark" (`isSchemaKind` reads
+                  # `v ? kind` first); a result echoing a WRONG name published that name while the
+                  # mark stayed keyed to the option path, silently disagreeing with it. Applied AFTER
+                  # `// computedFields`, beside `__mint`, so a computed `kind` cannot re-open what this
+                  # write closes — `kind` is refused as a computed-field name below regardless.
+                  # The mark reads `plane`, the one plane the arm publishes as `options` and `refs`
+                  # (den-hoag-mx07b §4 Q1 ruled). `ci/tests/mktype-refinements.nix` pins that the mark
+                  # reads it.
+                  inherit kind;
+                  __mint = {
+                    minted = markOf { inherit kind strict plane; };
+                  };
+                  __sealed = plane.sealed;
+                }
+              else
+                let
+                  # When mixins are present and baseModule is an inline attrset,
+                  # apply mixins via the record algebra and emit through the bridge.
+                  hasMixins = mixins != [ ] && resolvedBase != null && builtins.isAttrs resolvedBase;
+
+                  mixinResult =
+                    if hasMixins then
+                      let
+                        baseRecord = record.fromAttrs resolvedBase;
+                        withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
+                        emitted = emitModule collectionKeys withMixins;
+                      in
+                      emitted
+                    else
+                      null;
+
+                  # Effective base module: bridge output when mixins applied, original otherwise
+                  effectiveBase = if mixinResult != null then mixinResult.module else resolvedBase;
+
+                  # Refinements are a PROJECTION of the option plane, read off the same `introspect.options`
+                  # `refs` is, so `attrNames refinements ⊆ attrNames options` holds by construction and no
+                  # option can land without its contract, nor a contract without its option. A second,
+                  # syntactic reader of the raw defs is what let the two planes disagree. On the mixin path
+                  # the bridge's record refinements are unioned in: its keys are lifted into `options`, so
+                  # the inclusion still holds, and a contract declared in the kind entry itself is read too.
+                  # Lazy: forced only when `refinements` is, and that must stay so.
+                  # Stored on the kind result so mkInstanceRegistry can consume them automatically.
+                  extractedRefinements =
+                    (if mixinResult != null then mixinResult.refinements else { })
+                    // prelude.filterAttrs (_: v: v != [ ]) (
+                      prelude.mapAttrs (_: o: getRefinements o.type) (
+                        prelude.filterAttrs (_: o: isOptionDecl o && o ? type) introspect.options
+                      )
+                    );
+
+                  # Merge bridge-extracted collections into the collection results
+                  bridgeCollections =
+                    if mixinResult != null then
+                      prelude.mapAttrs (
+                        name: stacks:
+                        let
+                          merge = inferMerge name allCollections.${name};
+                        in
+                        builtins.foldl' merge (extractedCollections.${name} or allCollections.${name}.default) stacks
+                      ) (prelude.filterAttrs (n: _: allCollections ? ${n}) mixinResult.collections)
+                    else
+                      { };
+
+                  finalCollections = extractedCollections // bridgeCollections;
+
+                  # Inject baseModule + methods module (methods is the only collection
+                  # that generates instance-level options via mkMethodsModule)
+                  injected =
+                    prelude.optional (effectiveBase != null) {
+                      file = "gen-schema/base";
+                      value = effectiveBase;
+                    }
+                    ++ prelude.optional (finalCollections.methods != { }) {
+                      file = "gen-schema/methods";
+                      value = mkMethodsModule kind finalCollections.methods;
+                    };
+
+                  merged = base.merge loc (strippedDefs ++ injected);
+
+                  introspect = introspectOf merged;
+                  plane = planeOf {
+                    inherit (introspect) options config refs;
+                    collections = finalCollections;
+                    inherit keySemantics;
+                    computed = computedFields;
+                    modules = map (d: d.value) strippedDefs ++ [ effectiveBase ];
+                    functions = { inherit mkType computed; };
+                  };
+                in
+                # Precedence: computed overrides collections of the same name.
+                # __functor is reserved — collections/computed must not use it as a key.
+                {
+                  __functor =
+                    _:
+                    { ... }:
+                    {
+                      imports = [ merged ];
+                    };
+                  inherit
+                    kind
+                    mixins
+                    strict
+                    keySemantics
+                    ;
+                  inherit (introspect) options refs;
+                  refinements = extractedRefinements;
+                }
+                // finalCollections
+                // computedFields
+                // {
+                  # Applied LAST so the mark cannot be shadowed by a collection or a computed field;
+                  # both are refused by name above rather than left to win silently here.
+                  __mint = {
+                    minted = markOf { inherit kind strict plane; };
+                  };
+                  __sealed = plane.sealed;
+                }
+            );
+        };
+      in
+      self
+    )
+      checked;
+
+  # OPTIONS door (P1): every formal is optional, closed over `schemaEntryFormals` — the SAME list
+  # `mkSchemaEntryType` closes over, so "the option's type is its entry type's construction" holds
+  # by construction (see that list's own header comment, above).
+  mkSchemaOption =
+    args:
+    let
+      checked = prelude.checkOptions "gen-schema.mkSchemaOption" schemaEntryFormals args;
+    in
+    # Applied to a native formal, not destructured field-by-field, for the same reason
+    # `mkSchemaEntryType` is (den-hoag-jzatq, see its own header comment): every field here is
+    # forwarded VERBATIM into `mkSchemaEntryType`'s own `compared` components below, and a
+    # `let`-bound selection would hand that door a fresh slot per call rather than the one this
+    # door itself was given.
+    (
+      {
+        strict ? true,
+        baseModule ? null,
+        collections ? { },
+        computed ? null,
+        mixins ? [ ],
+        mkType ? null,
+        keySemantics ? { },
+        # Forwarded VERBATIM to the entry type, which is what builds the kind tree. Same formal, same
+        # name, one hop — the schema option itself needs no args, because its own submodule declares
+        # only this library's introspection options and never a caller's module.
+        specialArgs ? { },
+      }:
+      let
+        # Built once per call, from the SAME accepted set this door itself just checked against —
+        # one list, read twice, so no runtime `==` of two reflections is needed to state the premise.
+        entry = mkSchemaEntryType {
+          inherit
+            baseModule
+            computed
+            mixins
+            collections
+            mkType
+            strict
+            keySemantics
+            specialArgs
+            ;
+        };
+        inner = merge.types.submodule (
+          { config, options, ... }:
+          {
+            freeformType = merge.types.lazyAttrsOf entry;
+
+            # READ-ONLY, on two measured bases (den-hoag-px98p): a well-typed write to a derived output
+            # (`config.schema._collectionKeys = [ "fake" ]`) would otherwise be published silently, and
+            # a doubly-imported introspection module would concatenate its `listOf` fields
+            # (`[ "k" "k" ]`). A KIND named after one of these options is refused by its type, not by
+            # this flag (den-hoag-collectionkeys-collision-oracle-25mae, O6: a companion, not a
+            # discriminator).
+            options._kindNames = merge.mkOption {
+              type = merge.types.listOf merge.types.str;
+              internal = true;
+              readOnly = true;
+              description = "All kind names in the schema";
+            };
+            options._topology = merge.mkOption {
+              type = merge.types.raw;
+              internal = true;
+              readOnly = true;
+              description = "Parent-child nesting: { kind = { parent, children }; }";
+            };
+            options._refEdges = merge.mkOption {
+              type = merge.types.listOf merge.types.raw;
+              internal = true;
+              readOnly = true;
+              description = "All ref edges: [ { from, field, to } ]";
+            };
+            options._edges = merge.mkOption {
+              type = merge.types.listOf merge.types.raw;
+              internal = true;
+              readOnly = true;
+              description = "Unified edge view: parent (§ Neron 2015 P) + inherits + ref (§ Neron 2015 I) edges";
+            };
+            options._roots = merge.mkOption {
+              type = merge.types.listOf merge.types.str;
+              internal = true;
+              readOnly = true;
+              description = "Kinds with no parent in the topology";
+            };
+            options._leaves = merge.mkOption {
+              type = merge.types.listOf merge.types.str;
+              internal = true;
+              readOnly = true;
+              description = "Kinds with no children in the topology";
+            };
+            options._collectionKeys = merge.mkOption {
+              type = merge.types.listOf merge.types.str;
+              internal = true;
+              readOnly = true;
+              description = "Collection keys extracted from kind defs: built-ins plus this schema's declared collections; a computed field of the same name wins on the kind result, so reading a key through it may return the computed value";
+            };
+            # Published for the reason its two siblings are (`den-hoag-4kh.53.55`): consumers
+            # hardcode what a library does not publish, and a consumer that GENERATES collection
+            # names — which gen-aspects' caller-supplied cnf makes reachable — needs the set it must
+            # avoid without re-deriving it from this file. Single-line description for the reason
+            # `_declarationKeys`' is.
+            options._reservedCollectionKeys = merge.mkOption {
+              type = merge.types.listOf merge.types.str;
+              internal = true;
+              readOnly = true;
+              description = "The collection names `mkSchemaOption` refuses, by name, at construction: gen-merge's structural markers plus the `key` metadata name (a collection of that name would delete the key from every kind declaration before the module merge sees it) together with the names gen-schema writes onto the kind value itself (a collection of that name would shadow what this library wrote, or — for `__mint`, applied last — be silently overwritten by it). The remedy for all of them is the same: rename the collection.";
+            };
+            # Published for the reason `_collectionKeys` was (`den-hoag-4kh.53.55`): consumers
+            # hardcode what a library does not publish. The LIST is only the finite, enforced part of
+            # the contract; the two rules that are not lists are stated here and NOT published as
+            # lists, which is exactly the narrower-than-enforced defect that ruling rejected.
+            options._declarationKeys = merge.mkOption {
+              type = merge.types.listOf merge.types.str;
+              internal = true;
+              readOnly = true;
+              # A single-line string rather than a multi-line block, deliberately, and the comment
+              # avoids the block delimiter for the same reason: `ci/tests/purity.nix`'s
+              # `test-strip-premise-multiline-strings` enumerates the library files containing it —
+              # over the RAW source, comments included — because its comment stripper is line-based
+              # and a multi-line string is where that premise could break. Matching `_collectionKeys`
+              # above costs nothing and leaves that census's population where it was.
+              description = "The admissible non-collection keys of a kind declaration: gen-merge's five structural markers plus the `key` metadata name. A structured declaration — one carrying any of those markers — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. An option is declared under `options`; a bare top-level option declaration is not read, because neither module engine collects one, and is refused like any other key. Every other key on a structured declaration is refused by name. Two exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. An UNSTRUCTURED declaration carries no marker, every key of it is read as config, and none is refused.";
+            };
+            config =
+              let
+                # A kind name is any config key that is not one of this submodule's own
+                # declared introspection options (_kindNames, _topology, etc. above) — those
+                # carry `internal = true`, the same shared per-option marker docs.nix and
+                # codec.nix read to separate internal fields from user
+                # ones, reused here at the kind-name granularity instead of a re-derived name
+                # prefix. A freeform kind has no declared option, so `options.${n}` is absent
+                # and the check falls through to `false` — never internal by construction.
+                isInternalField = n: options.${n}.internal or false;
+
+                # Reserving the `_` prefix (README: "kind names starting with `_` are
+                # reserved for internal use") must be enforced, not merely documented — a
+                # reserved name that silently vanished from _kindNames/_topology instead of
+                # being refused is exactly the absence-collapse this schema's own reserved
+                # collection keys (__functor, kind — above) already refuse loudly.
+                reservedKindNames = builtins.filter (n: !(isInternalField n) && prelude.hasPrefix "_" n) (
+                  prelude.attrNames config
+                );
+
+                kindNames =
+                  if reservedKindNames != [ ] then
+                    throw "gen-schema: kind name '${builtins.head reservedKindNames}' is reserved — names starting with '_' are internal use only (_kindNames, _topology, etc.)"
+                  else
+                    prelude.sort (a: b: a < b) (prelude.filter (n: !(isInternalField n)) (prelude.attrNames config));
+
+                # Containment, read off gen-graph (ADR-0012: one graph notion). `parent` is validated
+                # here — the refusal is this library's — and the relation is then handed to gen-graph
+                # oriented container -> contained, the orientation of its own `contains` fixture, so
+                # `children`, `_roots` and `_leaves` are all answers over ONE accessor.
+                kindSet = prelude.genAttrs kindNames (_: true);
+                # `materializeParents` is gen-graph's parent map; building it reads every kind's
+                # `parent`, so ANY topology read refuses an undeclared parent — the timing the fold
+                # this replaced had, kept rather than weakened to a per-kind check.
+                parentMap = graph.materializeParents {
+                  nodes = kindNames;
+                  parent =
+                    k:
+                    let
+                      p = config.${k}.parent or null;
+                    in
+                    # The type is tested before the name: the collection is untyped, and a non-string
+                    # indexed or interpolated is an interpreter abort, not a refusal (ADR-0025 item 1).
+                    # The message names the type and never the value, as gen-graph's `renderId` does.
+                    # A string carrying store context is not a kind name either, and cannot index one.
+                    if p == null then
+                      null
+                    else if !(builtins.isString p) then
+                      throw "gen-schema: kind '${k}' declares a parent of type ${builtins.typeOf p}, not a kind name"
+                    else if builtins.hasContext p then
+                      throw "gen-schema: kind '${k}' declares a parent carrying string context, not a kind name"
+                    else if !(kindSet ? ${p}) then
+                      throw "gen-schema: kind '${k}' declares parent '${p}' which is not a declared kind"
+                    else
+                      p;
+                };
+                childrenMap = graph.directDependents {
+                  nodes = kindNames;
+                  edges = k: prelude.optional (parentMap ? ${k}) parentMap.${k};
+                };
+                # A complete gen-graph accessor: containment also rides gen-graph's own `parent`
+                # dimension (`mkGraph`'s `parents`, `ancestorsOf`), beside the `edges` roots and leaves
+                # read.
+                containment = {
+                  nodes = kindNames;
+                  edges = k: childrenMap.${k} or [ ];
+                  parent = k: parentMap.${k} or null;
+                };
+                # Containment is well-founded: a kind that is its own ancestor has no root to hang
+                # from, and `_roots`/`_leaves` would drop it without a word. gen-graph's `cycles`
+                # names exactly the kinds ON a cycle; a kind nested under one is not itself wrong.
+                # Every published read of the containment graph passes through this guard, so it
+                # refuses at the timing an undeclared parent does. `_topology` guards each ENTRY, not
+                # the set, so its spine (`attrNames`, `?`) answers as it did before the guard.
+                cyclic = graph.cycles containment;
+                wellFounded =
+                  v:
+                  if cyclic == [ ] then
+                    v
+                  else
+                    throw "gen-schema: containment cycle among kinds [${prelude.concatStringsSep " " cyclic}] — a kind may not be its own ancestor";
+                topology = prelude.genAttrs kindNames (
+                  k:
+                  wellFounded {
+                    parent = containment.parent k;
+                    children = containment.edges k;
+                  }
+                );
+
+                # Materialize all ref edges from kind.refs across all kinds
+                refEdges = prelude.concatMap (
+                  fromKind:
+                  let
+                    refs = config.${fromKind}.refs;
+                  in
+                  prelude.mapAttrsToList (field: refEntry: {
+                    from = fromKind;
+                    inherit field;
+                    to = refEntry.refKind;
+                  }) refs
+                ) kindNames;
+                # Unified edge view: § Neron 2015 P (parent) + I (ref/import) edges
+                parentEdges = prelude.concatMap (
                   k:
                   let
-                    p = config.${k}.parent or null;
+                    t = topology.${k};
                   in
-                  # The type is tested before the name: the collection is untyped, and a non-string
-                  # indexed or interpolated is an interpreter abort, not a refusal (ADR-0025 item 1).
-                  # The message names the type and never the value, as gen-graph's `renderId` does.
-                  # A string carrying store context is not a kind name either, and cannot index one.
-                  if p == null then
-                    null
-                  else if !(builtins.isString p) then
-                    throw "gen-schema: kind '${k}' declares a parent of type ${builtins.typeOf p}, not a kind name"
-                  else if builtins.hasContext p then
-                    throw "gen-schema: kind '${k}' declares a parent carrying string context, not a kind name"
-                  else if !(kindSet ? ${p}) then
-                    throw "gen-schema: kind '${k}' declares parent '${p}' which is not a declared kind"
-                  else
-                    p;
+                  prelude.optional (t.parent != null) {
+                    from = k;
+                    to = t.parent;
+                    type = "parent";
+                    field = null;
+                  }
+                ) kindNames;
+
+                # The third constituent, derived from the same name graph `evalSchema` stages over —
+                # one derivation, not a second spelling. `or [ ]` for a custom `mkType` entry, which
+                # carries no collections, exactly as the topology derivation does on `parent`.
+                inheritsEdges = prelude.concatMap (
+                  k:
+                  map (p: {
+                    from = k;
+                    to = p;
+                    type = "inherits";
+                    field = null;
+                  }) (config.${k}.inherits or [ ])
+                ) kindNames;
+
+                edges = parentEdges ++ inheritsEdges ++ map (e: e // { type = "ref"; }) refEdges;
+
+                roots = wellFounded (graph.roots containment);
+                leaves = wellFounded (graph.leaves containment);
+
+              in
+              {
+                _kindNames = kindNames;
+                _topology = topology;
+                _refEdges = refEdges;
+                _edges = edges;
+                _roots = roots;
+                _leaves = leaves;
+                # The same derivation the entry type extracts with — not a second spelling.
+                # attrNames is already sorted, so no sort is added.
+                _collectionKeys = prelude.attrNames (mkAllCollections collections);
+                # Likewise ONE derivation with the guard's own predicate.
+                _declarationKeys = declarationKeys;
+                _reservedCollectionKeys = reservedCollectionKeys;
               };
-              childrenMap = graph.directDependents {
-                nodes = kindNames;
-                edges = k: prelude.optional (parentMap ? ${k}) parentMap.${k};
-              };
-              # A complete gen-graph accessor: containment also rides gen-graph's own `parent`
-              # dimension (`mkGraph`'s `parents`, `ancestorsOf`), beside the `edges` roots and leaves
-              # read.
-              containment = {
-                nodes = kindNames;
-                edges = k: childrenMap.${k} or [ ];
-                parent = k: parentMap.${k} or null;
-              };
-              # Containment is well-founded: a kind that is its own ancestor has no root to hang
-              # from, and `_roots`/`_leaves` would drop it without a word. gen-graph's `cycles`
-              # names exactly the kinds ON a cycle; a kind nested under one is not itself wrong.
-              # Every published read of the containment graph passes through this guard, so it
-              # refuses at the timing an undeclared parent does. `_topology` guards each ENTRY, not
-              # the set, so its spine (`attrNames`, `?`) answers as it did before the guard.
-              cyclic = graph.cycles containment;
-              wellFounded =
-                v:
-                if cyclic == [ ] then
-                  v
-                else
-                  throw "gen-schema: containment cycle among kinds [${prelude.concatStringsSep " " cyclic}] — a kind may not be its own ancestor";
-              topology = prelude.genAttrs kindNames (
-                k:
-                wellFounded {
-                  parent = containment.parent k;
-                  children = containment.edges k;
-                }
-              );
-
-              # Materialize all ref edges from kind.refs across all kinds
-              refEdges = prelude.concatMap (
-                fromKind:
-                let
-                  refs = config.${fromKind}.refs;
-                in
-                prelude.mapAttrsToList (field: refEntry: {
-                  from = fromKind;
-                  inherit field;
-                  to = refEntry.refKind;
-                }) refs
-              ) kindNames;
-              # Unified edge view: § Neron 2015 P (parent) + I (ref/import) edges
-              parentEdges = prelude.concatMap (
-                k:
-                let
-                  t = topology.${k};
-                in
-                prelude.optional (t.parent != null) {
-                  from = k;
-                  to = t.parent;
-                  type = "parent";
-                  field = null;
-                }
-              ) kindNames;
-
-              # The third constituent, derived from the same name graph `evalSchema` stages over —
-              # one derivation, not a second spelling. `or [ ]` for a custom `mkType` entry, which
-              # carries no collections, exactly as the topology derivation does on `parent`.
-              inheritsEdges = prelude.concatMap (
-                k:
-                map (p: {
-                  from = k;
-                  to = p;
-                  type = "inherits";
-                  field = null;
-                }) (config.${k}.inherits or [ ])
-              ) kindNames;
-
-              edges = parentEdges ++ inheritsEdges ++ map (e: e // { type = "ref"; }) refEdges;
-
-              roots = wellFounded (graph.roots containment);
-              leaves = wellFounded (graph.leaves containment);
-
-            in
-            {
-              _kindNames = kindNames;
-              _topology = topology;
-              _refEdges = refEdges;
-              _edges = edges;
-              _roots = roots;
-              _leaves = leaves;
-              # The same derivation the entry type extracts with — not a second spelling.
-              # attrNames is already sorted, so no sort is added.
-              _collectionKeys = prelude.attrNames (mkAllCollections collections);
-              # Likewise ONE derivation with the guard's own predicate.
-              _declarationKeys = declarationKeys;
-              _reservedCollectionKeys = reservedCollectionKeys;
-            };
-        }
-      );
-      # ★ THE OPTION'S TYPE STATES ITS OWN MERGE RELATION (den-hoag-px98p). Declared twice, a plain
-      # `submodule` concatenates its module lists, so one construction declared twice imported the
-      # introspection module twice and every read-only `_`-field refused "defined 2 times". This type
-      # DELEGATES to `inner` (check, merge, emptyValue, sub-options) and takes its relation from the
-      # entry type's `constructionRelation` payload and binOp: two schema option types are one type
-      # exactly when their entry types are one construction (ADR-0034, t ⊔ t = t), and the merge
-      # answers with that one type, so every `_`-field is defined once (ADR-0012 item 2: a
-      # materialized view of the record, computed once). A pair of different constructions is
-      # refused by name at `schema`, within `closuresFirst`'s enumerated exception (a per-call type
-      # in module content can still abort; bfc0k gate v1 residual (b), den-hoag-6b5ia).
-      #
-      # Stated departures: the type is named `schema`, not `submodule`, so a plain `submodule`
-      # declared beside it is refused by name, in both orders (it used to union in and have its
-      # option misread as a kind); and it carries no `getSubModules`/`substSubModules`, so a foreign
-      # engine's `substSubModules` cannot rebuild a plain submodule and drop the relation — gen-merge's
-      # declaration-stratum route over `getSubModules` no longer applies to it. The idempotence is a
-      # property of gen-merge's engine: nixpkgs `lib.evalModules` still refuses the second
-      # declaration.
-      self = merge.mkOptionType {
-        name = "schema";
-        description = "schema — typed record registry";
-        inherit (inner)
-          check
-          merge
-          emptyValue
-          getSubOptions
-          ;
-        functor = {
+          }
+        );
+        # ★ THE OPTION'S TYPE STATES ITS OWN MERGE RELATION (den-hoag-px98p). Declared twice, a plain
+        # `submodule` concatenates its module lists, so one construction declared twice imported the
+        # introspection module twice and every read-only `_`-field refused "defined 2 times". This type
+        # DELEGATES to `inner` (check, merge, emptyValue, sub-options) and takes its relation from the
+        # entry type's `constructionRelation` payload and binOp: two schema option types are one type
+        # exactly when their entry types are one construction (ADR-0034, t ⊔ t = t), and the merge
+        # answers with that one type, so every `_`-field is defined once (ADR-0012 item 2: a
+        # materialized view of the record, computed once). A pair of different constructions is
+        # refused by name at `schema`, within `closuresFirst`'s enumerated exception (a per-call type
+        # in module content can still abort; bfc0k gate v1 residual (b), den-hoag-6b5ia).
+        #
+        # Stated departures: the type is named `schema`, not `submodule`, so a plain `submodule`
+        # declared beside it is refused by name, in both orders (it used to union in and have its
+        # option misread as a kind); and it carries no `getSubModules`/`substSubModules`, so a foreign
+        # engine's `substSubModules` cannot rebuild a plain submodule and drop the relation — gen-merge's
+        # declaration-stratum route over `getSubModules` no longer applies to it. The idempotence is a
+        # property of gen-merge's engine: nixpkgs `lib.evalModules` still refuses the second
+        # declaration.
+        self = merge.mkOptionType {
           name = "schema";
-          inherit (entry.functor) payload binOp;
-          type = _: self;
+          description = "schema — typed record registry";
+          inherit (inner)
+            check
+            merge
+            emptyValue
+            getSubOptions
+            ;
+          functor = {
+            name = "schema";
+            inherit (entry.functor) payload binOp;
+            type = _: self;
+          };
         };
-      };
-    in
-    merge.mkOption {
-      description = "Schema — typed record registry with extension points";
-      default = { };
-      type = self;
-    };
+      in
+      merge.mkOption {
+        description = "Schema — typed record registry with extension points";
+        default = { };
+        type = self;
+      }
+    )
+      checked;
 in
 {
   inherit

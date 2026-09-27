@@ -30,8 +30,16 @@ let
     identityKeysForKind
     evalSchema
     mkSchemaOption
+    mkSchemaEntryType
+    mkFieldValidator
+    mkMixin
     mkInstanceRegistry
     ;
+
+  # The door table door-checks.nix also reads, for the doors' own valid fixtures — the message
+  # goldens below apply the same rows' violations, so a row edited there cannot drift from what is
+  # pinned here.
+  doors = import ./doors.nix { inherit genSchema genMerge; };
 
   # A kind value the way a caller actually gets one, for the kind-mark cells below.
   markedHostKind =
@@ -1780,4 +1788,115 @@ in
         };
       };
     };
+
+  # THE CLOSED-DOOR REFUSALS (den-hoag-7gp66 P1) — `ci/tests/door-checks.nix` pins that every door
+  # refuses catchably; these pin WHICH refusal fired and that it names the door (R6). One cell per
+  # violation gen-prelude's `checkOptions`/`checkRequired` can raise for a row in `../doors.nix`, in
+  # the row's own order; a RECORD door (`options == [ ]`) has no unknown-option cell because R5 admits
+  # an extra field rather than refusing it (that admission is `door-checks.nix`'s own cell).
+  flake.testsError.door-checks = {
+    test-mkfieldvalidator-missing-required-names-the-door = {
+      expr = doors.mkFieldValidator.call (builtins.removeAttrs doors.mkFieldValidator.valid [ "fields" ]);
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkFieldValidator: required field 'fields' is missing \\(required: 'fields', 'name', 'check', 'message'\\) \\(in prelude\\.checkRequired\\)$";
+      };
+    };
+    test-mkfieldvalidator-non-attrset-argument-names-the-door = {
+      expr = doors.mkFieldValidator.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkFieldValidator: the argument must be an attrset, not a int \\(required: 'fields', 'name', 'check', 'message'\\) \\(in prelude\\.checkRequired\\)$";
+      };
+    };
+
+    test-mkmixin-missing-required-names-the-door = {
+      expr = doors.mkMixin.call (builtins.removeAttrs doors.mkMixin.valid [ "define" ]);
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkMixin: required field 'define' is missing \\(required: 'define'\\) \\(in prelude\\.checkRequired\\)$";
+      };
+    };
+    test-mkmixin-non-attrset-argument-names-the-door = {
+      expr = doors.mkMixin.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkMixin: the argument must be an attrset, not a int \\(required: 'define'\\) \\(in prelude\\.checkRequired\\)$";
+      };
+    };
+    test-mkmixin-unknown-option-names-the-door = {
+      expr = doors.mkMixin.call (doors.mkMixin.valid // { bogus = 1; });
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkMixin: 'bogus' is not an option of this door; the options are closed \\(accepted: 'define', 'requires', 'provides', 'kinds', 'name'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+
+    test-evalschema-missing-required-names-the-door = {
+      expr = doors.evalSchema.call (builtins.removeAttrs doors.evalSchema.valid [ "modules" ]);
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.evalSchema: required field 'modules' is missing \\(required: 'modules'\\) \\(in prelude\\.checkRequired\\)$";
+      };
+    };
+    test-evalschema-non-attrset-argument-names-the-door = {
+      expr = doors.evalSchema.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.evalSchema: the argument must be an attrset, not a int \\(required: 'modules'\\) \\(in prelude\\.checkRequired\\)$";
+      };
+    };
+    test-evalschema-unknown-option-names-the-door = {
+      expr = doors.evalSchema.call (doors.evalSchema.valid // { bogus = 1; });
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.evalSchema: 'bogus' is not an option of this door; the options are closed \\(accepted: 'modules', 'schemaOption', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+
+    test-identitykeysforkind-non-attrset-argument-names-the-door = {
+      expr = doors.identityKeysForKind.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.identityKeysForKind: the options must be an attrset, not a int \\(accepted: 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+    test-identitykeysforkind-unknown-option-names-the-door = {
+      expr = doors.identityKeysForKind.call { bogus = 1; };
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.identityKeysForKind: 'bogus' is not an option of this door; the options are closed \\(accepted: 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+
+    test-mkschemaentrytype-non-attrset-argument-names-the-door = {
+      expr = doors.mkSchemaEntryType.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkSchemaEntryType: the options must be an attrset, not a int \\(accepted: 'baseModule', 'collections', 'computed', 'mixins', 'mkType', 'strict', 'keySemantics', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+    test-mkschemaentrytype-unknown-option-names-the-door = {
+      expr = doors.mkSchemaEntryType.call { bogus = 1; };
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkSchemaEntryType: 'bogus' is not an option of this door; the options are closed \\(accepted: 'baseModule', 'collections', 'computed', 'mixins', 'mkType', 'strict', 'keySemantics', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+
+    test-mkschemaoption-non-attrset-argument-names-the-door = {
+      expr = doors.mkSchemaOption.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkSchemaOption: the options must be an attrset, not a int \\(accepted: 'baseModule', 'collections', 'computed', 'mixins', 'mkType', 'strict', 'keySemantics', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+    test-mkschemaoption-unknown-option-names-the-door = {
+      expr = doors.mkSchemaOption.call { bogus = 1; };
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkSchemaOption: 'bogus' is not an option of this door; the options are closed \\(accepted: 'baseModule', 'collections', 'computed', 'mixins', 'mkType', 'strict', 'keySemantics', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+  };
 }

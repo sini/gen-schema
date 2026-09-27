@@ -124,10 +124,19 @@ let
   # Defaulted, so the two callers differ only in what they have: `mkInstanceType` passes the set it
   # received, and `identityHashForKind` below — the reflection path, which takes no such argument —
   # passes nothing and keeps today's behaviour exactly.
+  # OPTIONS door (P1, den-hoag-7gp66): the sole formal is optional, so `checkOptions` alone closes
+  # it — an unknown option is refused, catchably, by name (§v1.9 cell 1'). Curried past the check:
+  # the `assert` sits BETWEEN the check and the returned `kindValue: …` lambda, not inside it,
+  # because a lambda is already WHNF and a probe of just the first application (the spec's own
+  # `identityKeysForKind { <fresh> = 1; }` under `tryEval`, with `kindValue` never supplied) would
+  # otherwise get back a perfectly valid-looking function without the check ever having run.
   identityKeysForKind =
-    {
-      specialArgs ? { },
-    }:
+    args:
+    let
+      checked = prelude.checkOptions "gen-schema.identityKeysForKind" [ "specialArgs" ] args;
+      specialArgs = checked.specialArgs or { };
+    in
+    assert builtins.isAttrs checked;
     kindValue:
     prelude.sort (a: b: a < b) (
       prelude.unique (

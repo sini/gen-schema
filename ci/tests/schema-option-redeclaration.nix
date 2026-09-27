@@ -86,11 +86,37 @@ in
         kindNamedAfterIntrospection = "REFUSED";
       };
     };
-    # The option's type is its entry type's construction only while the two constructors take one
-    # formal set; `mkSchemaOption` refuses by name otherwise, and a planted extra formal reds this.
+    # The option's type is its entry type's construction only while the two constructors accept one
+    # formal set. Before P1 (den-hoag-7gp66) that was a runtime `builtins.functionArgs` comparison;
+    # both doors are now bare `args:` lambdas (P1's catchable-refusal door shape), so `functionArgs`
+    # reads `{}` for both and the comparison would hold vacuously rather than state anything.
+    # Retargeted to the behavior the invariant is FOR: both doors admit the identical known field set,
+    # and both refuse an identical fresh unknown one ("bogus", this library's own not-a-field probe).
     test-option-formals-are-the-entry-formals = {
-      expr = builtins.functionArgs mkSchemaOption == builtins.functionArgs mkSchemaEntryType;
-      expected = true;
+      expr =
+        let
+          knownArgs = {
+            baseModule = null;
+            collections = { };
+            computed = null;
+            mixins = [ ];
+            mkType = null;
+            strict = true;
+            keySemantics = { };
+            specialArgs = { };
+          };
+          admits = f: (builtins.tryEval (builtins.seq (f knownArgs) true)).success;
+          refusesUnknown =
+            f: !(builtins.tryEval (builtins.seq (f (knownArgs // { bogus = 1; })) true)).success;
+        in
+        {
+          bothAdmitKnown = admits mkSchemaOption && admits mkSchemaEntryType;
+          bothRefuseUnknown = refusesUnknown mkSchemaOption && refusesUnknown mkSchemaEntryType;
+        };
+      expected = {
+        bothAdmitKnown = true;
+        bothRefuseUnknown = true;
+      };
     };
   };
 }
