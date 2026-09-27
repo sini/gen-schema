@@ -41,7 +41,7 @@ Entry: `inputs.gen-schema.lib` (flake) or `import ./default.nix { }` (root, self
 `{ prelude, merge, algebra, identity }` (`builtins.functionArgs (import ./lib/default.nix)` at
 `00ba0d8`).
 
-Root `default.nix`'s `wire ? { deps, resolve }: import ./lib deps` formal is the seam that hands this
+Root `default.nix`'s `wire ? { deps, resolve, lock }: import ./lib deps` formal is the seam that hands this
 exact parameter set to `./lib` as `deps`, and it is also the only channel by which the shim publishes
 anything outward — a formal is an INPUT channel and cannot carry a value out, so the lock-parameterised
 `follows` resolver rides out on the same record. Overriding `wire` is how a cell reads the shim's own
