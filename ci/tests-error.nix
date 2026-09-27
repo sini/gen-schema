@@ -1446,6 +1446,24 @@ in
           msg = "^gen-schema: ref field 'host' on kind 'service': declaration 'igloo' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
         };
       };
+      # Gate v1 (P1) C1, exercised at an IMMEDIATE ref-field door: the same hinted, stampless value
+      # naming a real member as the direct-door cell above, routed through `mkCoerceChain` instead of
+      # `mkCoercingRefType`. Both call `isCanonicalOf`, so one guard covers both, but only a cell at
+      # each door measures that rather than assuming it.
+      test-stampless-real-member-refused-at-a-ref-field = {
+        expr =
+          (at (
+            { config, ... }: {
+              config.services.s.host = {
+                name = "igloo";
+              };
+            }
+          )).services.s.host;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: ref field 'host' on kind 'service': declaration 'igloo' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
+        };
+      };
       # A registry whose members are not gen-schema instances has no identity-key datum to compare.
       # This is the one refusal in the suite that does NOT name the door: it throws from
       # `isCanonicalOf` (lib/ref.nix), which `prelude.resolve` binds registry-first so the by-hint
@@ -1477,6 +1495,27 @@ in
               };
             }
           )).drift.n1.parent.addr;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: ref field 'parent' on kind 'node': declaration 'n0' is not a member of the registry \\(available: 'n0', 'n1'\\) \\(in prelude\\.resolve\\)$";
+        };
+      };
+      # Gate v1 (P1) C1, exercised at a DEFERRED ref-field door (`mkInstanceRegistry`'s
+      # `refs.<field> = { deferred = true; instances = …; }`): same hinted, stampless real-member
+      # value, third door onto the shared `isCanonicalOf` guard.
+      test-stampless-real-member-refused-in-deferred-ref = {
+        expr =
+          (at (
+            { config, ... }:
+            {
+              config.drift.n1 = {
+                addr = "n1";
+                parent = {
+                  name = "n0";
+                };
+              };
+            }
+          )).drift.n1.parent;
         expectedError = {
           type = "ThrownError";
           msg = "^gen-schema: ref field 'parent' on kind 'node': declaration 'n0' is not a member of the registry \\(available: 'n0', 'n1'\\) \\(in prelude\\.resolve\\)$";
