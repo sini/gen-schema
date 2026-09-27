@@ -1409,7 +1409,7 @@ in
         );
         expectedError = {
           type = "ThrownError";
-          msg = "^links\\.main\\.target: declaration 'igloo' \\(host:[0-9a-f]{64}\\) is not a member of the instance registry \\(available: igloo\\)$";
+          msg = "^links\\.main\\.target: declaration 'igloo' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
         };
       };
       test-non-instance-refused-by-form = {
@@ -1420,7 +1420,7 @@ in
         };
         expectedError = {
           type = "ThrownError";
-          msg = "^links\\.main\\.target: expected an identifier or a declaration \\(an instance with name and id_hash\\), got set$";
+          msg = "^links\\.main\\.target: declaration 'ghost' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
         };
       };
       # A ref-field door (immediate): the prefix names the field and the kind, as the identifier arm's.
@@ -1428,10 +1428,14 @@ in
         expr = (at ({ config, ... }: { config.services.s.host = config.spares.igloo; })).services.s.host;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: ref field 'host' on kind 'service': declaration 'igloo' \\(host:[0-9a-f]{64}\\) is not a member of the instance registry \\(available: igloo\\)$";
+          msg = "^gen-schema: ref field 'host' on kind 'service': declaration 'igloo' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
         };
       };
       # A registry whose members are not gen-schema instances has no identity-key datum to compare.
+      # This is the one refusal in the suite that does NOT name the door: it throws from
+      # `isCanonicalOf` (lib/ref.nix), which `prelude.resolve` binds registry-first so the by-hint
+      # index is shared across every option location — the calling door is not yet known there, so
+      # the message names the library instead.
       test-member-without-identity-keys-refused = {
         expr =
           (at {
@@ -1441,7 +1445,7 @@ in
           }).handLinks.main.target;
         expectedError = {
           type = "ThrownError";
-          msg = "^handLinks\\.main\\.target: registry member 'a' carries no _identityKeys; a declaration value resolves only against gen-schema instances \\(use the identifier 'a'\\)$";
+          msg = "^gen-schema: registry member 'a' carries no _identityKeys; a declaration value resolves only against gen-schema instances \\(use the identifier 'a'\\)$";
         };
       };
       # The registry's own member, after a `derive` overwrote an identity key: its stamp is stale
@@ -1460,7 +1464,7 @@ in
           )).drift.n1.parent.addr;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: ref field 'parent' on kind 'node': declaration 'n0' \\(node:[0-9a-f]{64}\\) is not a member of the instance registry \\(available: n0, n1\\)$";
+          msg = "^gen-schema: ref field 'parent' on kind 'node': declaration 'n0' is not a member of the registry \\(available: 'n0', 'n1'\\) \\(in prelude\\.resolve\\)$";
         };
       };
     };
