@@ -192,7 +192,7 @@ let
       defaultOnError
       filterValidators
       ;
-    inherit (refLib) dedupByHash;
+    inherit (refLib) dedupByHash resolveDeclaration;
   };
   docs = import ./docs.nix { inherit prelude; };
   codecLib = import ./codec.nix {

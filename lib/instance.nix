@@ -17,6 +17,7 @@
   runValidators,
   defaultOnError,
   dedupByHash,
+  resolveDeclaration,
   filterValidators,
 }:
 let
@@ -119,13 +120,7 @@ let
   mkCoerceChain =
     field: kind: registry: customCoerce: type:
     let
-      # Validate that a coercion result is a plausible instance (has name + id_hash).
-      assertInstance =
-        v:
-        if builtins.isAttrs v && v ? name && v ? id_hash then
-          v
-        else
-          throw "gen-schema: ref field '${field}' on kind '${kind}': expected an instance (with name and id_hash), got ${builtins.typeOf v}";
+      resolve = resolveDeclaration registry "gen-schema: ref field '${field}' on kind '${kind}'";
 
       defaultCoerce =
         v:
@@ -135,7 +130,7 @@ let
           else
             throw "gen-schema: ref field '${field}' on kind '${kind}': reference '${v}' not found in instance registry (available: ${builtins.concatStringsSep ", " (builtins.attrNames registry)})"
         else
-          assertInstance v;
+          registry.${resolve v};
 
       # Scalar leaf: custom coerce receives the default result (lazy) and raw value.
       # Throws if custom coerce returns a list in scalar context.
@@ -429,23 +424,27 @@ let
             else
               let
                 deferredFields = builtins.attrNames refResult.deferredCoerce;
+                # One chain per FIELD: its inputs are the field and the raw registry, never the
+                # instance, so building it per instance rebuilt the resolver's index n times.
+                # The registry is the raw instances, NOT the captured binding.instances (which may
+                # be config.X, causing cycles). A custom coerce is wrapped to take that registry
+                # first: the consumer writes `coerce = registry: default: val: ...` and gen-schema
+                # calls `wrappedCoerce default val`.
+                chains = builtins.mapAttrs (
+                  field: binding:
+                  mkCoerceChain field kind instances (
+                    if binding.rawCustomCoerce != null then binding.rawCustomCoerce instances else null
+                  ) binding.type
+                ) refResult.deferredCoerce;
               in
               prelude.mapAttrs (
                 _name: instance:
                 builtins.foldl' (
                   inst: field:
                   let
-                    binding = refResult.deferredCoerce.${field};
-                    # Rebuild coerce chain with raw instances as registry —
-                    # NOT the captured binding.instances (which may be config.X, causing cycles).
-                    # Wrap custom coerce to inject registry as first arg when deferred:
-                    # consumer writes: coerce = registry: default: val: ...
-                    # gen-schema calls: wrappedCoerce default val (pre-applies registry)
-                    wrappedCoerce = if binding.rawCustomCoerce != null then binding.rawCustomCoerce instances else null;
-                    coerceChain = mkCoerceChain field kind instances wrappedCoerce binding.type;
                     rawValue = inst.${field} or null;
                   in
-                  inst // { ${field} = coerceChain rawValue; }
+                  inst // { ${field} = chains.${field} rawValue; }
                 ) instance deferredFields
               ) instances;
 

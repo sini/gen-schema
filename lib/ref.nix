@@ -4,16 +4,74 @@
 # Deferred: schema.declarationOf "host" → marker type, bound via refs on mkInstanceRegistry
 # Direct:   schema.declarationOf config.fleet.hosts → resolved immediately
 #
-# Both modes accept string keys ("igloo") or instance values (config.fleet.hosts.igloo).
+# Both modes accept string keys ("igloo") or instance values (config.fleet.hosts.igloo). A value must
+# be a member of the target registry, and resolves to the registry's entry: the door serves that
+# entry, never the value it was handed.
+#
+# The price, enumerated (ADR-0025 item 1's exception clause; warrant ADR-0033, the in-stratum read
+# this file shares with `id-hash.nix`): an identity key (including `name`) whose value is computed
+# through a declaration-value resolution that must read that key aborts with an uncatchable
+# `infinite recursion`. That is self-reference, a cycle through several members, or any member's
+# `name` when the resolution takes the by-name path (a renamed or refused value). The identifier
+# form ("cabin") never reads identity, and is the escape.
 {
   prelude,
   merge,
   constructionRelation,
 }:
 let
+  # ── THE DECLARATION RESOLVER (den-hoag-a4158, den-hoag-2zjg1 arm (B)) ──
+  # A declaration value resolves to the IDENTIFIER of the registry member it is, and the door then
+  # serves that member, so both written forms reach one entry. Membership is decided against the
+  # member itself, never by the value's own editable `name`, which is read only as a HINT for where
+  # to look. Registry first: a caller binds it once and every value shares one index.
+  resolveDeclaration =
+    registry:
+    let
+      # A value IS member `k` when it carries k's stamp AND k's identity-key values. The stamp alone
+      # is not enough: `member // { addr = …; }` keeps the stamp while the key moves. The key values
+      # alone are not enough either: a value of another kind can share them, and the stamp's kind tag
+      # separates the two. Both are field reads against a stamp minted inside k's own fixpoint, so
+      # this is the mint's verdict without minting again (ADR-0034, a comparison mints nothing), and
+      # every compared value is a primitive, so `==` here never meets a function. A member without
+      # the `_identityKeys` datum is not a gen-schema instance, and comparing its stamp alone would
+      # admit an override and drop the edit silently, so it is refused by name.
+      isCanonical =
+        door: v: k:
+        let
+          c = registry.${k};
+        in
+        if !(c ? _identityKeys) then
+          throw "${door}: registry member '${k}' carries no _identityKeys; a declaration value resolves only against gen-schema instances (use the identifier '${k}')"
+        else
+          v.id_hash == (c.id_hash or null) && prelude.all (f: v ? ${f} && v.${f} == c.${f}) c._identityKeys;
+      # Read only when the hint misses (a member whose `name` is not its key). It forces every
+      # member's `name` and nothing else, never an `id_hash`, so a member whose identity is still
+      # being computed is not dragged in.
+      byName = builtins.groupBy (k: registry.${k}.name) (builtins.attrNames registry);
+    in
+    door: v:
+    if
+      !(builtins.isAttrs v && builtins.isString (v.name or null) && builtins.isString (v.id_hash or null))
+    then
+      throw "${door}: expected an identifier or a declaration (an instance with name and id_hash), got ${builtins.typeOf v}"
+    else
+      let
+        found = builtins.filter (isCanonical door v) (byName.${v.name} or [ ]);
+      in
+      if registry ? ${v.name} && isCanonical door v v.name then
+        v.name
+      else if found != [ ] then
+        builtins.head found
+      else
+        throw "${door}: declaration '${v.name}' (${v.id_hash}) is not a member of the instance registry (available: ${builtins.concatStringsSep ", " (builtins.attrNames registry)})";
+
   # Resolved ref type with string/instance coercion.
   mkCoercingRefType =
     instances:
+    let
+      resolve = resolveDeclaration instances;
+    in
     merge.mkOptionType {
       name = "declarationOf";
       description = "reference to an instance (key or value)";
@@ -29,7 +87,7 @@ let
           else
             throw "${merge.showOption loc}: reference '${val}' not found in instance registry"
         else
-          val;
+          instances.${resolve (merge.showOption loc) val};
     };
 
   # Deferred ref — marker type carrying target kind name.
@@ -175,7 +233,12 @@ in
   # applying it; the message interpolates nothing, so no argument can turn it into a coercion abort.
   ref = throw "gen-schema: `ref` is renamed `declarationOf`. A value denoting a node is a declaration and the name written at a use site is a reference (Neron et al. 2015), so the type of a field holding either is `declarationOf <kind-or-registry>`; the argument and the behaviour are unchanged.";
 
-  inherit getRefKind dedupByHash setOf;
+  inherit
+    getRefKind
+    dedupByHash
+    setOf
+    resolveDeclaration
+    ;
 
   # Scan evaluated options for deferred ref types, preserving the option type
   # for coercion chain construction. Returns { fieldName = { refKind; type; }; }.

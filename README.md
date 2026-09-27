@@ -591,17 +591,37 @@ Both modes accept string keys or instance values:
 
 ```nix
 config.fleet.services.nginx.host = "igloo";                    # string key → lookup
-config.fleet.services.gateway.upstream = config.fleet.services.nginx;  # instance → passthrough
+config.fleet.services.gateway.upstream = config.fleet.services.nginx;  # instance → its registry entry
 
 config.fleet.services.nginx.host.addr  # → "10.0.1.1"
 config.fleet.services.gateway.upstream.port  # → 80
 ```
 
-Invalid references throw at eval time:
+A value must be a member of the target registry: it carries a member's stamp (`id_hash`) and that
+member's identity-key values. It resolves to the registry's entry, so both forms reach one node, and
+the door serves the entry, never the value it was handed: `igloo // { note = "x"; }` with `note` a
+non-identity field serves the registry's `note`.
+
+Invalid references and non-member values throw at eval time, catchably:
 
 ```
 ref field 'host' on kind 'service': reference 'nonexistent' not found in instance registry
+ref field 'host' on kind 'service': expected an identifier or a declaration (an instance with name and id_hash), got set
+ref field 'host' on kind 'service': declaration 'igloo' (host:…) is not a member of the instance registry (available: igloo, yurt)
+ref field 'host' on kind 'service': registry member 'a' carries no _identityKeys; a declaration value resolves only against gen-schema instances (use the identifier 'a')
 ```
+
+The non-member refusal covers the key-override idiom (`igloo // { addr = "evil"; }`), a same-name
+member of another registry, a value of another kind, and a registry's own member after a `derive`
+overwrote one of its identity keys (its stamp no longer matches its fields; the identifier form still
+resolves).
+
+One class is not catchable. An identity key (including `name`) whose value is computed through a
+declaration-value resolution that must read that key aborts with `infinite recursion`: self-reference,
+a cycle through several members, or any member's `name` when the resolution takes the by-name path (a
+renamed or refused value). This is an in-stratum read of in-flight identity, the price ADR-0033 records
+and ADR-0025 item 1 requires to be enumerated. The identifier form (`"cabin"`) never reads identity and
+is the escape.
 
 ### Refs in Collections
 

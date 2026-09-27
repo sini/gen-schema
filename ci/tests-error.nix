@@ -1326,6 +1326,145 @@ in
       };
     };
 
+  # ── a declaration value that is not a member (den-hoag-a4158) ────────────────────────────────
+  # The refusal names the door, the declaration and the registry's identifiers; ./tests pins only
+  # THAT the value is refused. The key-override idiom (`member // { addr = …; }`) is the case: it
+  # keeps the member's stamp, so a message naming a cause other than membership would misdiagnose.
+  flake.testsError.declaration-membership-refusals =
+    let
+      at =
+        extra:
+        (genMerge.evalModuleTree {
+          modules = [
+            (
+              { config, ... }:
+              let
+                kinds = genSchema.evalSchema {
+                  modules = [
+                    {
+                      config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                      config.schema.link.options.label = genMerge.mkOption { type = genMerge.types.str; };
+                      config.schema.service.options.host = genMerge.mkOption {
+                        type = genSchema.declarationOf "host";
+                      };
+                      config.schema.node = {
+                        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                        options.parent = genMerge.mkOption {
+                          type = genMerge.types.nullOr (genSchema.declarationOf "node");
+                          default = null;
+                        };
+                      };
+                    }
+                  ];
+                };
+              in
+              {
+                options.hosts = genSchema.mkInstanceRegistry kinds.host { };
+                options.spares = genSchema.mkInstanceRegistry kinds.host { };
+                options.links = genSchema.mkInstanceRegistry kinds.link {
+                  extraModules = [
+                    { options.target = genMerge.mkOption { type = genSchema.declarationOf config.hosts; }; }
+                  ];
+                };
+                options.handLinks = genSchema.mkInstanceRegistry kinds.link {
+                  extraModules = [
+                    { options.target = genMerge.mkOption { type = genSchema.declarationOf hand; }; }
+                  ];
+                };
+                options.services = genSchema.mkInstanceRegistry kinds.service { refs.host = config.hosts; };
+                # `derive` overwrites an identity key after the stamp is minted, so the post-derive
+                # record carries a stamp its own fields no longer produce.
+                options.drift = genSchema.mkInstanceRegistry kinds.node {
+                  refs.parent = {
+                    deferred = true;
+                    instances = config.drift;
+                  };
+                  derive = _: { n0.addr = "derived"; };
+                };
+                config.hosts.igloo.addr = "10.0.0.1";
+                config.spares.igloo.addr = "10.9.9.9";
+                config.links.main.label = "l";
+                config.handLinks.main.label = "l";
+                config.drift.n0.addr = "n0";
+              }
+            )
+            extra
+          ];
+        }).config;
+      fixture = extra: (at extra).links.main.target;
+      hand.a = {
+        name = "a";
+        id_hash = "hand:1";
+        addr = "x";
+      };
+    in
+    {
+      test-key-override-refused-as-non-member = {
+        expr = fixture (
+          { config, ... }: {
+            config.links.main.target = config.hosts.igloo // {
+              addr = "evil";
+            };
+          }
+        );
+        expectedError = {
+          type = "ThrownError";
+          msg = "^links\\.main\\.target: declaration 'igloo' \\(host:[0-9a-f]{64}\\) is not a member of the instance registry \\(available: igloo\\)$";
+        };
+      };
+      test-non-instance-refused-by-form = {
+        expr = fixture {
+          config.links.main.target = {
+            name = "ghost";
+          };
+        };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^links\\.main\\.target: expected an identifier or a declaration \\(an instance with name and id_hash\\), got set$";
+        };
+      };
+      # A ref-field door (immediate): the prefix names the field and the kind, as the identifier arm's.
+      test-foreign-refused-at-a-ref-field = {
+        expr = (at ({ config, ... }: { config.services.s.host = config.spares.igloo; })).services.s.host;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: ref field 'host' on kind 'service': declaration 'igloo' \\(host:[0-9a-f]{64}\\) is not a member of the instance registry \\(available: igloo\\)$";
+        };
+      };
+      # A registry whose members are not gen-schema instances has no identity-key datum to compare.
+      test-member-without-identity-keys-refused = {
+        expr =
+          (at {
+            config.handLinks.main.target = hand.a // {
+              addr = "evil";
+            };
+          }).handLinks.main.target;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^handLinks\\.main\\.target: registry member 'a' carries no _identityKeys; a declaration value resolves only against gen-schema instances \\(use the identifier 'a'\\)$";
+        };
+      };
+      # The registry's own member, after a `derive` overwrote an identity key: its stamp is stale
+      # against its fields, so it is not the entry it claims to be. At HEAD this served "derived"
+      # while the identifier "n0" served "n0"; now the value form is loud.
+      test-derive-overlaid-member-refused = {
+        expr =
+          (at (
+            { config, ... }:
+            {
+              config.drift.n1 = {
+                addr = "n1";
+                parent = config.drift.n0;
+              };
+            }
+          )).drift.n1.parent.addr;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: ref field 'parent' on kind 'node': declaration 'n0' \\(node:[0-9a-f]{64}\\) is not a member of the instance registry \\(available: n0, n1\\)$";
+        };
+      };
+    };
+
   # ── the kind-tree channel's reserved keys (den-hoag-v9gjd, G5/G6) ────────────────────────────
   # `evalSchema`, `mkSchemaOption` and `identityKeysForKind` forward `specialArgs` verbatim into
   # `merge.evalModuleTree`'s own `baseArgs` (S2/S3/S4 in the spec's channel census). The gen-merge
