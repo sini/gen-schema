@@ -93,7 +93,7 @@ let
     };
   };
 
-  # den-hoag-6vgwm. THE ANTI-OVER-FIRE CENSUS. `mkAllCollections` refuses fifteen names that
+  # den-hoag-6vgwm. THE ANTI-OVER-FIRE CENSUS. `mkAllCollections` refuses 21 names that
   # collide with gen-schema's own vocabulary, and a door that refuses too much is exactly as much a
   # failure as one that refuses too little — a guard that threw on every collection would satisfy
   # every error-plane cell of that class and fail only here. These six are the census of every
@@ -253,27 +253,30 @@ in
 
   # The reserved set is PUBLISHED for the reason `_collectionKeys` and `_declarationKeys` are
   # (den-hoag-4kh.53.55): a consumer that generates collection names needs the set it must avoid
-  # without re-deriving it from `lib/entry-type.nix`. Half of it is derived from `declarationKeys`,
-  # half restated as `kindResultKeys` -- pinned here so neither half moves unremarked.
+  # without re-deriving it from `lib/entry-type.nix`. One part is `declarationKeys`, one part
+  # gen-merge's published `moduleSyntax.shorthandMeta` (den-hoag-1n12c: DERIVED here, not restated
+  # — the module-key half is gen-merge's to name, not a literal frozen against it), and one part
+  # restated as `kindResultKeys` -- pinned here so no part moves unremarked.
   flake.tests.collection-keys.test-reserved-collection-keys-published = {
     expr = liveConsumerNames.config.schema._reservedCollectionKeys;
-    expected = [
-      "__functor"
-      "__mint"
-      "__sealed"
-      "config"
-      "disabledModules"
-      "freeformType"
-      "imports"
-      "key"
-      "keySemantics"
-      "kind"
-      "mixins"
-      "options"
-      "refinements"
-      "refs"
-      "strict"
-    ];
+    expected = builtins.sort (a: b: a < b) (
+      prelude.unique (
+        genMerge.moduleSyntax.structured
+        ++ genMerge.moduleSyntax.shorthandMeta
+        ++ [
+          "__functor"
+          "__mint"
+          "__sealed"
+          "keySemantics"
+          "kind"
+          "mixins"
+          "options"
+          "refinements"
+          "refs"
+          "strict"
+        ]
+      )
+    );
   };
 
   # O6 -- the collision input, the one arm the filtered/refused pair is missing. An ARBITRARY `_`

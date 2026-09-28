@@ -403,35 +403,25 @@ let
   # branch — and each consumes top-level keys `configOf` never sees. A predicate derived from
   # `configOf`'s domain FALSE-REFUSES keys this library just read.
 
-  # gen-merge's structural-classification set, RESTATED rather than imported: `markers` is a private
-  # binding of its `lib/modules.nix` and its public lib exports none of it (32 members, measured —
-  # no marker and no module-key surface). Copying an ENFORCED contract would be the defect
-  # `den-hoag-4kh.53.55` rejected; this list is not enforced against gen-merge, and it errs SAFE by
-  # construction — a marker omitted here makes a def read as UNSTRUCTURED, so the guard under-fires.
-  # A missed refusal, never a false one.
-  declarationMarkers = [
-    "config"
-    "disabledModules"
-    "freeformType"
-    "imports"
-    "options"
-  ];
-
-  # `configOf`'s unstructured strip list is `[ key _file _module __pureModule ]`. Three of the four
-  # carry the `_` prefix and are admitted by the prefix rule below; `key` is the one that does not.
-  declarationMetaKeys = [ "key" ];
-
+  # gen-merge's structural-classification set, READ off its own published `moduleSyntax` record
+  # (`lib/default.nix` there) rather than restated: RESTATING it was the defect (den-hoag-4kh.53.55
+  # — an owning library publishes what it enforces; a consumer's second spelling drifts). Measured
+  # at s7826 (den-hoag-1n12c): the old restated five-marker copy fell out of step with gen-merge's
+  # own reader within one landing, refusing keys gen-merge reads. `moduleSyntax` is data only (a
+  # plain-string-list record, ADR-0014), and it IS the set `configOf` enforces with, by construction
+  # on gen-merge's side — never a narrower or stale spelling of it.
+  #
   # Published as `schema._declarationKeys` — ONE derivation read by the guard and by the option,
   # never two spellings of one contract. It is a LIST because the enforced finite part of the
   # contract IS a finite list; the prefix rule and the option-declaration rule are NOT lists and go
   # in the option's description instead.
-  declarationKeys = prelude.sort (a: b: a < b) (declarationMarkers ++ declarationMetaKeys);
+  declarationKeys = prelude.sort (a: b: a < b) merge.moduleSyntax.structured;
 
   # ★ THE NAMES `mkSchemaEntryType` WRITES ONTO THE KIND VALUE, each with the writer that earns
-  # it. RESTATED for the reason `declarationMarkers` is: the record is built inside the merge body
-  # while `mkAllCollections` runs outside it, so it cannot be read off the result. A name omitted
-  # here is an UNDER-fire — a missed refusal, never a false one — and the §3b census is what keeps
-  # it from drifting.
+  # it. RESTATED because this is gen-schema's OWN contract, not gen-merge's: the record is built
+  # inside the merge body while `mkAllCollections` runs outside it, so it cannot be read off the
+  # result. A name omitted here is an UNDER-fire — a missed refusal, never a false one — and the
+  # §3b census is what keeps it from drifting.
   kindResultKeys = [
     "__functor" # the importable-module wrapper, default branch
     "kind" # `prelude.last loc`, both branches
@@ -478,11 +468,18 @@ let
   # refusing them over-fires by three names. `reservedDeclarationKeysFor` branches on `mkType`
   # because `__functor` is LEGITIMATE on that branch; none of these three is legitimate as a
   # collection on either, so one list is taken over two.
+  # `moduleSyntax.shorthandMeta` joins the module-key half of the reserved set beside
+  # `declarationKeys` for collision case (A) above: gen-merge reads `require` as module syntax on a
+  # SHORTHAND declaration (it joins `imports`), so a collection named `require` would delete
+  # `imports` before the merge, silently, the same way a collection named for a structured key
+  # already does. `declarationKeys` alone (gen-merge's STRUCTURED set) does not cover it, because a
+  # shorthand-only key is never a structured one.
   reservedCollectionKeys = prelude.sort (a: b: a < b) (
-    prelude.unique (declarationKeys ++ kindResultKeys)
+    prelude.unique (declarationKeys ++ merge.moduleSyntax.shorthandMeta ++ kindResultKeys)
   );
 
-  isStructuredDecl = v: builtins.isAttrs v && prelude.any (k: v ? ${k}) declarationMarkers;
+  isStructuredDecl =
+    v: builtins.isAttrs v && prelude.any (k: v ? ${k}) merge.moduleSyntax.structuring;
 
   # ★ THE NAMES THIS LIBRARY WRITES ONTO THE KIND VALUE ITSELF. They begin with `_`, so the prefix
   # rule would admit them as "consumer-private metadata gen-schema must not read" — and they are the
@@ -514,6 +511,36 @@ let
         "__sealed"
       ];
 
+  # A top-level option declaration is never a read plane once the declaration asserts ANY
+  # module-syntax vocabulary: a kind entry is a module, and neither gen-merge nor nixpkgs collects a
+  # top-level `mkOption` as a declaration (den-hoag-zijk1). INDEPENDENT of `isStructuredDecl` on
+  # purpose (Arm 1, den-hoag-declaration-markers-restated-1n12c): `moduleSyntax.structuring` narrowed
+  # to `config`/`options` only reclassifies an `imports`-only or `freeformType`-only decl as
+  # SHORTHAND, which would otherwise stand the whole guard down and admit a flat `mkOption` record as
+  # ordinary config — silently dropping zijk1's guarantee for exactly that case. Reuses
+  # `isOptionDecl`, the same predicate `optionsOf`/`extractedRefinements` read, rather than a second
+  # one.
+  #
+  # GATED on `moduleSyntax.structured` — gen-merge's full published key list, not the narrowed
+  # `structuring` pair — never unconditional: a decl asserting NO module-syntax key at all (none of
+  # `imports`, `freeformType`, `config`, `options`, `key`, `meta`, …) is data through and through, and
+  # gen-merge's `configOf` reads it as ordinary config with no ambiguity; an option-shaped VALUE there
+  # is then no different from any other value a config key may hold. The ambiguity zijk1 names only
+  # arises once the decl also asserts some module-syntax key — that is where a reader could mistake
+  # the flat option for a declaration instead of a value. An earlier, unconditional pass regressed two
+  # live cells that depend on exactly this admission
+  # (`kind-mixins.test-entry-type-empty-mixins-default`,
+  # `reverse-half-read.test-flat-unstructured-lands-no-refinement`), driven and read, not asserted.
+  carriesModuleSyntaxKey =
+    v: builtins.isAttrs v && prelude.any (k: v ? ${k}) merge.moduleSyntax.structured;
+
+  flatOptionValuedKeys =
+    v:
+    if builtins.isAttrs v && carriesModuleSyntaxKey v then
+      builtins.filter (k: isOptionDecl v.${k}) (prelude.attrNames v)
+    else
+      [ ];
+
   # The surplus keys of ONE def value — the keys no reader consumes. Each clause names the reader
   # that earns it; `mkSchemaOption`'s `_declarationKeys` option below publishes the same contract.
   surplusDeclarationKeys =
@@ -530,47 +557,55 @@ let
     # to us — it is unbounded, and no finite allow-list could express it.
     if computed != null || mkType != null then
       [ ]
-    # CLAUSE B · on an UNSTRUCTURED def gen-merge's `configOf` reads EVERY key as config, so there
-    # is nothing unread to refuse. This is what lets a live consumer's shorthand declarations pass.
+    # CLAUSE B · on an UNSTRUCTURED def gen-merge's `configOf` reads EVERY OTHER key as config, so
+    # only `flatOptionValuedKeys` is unread here — the one plane no regime ever gives a flat
+    # `mkOption` record to.
     else if !(isStructuredDecl v) then
-      [ ]
+      flatOptionValuedKeys v
     else
-      # A top-level option declaration is NOT among the read keys: a kind entry is a module, and
-      # neither gen-merge nor nixpkgs collects a top-level `mkOption` as a declaration, so it is
-      # refused here like any other unread key. `options` is the one place an option is declared.
       # Scoped to the kind entry: a mixin `baseModule` is a RECORD, and `bridge.nix`'s `emitModule`
       # is the typed record→module boundary that lifts its flat option records soundly.
-      builtins.filter (
-        k:
-        # RULE 4 · any key beginning with `_` is consumer-private metadata this library must not
-        # read. A PREFIX rule, not a list: it admits every present and future `_`-prefixed module
-        # metadata key gen-merge adds, and gen-schema already enforces `_` as its reserved prefix
-        # one plane up (`reservedKindNames`, below). The reserved names above are its one exception
-        # and are refused by their own door, before this predicate runs.
-        !(prelude.hasPrefix "_" k)
-        # RULES 1-3 · this schema's collection keys (reader: `extractedCollections`), gen-merge's
-        # five structural markers (readers: `configOf`, `optionsOf`, `importsOf`, `topFreeformOf`)
-        # and the `key` metadata name (reader: `configOf`'s unstructured strip list).
-        && !(builtins.elem k (declarationKeys ++ collectionKeys))
-      ) (prelude.attrNames v);
+      prelude.unique (
+        flatOptionValuedKeys v
+        ++ builtins.filter (
+          k:
+          # RULE 4 · any key beginning with `_` is consumer-private metadata this library must not
+          # read. A PREFIX rule, not a list: it admits every present and future `_`-prefixed module
+          # metadata key gen-merge adds, and gen-schema already enforces `_` as its reserved prefix
+          # one plane up (`reservedKindNames`, below). The reserved names above are its one exception
+          # and are refused by their own door, before this predicate runs.
+          !(prelude.hasPrefix "_" k)
+          # RULES 1-3 · this schema's collection keys (reader: `extractedCollections`) and gen-merge's
+          # published structured-module keys, `merge.moduleSyntax.structured` (readers: `configOf`,
+          # `optionsOf`, `importsOf`, `topFreeformOf`), which already includes `key`.
+          && !(builtins.elem k (declarationKeys ++ collectionKeys))
+        ) (prelude.attrNames v)
+      );
 
   # Names EVERY offending key on the first offending def, never just the first — a three-typo
   # migration is otherwise three round trips. The recognised sets are RENDERED FROM the bindings the
   # predicate reads, never restated as literals in the string, so they cannot drift out of step.
   unknownDeclarationKeyRefusal =
-    kind: collectionKeys: unknown: file:
+    kind: collectionKeys: unknown: structured: file:
     let
       noun = if builtins.length unknown == 1 then "key" else "keys";
       named = builtins.concatStringsSep ", " (map (k: "'${k}'") unknown);
       first = builtins.head unknown;
     in
     "gen-schema: kind '${kind}': unrecognised declaration ${noun} ${named} (declared in ${file}). "
-    + "This declaration is structured — it carries a module marker — so gen-schema reads only: "
-    + "this schema's collection keys "
-    + "[${builtins.concatStringsSep ", " collectionKeys}] (published as `schema._collectionKeys`), "
-    + "the module keys [${builtins.concatStringsSep ", " declarationKeys}] "
-    + "(published as `schema._declarationKeys`), and any `_`-prefixed key. Every other key is "
-    + "discarded unread. Declare '${first}': `options.${first} = mkOption { … };` for an option, "
+    + (
+      if structured then
+        "This declaration is structured — it carries `config` or `options` — so gen-schema reads only: "
+        + "this schema's collection keys "
+        + "[${builtins.concatStringsSep ", " collectionKeys}] (published as `schema._collectionKeys`), "
+        + "the module keys [${builtins.concatStringsSep ", " declarationKeys}] "
+        + "(published as `schema._declarationKeys`), and any `_`-prefixed key. Every other key is "
+        + "discarded unread. "
+      else
+        "This declaration is config shorthand, so gen-schema reads every other key as config; a flat "
+        + "option declaration alone is never a read plane here, structured or not (den-hoag-zijk1). "
+    )
+    + "Declare '${first}': `options.${first} = mkOption { … };` for an option, "
     + "`config.${first} = …` for a value on an option already declared, `_${first}` for "
     + "consumer-private metadata gen-schema must not read, or `${first}` as a collection on "
     + "mkSchemaOption for schema-level data.";
@@ -857,7 +892,7 @@ let
                   throw (
                     unknownDeclarationKeyRefusal kind collectionKeys (surplusDeclarationKeys {
                       inherit computed mkType;
-                    } collectionKeys offender.value) (offender.file or "<unknown>")
+                    } collectionKeys offender.value) (isStructuredDecl offender.value) (offender.file or "<unknown>")
                   )
                 else
                   result;
@@ -1163,7 +1198,7 @@ let
               type = merge.types.listOf merge.types.str;
               internal = true;
               readOnly = true;
-              description = "The collection names `mkSchemaOption` refuses, by name, at construction: gen-merge's structural markers plus the `key` metadata name (a collection of that name would delete the key from every kind declaration before the module merge sees it) together with the names gen-schema writes onto the kind value itself (a collection of that name would shadow what this library wrote, or — for `__mint`, applied last — be silently overwritten by it). The remedy for all of them is the same: rename the collection.";
+              description = "The collection names `mkSchemaOption` refuses, by name, at construction: gen-merge's published module-syntax keys — its structured set (`_declarationKeys`) and its shorthand metadata set, e.g. `require`, which joins `imports` on a shorthand declaration (a collection of either would delete that key from every kind declaration before the module merge sees it) — together with the names gen-schema writes onto the kind value itself (a collection of that name would shadow what this library wrote, or — for `__mint`, applied last — be silently overwritten by it). The remedy for all of them is the same: rename the collection.";
             };
             # Published for the reason `_collectionKeys` was (`den-hoag-4kh.53.55`): consumers
             # hardcode what a library does not publish. The LIST is only the finite, enforced part of
@@ -1179,7 +1214,7 @@ let
               # over the RAW source, comments included — because its comment stripper is line-based
               # and a multi-line string is where that premise could break. Matching `_collectionKeys`
               # above costs nothing and leaves that census's population where it was.
-              description = "The admissible non-collection keys of a kind declaration: gen-merge's five structural markers plus the `key` metadata name. A structured declaration — one carrying any of those markers — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. An option is declared under `options`; a bare top-level option declaration is not read, because neither module engine collects one, and is refused like any other key. Every other key on a structured declaration is refused by name. Two exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. An UNSTRUCTURED declaration carries no marker, every key of it is read as config, and none is refused.";
+              description = "The admissible non-collection keys of a kind declaration: gen-merge's published structured-module keys (`merge.moduleSyntax.structured`, which includes `key`). A structured declaration — one carrying `config` or `options` — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. Every other key on a structured declaration is refused by name. A bare top-level option declaration is never read, structured or not: neither module engine collects a top-level `mkOption` as a declaration, so it is refused independently of structuring the moment the surrounding declaration carries ANY module-syntax key at all (`den-hoag-zijk1`). Two exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. A declaration carrying NO module-syntax key at all is plain data through and through: every key of it is read as config, an option-shaped value among them is no different from any other, and nothing is refused.";
             };
             config =
               let
