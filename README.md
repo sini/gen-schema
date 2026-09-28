@@ -1058,13 +1058,13 @@ config.schema.host = {
 ```
 
 A declaration is **structured** when it carries `config` or `options`
-(`genMerge.moduleSyntax.structuring`, narrowed to those two — den-hoag-1n12c). An unstructured one is
+(`genMerge.moduleSyntax.structuring`, narrowed to those two). An unstructured one is
 config shorthand: gen-merge reads every other key of it as config. Beside `_declarationKeys` and
 `_collectionKeys`, one rule that is not a list: any `_`-prefixed key is admitted as consumer-private
 metadata gen-schema must not read.
 
-A bare top-level `myPort = mkOption { … }` is refused **independently of structuring**
-(`den-hoag-zijk1`; den-hoag-1n12c Arm 1): a kind entry is a module, and neither gen-merge nor nixpkgs
+A bare top-level `myPort = mkOption { … }` is refused **independently of structuring**:
+a kind entry is a module, and neither gen-merge nor nixpkgs
 ever collects a top-level `mkOption` as a declaration, so a flat option-valued key is never a read
 plane whether the surrounding declaration is structured or not. That check only fires once the
 declaration carries **some** module-syntax key at all (`genMerge.moduleSyntax.structured` — `imports`,
