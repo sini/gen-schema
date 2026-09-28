@@ -143,11 +143,11 @@
         "gen-types": "gen-types"
       },
       "locked": {
-        "lastModified": 1790615904,
-        "narHash": "sha256-8okiYCLTRpCA6hSly4NDGMqK4nu2F6TXkuH7RV9bnHk=",
+        "lastModified": 1790616235,
+        "narHash": "sha256-HVIFC7Q1jmavbxnSKk8DHSZMngY3Hjw7IcDsAvHXaPM=",
         "owner": "sini",
         "repo": "gen-merge",
-        "rev": "508c390e035c704fc42b9febfb29bccfad63d363",
+        "rev": "0c49041195bf4ceb172986641f90c0a153e0040b",
         "type": "github"
       },
       "original": {
