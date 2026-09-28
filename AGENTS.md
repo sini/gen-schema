@@ -196,10 +196,15 @@ A codec is `{ encode; decode; encodeAll; decodeAll; serialize; deserialize; seri
 `{ __functor; __mint; __sealed; kind; options; refs; refinements; strict; keySemantics; mixins; methods; validators; parent; }` plus user collections and computed fields. `__functor` makes the kind directly importable
 as a module. `__mint.minted` is the PROVENANCE MARK (ADR-0034), minted by the one authority
 (`gen-identity`'s `hashIdentity`, ADR-0016 ruling 5) and tagged `"schemakind"` over the kind's
-distinguishing content as per-component PREIMAGE TAGS (gen-algebra `componentsPreimage`): every
-option-declaration attribute, each option's kind-level value, the declaration's `freeformType`,
-the collection values, `keySemantics`, `refs`, the computed fields, the opaque (function) modules
-and the schema's `mkType`/`computed`. `__sealed` carries the sealed components' subjects from the
+distinguishing content as per-component PREIMAGE TAGS (gen-algebra `componentsPreimage`): each
+option declaration's `type` (no other attribute of it), the declaration's `freeformType`, the
+collection values, `keySemantics`, `refs`, the computed fields, the opaque (function) modules and
+the schema's `mkType`/`computed`. An option's kind-level value is not a component. Any other
+declaration attribute (`default`, `defaultText`, `description`, `example`, `readOnly`, `apply`,
+`visible`, `internal`, `identity`, an unknown one) and the kind-level value may read instance data
+(`config.name`) that the kind level lacks, so forcing them made the mark partial (den-hoag-pa887,
+arm A). The cost, two kinds differing only there sharing one identity, is pinned class by class by
+the `kind-mark-cplus.test-*-reopened-*-until-pa887-c` cells until pa887's arm C. `__sealed` carries the sealed components' subjects from the
 same call; `kindEq` compares two kinds through both and refuses BY NAME a pair that mints one mark
 and differs only at sealed components. A sealed component holding type records (an option's
 `type`, `freeformType`, a `keySemantics` entry's `option.type`, a `refs` entry's `type`) publishes

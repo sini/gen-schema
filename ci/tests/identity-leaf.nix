@@ -202,8 +202,8 @@ in
         default.keys = [ "addr" ];
         empty.keys = [ ];
         unset.keys = [ ];
-        hashReflected = "host:40aa9c14f591155a0804aebe7b96f7606295a3f424207a7fdeb56731c18cc7e1";
-        hashExplicit = "host:d7aedf042f783b3c7d14ffbc1228dad310f8be3b082a90b1ed2432a8bdf27da2";
+        hashReflected = "host:711456647b2fa32e7b78b8408dd5e47d32b7e1cb4c2fd673a048e262acd98096";
+        hashExplicit = "host:5ac541973e4ff13a4468034789ce69444102732f6eab9e95d265c3ab833eb725";
       };
     };
   };

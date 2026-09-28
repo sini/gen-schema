@@ -145,8 +145,8 @@ in
       closedKeys = base._identityKeys;
     };
     expected = {
-      base = "host:568a01c7719445b4fc776270ae9baae39c11bd50d7ccf718a3028d7c0a78c869";
-      withExtra = "host:568a01c7719445b4fc776270ae9baae39c11bd50d7ccf718a3028d7c0a78c869";
+      base = "host:e5273b507a632a0689f35bda11f21d724ec81ab17bd05685516a2d359d9566a0";
+      withExtra = "host:e5273b507a632a0689f35bda11f21d724ec81ab17bd05685516a2d359d9566a0";
       agree = true;
       closedKeys = [
         "name"
@@ -178,7 +178,7 @@ in
     };
     expected = {
       moved = true;
-      otherRole = "host:189f15d989c34bcb8eb98bc0209c57574c4f3dff4e66ddcc5808c6577fdfed0e";
+      otherRole = "host:e7ca54e402efff53ecfa83c099347fbd69f42aeda06f6cba6e6db778d5694e6b";
     };
   };
 
@@ -232,7 +232,7 @@ in
       ];
       kindValueOptions = [ "spool" ];
       recomputeMatchesStamp = true;
-      stamped = "thimble:15c832bc881510c21e80a9635924fc768b837a7ce5544f7a91d82d03d10bf3a8";
+      stamped = "thimble:a07021dda2a4692493bb0735f9cc72f0cd2f07de0ed7eda46e41398026b44c29";
     };
   };
 

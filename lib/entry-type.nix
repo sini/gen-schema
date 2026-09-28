@@ -56,15 +56,13 @@ let
   # read by both arms of the merge, not two spellings of one preimage. `attrNames` is already
   # sorted, so no sort is added.
   # ★ (c+), den-hoag-markof-partial-preimage-znfjq. THE KIND'S DISTINGUISHING CONTENT, as
-  # components, from ONE plane per arm — the option tree, its kind-level config, the
-  # collections, `keySemantics`, `refs` and the computed fields. `markOf` mints over the
-  # components' TAGS and the kind value carries their SEALED subjects (`__sealed`) for `kindEq`;
-  # both come out of one `componentsPreimage` call, so the two cannot read different planes.
+  # components, from ONE plane per arm — the option tree, the collections, `keySemantics`, `refs`
+  # and the computed fields. `markOf` mints over the components' TAGS and the kind value carries
+  # their SEALED subjects (`__sealed`) for `kindEq`; both come out of one `componentsPreimage` call,
+  # so the two cannot read different planes.
   #
-  # EVERY attribute of an option declaration is a component, the presentation keys (`description`,
-  # `example`, `defaultText`, …) included: an instance module is handed `options` and can read
-  # `options.port.description` into its config, so no attribute is outside the merged result (the
-  # a0gc standard: exclusion owes that argument, and none holds). The declaration's `freeformType`,
+  # Of an option declaration, ONE attribute is a component: its `type` (`optionComponents` below).
+  # An option's kind-level VALUE is not one. The declaration's `freeformType`,
   # at either site (top-level or `_module.freeformType`), is a component too: it decides which
   # undeclared instance keys are accepted. Four exclusions, each a projection of a
   # component already present (ADR-0013, a derivable fact is derived once): `refinements`
@@ -83,9 +81,8 @@ let
   # see into them. An OPAQUE module — a function module, a functor, a path — is one the plane
   # cannot see into: what it contributes that the kind level cannot evaluate (a definition reading
   # an instance's config) lives only in its body, so the body is a component. An attrset module
-  # is not opaque: its `options` and `config` are the option plane and the kind-level values
-  # themselves, and its `freeformType` is read off it here (the evaluated tree does not publish
-  # the resolved one).
+  # is not opaque: its `options` are the option plane itself, and its `freeformType` is read off it
+  # here (the evaluated tree does not publish the resolved one).
   modulesOf = prelude.concatMap (
     v:
     if v == null then
@@ -101,6 +98,23 @@ let
   # declares it) — this reads it, it does not declare it; what the grammar declares is the POSITION
   # of the records (`recordsOf` below), which is what `comparedTyped` needs.
   isSealedType = t: !(builtins.isAttrs t) || !(identityOf t ? minted);
+
+  # ★ AN OPTION ENTERS THE MARK BY ITS `type` ALONE (den-hoag-pa887, arm A). Every other attribute of
+  # a declaration — `default`, `defaultText`, `description`, `example`, `readOnly`, `apply`,
+  # `visible`, `internal`, `identity`, any attribute gen-merge does not know — and the option's
+  # kind-level VALUE may be written in a function module over an instance's `config`
+  # (`default = self + "/${config.name}"` is the ordinary idiom). At kind level that is an open
+  # term: `name` is bound only per instance (`mkInstanceType`), so forcing it aborts, uncatchably
+  # ("attribute 'name' missing" is no `throw`), and a demanded kind identity becomes partial on a
+  # well-formed schema. Whether a given attribute reads `config` is visible only by forcing it, the
+  # INSPECTION ADR-0034 excludes ("decided by constructor, never by inspecting a value"), so no
+  # attribute outside `type` is forced; `type` was the whole of znfjq's (c+) ruling and is forced by
+  # the mint as before. What distinguishes a term written over `config` is its enclosing function
+  # module, already a sealed component (`modules`).
+  # ⇒ the COST, pinned, never silent: two kinds differing only in an INERT literal at any other
+  # attribute, or in a kind-level definition, share one identity (the znfjq gate's F2, reopened,
+  # bounded; `kind-mark-cplus`, `test-f2-reopened-...-until-pa887-c`). The fix is den-hoag-pa887's
+  # arm C, BY CONSTRUCTOR: an option declared in an attrset module is inert and re-enters.
 
   # ★ THE COMPARED SUBJECT OF A SEALED COMPONENT HOLDING TYPE RECORDS (den-hoag-6b5ia). A type record
   # is cyclic (`functor.type`), so a bare `==` between two constructions can recurse until the
@@ -119,8 +133,7 @@ let
   # ★ ENUMERATED EXCEPTION TO TOTALITY (ADR-0025 item 1). `kindEq` can still abort where the closures
   # prefix is EQUAL and the value reaches a back-edge before a difference: (1) a GRAFT sharing every
   # closure slot and holding distinct cyclic data elsewhere (`closuresFirst`'s exception 1); (2) a
-  # cyclic value at a position this grammar does not fix — an option's `description`, `default`
-  # (a type record there included) or `example`; content of a `keySemantics` entry outside
+  # cyclic value at a position this grammar does not fix — content of a `keySemantics` entry outside
   # `option.type` (the option's own `description`, a type under any other key); a collection member;
   # a functor module. Closing it without moving a value needs an evaluator-observable value identity
   # (a visited set), which pure Nix does not expose; a bounded finiteness walk closes it at a value
@@ -133,7 +146,6 @@ let
   planeOf =
     {
       options,
-      config,
       collections,
       keySemantics,
       refs,
@@ -143,36 +155,35 @@ let
     }:
     let
       optionComponents =
-        prefix: opts: cfg:
+        prefix: opts:
         prelude.concatMap (
           n:
           let
             o = opts.${n};
             p = prefix ++ [ n ];
           in
+          # An option with no `type` still enters, as `null`, so the option set stays in the mark.
           if isOptionDecl o then
-            map (
-              a:
-              if a == "type" && isSealedType o.type then
-                {
-                  path = [ "options" ] ++ p ++ [ a ];
-                  value = comparedTyped [ o.type ] o.type;
-                  sealed = true;
-                }
-              else
-                {
-                  path = [ "options" ] ++ p ++ [ a ];
-                  value = o.${a};
-                }
-            ) (prelude.attrNames o)
-            ++ [
-              {
-                path = [ "value" ] ++ p;
-                value = cfg.${n};
-              }
+            let
+              t = o.type or null;
+            in
+            [
+              (
+                if t != null && isSealedType t then
+                  {
+                    path = [ "options" ] ++ p ++ [ "type" ];
+                    value = comparedTyped [ t ] t;
+                    sealed = true;
+                  }
+                else
+                  {
+                    path = [ "options" ] ++ p ++ [ "type" ];
+                    value = t;
+                  }
+              )
             ]
           else
-            optionComponents p o cfg.${n}
+            optionComponents p o
         ) (prelude.attrNames opts);
       # An attrset-valued component is spread one level, so a refusal names the member (a method,
       # a category) rather than the whole collection; its key set stays a component of its own.
@@ -228,7 +239,7 @@ let
       );
     in
     componentsPreimage identity.hashIdentity (
-      optionComponents [ ] options config
+      optionComponents [ ] options
       ++ [
         {
           path = [ "collectionNames" ];
@@ -679,8 +690,8 @@ let
       let
         base = merge.types.deferredModule;
 
-        # ONE introspection for both arms: the option tree an instance imports, its kind-level config
-        # and its refs, from one `evalModuleTree` over the module an instance imports. Each arm
+        # ONE introspection for both arms: the option tree an instance imports and its refs, from
+        # one `evalModuleTree` over the module an instance imports. Each arm
         # publishes `options` and `refs` from it and `planeOf` and `refinements` read the same
         # binding, so the published plane, the mark and `__sealed` are one plane.
         #
@@ -697,7 +708,6 @@ let
           in
           {
             inherit options;
-            inherit (tree) config;
             refs = refsFromOptionsWithTypes options;
           };
 
@@ -945,7 +955,7 @@ let
                   # ONE plane for the published fields, the mark and `kindEq` (c+): this arm's option
                   # plane is the tree an instance imports, so it enters the preimage.
                   plane = planeOf {
-                    inherit (introspect) options config refs;
+                    inherit (introspect) options refs;
                     collections = extractedCollections;
                     inherit keySemantics;
                     computed = computedFields;
@@ -1051,7 +1061,7 @@ let
 
                   introspect = introspectOf merged;
                   plane = planeOf {
-                    inherit (introspect) options config refs;
+                    inherit (introspect) options refs;
                     collections = finalCollections;
                     inherit keySemantics;
                     computed = computedFields;

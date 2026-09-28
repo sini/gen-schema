@@ -1,10 +1,11 @@
 # (c+) — den-hoag-markof-partial-preimage-znfjq. A kind's mark is minted over its distinguishing
-# CONTENT as per-component tags: every option-declaration attribute, each option's kind-level
-# value, the declaration's `freeformType`, the collection values, `keySemantics`, `refs` and the
-# computed fields. A component carrying a minted identity enters by it, an inert one whole, one
-# with no value at WHNF as `undefined`, anything else as the sealed marker. Two declarations that then
-# mint one mark and differ only at a sealed component are refused BY NAME by `kindEq`, never
-# merged; every other pair is decided.
+# CONTENT as per-component tags: each option declaration's `type` and no other attribute of it
+# (den-hoag-pa887, arm A), the declaration's `freeformType`, the collection values, `keySemantics`,
+# `refs`, the computed fields and the opaque modules; an option's kind-level value is not a
+# component. A component carrying a minted identity enters by it, an inert
+# one whole, one with no value at WHNF as `undefined`, anything else as the sealed marker. Two
+# declarations that then mint one mark and differ only at a sealed component are refused BY NAME by
+# `kindEq`, never merged; every other pair is decided.
 {
   genSchema,
   genMerge,
@@ -61,14 +62,6 @@ let
       options.name = opt T.str;
       options.fqdn = opt T.str;
       imports = [ ({ config, ... }: { config.fqdn = "${config.name}.${suffix}"; }) ];
-    };
-  applied =
-    f:
-    kindOf {
-      options.port = genMerge.mkOption {
-        type = T.int;
-        apply = f;
-      };
     };
   lambdaDefault =
     f:
@@ -142,14 +135,69 @@ let
     options.a = opt T.int;
     config._module.freeformType = T.attrsOf T.int;
   };
-  described =
-    d:
+  # One option declaration differing at one attribute other than `type`.
+  attributed =
+    attr: v:
     kindOf {
-      options.port = genMerge.mkOption {
-        type = T.int;
-        description = d;
-      };
+      options.port = genMerge.mkOption (
+        {
+          type = T.int;
+        }
+        // {
+          ${attr} = v;
+        }
+      );
     };
+  # Two kinds differing only at `attr` (`a` against `b`): `true` is the reopened collision.
+  sharesIdentity =
+    attr: a: b:
+    kindEq (attributed attr a) (attributed attr b);
+
+  # den-hoag-pa887 · THE ORDINARY IDIOM: a function module whose option attribute, or kind-level
+  # definition, reads an instance's `name`, which the kind does NOT declare (`name` is injected per
+  # instance). At kind level the read aborts UNCATCHABLY, so a kind identity demanded over it takes
+  # the whole evaluation down; the cell below is green only if the mark never forces it.
+  readsName =
+    attr: word:
+    kindOf {
+      imports = [
+        (
+          { config, ... }:
+          {
+            options.p = genMerge.mkOption (
+              {
+                type = T.str;
+                default = "x";
+              }
+              // {
+                ${attr} = "${word}-${config.name}";
+              }
+            );
+          }
+        )
+      ];
+    };
+  definesName =
+    wrap: word:
+    kindOf {
+      imports = [
+        (
+          { config, ... }:
+          {
+            options.p = genMerge.mkOption { type = T.str; };
+            config.p = wrap "${word}-${config.name}";
+          }
+        )
+      ];
+    };
+  instanceP =
+    kind:
+    (genMerge.evalModuleTree {
+      modules = [
+        { options.hosts = genSchema.mkInstanceRegistry kind { }; }
+        { config.hosts.a = { }; }
+      ];
+    }).config.hosts.a;
 
   # F3 · the `mkType` arm (gen-aspects' door), where the published `options` is `{ }`.
   aspectShaped =
@@ -238,48 +286,158 @@ in
         reflexive = true;
       };
     };
-    # F1's class: a function module's body, an `apply` and a lambda `default` are each sealed
-    # content, so each pair shares a mark and is refused, never merged.
+    # F1's class: a function module's body and a schema's `mkType` are each sealed content, so each
+    # pair shares a mark and is refused, never merged.
     test-lambda-content-is-sealed = {
       expr = {
         moduleBody = decides (kindEq (withFqdn "a") (withFqdn "b"));
-        apply = decides (kindEq (applied (x: x)) (applied (x: x + 1)));
-        lambdaDefault = decides (kindEq (lambdaDefault (x: "a")) (lambdaDefault (x: "b")));
         schemaMkType = decides (kindEq (fqdnKind "a") (fqdnKind "b"));
         moduleBodySameMark = (withFqdn "a").__mint.minted == (withFqdn "b").__mint.minted;
       };
       expected = {
         moduleBody = false;
-        apply = false;
-        lambdaDefault = false;
         schemaMkType = false;
         moduleBodySameMark = true;
       };
     };
-    # F2 — inert content enters the mark: each pair separates and is decided `false`.
+    # F2 — inert content outside the option declarations enters the mark: each pair separates and
+    # is decided `false`.
     test-inert-content-separates = {
       expr = {
-        default = kindEq (defaulted 80) (defaulted 443);
-        definition = kindEq (defaulted 80) defined;
         parent = kindEq (parented "net") (parented "site");
         category = kindEq (categorised "class") (categorised "channel");
       };
       expected = {
-        default = false;
-        definition = false;
         parent = false;
         category = false;
       };
     };
-    # A presentation attribute is content: an instance module can read `options.port.description`.
-    test-presentation-is-content = {
+    # ★ THE REOPENED COLLISIONS, PINNED — den-hoag-pa887 arm A, bounded, accepted by the owner until
+    # arm C lands. An option enters the mark by its `type` alone, and its kind-level value not at
+    # all, so two kinds differing ONLY at another attribute of a declaration are ONE kind. One cell
+    # per class, each stating its collision so it is never silent. pa887's arm C (by constructor:
+    # an option declared in an attrset module is inert and re-enters the mark) is the fix, and it
+    # flips every `true` below: rewrite each cell then, never widen it.
+    #
+    # F2 (the znfjq gate's pair): an inert literal default, 80 against 443, shares one mark.
+    test-f2-reopened-inert-default-shares-identity-until-pa887-c = {
       expr = {
-        marksDiffer = (described "one").__mint.minted != (described "two").__mint.minted;
-        decided = kindEq (described "one") (described "two");
+        default = sharesIdentity "default" 80 443;
+        sameMark = (attributed "default" 80).__mint.minted == (attributed "default" 443).__mint.minted;
       };
       expected = {
-        marksDiffer = true;
-        decided = false;
+        default = true;
+        sameMark = true;
+      };
+    };
+    # F2's definition member: a kind-level definition (`config.port = 443`) is not a component.
+    test-f2-reopened-kind-level-definition-shares-identity-until-pa887-c = {
+      expr = kindEq (attributed "default" 80) defined;
+      expected = true;
+    };
+    # Was sealed and REFUSED by name (F1 and the partly-defined class): a lambda, a partial and a
+    # derivation default are no longer components, so each pair is one kind, silently.
+    test-f1-reopened-non-inert-default-shares-identity-until-pa887-c = {
+      expr = {
+        lambdaDefault = kindEq (lambdaDefault (x: "a")) (lambdaDefault (x: "b"));
+        partialDefault = kindEq (partial 1) (partial 2);
+        partialSealed = builtins.attrNames (partial 1).__sealed;
+        derivationDefault = kindEq (pkgDefault "hello") (pkgDefault "cowsay");
+      };
+      expected = {
+        lambdaDefault = true;
+        partialDefault = true;
+        partialSealed = [ "options.cfg.type" ];
+        derivationDefault = true;
+      };
+    };
+    # Was sealed and REFUSED by name (F1): an `apply` is no longer a component.
+    test-f1-reopened-apply-shares-identity-until-pa887-c = {
+      expr = sharesIdentity "apply" (x: x) (x: x + 1);
+      expected = true;
+    };
+    # N3's presentation keys: an instance module can read `options.port.description`, yet a pair
+    # differing there is one kind.
+    test-n3-reopened-presentation-shares-identity-until-pa887-c = {
+      expr = {
+        description = sharesIdentity "description" "one" "two";
+        example = sharesIdentity "example" 1 2;
+        defaultText = sharesIdentity "defaultText" "80" "443";
+        visible = sharesIdentity "visible" true false;
+        internal = sharesIdentity "internal" false true;
+      };
+      expected = {
+        description = true;
+        example = true;
+        defaultText = true;
+        visible = true;
+        internal = true;
+      };
+    };
+    # Behavioural attributes: `readOnly` decides whether an instance may define the option at all,
+    # and `identity = false` removes a primitive option from the instance key set, yet a pair
+    # differing there shares the KIND identity (instances still differ through their key sets).
+    test-reopened-behavioural-attributes-share-identity-until-pa887-c = {
+      expr = {
+        readOnly = sharesIdentity "readOnly" false true;
+        identity = sharesIdentity "identity" true false;
+      };
+      expected = {
+        readOnly = true;
+        identity = true;
+      };
+    };
+    # Any attribute gen-merge does not know is carried on the declaration and is not a component.
+    test-reopened-unknown-attribute-shares-identity-until-pa887-c = {
+      expr = sharesIdentity "pa887Unknown" 1 2;
+      expected = true;
+    };
+    # den-hoag-pa887 · the REGRESSION CELL. A kind whose option attribute other than `type`, or a
+    # kind-level definition (plain or `mkDefault`), reads an instance's UNDECLARED `name` mints a
+    # mark, and its instances mint an `id_hash` and read the value. One process per arm, on three
+    # evaluators: the pa887 build report's probe. Before arm A this cell ABORTS (uncatchable
+    # "attribute 'name' missing"), which takes the whole run down rather than failing the cell.
+    # Such a term is not lost: its function module is a sealed component, so a pair differing only
+    # there is refused (by name at 'modules': `kind-mark-cplus-refusal`).
+    test-open-term-reading-instance-name-mints = {
+      expr = {
+        marks = map (k: builtins.isString (builtins.deepSeq k.__mint.minted k.__mint.minted)) (
+          map (a: readsName a "x") [
+            "default"
+            "defaultText"
+            "description"
+            "example"
+            "readOnly"
+            "apply"
+            "visible"
+            "internal"
+            "pa887Unknown"
+          ]
+          ++ [
+            (definesName genMerge.mkDefault "x")
+            (definesName (v: v) "x")
+          ]
+        );
+        idHash = builtins.isString (instanceP (readsName "default" "x")).id_hash;
+        defaultValue = (instanceP (readsName "default" "x")).p;
+        definedIdHash = builtins.isString (instanceP (definesName genMerge.mkDefault "x")).id_hash;
+        definedValue = (instanceP (definesName genMerge.mkDefault "x")).p;
+        # ONE kind value: separately built twins of a function module are refused (znfjq's R1).
+        reflexive =
+          let
+            k = readsName "default" "x";
+          in
+          kindEq k k;
+        distinguished = decides (kindEq (readsName "default" "x") (readsName "default" "y"));
+      };
+      expected = {
+        marks = builtins.genList (_: true) 11;
+        idHash = true;
+        defaultValue = "x-a";
+        definedIdHash = true;
+        definedValue = "x-a";
+        reflexive = true;
+        distinguished = false;
       };
     };
     # A declaration's `freeformType`, at either site, is content: each pair differs in which
@@ -294,24 +452,6 @@ in
         topLevel = false;
         moduleSite = false;
         sealed = [ "freeformType" ];
-      };
-    };
-    # A value defined at WHNF with a throwing member keeps its content: a partial default and a
-    # derivation default are sealed, so each pair shares a mark and is refused, never merged.
-    test-partly-defined-content-is-sealed = {
-      expr = {
-        partialDefault = decides (kindEq (partial 1) (partial 2));
-        derivationDefault = decides (kindEq (pkgDefault "hello") (pkgDefault "cowsay"));
-        partialSealed = builtins.attrNames (partial 1).__sealed;
-      };
-      expected = {
-        partialDefault = false;
-        derivationDefault = false;
-        partialSealed = [
-          "options.cfg.default"
-          "options.cfg.type"
-          "value.cfg"
-        ];
       };
     };
     # F3 — the `mkType` arm's mark and `kindEq` read ONE plane: its predicate-only pair is refused,
@@ -374,18 +514,13 @@ in
         msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'collections.methods.greeting'; .*$";
       };
     };
-    test-partial-default-collision-names-its-components = {
-      expr = kindEq (partial 1) (partial 2);
+    # den-hoag-pa887: an open term reading an instance's `name` is distinguished by its function
+    # module, the sealed `modules` component, and the collision is refused naming it.
+    test-open-term-collision-names-its-module = {
+      expr = kindEq (readsName "default" "x") (readsName "default" "y");
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'options.cfg.default', 'value.cfg'; .*$";
-      };
-    };
-    test-derivation-default-collision-names-its-components = {
-      expr = kindEq (pkgDefault "hello") (pkgDefault "cowsay");
-      expectedError = {
-        type = "ThrownError";
-        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'options.package.default', 'value.package'; .*$";
+        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'modules'; .*$";
       };
     };
     test-non-kind-operand-refuses-by-name = {
