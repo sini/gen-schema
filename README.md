@@ -1009,7 +1009,7 @@ Every schema has flat `_`-prefixed options for programmatic access:
 ```nix
 config.schema._kindNames                # → [ "host" "service" "user" ]
 config.schema._collectionKeys           # → [ "includes" "methods" "parent" "validators" ]
-config.schema._declarationKeys          # → [ "config" "disabledModules" "freeformType" "imports" "key" "options" ]
+config.schema._declarationKeys          # → [ "__pureModule" "_class" "_file" "_module" "config" "disabledModules" "freeformType" "imports" "key" "meta" "options" ]
 
 # Per-kind introspection — available on each kind value
 config.schema.host.options          # → full option declarations (filtered, no _module.*)
@@ -1032,10 +1032,13 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 **Scope.** That idiom reads collection values on the **default entry-type path**. Two caveats, both
 real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
-with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__mint`, `__sealed`,
-`config`, `disabledModules`, `freeformType`, `imports`, `key`, `keySemantics`, `kind`, `mixins`,
-`options`, `refinements`, `refs`, `strict` — `schema._reservedCollectionKeys`, 15 names)
-is refused when `_collectionKeys` is read, exactly as it is refused when a kind is merged.
+with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__mint`,
+`__pureModule`, `__sealed`, `_class`, `_file`, `_module`, `config`, `disabledModules`, `freeformType`,
+`imports`, `key`, `keySemantics`, `kind`, `meta`, `mixins`, `options`, `refinements`, `refs`,
+`require`, `strict` — `schema._reservedCollectionKeys`, 21 names: gen-merge's published
+`moduleSyntax.structured` and `moduleSyntax.shorthandMeta` together with the names gen-schema writes
+onto the kind value itself) is refused when `_collectionKeys` is read, exactly as it is refused when a
+kind is merged.
 
 ### Unrecognised declaration keys are refused by name
 
@@ -1049,20 +1052,27 @@ config.schema.host = {
   roel = "web";                       # typo
 };
 # → gen-schema: kind 'host': unrecognised declaration key 'roel' (declared in <…>). This declaration
-#   is structured — it carries a module marker — so gen-schema reads only: this schema's
+#   is structured — it carries `config` or `options` — so gen-schema reads only: this schema's
 #   collection keys […] (published as `schema._collectionKeys`), the module keys […]
 #   (published as `schema._declarationKeys`), and any `_`-prefixed key. …
 ```
 
-A declaration is **structured** when it carries a module marker (`imports`, `options`, `config`,
-`freeformType`, `disabledModules`). An unstructured one is config shorthand: gen-merge reads every
-key of it, so nothing is unread and nothing is refused. Beside `_declarationKeys` and
-`_collectionKeys`, one rule that is not a list: any `_`-prefixed key is admitted as
-consumer-private metadata gen-schema must not read. An option is declared under `options`; a bare
-top-level `myPort = mkOption { … }` is refused like any other unread key, because a kind entry is a
-module and neither gen-merge nor nixpkgs collects a top-level `mkOption` as a declaration. A
-kind's refinement contracts are read off its option plane, so a refined option declared through
-`imports`, `baseModule` or a function module is enforced exactly as a module-style one is.
+A declaration is **structured** when it carries `config` or `options`
+(`genMerge.moduleSyntax.structuring`, narrowed to those two — den-hoag-1n12c). An unstructured one is
+config shorthand: gen-merge reads every other key of it as config. Beside `_declarationKeys` and
+`_collectionKeys`, one rule that is not a list: any `_`-prefixed key is admitted as consumer-private
+metadata gen-schema must not read.
+
+A bare top-level `myPort = mkOption { … }` is refused **independently of structuring**
+(`den-hoag-zijk1`; den-hoag-1n12c Arm 1): a kind entry is a module, and neither gen-merge nor nixpkgs
+ever collects a top-level `mkOption` as a declaration, so a flat option-valued key is never a read
+plane whether the surrounding declaration is structured or not. That check only fires once the
+declaration carries **some** module-syntax key at all (`genMerge.moduleSyntax.structured` — `imports`,
+`freeformType`, `config`, `options`, `meta`, `key`, …): a declaration carrying none of them is plain
+data through and through, and an option-shaped value on one of its keys is no different from any other
+value a config key may hold. A kind's refinement contracts are read off its option plane, so a refined
+option declared through `imports`, `baseModule` or a function module is enforced exactly as a
+module-style one is.
 
 The guard **stands down entirely** for a schema built with `computed` or `mkType`. Both hand the raw
 or stripped defs to a caller-supplied function — gen-aspects' `mkType` consumes the whole def as a
