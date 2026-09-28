@@ -29,7 +29,7 @@ rec {
     define = parent: {
       metricsPort = lib.mkOption {
         type = lib.types.int;
-        default = (record.select parent "port") + 1000;
+        default = (record.select "port" parent) + 1000;
         description = "Prometheus metrics port.";
       };
       metricsPath = lib.mkOption {

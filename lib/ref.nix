@@ -63,12 +63,16 @@ let
   mkCoercingRefType =
     instances:
     let
-      resolve = prelude.resolve {
-        entries = instances;
-        isCanonical = isCanonicalOf instances;
-        hint = "name";
-        form = declarationForm;
-      };
+      resolve =
+        prelude.resolve
+          {
+            hint = "name";
+            form = declarationForm;
+          }
+          {
+            entries = instances;
+            isCanonical = isCanonicalOf instances;
+          };
     in
     merge.mkOptionType {
       name = "declarationOf";

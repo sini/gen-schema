@@ -75,7 +75,7 @@ let
     define = parent: {
       metrics_port = genMerge.mkOption {
         type = genMerge.types.int;
-        default = (R.select parent "port").default or 9090;
+        default = (R.select "port" parent).default or 9090;
       };
     };
   };

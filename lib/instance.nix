@@ -121,12 +121,17 @@ let
   mkCoerceChain =
     field: kind: registry: customCoerce: type:
     let
-      resolve = prelude.resolve {
-        entries = registry;
-        isCanonical = isCanonicalOf registry;
-        hint = "name";
-        form = declarationForm;
-      } "gen-schema: ref field '${field}' on kind '${kind}'";
+      resolve =
+        prelude.resolve
+          {
+            hint = "name";
+            form = declarationForm;
+          }
+          {
+            entries = registry;
+            isCanonical = isCanonicalOf registry;
+          }
+          "gen-schema: ref field '${field}' on kind '${kind}'";
 
       defaultCoerce =
         v:

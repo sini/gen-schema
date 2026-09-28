@@ -32,10 +32,12 @@ let
   };
 
   # Record with a mix of options and plain config values
-  mixedRecord = R.extend (R.fromAttrs {
-    port = genMerge.mkOption { type = genMerge.types.int; };
-    hostname = genMerge.mkOption { type = genMerge.types.str; };
-  }) "defaultPort" 8080;
+  mixedRecord = R.extend "defaultPort" 8080 (
+    R.fromAttrs {
+      port = genMerge.mkOption { type = genMerge.types.int; };
+      hostname = genMerge.mkOption { type = genMerge.types.str; };
+    }
+  );
 
   # Record with refined type
   refinedRecord = R.fromAttrs {
@@ -56,7 +58,7 @@ let
         validators = [ "validator-a" ];
       };
     in
-    R.extend base "validators" [ "validator-b" ];
+    R.extend "validators" [ "validator-b" ] base;
 in
 {
   flake.tests.bridge-basic.test-isOptionDecl-true = {

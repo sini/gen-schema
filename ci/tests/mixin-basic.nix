@@ -22,7 +22,7 @@ in
         requires = [ "port" ];
         provides = [ "metrics_port" ];
         define = parent: {
-          metrics_port = (R.select parent "port") + 1000;
+          metrics_port = (R.select "port" parent) + 1000;
         };
       }).__isMixin;
     expected = true;
@@ -55,11 +55,11 @@ in
           requires = [ "port" ];
           provides = [ "metrics_port" ];
           define = parent: {
-            metrics_port = (R.select parent "port") + 1000;
+            metrics_port = (R.select "port" parent) + 1000;
           };
         };
       in
-      R.select (applyMixin m base "service") "metrics_port";
+      R.select "metrics_port" (applyMixin m base "service");
     expected = 9080;
   };
 
@@ -74,11 +74,11 @@ in
           requires = [ "port" ];
           provides = [ "metrics_port" ];
           define = parent: {
-            metrics_port = (R.select parent "port") + 1000;
+            metrics_port = (R.select "port" parent) + 1000;
           };
         };
       in
-      R.select (applyMixin m base "service") "hostname";
+      R.select "hostname" (applyMixin m base "service");
     expected = "localhost";
   };
 
@@ -136,7 +136,7 @@ in
           };
         };
       in
-      R.has (applyMixin m base "service") "status";
+      R.has "status" (applyMixin m base "service");
     expected = true;
   };
 
@@ -154,7 +154,7 @@ in
           define = _: { display = "mixin-display"; };
         });
       in
-      R.select (applyMixin m base "service") "display";
+      R.select "display" (applyMixin m base "service");
     expected = "base-display"; # Beta: kind (parent) wins
   };
 
@@ -172,7 +172,7 @@ in
           define = _: { display = "mixin-display"; };
         };
       in
-      R.select (applyMixin m base "service") "display";
+      R.select "display" (applyMixin m base "service");
     expected = "mixin-display"; # Smalltalk: mixin (child) wins
   };
 }

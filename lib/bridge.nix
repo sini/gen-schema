@@ -29,7 +29,7 @@ let
   emitModule =
     collectionLabels: record':
     let
-      allAttrs = record.emitAll record' collectionLabels;
+      allAttrs = record.emitAll collectionLabels record';
       collections = prelude.filterAttrs (n: _: builtins.elem n collectionLabels) allAttrs;
       content = builtins.removeAttrs allAttrs collectionLabels;
 

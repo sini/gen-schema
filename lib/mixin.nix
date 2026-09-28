@@ -92,7 +92,7 @@ let
           throw "gen-schema: mixin '${mixin.name}' constrained to kinds [${builtins.concatStringsSep " " mixin.kinds}], got '${kindName}'"
         else
           null;
-      structCheck = record.assertSatisfies kindRecord mixin.requires;
+      structCheck = record.assertSatisfies mixin.requires kindRecord;
     in
     builtins.seq kindCheck (
       builtins.seq structCheck (
@@ -100,7 +100,10 @@ let
           mixin.__direction == "beta"
         # Beta: kind (parent) controls — kind fields take precedence over mixin's
         then
-          record.combine kindRecord (mixin.delta kindRecord)
+          record.combine {
+            left = kindRecord;
+            right = mixin.delta kindRecord;
+          }
         # Smalltalk: mixin (child) wins — mixin fields override kind's
         else
           record.mixin mixin.delta kindRecord

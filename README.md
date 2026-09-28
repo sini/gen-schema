@@ -1538,7 +1538,7 @@ monitorable = genSchema.mkMixin {
   provides = [ "metrics_port" ];
   # kinds = [ "service" ];  # optional kind constraint
   define = parent: {
-    metrics_port = (record.select parent "port") + 1000;
+    metrics_port = (record.select "port" parent) + 1000;
   };
 };
 ```

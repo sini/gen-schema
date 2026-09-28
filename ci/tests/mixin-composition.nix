@@ -21,7 +21,7 @@ let
     provides = [ "metrics_port" ];
     name = "a";
     define = parent: {
-      metrics_port = (R.select parent "port") + 1000;
+      metrics_port = (R.select "port" parent) + 1000;
     };
   };
 
@@ -30,7 +30,7 @@ let
     provides = [ "metrics_url" ];
     name = "b";
     define = parent: {
-      metrics_url = "http://localhost:${toString (R.select parent "metrics_port")}";
+      metrics_url = "http://localhost:${toString (R.select "metrics_port" parent)}";
     };
   };
 in
@@ -65,7 +65,7 @@ in
         ];
         base = R.fromAttrs { port = 8080; };
       in
-      R.select (applyMixin composed base "service") "metrics_url";
+      R.select "metrics_url" (applyMixin composed base "service");
     expected = "http://localhost:9080";
   };
 
@@ -99,7 +99,7 @@ in
         composed = composeMixins [ a ];
         base = R.fromAttrs { port = 3000; };
       in
-      R.select (applyMixin composed base "service") "metrics_port";
+      R.select "metrics_port" (applyMixin composed base "service");
     expected = 4000;
   };
 
@@ -126,7 +126,7 @@ in
         ];
         base = R.empty;
       in
-      R.select (applyMixin composed base "test") "status";
+      R.select "status" (applyMixin composed base "test");
     expected = "from-second"; # last listed mixin wins (has priority), first provides base
   };
 
@@ -151,7 +151,7 @@ in
         ];
         base = R.empty;
       in
-      R.select (applyMixin composed base "test") "status";
+      R.select "status" (applyMixin composed base "test");
     # provider is earlier (acc), betaMixin is beta so acc wins
     expected = "from-provider";
   };
@@ -176,7 +176,7 @@ in
         ];
         base = R.empty;
       in
-      R.select (applyMixin composed base "test") "status";
+      R.select "status" (applyMixin composed base "test");
     expected = "from-overrider"; # Smalltalk: later wins
   };
 }
