@@ -1899,4 +1899,35 @@ in
       };
     };
   };
+
+  # den-hoag-n6dh7 Unit 2.4 (item 1; OQ2 α): a nested tree is a child of the one evaluation that
+  # holds it, so a submodule's CALLED `whenEmpty.value` refuses by name rather than evaluating the
+  # tree standalone. A deep force of a submodule-based TYPE record (here `mkInstanceType`'s) reaches
+  # that field, so it meets the refusal, catchably; the value side and a shallow read are untouched
+  # (`ci/tests/mktype-kind-value.nix`).
+  flake.testsError.type-record-deep-force = {
+    test-a-deep-force-of-a-submodule-based-type-meets-the-called-empty-value-refusal = {
+      expr =
+        let
+          # every option defaulted, so the deep force reaches the type's own fields first
+          kind =
+            (genMerge.evalModuleTree {
+              modules = [
+                { options.schema = mkSchemaOption { }; }
+                {
+                  config.schema.host.options.role = genMerge.mkOption {
+                    type = genMerge.types.str;
+                    default = "x";
+                  };
+                }
+              ];
+            }).config.schema.host;
+        in
+        builtins.deepSeq (genSchema.mkInstanceType kind { }) null;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-merge: `submodule': its called `whenEmpty' does not evaluate the nested tree: a nested tree is a child of the one evaluation that holds it [(]`evalModuleTree'[)], read through its fold's threaded sibling, and no second evaluation is made for it [(]den-hoag-n6dh7[)]$";
+      };
+    };
+  };
 }

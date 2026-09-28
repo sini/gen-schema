@@ -65,11 +65,22 @@ in
 
   # F1, arm 1 continued: `mkInstanceType` reads `isSchemaKind` (`v ? kind && …`) before it ever
   # reaches the mark, so the no-`kind` kind value refused with the FALSE reason "no mark" even
-  # though `__mint.minted` was present and correct. Admission, not the mark, is what this pins.
+  # though `__mint.minted` was present and correct. Admission, not the mark, is what this pins:
+  # the type CONSTRUCTS, and its name and `check` apply. It does not `deepSeq` the type record: a
+  # deep force of a type is not an admission test, and since den-hoag-n6dh7 Unit 2.4 it reaches a
+  # submodule's called `whenEmpty.value`, which refuses by name (item 1; OQ2 α: never a silent
+  # standalone evaluation). `ci/tests-error.nix` `type-record-deep-force` pins that refusal.
   flake.tests.mktype-kind-value.test-mktype-arm-with-no-kind-echo-is-admitted-by-mkInstanceType = {
     expr =
-      (builtins.tryEval (builtins.deepSeq (mkInstanceType (kindOf mkTypeNoKind "host") { }) true))
-      .success;
+      let
+        ty = mkInstanceType (kindOf mkTypeNoKind "host") { };
+      in
+      (builtins.tryEval (
+        builtins.deepSeq [
+          ty.name
+          (ty.check { })
+        ] true
+      )).success;
     expected = true;
   };
 
