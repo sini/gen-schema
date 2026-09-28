@@ -152,6 +152,36 @@ let
   sharesIdentity =
     attr: a: b:
     kindEq (attributed attr a) (attributed attr b);
+  # A module pulled in through a shorthand module's `require`, which gen-merge joins into its
+  # imports (`importsOf`): an attrset one differing in an inert default, a function one in a
+  # default reading an instance's `name`.
+  requireOpen =
+    port:
+    kindOf {
+      require = [
+        {
+          options.port = genMerge.mkOption {
+            type = T.int;
+            default = port;
+          };
+        }
+      ];
+    };
+  requireFn =
+    word:
+    kindOf {
+      require = [
+        (
+          { config, ... }:
+          {
+            options.p = genMerge.mkOption {
+              type = T.str;
+              default = "${word}-${config.name}";
+            };
+          }
+        )
+      ];
+    };
 
   # den-hoag-pa887 · THE ORDINARY IDIOM: a function module whose option attribute, or kind-level
   # definition, reads an instance's `name`, which the kind does NOT declare (`name` is injected per
@@ -392,6 +422,25 @@ in
       expr = sharesIdentity "pa887Unknown" 1 2;
       expected = true;
     };
+    # F2 under `require`: an attrset module reached through `require` is walked as an open module
+    # like an imported one, so its inert default is not a component either.
+    test-f2-reopened-required-default-shares-identity-until-pa887-c = {
+      expr = kindEq (requireOpen 80) (requireOpen 443);
+      expected = true;
+    };
+    # A function module reached through `require` is a sealed component at `modules`, as one reached
+    # through `imports` is: the pair mints and is refused (by name: `kind-mark-cplus-refusal`),
+    # never called one kind.
+    test-open-term-under-require-is-sealed = {
+      expr = {
+        mints = builtins.isString (requireFn "x").__mint.minted;
+        distinguished = decides (kindEq (requireFn "x") (requireFn "y"));
+      };
+      expected = {
+        mints = true;
+        distinguished = false;
+      };
+    };
     # den-hoag-pa887 · the REGRESSION CELL. A kind whose option attribute other than `type`, or a
     # kind-level definition (plain or `mkDefault`), reads an instance's UNDECLARED `name` mints a
     # mark, and its instances mint an `id_hash` and read the value. One process per arm, on three
@@ -518,6 +567,13 @@ in
     # module, the sealed `modules` component, and the collision is refused naming it.
     test-open-term-collision-names-its-module = {
       expr = kindEq (readsName "default" "x") (readsName "default" "y");
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'modules'; .*$";
+      };
+    };
+    test-open-term-under-require-names-its-module = {
+      expr = kindEq (requireFn "x") (requireFn "y");
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'modules'; .*$";

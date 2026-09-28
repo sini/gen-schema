@@ -77,7 +77,8 @@ let
   # no minted identity) is sealed here rather than handed to the encoder, so no type record is forced
   # to decide it, and it is compared through `comparedTyped` below.
   #
-  # A declaration's modules, found through `imports` at any depth, split by whether the plane can
+  # A declaration's modules, found at any depth through the list gen-merge's `importsOf` joins
+  # (`imports`, and before it a shorthand module's `require`), split by whether the plane can
   # see into them. An OPAQUE module — a function module, a functor, a path — is one the plane
   # cannot see into: what it contributes that the kind level cannot evaluate (a definition reading
   # an instance's config) lives only in its body, so the body is a component. An attrset module
@@ -88,7 +89,14 @@ let
     if v == null then
       [ ]
     else if builtins.isAttrs v && !(v ? __functor) then
-      [ { open = v; } ] ++ modulesOf (v.imports or [ ])
+      let
+        i = v.imports or [ ];
+      in
+      [ { open = v; } ]
+      ++ modulesOf (
+        (if v ? require && !(isStructuredDecl v) then v.require else [ ])
+        ++ (if builtins.isList i then i else [ i ])
+      )
     else
       [ { opaque = v; } ]
   );
