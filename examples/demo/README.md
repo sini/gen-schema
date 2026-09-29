@@ -30,7 +30,7 @@ Kind definitions live in `gen-modules/schema/` and are plain modules setting `co
 | Cross-instance refs                          | `gen-modules/fleet/registries.nix`         | `declarationOf` on service's `host` option                                                                               |
 | Ref resolution                               | `gen-modules/fleet/services.nix`           | `host = "igloo"` resolves to the full host instance                                                                      |
 | Schema composition                           | `gen-modules/schema/monitoring-plugin.nix` | Extends host + service kinds from a separate module — merges cleanly                                                     |
-| Kind mix-ins                                 | `gen-modules/schema/admin-user.nix`        | Imports user kind — inherits userName, shell, adds sudoPrivileges, sshKeys                                               |
+| Kind inheritance                             | `gen-modules/schema/admin-user.nix`        | `inherits = [ "user" ]` — gains userName, shell, adds sudoPrivileges, sshKeys                                            |
 | Declarative methods                          | `gen-modules/fleet/methods.nix`            | `hasService` closes over services registry; `describe` resolves all args from config                                     |
 | Schema validators                            | `gen-modules/fleet/validation.nix`         | Host addr/role + service port validators declared on kinds, fire automatically                                           |
 | Derive hooks                                 | `gen-modules/fleet/registries.nix`         | Plain `derive` assigns deterministic UIDs from `id_hash`                                                                 |
@@ -51,7 +51,7 @@ gen-modules/                      — the gen definition tree, composed PURELY b
     host.nix                      — host kind: addr, system, role
     user.nix                      — user kind: userName, shell
     service.nix                   — service kind: port, protocol
-    admin-user.nix                — kind mix-in: imports user, adds sudoPrivileges + sshKeys
+    admin-user.nix                — kind inheritance: inherits user, adds sudoPrivileges + sshKeys
     monitoring-plugin.nix         — composition: extends host + service from a separate module
     field-validators.nix          — row-polymorphic https-port validator
     group.nix, network.nix        — group + network kinds
@@ -122,7 +122,7 @@ fleet.hosts.igloo.role → "web"          (from host.nix)
 
 The generated docs (`nix eval .#docs --raw`) list all options from all contributing modules in a single table per kind. No manual aggregation needed.
 
-## Kind Mix-ins
+## Kind Inheritance
 
 A kind can declare `inherits` on another kind, gaining all of its options. This is how you build specialized variants without duplicating field declarations.
 
@@ -147,19 +147,17 @@ options.fleet.admins = mkInstanceRegistry schema.admin-user {};
 
 Instances in each registry are independent — admins don't appear in the user registry. Identity hashes include the kind prefix, so a user "root" and an admin "root" hash differently.
 
-This pattern composes with multiple mix-ins:
+A kind may inherit several parents:
 
 ```nix
-config.schema.deploy-user = {
-  imports = [
-    config.schema.user
-    config.schema.ssh-access    # sshKeys, sshPort
-    config.schema.sudo-access   # sudoPrivileges, sudoCommands
-  ];
-};
+config.schema.deploy-user.inherits = [
+  "user"
+  "ssh-access"    # sshKeys, sshPort
+  "sudo-access"   # sudoPrivileges, sudoCommands
+];
 ```
 
-All imported options merge through deferred module merge. Conflicts (two imports declaring the same option with different types) are caught at evaluation time.
+All inherited options merge through deferred module merge. Conflicts (two parents declaring the same option with different types) are caught at evaluation time. The retired spelling, a kind value in `imports` (`imports = [ config.schema.user ]`), is refused by name; see the root README's Kind Inheritance section.
 
 ## Declarative Methods
 

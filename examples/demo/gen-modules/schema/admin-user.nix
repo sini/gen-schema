@@ -1,4 +1,4 @@
-# Admin user kind: mixes in the base user kind and adds admin-specific fields.
+# Admin user kind: inherits the base user kind and adds admin-specific fields.
 #
 # Demonstrates kind-level composition via `inherits` — admin-user inherits all
 # of user's options (userName, shell) and adds its own (sudoPrivileges, sshKeys).

@@ -1007,10 +1007,13 @@ let
               # kind entry's `imports` (or a shorthand def's `require`), found by the walk `modulesOf`
               # makes for the plane. Inheritance travels as a NAME in `inherits`, resolved by
               # `evalSchema`, which imports the parent's applied functor rather than its kind value.
-              # A VALUE test: it applies no function and imports no path, so a function module, a
-              # hand-applied functor and a path to a kind are admitted — the README's declared
-              # ADR-0025 exception. It forces each `imports` element to WHNF, one step before the
-              # plane would.
+              # A VALUE test: a path or string member is imported, which needs no argument and yields
+              # the value gen-merge would compose, so a path to a kind is refused too. It applies no
+              # function, so a function module and a hand-applied functor are admitted — the README's
+              # declared ADR-0025 exception. What it forces, at the kind's WHNF: every `imports` and
+              # `require` list of every attrset module reachable from the def, every member of those
+              # lists, the `__mint` record of any member carrying `kind` and `__mint`, and the import
+              # of every path or string member.
               kindImports = prelude.concatMap (
                 d:
                 if builtins.isAttrs d.value && !(d.value ? __functor) then
@@ -1019,12 +1022,20 @@ let
                     i = v.imports or [ ];
                   in
                   builtins.filter isSchemaKind (
-                    map (m: m.open or m.opaque) (
-                      modulesOf (
-                        (if v ? require && !(isStructuredDecl v) then v.require else [ ])
-                        ++ (if builtins.isList i then i else [ i ])
+                    map
+                      (
+                        m:
+                        if m ? opaque && (builtins.isPath m.opaque || builtins.isString m.opaque) then
+                          import m.opaque
+                        else
+                          m.open or m.opaque
                       )
-                    )
+                      (
+                        modulesOf (
+                          (if v ? require && !(isStructuredDecl v) then v.require else [ ])
+                          ++ (if builtins.isList i then i else [ i ])
+                        )
+                      )
                   )
                 else
                   [ ]

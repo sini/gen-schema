@@ -1,5 +1,5 @@
 # Deterministic UID assignment from id_hash.
-# Declares the uid option on the user kind (inherited by admin-user via mix-in).
+# Declares the uid option on the user kind (inherited by admin-user via `inherits`).
 #
 # uid defaults to null ("assign automatically"). Setting uid explicitly
 # on an instance overrides the computed assignment.

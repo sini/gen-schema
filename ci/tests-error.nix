@@ -189,6 +189,28 @@ in
       };
     };
 
+    # A PATH member is imported by the test, so a path whose file is a kind value refuses the same
+    # way. Pure evaluation cannot write a live kind value into a file, so the file holds a value the
+    # test's predicate (`isSchemaKind`: `kind` and a minted `__mint`) holds of; a live kind reached
+    # through a path is the gate's `r4Path` probe.
+    test-path-spelling-refuses-by-name = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = genSchema.mkSchemaOption { };
+              config.schema.derived.imports = [
+                (builtins.toFile "cxlc0-kind-path.nix" ''{ kind = "base"; __mint.minted = "m"; }'')
+              ];
+            }
+          ];
+        }).config.schema.derived.kind;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'derived': its `imports` carries the kind value 'base', the retired spelling of kind inheritance";
+      };
+    };
+
     # A parent name nothing declares refuses by name too, and names both ends of the edge.
     test-unknown-parent-refuses-by-name = {
       expr = evalSchema {

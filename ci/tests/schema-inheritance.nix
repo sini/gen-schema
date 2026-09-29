@@ -125,6 +125,25 @@ in
       expr = builtins.elem "description" (optionSet rel.derived);
       expected = true;
     };
+    # The path member the refusal now imports: a path to an ordinary module still composes.
+    test-path-module-member-composes = {
+      expr =
+        builtins.attrNames
+          (evalSchema {
+            modules = [
+              {
+                config.schema.derived.imports = [
+                  (builtins.toFile "cxlc0-module-path.nix" "{ options.bolt = { }; }")
+                ];
+                config.schema.derived.options.spool = str "s";
+              }
+            ];
+          }).derived.options;
+      expected = [
+        "bolt"
+        "spool"
+      ];
+    };
     test-c1-relocated-option-names = {
       expr = optionSet rel.derived;
       expected = [

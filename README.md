@@ -864,25 +864,26 @@ config.schema.deploy-user.inherits = [ "user" "ssh-access" "sudo-access" ];
 ```
 
 **The retired inheritance spelling is refused where a value test can see it, and nowhere else
-(ADR-0025 item 1, declared exception).** A kind value appearing in a kind entry's `imports`, at any
-depth of plain attrset modules, or as a bare non-list `imports`, is refused by name. Declare
-`inherits = [ "<parent>" ]` and build the schema with `evalSchema`. Five constructions compose as
-before and are not refused, because deciding them needs something other than a value test:
-(1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree that declares the kind:
-it has no kind-entry `imports` element, and it is the same value as the relocated form; (2) a
-function module whose body imports a kind: the test does not apply functions; (3) a kind's functor
-applied by hand, `k.__functor k`: the result carries no mark, and `evalSchema` composes a parent
-through exactly this form; (4) a path whose value is a kind: the test does not import paths;
-(5) gen-aspects' `__defsModule`, which is not a kind value. Each is a reversible, silent
-re-accretion, bounded by what a consumer writes.
+(ADR-0025 item 1, declared exception).** A kind value appearing in a kind entry's `imports` (or a
+shorthand module's `require`), at any depth of plain attrset modules, as a bare non-list `imports`,
+or as the value of a path or string member, is refused by name. Declare `inherits = [ "<parent>" ]`
+and build the schema with `evalSchema`. Four constructions compose as before and are not refused,
+because deciding them needs something other than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree that declares the kind: it has no kind-entry `imports` element,
+and it is the same value as the relocated form; (2) a function module whose body imports a kind: the
+test does not apply functions, whose module arguments it does not have; (3) a kind's functor applied
+by hand, `k.__functor k`: the result carries no mark, and `evalSchema` composes a parent through
+exactly this form; (4) gen-aspects' `__defsModule`, which is not a kind value. Each is a reversible,
+silent re-accretion, bounded by what a consumer writes.
 
-The test adds one strictness, stated: at the kind's WHNF it forces each `imports` element of the
-kind entry to WHNF, one step before the option plane would. An element whose own WHNF throws
-(`imports = [ (throw …) ]`) therefore raises at the kind's WHNF, where it used to raise only at the
-first option read. It forces nothing inside an element: no option, `config`, function body or path,
-and of a kind value's mark only its keys. The refusal fires at the offending kind's WHNF, in the
-entry-type merge, before resolution; a sibling kind, `_kindNames`, the parent kind and a registry
-declared over the kind do not raise it.
+What the test forces, stated: at the kind's WHNF it forces every `imports` and `require` list of
+every attrset module reachable from the kind entry's defs, every member of those lists, the `__mint`
+record of any member carrying `kind` and `__mint`, and the `import` of every path or string member.
+So a member whose own WHNF throws (`imports = [ (throw …) ]`), a path to a file that throws and a
+path that does not exist all raise at the kind's WHNF, where they used to raise only at the first
+option read. It applies no function module and reads no option, `config` or other attribute of a
+member beyond those. The refusal fires at the offending kind's WHNF, in the entry-type merge, before
+resolution; a sibling kind, `_kindNames`, the parent kind and a registry declared over the kind do
+not raise it.
 
 ```nix
 config.schema.admin-user.imports = [ config.schema.user ];
@@ -1338,6 +1339,38 @@ mkSchemaOption {
 }
 ```
 
+### `evalSchema`
+
+```nix
+evalSchema {
+  modules,              # the kind tree's modules
+  schemaOption ? null,  # a caller-built `mkSchemaOption` result; default `mkSchemaOption { inherit specialArgs; }`
+  specialArgs ? { },    # base module args for the kind tree
+}
+```
+
+Returns the evaluated schema (`config.schema`) with kind inheritance resolved (ADR-0016 ruling 7). A
+kind names its parents in `inherits = [ "<parent>" ]`; `evalSchema` evaluates the tree at pass 0 and
+once more per inheritance depth, and at pass n imports into each child the parent's module as frozen at
+pass n-1. Each inheritance is an `_edges` entry with `type = "inherits"`. Refused by name: an undeclared
+parent, an inheritance cycle, `schemaOption` together with `specialArgs`, and a parent whose kind value
+has no `__functor` (an `mkType` result that is not a module). See [Kind Inheritance](#kind-inheritance)
+for the retired `imports` spelling, which the kind entry refuses.
+
+### `kindEq`
+
+```nix
+kindEq kindA kindB   # → true | false, or a refusal by name
+```
+
+`true` iff two kind values carry one identity, `false` if two. Where they mint one identity and differ
+only at a sealed component (ADR-0034), for example open-module content beyond an option's `type`, it
+refuses by name, naming the component (`…only at sealed component(s) 'open.options.<path>.<attr>'…`).
+An operand that is not a kind value carrying a mint-backed mark is refused by name. Enumerated
+exception: a kind value compared with itself after being carried through gen-merge's `types.anything`
+is refused on Nix and Determinate and `true` on Lix, never `false`; carry kind values through `raw`,
+`attrs` or `lazyAttrsOf raw` to keep them decided.
+
 ### `mkInstanceType`
 
 ```nix
@@ -1687,7 +1720,7 @@ Identity hashing (`mkIdentityModule`), strict validation (`mkStrictModule`), and
 
 ## Demo
 
-See [`examples/demo/`](examples/demo/) for a complete fleet management example using flake-parts + import-tree. The demo exercises all features: kinds, instances, strict validation, identity hashing, cross-instance references, schema composition, kind mix-ins, declarative methods, codec serialization, and documentation generation.
+See [`examples/demo/`](examples/demo/) for a complete fleet management example using flake-parts + import-tree. The demo exercises all features: kinds, instances, strict validation, identity hashing, cross-instance references, schema composition, kind inheritance, declarative methods, codec serialization, and documentation generation.
 
 ```bash
 cd examples/demo

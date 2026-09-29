@@ -76,7 +76,7 @@ in
       iglooDescribe = fleet.hosts.igloo.describe;
       icebergDescribe = fleet.hosts.iceberg.describe;
 
-      # --- Kind mix-in composition ---
+      # --- Kind inheritance composition ---
       # admin-user imports user kind — gets userName, shell for free
       adminNames = builtins.attrNames fleet.admins;
       rootShell = fleet.admins.root.shell;
