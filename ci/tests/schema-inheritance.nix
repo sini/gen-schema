@@ -16,7 +16,6 @@ let
     evalSchema
     mkSchemaOption
     mkInstanceRegistry
-    identityHashForKind
     kindEq
     ;
 
@@ -27,26 +26,10 @@ let
       inherit default;
     };
 
-  # ── the fixture, in both shapes ──────────────────────────────────────────────────────────────
-  # base carries `description`; derived carries `spool` and composes base.
-
-  # HEAD's idiom: the child reads the parent out of the very tree it is being declared in.
-  headSpelling =
-    (genMerge.evalModuleTree {
-      modules = [
-        (
-          { config, ... }:
-          {
-            options.schema = mkSchemaOption { };
-            config.schema.base.options.description = str "";
-            config.schema.derived = {
-              imports = [ config.schema.base ];
-              options.spool = str "s";
-            };
-          }
-        )
-      ];
-    }).config.schema;
+  # ── the fixture ──────────────────────────────────────────────────────────────────────────────
+  # base carries `description`; derived carries `spool` and composes base. The retired idiom, the
+  # child reading the parent out of the tree it is declared in, is refused; its cell is in
+  # ci/tests-error.nix.
 
   # The relocated form: the parent travels as a name, resolved by the pass.
   relModules = withInherit: [
@@ -139,8 +122,8 @@ in
   flake.tests.schema-inheritance = {
     # C1 — a child kind's instance option set carries its parent's options.
     test-c1-relocated-composes = {
-      expr = optionSet rel.derived;
-      expected = optionSet headSpelling.derived;
+      expr = builtins.elem "description" (optionSet rel.derived);
+      expected = true;
     };
     test-c1-relocated-option-names = {
       expr = optionSet rel.derived;
@@ -264,41 +247,14 @@ in
     # `attribute 'knob' missing`, and that message IS the cell — the knob is not refused, it is
     # inexpressible. It does not survive `tryEval`, so it cannot be asserted from here.
 
-    # C11 — the relocation preserves the kind's identity CONTENT, and the oracle can see it move.
-    # Asserted RELATIONALLY rather than against a literal digest: a hash pinned across a rev
-    # boundary is a relayed figure.
-    #
-    # The two spellings are two DECLARATIONS (`kindEq` has always called them distinct), and the
-    # stamp carries the declaration's minted identity, so the stamps follow `kindEq` rather than
-    # agreeing. What the relocation preserves is the content: the relocated instance, recomputed
-    # under the head-spelled kind, is the head instance, over one closed key set.
-    test-c11-relocation-preserves-identity-content = {
-      expr = {
-        contentUnderHeadKind =
-          identityHashForKind headSpelling.derived (instanceOf rel.derived { })
-          == (instanceOf headSpelling.derived { }).id_hash;
-        keySetsEqual =
-          (instanceOf rel.derived { })._identityKeys == (instanceOf headSpelling.derived { })._identityKeys;
-        stampFollowsKindEq =
-          ((instanceOf rel.derived { }).id_hash == (instanceOf headSpelling.derived { }).id_hash)
-          == kindEq headSpelling.derived rel.derived;
-      };
-      expected = {
-        contentUnderHeadKind = true;
-        keySetsEqual = true;
-        stampFollowsKindEq = true;
-      };
-    };
-    # The discriminator is on the KEY plane: dropping the inheritance drops `description` from the
-    # key set. Two declarations' stamps differ whatever their keys are, so the stamp inequality
-    # beside it can no longer be driven red by a key-set change and is kept only as a reading.
+    # C11 — the oracle can see the identity move. Asserted RELATIONALLY rather than against a
+    # literal digest: a hash pinned across a rev boundary is a relayed figure. Dropping the
+    # inheritance drops `description` from the key set, and the stamp moves with it.
     test-c11-discriminator-the-stamp-can-move = {
       expr = {
         keySetMoves =
-          (instanceOf relNoInherit.derived { })._identityKeys != (instanceOf headSpelling.derived { })
-          ._identityKeys;
-        stampMoves =
-          (instanceOf relNoInherit.derived { }).id_hash != (instanceOf headSpelling.derived { }).id_hash;
+          (instanceOf relNoInherit.derived { })._identityKeys != (instanceOf rel.derived { })._identityKeys;
+        stampMoves = (instanceOf relNoInherit.derived { }).id_hash != (instanceOf rel.derived { }).id_hash;
       };
       expected = {
         keySetMoves = true;

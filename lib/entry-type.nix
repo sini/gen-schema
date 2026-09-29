@@ -1003,13 +1003,42 @@ let
                   [ ]
               ) defs;
 
+              # THE RETIRED INHERITANCE SPELLING (den-hoag-cxlc0), refused FIRST: a kind VALUE in a
+              # kind entry's `imports` (or a shorthand def's `require`), found by the walk `modulesOf`
+              # makes for the plane. Inheritance travels as a NAME in `inherits`, resolved by
+              # `evalSchema`, which imports the parent's applied functor rather than its kind value.
+              # A VALUE test: it applies no function and imports no path, so a function module, a
+              # hand-applied functor and a path to a kind are admitted — the README's declared
+              # ADR-0025 exception. It forces each `imports` element to WHNF, one step before the
+              # plane would.
+              kindImports = prelude.concatMap (
+                d:
+                if builtins.isAttrs d.value && !(d.value ? __functor) then
+                  let
+                    v = d.value;
+                    i = v.imports or [ ];
+                  in
+                  builtins.filter isSchemaKind (
+                    map (m: m.open or m.opaque) (
+                      modulesOf (
+                        (if v ? require && !(isStructuredDecl v) then v.require else [ ])
+                        ++ (if builtins.isList i then i else [ i ])
+                      )
+                    )
+                  )
+                else
+                  [ ]
+              ) defs;
+
               surplusOffenders = builtins.filter (
                 d: surplusDeclarationKeys { inherit computed mkType; } collectionKeys d.value != [ ]
               ) defs;
 
               checkDeclarationKeys =
                 result:
-                if reservedNamed != [ ] then
+                if kindImports != [ ] then
+                  throw "gen-schema: kind '${kind}': its `imports` carries the kind value '${(builtins.head kindImports).kind}', the retired spelling of kind inheritance; declare `inherits = [ \"${(builtins.head kindImports).kind}\" ]` and build the schema with `evalSchema`"
+                else if reservedNamed != [ ] then
                   throw "gen-schema: kind '${kind}': declaration key '${builtins.head reservedNamed}' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread"
                 else if surplusOffenders != [ ] then
                   let

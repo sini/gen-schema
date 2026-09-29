@@ -168,6 +168,27 @@ in
       };
     };
 
+    # cxlc0 (3'): the retired spelling, a kind VALUE in a kind entry's `imports`, refuses by name.
+    test-spelling-refuses-by-name = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            (
+              { config, ... }:
+              {
+                options.schema = genSchema.mkSchemaOption { };
+                config.schema.base.options.description = genMerge.mkOption { type = genMerge.types.str; };
+                config.schema.derived.imports = [ config.schema.base ];
+              }
+            )
+          ];
+        }).config.schema.derived.options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'derived': its `imports` carries the kind value 'base', the retired spelling of kind inheritance";
+      };
+    };
+
     # A parent name nothing declares refuses by name too, and names both ends of the edge.
     test-unknown-parent-refuses-by-name = {
       expr = evalSchema {

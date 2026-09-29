@@ -3,8 +3,8 @@
 # A kind is a node, an inheritance edge is a relation, and a kind may inherit only kinds frozen by
 # a STRICTLY EARLIER pass (ADR-0016 ruling 7). The reference travels as a NAME — `inherits = [ "p" ]`
 # — never as a value read out of the tree being declared, and that is the whole of what separates
-# this from the `imports = [ config.schema.p ]` idiom it replaces: no `config` is read at any point
-# below, so nothing here consumes its own stratum's in-flight output.
+# this from the `imports = [ config.schema.p ]` idiom it replaces (now refused): no `config` is
+# read at any point below, so nothing here consumes its own stratum's in-flight output.
 #
 # The user-visible consequence is ruling 7's own: a structure two levels deep takes two passes.
 {
@@ -106,8 +106,16 @@ let
       # It is IMPORTED rather than assigned bare. A bare `config.schema.<k> = prev.<p>` hands the
       # entry type the parent's own collections as well, so the child would inherit the parent's
       # `inherits` — a spurious `type = "inherits"` edge — and the parent's `parent`, whose merge
-      # refuses a conflict outright. Wrapped, the module system applies the value through its
-      # `__functor` exactly as `imports = [ config.schema.<p> ]` does today.
+      # refuses a conflict outright.
+      #
+      # What is imported is the parent's MODULE, its `__functor` applied here, never its kind
+      # value: a kind value in a kind entry's `imports` is the retired spelling, which the entry
+      # type refuses (den-hoag-cxlc0). The module system applies a functor the same way, so nothing
+      # composes differently. ★ The hand-applied functor is a member of that refusal's declared
+      # exception (README, "The retired inheritance spelling"), and this injection composes through
+      # it: a change that decided applied functors would refuse `evalSchema` too, so it moves this
+      # first. A parent with no `__functor` (an `mkType` result that is not a module) has nothing
+      # to compose and is refused by name.
       injectFor =
         prev: n:
         prelude.concatMap (
@@ -117,7 +125,14 @@ let
           else
             map (p: {
               config.schema.${k} = {
-                imports = [ prev.${p} ];
+                imports = [
+                  (
+                    if prev.${p} ? __functor then
+                      prev.${p}.__functor prev.${p}
+                    else
+                      throw "gen-schema: kind '${k}' inherits '${p}', whose kind value is not a module (its `mkType` result carries no `__functor`), so there is nothing to compose"
+                  )
+                ];
               };
             }) (parentsOf k)
         ) kindNames;

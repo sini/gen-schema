@@ -34,7 +34,7 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
   - [Parent-Child Topology](#parent-child-topology)
   - [Schema Introspection](#schema-introspection)
   - [Scope Graph Bridge](#scope-graph-bridge-consumer-side)
-  - [Kind Mix-ins](#kind-mix-ins)
+  - [Kind Inheritance](#kind-inheritance)
   - [Declarative Methods](#declarative-methods)
   - [Collection Fields](#collection-fields)
   - [Computed Fields](#computed-fields)
@@ -364,7 +364,7 @@ config.fleet.hosts.igloo.description  # → ""
 config.fleet.users.tux.description    # → ""
 ```
 
-`baseModule` is static — set at `mkSchemaOption` call time, not extensible by downstream modules. For extensible shared bases, use the kind mix-in pattern instead (a shared kind imported by others via `imports`).
+`baseModule` is static — set at `mkSchemaOption` call time, not extensible by downstream modules. For extensible shared bases, use [kind inheritance](#kind-inheritance) instead (a shared kind that others name in `inherits`).
 
 ### Default Propagation
 
@@ -831,36 +831,58 @@ config.schema._collectionKeys
 
 gen-schema provides generic introspection options (`_topology`, `_edges`, `_kindNames`, etc.) that consumers use to build whatever graph format their evaluator needs. The bridge logic lives in consumers (e.g., den's `buildScopeGraphs`), not in gen-schema.
 
-### Kind Mix-ins
+### Kind Inheritance
 
-A kind can import another kind's schema, inheriting all options:
+A kind inherits another kind's options by NAME. Declare the parent in `inherits` and build the
+schema with `evalSchema`, which resolves each parent in a strictly earlier pass and composes its
+module into the child (ADR-0016 ruling 7):
 
 ```nix
-config.schema.user = {
-  options.userName = lib.mkOption { type = str; };
-  options.shell = lib.mkOption { type = str; default = "/bin/bash"; };
-};
-
-config.schema.admin-user = {
-  imports = [ config.schema.user ];  # inherits userName, shell
-  options.sudoPrivileges = lib.mkOption { type = bool; default = true; };
-  options.sshKeys = lib.mkOption { type = listOf str; default = []; };
+schema = genSchema.evalSchema {
+  modules = [
+    {
+      config.schema.user = {
+        options.userName = lib.mkOption { type = str; };
+        options.shell = lib.mkOption { type = str; default = "/bin/bash"; };
+      };
+      config.schema.admin-user = {
+        inherits = [ "user" ];  # inherits userName, shell
+        options.sudoPrivileges = lib.mkOption { type = bool; default = true; };
+        options.sshKeys = lib.mkOption { type = listOf str; default = []; };
+      };
+    }
+  ];
 };
 ```
 
 Each gets its own registry. Identity hashes include the kind prefix — a user "root" and an admin "root" hash differently.
 
-Multiple mix-ins compose cleanly:
+Multiple parents compose, and a chain two levels deep takes two passes. Each inheritance is also an edge, `type = "inherits"`, in `_edges`:
 
 ```nix
-config.schema.deploy-user = {
-  imports = [
-    config.schema.user
-    config.schema.ssh-access
-    config.schema.sudo-access
-  ];
-};
+config.schema.deploy-user.inherits = [ "user" "ssh-access" "sudo-access" ];
 ```
+
+**The retired inheritance spelling is refused where a value test can see it, and nowhere else
+(ADR-0025 item 1, declared exception).** A kind value appearing in a kind entry's `imports`, at any
+depth of plain attrset modules, or as a bare non-list `imports`, is refused by name. Declare
+`inherits = [ "<parent>" ]` and build the schema with `evalSchema`. Five constructions compose as
+before and are not refused, because deciding them needs something other than a value test:
+(1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree that declares the kind:
+it has no kind-entry `imports` element, and it is the same value as the relocated form; (2) a
+function module whose body imports a kind: the test does not apply functions; (3) a kind's functor
+applied by hand, `k.__functor k`: the result carries no mark, and `evalSchema` composes a parent
+through exactly this form; (4) a path whose value is a kind: the test does not import paths;
+(5) gen-aspects' `__defsModule`, which is not a kind value. Each is a reversible, silent
+re-accretion, bounded by what a consumer writes.
+
+```nix
+config.schema.admin-user.imports = [ config.schema.user ];
+# → error: gen-schema: kind 'admin-user': its `imports` carries the kind value 'user', the retired
+#   spelling of kind inheritance; declare `inherits = [ "user" ]` and build the schema with `evalSchema`
+```
+
+`evalSchema` refuses by name a parent whose kind value is not a module (an `mkType` result with no `__functor`): there is nothing to compose.
 
 ### Declarative Methods
 
