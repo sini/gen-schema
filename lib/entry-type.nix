@@ -63,7 +63,8 @@ let
   #
   # Of an option declaration, ONE attribute is a component by value: its `type` (`optionComponents`
   # below). Every other attribute, and every kind-level definition, is a component by PATH only,
-  # sealed (`openComponents` below). The declaration's `freeformType`,
+  # sealed (`openComponents` below), with `meta` and every kind-level `_module` key but
+  # `freeformType`. The declaration's `freeformType`,
   # at either site (top-level or `_module.freeformType`), is a component too: it decides which
   # undeclared instance keys are accepted. Four exclusions, each a projection of a
   # component already present (ADR-0013, a derivable fact is derived once): `refinements`
@@ -244,55 +245,93 @@ let
       walked = modulesOf modules;
       open = map (m: m.open) (builtins.filter (m: m ? open) walked);
       # The PATHS of an open module's content beyond an option's `type` (den-hoag-egei0): another
-      # attribute of a declaration, or a kind-level definition. Presence only, read by `attrNames`,
+      # attribute of a declaration, a kind-level definition (a structured module's `meta` included,
+      # which gen-merge's `configOf` folds into its config), and every kind-level `_module` key but
+      # `freeformType` (a component of its own, below). Presence only, read by `attrNames`,
       # `isOptionDecl` and `isAttrs`: no definition value is forced, and the config half stops at the
       # top-level key set, so nothing past the `m.config` WHNF `freeforms` already takes is read.
-      openPaths = prelude.concatLists (
-        prelude.imap0 (
-          i: m:
-          let
-            at = [
-              "open"
-              (toString i)
-            ];
-            s = isStructuredDecl m;
-            defs = if s then (m.config or { }) else builtins.removeAttrs m merge.moduleSyntax.shorthandMeta;
-            attrsOf =
-              pre: t:
-              prelude.concatMap (
-                n:
-                let
-                  o = t.${n};
-                  q = pre ++ [ n ];
-                in
-                if isOptionDecl o then
-                  map (a: q ++ [ a ]) (builtins.filter (a: a != "type" && a != "_type") (prelude.attrNames o))
-                else if builtins.isAttrs o then
-                  attrsOf q o
-                else
-                  [ ]
-              ) (prelude.attrNames t);
-          in
-          attrsOf (at ++ [ "options" ]) (if s then m.options or { } else { })
-          ++ (
-            if builtins.isAttrs defs && !(defs ? _type) then
-              map (
-                n:
-                at
-                ++ [
-                  "config"
-                  n
-                ]
-              ) (builtins.filter (n: n != "_module") (prelude.attrNames defs))
-            else
-              [ (at ++ [ "config" ]) ]
-          )
-        ) open
+      # A path carries NO module index and the set is deduplicated: which module states a key is not
+      # identity, so a reordered or regrouped twin reaches the same paths and is refused on the
+      # subject rather than split by the mark.
+      openPaths = builtins.attrValues (
+        builtins.listToAttrs (
+          map (p: {
+            name = builtins.concatStringsSep "." p;
+            value = p;
+          }) (prelude.concatMap openPathsOf open)
+        )
       );
+      openPathsOf =
+        m:
+        let
+          s = isStructuredDecl m;
+          # gen-merge's `configOf`, at the key level: a structured module's config plus its `meta`,
+          # a shorthand module less its module-syntax keys.
+          defs =
+            if s then
+              (m.config or { }) // (if m ? meta then { inherit (m) meta; } else { })
+            else
+              builtins.removeAttrs m merge.moduleSyntax.shorthandMeta;
+          whole = !(builtins.isAttrs defs) || defs ? _type;
+          attrsOf =
+            pre: t:
+            prelude.concatMap (
+              n:
+              let
+                o = t.${n};
+                q = pre ++ [ n ];
+              in
+              if isOptionDecl o then
+                map (a: q ++ [ a ]) (builtins.filter (a: a != "type" && a != "_type") (prelude.attrNames o))
+              else if builtins.isAttrs o then
+                attrsOf q o
+              else
+                [ ]
+            ) (prelude.attrNames t);
+          moduleKeys =
+            let
+              top = m._module or { };
+              inner = if whole then { } else defs._module or { };
+            in
+            builtins.filter (k: k != "freeformType") (
+              prelude.attrNames (
+                (if builtins.isAttrs top then top else { }) // (if builtins.isAttrs inner then inner else { })
+              )
+            );
+        in
+        attrsOf [
+          "open"
+          "options"
+        ] (if s then m.options or { } else { })
+        ++ (
+          if whole then
+            [
+              [
+                "open"
+                "config"
+              ]
+            ]
+          else
+            map (n: [
+              "open"
+              "config"
+              n
+            ]) (builtins.filter (n: n != "_module") (prelude.attrNames defs))
+        )
+        ++ map (k: [
+          "open"
+          "_module"
+          k
+        ]) moduleKeys;
       # Each is a SEALED component, as a schema's own `functions` are: the mark carries the marker at
-      # its path, and its subject is a closure allocated by this call, equal to itself by reference
-      # and to no other construction's. The content itself is never the subject: comparing it would
-      # force it, and a K3 capture aborts uncatchably when forced.
+      # its path, and its subject is a closure allocated by this call, never equal to another
+      # construction's. The content itself is never the subject: comparing it would force it, and a
+      # K3 capture aborts uncatchably when forced.
+      # ★ ENUMERATED EXCEPTION (den-hoag-egei0 C4, defaulted (a), reversible): whether a subject is
+      # equal to ITSELF after a rebuild is the evaluator's. A kind value carried through gen-merge's
+      # `types.anything` (or `attrsOf`/`listOf anything`) is rebuilt, and nix and Determinate compare
+      # the rebuilt closure unequal (a refusal) while Lix compares it equal (`true`). The comparison is
+      # never `false`: the mark is untouched by transport.
       openComponents = map (p: {
         path = p;
         value = _: p;
@@ -379,6 +418,12 @@ let
   # beyond an option's `type` is such a component (`openComponents`), so a pair differing there, or
   # two constructions of one declaration carrying it, is refused naming its `open.*` path. An operand
   # that is not a kind value is refused by name, as the four admission guards refuse it.
+  # ★ ENUMERATED EXCEPTION (den-hoag-egei0 C4, defaulted (a), reversible): a kind value compared with
+  # ITSELF CARRIED THROUGH gen-merge's `types.anything` (or `attrsOf anything`, `listOf anything`),
+  # which rebuilds its sealed subjects, is refused on nix and Determinate and `true` on Lix, never
+  # `false` (`kind-mark-cplus.test-open-content-transport-is-never-false`). The class predates the
+  # open-content subjects (function modules, sealed types); they widen it to every kind carrying open
+  # content. Carry a kind value through `raw`, `attrs` or `lazyAttrsOf raw` to keep it decided.
   kindEq =
     let
       subject =

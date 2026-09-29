@@ -232,7 +232,7 @@ in
         wrongKind = null;
         checked = 3;
         discovered = "host";
-        rightKind = "host:a4ababf24d7808f2ecaa7ab6cf16bc36003b873622b3ced906957672e1e316b2";
+        rightKind = "host:c131f4f6019aac2d9734366bd1a02f71b779737896c1a2f6ef460eee4babed3c";
       };
     };
   # THE GUARD TESTS PRESENCE AND NOTHING ELSE. A value predicate re-derived here would be a second copy
@@ -254,8 +254,8 @@ in
       ];
       tagType = "list";
       zoneType = "string";
-      ownKindRecompute = "widget:54c5b753e40921a877230c22e5cae22ab1b99b8e58afa42fea97cc11aa0d25cb";
-      stamped = "widget:54c5b753e40921a877230c22e5cae22ab1b99b8e58afa42fea97cc11aa0d25cb";
+      ownKindRecompute = "widget:fe697543f16ea5935aa282ddd95efa62f95086427b80e9f1e2987ff88dd2470b";
+      stamped = "widget:fe697543f16ea5935aa282ddd95efa62f95086427b80e9f1e2987ff88dd2470b";
     };
   };
   # THE BOUNDARY. Where the instance CARRIES the candidate's identity key at a value the mint refuses,

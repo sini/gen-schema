@@ -232,7 +232,7 @@ in
       ];
       kindValueOptions = [ "spool" ];
       recomputeMatchesStamp = true;
-      stamped = "thimble:81a5825cea5786be37e2a2f54057e13dc7f485483d0cc715f2be1aecea7dffcb";
+      stamped = "thimble:4ed795a8a2d0b3d661066ff651d16248d8b4373410c58d4f9060e4b611326048";
     };
   };
 

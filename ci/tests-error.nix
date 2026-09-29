@@ -733,7 +733,7 @@ in
             keys = forced clean._identityKeys;
           in
           id.success
-          && id.value == "host:6b6b0e7a7752a7aed0ae53a6e7e6b67f23e0a0ca4b820ed271a652f175a3082c"
+          && id.value == "host:81561e7dc4346fe8fd08f1be5b8201a91392889f0ca10efc59d2f48f626e9d63"
           && keys.success
           &&
             keys.value == [
@@ -769,7 +769,7 @@ in
             role = forced clean.role;
           in
           id.success
-          && id.value == "host:1142be9a62ef20d7398c22cbad64f51ae0db0edf53ebbe0d8d41508b9d2ee024"
+          && id.value == "host:ddce01b9dccdc44b1d4320738872e674510cb9aea614c49f86b6aacfa1cc155d"
           && role.success
           && role.value == "web";
         (instanceOf

@@ -220,6 +220,55 @@ let
         )
       ];
     };
+  # den-hoag-egei0 C1-C3: `meta` (folded into config by gen-merge), a kind-level `_module` key,
+  # and the same content stated by different modules or in a different order.
+  metaK =
+    v:
+    kindOf (
+      {
+        options.meta.x = opt T.int;
+      }
+      // (if v == null then { } else { meta.x = v; })
+    );
+  argsK =
+    v:
+    kindOf {
+      options.p = opt T.str;
+      config._module.args.x = v;
+    };
+  portM = {
+    options.port = genMerge.mkOption {
+      type = T.int;
+      default = 80;
+    };
+  };
+  nameM = {
+    options.name = opt T.str;
+  };
+  ordered = ms: kindOf { imports = ms; };
+  definedIn =
+    first:
+    kindOf {
+      imports = [
+        ({ options.port = opt T.int; } // (if first then { config.port = 443; } else { }))
+        (nameM // (if first then { } else { config.port = 443; }))
+      ];
+    };
+  # C4: one kind value carried through a consumer option of type `t`.
+  via =
+    t: k:
+    (genMerge.evalModuleTree {
+      modules = [
+        { options.k = genMerge.mkOption { type = t; }; }
+        { config.k = k; }
+      ];
+    }).config.k;
+  tr =
+    e:
+    let
+      r = builtins.tryEval (builtins.deepSeq e e);
+    in
+    if r.success then r.value else "REFUSED";
   instanceP =
     kind:
     (genMerge.evalModuleTree {
@@ -386,7 +435,7 @@ in
         lambdaDefault = false;
         partialDefault = false;
         partialSealed = [
-          "open.0.options.cfg.default"
+          "open.options.cfg.default"
           "options.cfg.type"
         ];
         derivationDefault = false;
@@ -438,6 +487,84 @@ in
     test-open-content-f2-required-default-refused = {
       expr = decides (kindEq (requireOpen 80) (requireOpen 443));
       expected = false;
+    };
+    # C1: a structured module's `meta` is a kind-level definition (gen-merge folds it into config).
+    test-open-content-meta-refused = {
+      expr = {
+        pair = decides (kindEq (metaK 80) (metaK 443));
+        oneSided = kindEq (metaK 80) (metaK null);
+        sealed = builtins.attrNames (metaK 80).__sealed;
+      };
+      expected = {
+        pair = false;
+        oneSided = false;
+        sealed = [ "open.config.meta" ];
+      };
+    };
+    # C2: a kind-level `_module` key other than `freeformType` is open content.
+    test-open-content-module-args-refused = {
+      expr = {
+        pair = decides (kindEq (argsK "1") (argsK "2"));
+        sealed = builtins.attrNames (argsK "1").__sealed;
+      };
+      expected = {
+        pair = false;
+        sealed = [ "open._module.args" ];
+      };
+    };
+    # C3: which module states a key is not identity. A reordered twin and a definition moved into
+    # another module reach the same paths and are REFUSED like the same-order twin, never split.
+    test-open-content-module-order-is-not-identity = {
+      expr = {
+        reordered = decides (
+          kindEq
+            (ordered [
+              portM
+              nameM
+            ])
+            (ordered [
+              nameM
+              portM
+            ])
+        );
+        reorderedSameMark =
+          (ordered [
+            portM
+            nameM
+          ]).__mint.minted == (ordered [
+            nameM
+            portM
+          ]).__mint.minted;
+        moved = decides (kindEq (definedIn true) (definedIn false));
+        movedSameMark = (definedIn true).__mint.minted == (definedIn false).__mint.minted;
+      };
+      expected = {
+        reordered = false;
+        reorderedSameMark = true;
+        moved = false;
+        movedSameMark = true;
+      };
+    };
+    # C4 · ENUMERATED EXCEPTION (the `kindEq` door): a kind carried through gen-merge's `anything`
+    # is rebuilt, so comparing it with itself is refused (nix, Determinate) or `true` (Lix). Never
+    # `false`: the mark is untouched. `raw` carries the value itself and decides `true`.
+    test-open-content-transport-is-never-false = {
+      expr =
+        let
+          k = defaulted 80;
+        in
+        {
+          anything = tr (kindEq k (via T.anything k)) != false;
+          attrsOfAnything = tr (kindEq k (via (T.attrsOf T.anything) { x = k; }).x) != false;
+          listOfAnything = tr (kindEq k (builtins.head (via (T.listOf T.anything) [ k ]))) != false;
+          raw = kindEq k (via T.raw k);
+        };
+      expected = {
+        anything = true;
+        attrsOfAnything = true;
+        listOfAnything = true;
+        raw = true;
+      };
     };
     # ★ THE TWIN COST (the named refusal class). Two independent constructions of ONE declaration
     # carrying open content are refused: each subject is equal only to itself, and nothing forces the
@@ -619,7 +746,7 @@ in
       expr = kindEq (defaulted 80) (defaulted 443);
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'open\\.0\\.options\\.port\\.default'; .*$";
+        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'open\\.options\\.port\\.default'; .*$";
       };
     };
     test-non-kind-operand-refuses-by-name = {
@@ -630,4 +757,56 @@ in
       };
     };
   };
+
+  # P1 · every `test-open-content-*-refused` pair, pinned by the refusal MESSAGE and the path it
+  # names, so a refusal from anywhere else (a walker that throws) cannot pass for the named one.
+  flake.testsError.kind-mark-cplus-open-refusal =
+    let
+      msg =
+        comp:
+        "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) '${comp}'; a sealed component has no identity \\(ADR-0034\\): .*$";
+      at = attr: "open\\.options\\.port\\.${attr}";
+      cell = expr: comp: {
+        inherit expr;
+        expectedError = {
+          type = "ThrownError";
+          msg = msg comp;
+        };
+      };
+      attrPair =
+        attr: a: b:
+        cell (sharesIdentity attr a b) (at attr);
+    in
+    {
+      test-inert-default = attrPair "default" 80 443;
+      test-apply = attrPair "apply" (x: x) (x: x + 1);
+      test-description = attrPair "description" "one" "two";
+      test-example = attrPair "example" 1 2;
+      test-defaultText = attrPair "defaultText" "80" "443";
+      test-visible = attrPair "visible" true false;
+      test-internal = attrPair "internal" false true;
+      test-readOnly = attrPair "readOnly" false true;
+      test-identity = attrPair "identity" true false;
+      test-unknown-attribute = attrPair "pa887Unknown" 1 2;
+      test-lambda-default = cell (kindEq (lambdaDefault (x: "a")) (
+        lambdaDefault (x: "b")
+      )) "open\\.options\\.greet\\.default";
+      test-partial-default = cell (kindEq (partial 1) (partial 2)) "open\\.options\\.cfg\\.default";
+      test-derivation-default = cell (kindEq (pkgDefault "hello") (pkgDefault "cowsay")) "open\\.options\\.package\\.default";
+      test-required-default = cell (kindEq (requireOpen 80) (requireOpen 443)) "open\\.options\\.port\\.default";
+      test-twin = cell (kindEq (defaulted 80) (defaulted 80)) "open\\.options\\.port\\.default";
+      test-meta = cell (kindEq (metaK 80) (metaK 443)) "open\\.config\\.meta";
+      test-module-args = cell (kindEq (argsK "1") (argsK "2")) "open\\._module\\.args";
+      test-reordered-twin = cell (kindEq
+        (ordered [
+          portM
+          nameM
+        ])
+        (ordered [
+          nameM
+          portM
+        ])
+      ) "open\\.options\\.port\\.default";
+      test-moved-definition = cell (kindEq (definedIn true) (definedIn false)) "open\\.config\\.port";
+    };
 }
