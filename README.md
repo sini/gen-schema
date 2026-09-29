@@ -876,6 +876,14 @@ through exactly this form; (4) a path whose value is a kind: the test does not i
 (5) gen-aspects' `__defsModule`, which is not a kind value. Each is a reversible, silent
 re-accretion, bounded by what a consumer writes.
 
+The test adds one strictness, stated: at the kind's WHNF it forces each `imports` element of the
+kind entry to WHNF, one step before the option plane would. An element whose own WHNF throws
+(`imports = [ (throw …) ]`) therefore raises at the kind's WHNF, where it used to raise only at the
+first option read. It forces nothing inside an element: no option, `config`, function body or path,
+and of a kind value's mark only its keys. The refusal fires at the offending kind's WHNF, in the
+entry-type merge, before resolution; a sibling kind, `_kindNames`, the parent kind and a registry
+declared over the kind do not raise it.
+
 ```nix
 config.schema.admin-user.imports = [ config.schema.user ];
 # → error: gen-schema: kind 'admin-user': its `imports` carries the kind value 'user', the retired
