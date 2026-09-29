@@ -835,7 +835,7 @@ gen-schema provides generic introspection options (`_topology`, `_edges`, `_kind
 
 A kind inherits another kind's options by NAME. Declare the parent in `inherits` and build the
 schema with `evalSchema`, which resolves each parent in a strictly earlier pass and composes its
-module into the child (ADR-0016 ruling 7):
+module into the child:
 
 ```nix
 schema = genSchema.evalSchema {
@@ -864,7 +864,7 @@ config.schema.deploy-user.inherits = [ "user" "ssh-access" "sudo-access" ];
 ```
 
 **The retired inheritance spelling is refused where a value test can see it, and nowhere else
-(ADR-0025 item 1, declared exception).** A kind value appearing in a kind entry's `imports` (or a
+(a declared exception to "a value or a named refusal").** A kind value appearing in a kind entry's `imports` (or a
 shorthand module's `require`), at any depth of plain attrset modules, as a bare non-list `imports`,
 or as the value of a path or string member or anywhere in the tree of files it imports, is refused
 by name. Declare `inherits = [ "<parent>" ]` and build the schema with `evalSchema`. Four
@@ -1353,7 +1353,7 @@ evalSchema {
 }
 ```
 
-Returns the evaluated schema (`config.schema`) with kind inheritance resolved (ADR-0016 ruling 7). A
+Returns the evaluated schema (`config.schema`) with kind inheritance resolved. A
 kind names its parents in `inherits = [ "<parent>" ]`; `evalSchema` evaluates the tree at pass 0 and
 once more per inheritance depth, and at pass n imports into each child the parent's module as frozen at
 pass n-1. Each inheritance is an `_edges` entry with `type = "inherits"`. Refused by name: an undeclared
@@ -1368,7 +1368,7 @@ kindEq kindA kindB   # → true | false, or a refusal by name
 ```
 
 `true` iff two kind values carry one identity, `false` if two. Where they mint one identity and differ
-only at a sealed component (ADR-0034), for example open-module content beyond an option's `type`, it
+only at a sealed component, for example open-module content beyond an option's `type`, it
 refuses by name, naming the component (`…only at sealed component(s) 'open.options.<path>.<attr>'…`).
 An operand that is not a kind value carrying a mint-backed mark is refused by name. Enumerated
 exception: a kind value compared with itself after being carried through gen-merge's `types.anything`
