@@ -875,9 +875,11 @@ spelling is the same kind as the hand-written `inherits` that `evalSchema` resol
 registry has migrated, and then it will be refused. Declare `inherits = [ "<parent>" ]` and build the
 schema with `evalSchema`.
 
-Each spelled kind warns once per evaluation that reads its `inherits`: the collection itself, `_edges`,
-or any mark or `id_hash`, whose preimage carries the collections. A read that forces none of them, such as
-`_kindNames`, does not warn. The warning is `builtins.warn`, so under `abort-on-warn` the evaluation
+Each spelled kind warns once per MODULE-TREE PASS that reads its `inherits`: once on a plain tree,
+and once per pass under `evalSchema`, which evaluates the tree at pass 0 and again per inheritance
+depth. The reads that fire it are the ones that force `inherits`: the collection itself, `_edges`,
+the kind's mark (`__mint.minted`) and an instance's `id_hash`, whose preimages carry the collections.
+A read of the kind's `options` only, of `.kind`, or of `_kindNames` does not warn. The warning is `builtins.warn`, so under `abort-on-warn` the evaluation
 aborts at the first spelled kind read, and `tryEval` does not catch it; an evaluator without
 `builtins.warn` prints it through `builtins.trace`.
 
