@@ -863,6 +863,15 @@ Multiple parents compose, and a chain two levels deep takes two passes. Each inh
 config.schema.deploy-user.inherits = [ "user" "ssh-access" "sudo-access" ];
 ```
 
+`evalSchema` is the only resolver. On a schema it did not build (a plain `mkSchemaOption` tree), a
+declared `inherits` is refused by name, catchably, at every read that would show the parent's options
+missing: `options`, `refs` (so `_edges`), `refinements`, the mark, an instance, the functor applied or
+imported as a module, a computed field and every field an `mkType` result built. The declaration itself
+(`kind`, `inherits`, `parent` and the other collections) stays readable. The refusal is
+`` gen-schema: kind '<k>' inherits '<p>', but nothing resolved it: … Build the schema with `evalSchema`  ``.
+A parent reached through the deprecated spelling below is not refused, since it composes where it is
+written.
+
 **The deprecated inheritance spelling is read as `inherits`, with a warning, where a value test can
 see it, and nowhere else (a declared exception to "a value or a named refusal").** A kind value
 appearing in a kind entry's `imports` (or a shorthand module's `require`), at any depth of plain
@@ -891,11 +900,11 @@ config.schema.admin-user.imports = [ config.schema.user ];
 ```
 
 A CYCLE written in the spelling, `a` importing `config.schema.b` and `b` importing `config.schema.a`, is
-refused by `evalSchema` with the name a hand-written `inherits` cycle gets (`inheritance cycle among kinds [a b]`). **Boundary: on a plain `mkSchemaOption` tree, a spelled kind cycle overflows
-uncatchably** (`stack overflow; max-call-depth exceeded`). That is the module system's own
-composition of the spelled modules importing each other, and it is pre-existing: the spelling
-overflowed the same way before it was aliased. A plain tree refuses no inheritance cycle, since a
-hand-written `inherits` composes nothing there.
+refused by `evalSchema` with the name a hand-written `inherits` cycle gets (`inheritance cycle among kinds [a b]`). **Open ADR-0025 item-1 defect, carried on `den-hoag-8c8pr`: on a plain
+`mkSchemaOption` tree, a spelled kind cycle overflows uncatchably** (`stack overflow; max-call-depth exceeded`). That is the module system's own composition of the spelled modules importing each other,
+before any value of this library is read; refusing it by name needs a transitive check over spelled
+parents that the kind value does not yet expose. A hand-written cycle on a plain tree is refused as
+unresolved (`kind 'a' inherits 'b', but nothing resolved it`).
 
 Four constructions compose as before, unaliased and unwarned, because deciding them needs something
 other than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree
@@ -1338,6 +1347,8 @@ mkSchemaEntryType {
 
 The return value is merged with `computedFields` (computed wins for same-named keys — except a name in `kindResultKeys`, the kind-value contract `lib/entry-type.nix` reserves and refuses by name on both branches; `computed` may not use one of those at all), so topology and introspection fields remain authoritative.
 
+The kind value always carries the `inherits` and `parent` collections, written over the `mkType` result (a computed field still wins), because `evalSchema` and `_topology` read them off the kind value; a result that publishes no collections still composes its declared parents under `evalSchema`. On a kind whose declared `inherits` nothing resolved (see [Kind Inheritance](#kind-inheritance)), every field the `mkType` result built and its applied `__functor` are read through the same refusal; `kind`, `strict`, `keySemantics`, `inherits` and `parent` stay readable.
+
 #### `keySemantics` — opaque per-key category surface
 
 ```nix
@@ -1381,8 +1392,10 @@ kind names its parents in `inherits = [ "<parent>" ]`; `evalSchema` evaluates th
 once more per inheritance depth, and at pass n imports into each child the parent's module as frozen at
 pass n-1. Each inheritance is an `_edges` entry with `type = "inherits"`. Refused by name: an undeclared
 parent, an inheritance cycle, `schemaOption` together with `specialArgs`, and a parent whose kind value
-has no `__functor` (an `mkType` result that is not a module). See [Kind Inheritance](#kind-inheritance)
-for the deprecated `imports` spelling, which the kind entry reads as `inherits` with a warning.
+has no `__functor` (an `mkType` result that is not a module). The kind entry refuses, by name, a
+declared parent that nothing resolved, so a declared `inherits` on a tree `evalSchema` did not build
+never composes nothing silently. See [Kind Inheritance](#kind-inheritance) for the deprecated `imports`
+spelling, which the kind entry reads as `inherits` with a warning.
 
 ### `kindEq`
 

@@ -36,6 +36,55 @@ let
     mkInstanceRegistry
     ;
 
+  # An `mkType` whose result publishes no collections and whose functor ignores `self`.
+  bareMkType =
+    { defs, ... }:
+    {
+      __functor =
+        _:
+        { ... }:
+        {
+          imports = map (d: d.value) defs;
+        };
+    };
+  # A kind whose declared parent nothing resolved, built by gen-aspects' `mkType` shape: the functor
+  # ignores `self`, and `__defsModule` is built from the defs.
+  unresolvedAspectsShaped =
+    (genMerge.evalModuleTree {
+      modules = [
+        {
+          options.schema = mkSchemaOption {
+            mkType =
+              { defs, collections, ... }:
+              let
+                defsModules = map (d: d.value) (builtins.filter (d: builtins.isAttrs d.value) defs);
+              in
+              {
+                __functor =
+                  _:
+                  { ... }:
+                  {
+                    imports = defsModules;
+                  };
+                __defsModule.imports = defsModules;
+              }
+              // collections;
+          };
+          config.schema.base.options.description = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "";
+          };
+          config.schema.derived = {
+            inherits = [ "base" ];
+            options.spool = genMerge.mkOption {
+              type = genMerge.types.str;
+              default = "s";
+            };
+          };
+        }
+      ];
+    }).config.schema.derived;
+
   # The door table door-checks.nix also reads, for the doors' own valid fixtures — the message
   # goldens below apply the same rows' violations, so a row edited there cannot drift from what is
   # pinned here.
@@ -187,6 +236,124 @@ in
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: inheritance cycle among kinds \\[a b\\] — a kind may inherit only kinds resolved in a strictly earlier pass$";
+      };
+    };
+
+    # den-hoag-8c8pr: a declared parent on a tree `evalSchema` did not build is refused BY NAME where
+    # the parent's options would be read, instead of composing nothing. ADR-0016 ruling 7: a
+    # same-pass relatum does not resolve, and the substrate refuses by name.
+    test-unresolved-inherits-refuses-by-name = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = mkSchemaOption { };
+              config.schema.base = { };
+              config.schema.derived.inherits = [ "base" ];
+            }
+          ];
+        }).config.schema.derived.options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: `inherits` composes only in a schema built by `evalSchema`, which resolves each parent in a strictly earlier pass, and without it the parent's options would be silently absent. Build the schema with `evalSchema`$";
+      };
+    };
+
+    # The same on the `mkType` branch: the guard sits on the tree module an instance imports.
+    test-unresolved-inherits-refuses-by-name-mktype = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = mkSchemaOption {
+                mkType =
+                  { defs, ... }:
+                  {
+                    __functor =
+                      _:
+                      { ... }:
+                      {
+                        imports = map (d: d.value) defs;
+                      };
+                  };
+              };
+              config.schema.base = { };
+              config.schema.derived.inherits = [ "base" ];
+            }
+          ];
+        }).config.schema.derived.options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: .*";
+      };
+    };
+
+    # The READS THAT BYPASS `options` (gate v0 C2): the kind's functor applied by hand, the kind
+    # imported as a module, and a field the caller's `mkType` built from its defs. The fixture is
+    # gen-aspects' shape: a functor that ignores `self`, and a `__defsModule`.
+    test-unresolved-inherits-refuses-through-the-functor =
+      let
+        k = unresolvedAspectsShaped;
+      in
+      {
+        expr = builtins.attrNames (genMerge.evalModuleTree { modules = [ (k.__functor k) ]; }).options;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: .*";
+        };
+      };
+    test-unresolved-inherits-refuses-imported-as-a-module = {
+      expr =
+        builtins.attrNames
+          (genMerge.evalModuleTree { modules = [ unresolvedAspectsShaped ]; }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: .*";
+      };
+    };
+    test-unresolved-inherits-refuses-through-a-caller-field = {
+      expr =
+        builtins.attrNames
+          (genMerge.evalModuleTree { modules = [ unresolvedAspectsShaped.__defsModule ]; }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: .*";
+      };
+    };
+
+    # den-hoag-8c8pr, S1: an `mkType` kind whose result publishes no collections still carries its
+    # `parent`, so an undeclared one is refused by the topology instead of reading as no parent.
+    test-mktype-undeclared-parent-refuses-by-name = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = mkSchemaOption { mkType = bareMkType; };
+              config.schema.user.parent = "nosuch";
+            }
+          ];
+        }).config.schema._topology.user;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'user' declares parent 'nosuch' which is not a declared kind$";
+      };
+    };
+
+    # A hand-written CYCLE on such a tree is refused by the same name: nothing resolves either edge.
+    test-unresolved-inherits-cycle-refuses-by-name = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = mkSchemaOption { };
+              config.schema.a.inherits = [ "b" ];
+              config.schema.b.inherits = [ "a" ];
+            }
+          ];
+        }).config.schema.a.options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'a' inherits 'b', but nothing resolved it: .*";
       };
     };
 

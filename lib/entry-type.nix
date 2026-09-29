@@ -456,6 +456,13 @@ let
   # mintable identity has `__mint` present and `minted` absent, and that read aborts uncatchably.
   isSchemaKind = v: builtins.isAttrs v && v ? kind && v ? __mint && v.__mint ? minted;
 
+  # THE RESOLVER'S PROVENANCE (den-hoag-8c8pr). `inherits` has one reader that composes it,
+  # `evalSchema`, and it composes a parent by contributing a def to the child. The def carries this
+  # `_file`, so the kind entry can tell a declared parent that was resolved from one nothing read —
+  # the nn4 discipline (a declaration key no reader consumes is refused, never discarded) applied to
+  # a key whose reader depends on how the tree was built. One derivation, read by both files.
+  inheritsResolvedFile = kind: parent: "<gen-schema evalSchema: kind '${kind}' inherits '${parent}'>";
+
   # THE REFINEMENT PLANE IS A PROJECTION OF AN OPTION PLANE (ADR-0013: a derivable fact is derived,
   # once). Every arm that publishes `refinements` from an evaluated option plane reads it through this
   # one binding, so two arms cannot disagree on what a refined option contributes.
@@ -922,16 +929,49 @@ let
               # according to the collection's merge strategy.
               extractedCollections = prelude.mapAttrs (
                 name: collection:
-                let
-                  merge = inferMerge name collection;
-                in
-                let
-                  declared = prelude.foldl' (
-                    acc: d: if builtins.isAttrs d.value && d.value ? ${name} then merge acc d.value.${name} else acc
-                  ) collection.default defs;
-                in
-                if name == "inherits" then aliasedInherits declared else declared
+                if name == "inherits" then aliasedInherits declaredInherits else declaredOf name collection
               ) allCollections;
+
+              declaredOf =
+                name: collection:
+                prelude.foldl' (
+                  acc: d:
+                  if builtins.isAttrs d.value && d.value ? ${name} then
+                    inferMerge name collection acc d.value.${name}
+                  else
+                    acc
+                ) collection.default defs;
+
+              # A DECLARED parent nothing resolved (den-hoag-8c8pr): no def of this kind carries the
+              # resolver's provenance for it, and it is not spelled either (a spelled parent composes
+              # where it is written). Computed only past a non-empty declaration, so a kind that
+              # inherits nothing pays one comparison.
+              declaredInherits = declaredOf "inherits" allCollections.inherits;
+              unresolvedInherits =
+                if declaredInherits == [ ] then
+                  [ ]
+                else
+                  let
+                    files = map (d: d.file or null) defs;
+                    spelled = map (k: k.kind) kindImports;
+                  in
+                  builtins.filter (
+                    p: !(builtins.elem (inheritsResolvedFile kind p) files) && !(builtins.elem p spelled)
+                  ) declaredInherits;
+              # Sited on the COMPOSED value (`merged`, `treeModule`), never the kind's WHNF: `evalSchema`
+              # reads `inherits` off pass 0, where no parent is resolved yet, and the collections, `kind`
+              # and `_kindNames` stay readable on an unresolved kind. What refuses is every read that
+              # would show the parent's options missing: `options`, `refs` (so `_edges`), the mark, an
+              # instance.
+              # A computed field is caller-built from the raw defs as well, so it is read through the
+              # guard on both branches, as the `mkType` result's own fields are.
+              guardedComputed = prelude.mapAttrs (_: resolvedOnly) computedFields;
+              resolvedOnly =
+                v:
+                if unresolvedInherits == [ ] then
+                  v
+                else
+                  throw "gen-schema: kind '${kind}' inherits '${builtins.head unresolvedInherits}', but nothing resolved it: `inherits` composes only in a schema built by `evalSchema`, which resolves each parent in a strictly earlier pass, and without it the parent's options would be silently absent. Build the schema with `evalSchema`";
 
               # THE DEPRECATED INHERITANCE SPELLING, READ AS `inherits` (den-hoag-cxlc0): each kind
               # value the walk below finds in this entry's `imports`/`require` contributes its NAME,
@@ -1164,12 +1204,14 @@ let
                   #
                   # The module is named for its kind, so a refusal of its syntax (a surplus key beside
                   # the published `options`) says which kind to fix; a `_file` of the result's own wins.
-                  treeModule = {
-                    _file = "<gen-schema mkType kind ${kind}>";
-                  }
-                  // custom
-                  // published
-                  // computedFields;
+                  treeModule = resolvedOnly (
+                    {
+                      _file = "<gen-schema mkType kind ${kind}>";
+                    }
+                    // custom
+                    // published
+                    // computedFields
+                  );
                   introspect = introspectOf treeModule;
                   # ONE plane for the published fields, the mark and `kindEq` (c+): this arm's option
                   # plane is the tree an instance imports, so it enters the preimage.
@@ -1182,7 +1224,20 @@ let
                     functions = { inherit mkType computed; };
                   };
                 in
-                custom
+                # Every field the caller's `mkType` built is read THROUGH the guard (den-hoag-8c8pr): the
+                # result is the caller's key space (`__defsModule`, or anything else built from `defs`),
+                # which gen-schema cannot enumerate, so each value is guarded rather than each name.
+                # Names stay lazy; a kind that inherits nothing pays one thunk per field.
+                prelude.mapAttrs (_: resolvedOnly) custom
+                # The two containment and inheritance relations are WRITTEN here, over the result,
+                # because their readers take them off the kind value — `evalSchema` reads `inherits`,
+                # `_topology` reads `parent` — and a result that publishes no collections would otherwise
+                # lose a declared edge without a word (den-hoag-fwoa8). Unguarded: both are read on an
+                # unresolved kind (`evalSchema`'s pass 0). Before the computed fields, which win over a
+                # collection on both branches.
+                // {
+                  inherit (extractedCollections) inherits parent;
+                }
                 // published
                 // {
                   inherit (introspect) options refs;
@@ -1191,8 +1246,12 @@ let
                 # The result's functor is applied to `treeModule`, so the tree and an instance hand it
                 # the same `self` and a functor that reads `self.options` declares one plane in both.
                 # Applied before the computed fields, which still win for same-named keys.
-                // prelude.optionalAttrs (custom ? __functor) { __functor = _: custom.__functor treeModule; }
-                // computedFields
+                // prelude.optionalAttrs (custom ? __functor) {
+                  # Guarded over the APPLIED module, not only through `treeModule`: a functor that
+                  # ignores its `self` never forces the tree module, and would compose unguarded.
+                  __functor = _: resolvedOnly (custom.__functor treeModule);
+                }
+                // guardedComputed
                 // {
                   # `kind` is the LET-BOUND `prelude.last loc` — the option path, which is
                   # authoritative — never the `mkType` result's echo of it, which is caller data.
@@ -1276,7 +1335,7 @@ let
                       value = mkMethodsModule kind finalCollections.methods;
                     };
 
-                  merged = base.merge loc (strippedDefs ++ injected);
+                  merged = resolvedOnly (base.merge loc (strippedDefs ++ injected));
 
                   introspect = introspectOf merged;
                   plane = planeOf {
@@ -1307,7 +1366,7 @@ let
                   refinements = extractedRefinements;
                 }
                 // finalCollections
-                // computedFields
+                // guardedComputed
                 // {
                   # Applied LAST so the mark cannot be shadowed by a collection or a computed field;
                   # both are refused by name above rather than left to win silently here.
@@ -1484,7 +1543,7 @@ let
                   parent =
                     k:
                     let
-                      p = config.${k}.parent or null;
+                      p = config.${k}.parent;
                     in
                     # The type is tested before the name: the collection is untyped, and a non-string
                     # indexed or interpolated is an interpreter abort, not a refusal (ADR-0025 item 1).
@@ -1561,8 +1620,8 @@ let
                 ) kindNames;
 
                 # The third constituent, derived from the same name graph `evalSchema` stages over —
-                # one derivation, not a second spelling. `or [ ]` for a custom `mkType` entry, which
-                # carries no collections, exactly as the topology derivation does on `parent`.
+                # one derivation, not a second spelling. Every kind value carries `inherits`: the entry
+                # type writes it on both branches.
                 inheritsEdges = prelude.concatMap (
                   k:
                   map (p: {
@@ -1570,7 +1629,7 @@ let
                     to = p;
                     type = "inherits";
                     field = null;
-                  }) (config.${k}.inherits or [ ])
+                  }) config.${k}.inherits
                 ) kindNames;
 
                 edges = parentEdges ++ inheritsEdges ++ map (e: e // { type = "ref"; }) refEdges;
@@ -1643,5 +1702,6 @@ in
     mkSchemaOption
     isSchemaKind
     kindEq
+    inheritsResolvedFile
     ;
 }

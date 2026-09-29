@@ -125,6 +125,19 @@ let
       ]
       ++ modules;
     }).config.schema;
+  # An `mkType` result that publishes no collections (den-hoag-fwoa8's shape).
+  bareMkTypeOpt = mkSchemaOption {
+    mkType =
+      { defs, ... }:
+      {
+        __functor =
+          _:
+          { ... }:
+          {
+            imports = map (d: d.value) defs;
+          };
+      };
+  };
   spelledRecord =
     modules:
     let
@@ -464,5 +477,97 @@ in
         idHash = true;
       };
     };
+
+    # den-hoag-fwoa8: an `mkType` kind whose result publishes no collections still carries its
+    # declared parents, so `evalSchema` resolves them and the parent's option reaches an instance.
+    # The discriminator is the same tree with `inherits` dropped.
+    test-mktype-without-collections-composes =
+      let
+        s =
+          withInherit:
+          evalSchema {
+            schemaOption = bareMkTypeOpt;
+            modules = relModules withInherit;
+          };
+      in
+      {
+        expr = {
+          inherits = (s true).derived.inherits;
+          composed = builtins.elem "description" (optionSet (s true).derived);
+          discriminator = builtins.elem "description" (optionSet (s false).derived);
+        };
+        expected = {
+          inherits = [ "base" ];
+          composed = true;
+          discriminator = false;
+        };
+      };
+
+    # den-hoag-8c8pr, S1: the same kind shape carries its `parent`, so `_topology` reads the declared
+    # container rather than `null`. The discriminator is a published-collections `mkType`, which
+    # read it before.
+    test-mktype-without-collections-publishes-parent = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = bareMkTypeOpt;
+              config.schema.host = { };
+              config.schema.user.parent = "host";
+            }
+          ];
+        }).config.schema._topology.user.parent;
+      expected = "host";
+    };
+
+    # The resolved kind reads the parent through every route the unresolved one refuses on
+    # (tests-error): its functor applied by hand and evaluated as a module.
+    test-mktype-without-collections-composes-through-the-functor =
+      let
+        k =
+          (evalSchema {
+            schemaOption = bareMkTypeOpt;
+            modules = relModules true;
+          }).derived;
+      in
+      {
+        expr = builtins.elem "description" (
+          builtins.attrNames (genMerge.evalModuleTree { modules = [ (k.__functor k) ]; }).options
+        );
+        expected = true;
+      };
+
+    # den-hoag-8c8pr: on a tree `evalSchema` did not build, a kind whose declared parent nothing
+    # resolved still answers what it declares — its `inherits`, its name, the schema's kind names —
+    # and refuses only the reads that would show the parent missing (tests-error,
+    # `test-unresolved-inherits-refuses-by-name`).
+    test-unresolved-kind-reads-its-declaration =
+      let
+        t = spelledTree [
+          {
+            config.schema.derived = {
+              inherits = [ "base" ];
+              options.spool = str "s";
+            };
+          }
+        ];
+      in
+      {
+        expr = {
+          inherits = t.derived.inherits;
+          kind = t.derived.kind;
+          kinds = t._kindNames;
+          options = (builtins.tryEval t.derived.options).success;
+        };
+        expected = {
+          inherits = [ "base" ];
+          kind = "derived";
+          kinds = [
+            "base"
+            "derived"
+          ];
+          options = false;
+        };
+      };
   };
 }
