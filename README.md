@@ -873,7 +873,9 @@ and it is the same value as the relocated form; (2) a function module whose body
 test does not apply functions, whose module arguments it does not have; (3) a kind's functor applied
 by hand, `k.__functor k`: the result carries no mark, and `evalSchema` composes a parent through
 exactly this form; (4) gen-aspects' `__defsModule`, which is not a kind value. Each is a reversible,
-silent re-accretion, bounded by what a consumer writes.
+silent re-accretion, bounded by what a consumer writes. A path or string member is imported and its
+value tested, but the modules inside the imported file are not walked, so a file whose own `imports`
+carry a kind composes; that case is decidable and not yet decided (den-hoag-cxlc0, open).
 
 What the test forces, stated: at the kind's WHNF it forces every `imports` and `require` list of
 every attrset module reachable from the kind entry's defs, every member of those lists, the `__mint`
