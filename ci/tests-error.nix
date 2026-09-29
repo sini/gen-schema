@@ -146,7 +146,7 @@ let
     }).config.hosts.a.myPort;
 in
 {
-  # evalSchema's two refusals, and the capability the relocation removes. All three are here rather
+  # evalSchema's two refusals, one of them reached through the deprecated spelling. They are here rather
   # than under ./tests for the same reason the identity cells are: `tryEval` discards the message,
   # and WHICH refusal fired is the subject.
   flake.testsError.schema-inheritance-refusals = {
@@ -168,83 +168,25 @@ in
       };
     };
 
-    # cxlc0 (3'): the retired spelling, a kind VALUE in a kind entry's `imports`, refuses by name.
-    test-spelling-refuses-by-name = {
-      expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            (
-              { config, ... }:
-              {
-                options.schema = genSchema.mkSchemaOption { };
-                config.schema.base.options.description = genMerge.mkOption { type = genMerge.types.str; };
-                config.schema.derived.imports = [ config.schema.base ];
-              }
-            )
-          ];
-        }).config.schema.derived.options;
-      expectedError = {
-        type = "ThrownError";
-        msg = "^gen-schema: kind 'derived': its `imports` carries the kind value 'base', the retired spelling of kind inheritance";
-      };
-    };
-
-    # A PATH member is imported by the test, so a path whose file is a kind value refuses the same
-    # way. Pure evaluation cannot write a live kind value into a file, so the file holds a value the
-    # test's predicate (`isSchemaKind`: `kind` and a minted `__mint`) holds of; a live kind reached
-    # through a path is the gate's `r4Path` probe.
-    # An imported file is walked in turn: a kind two files down refuses (fixtures in ci/test-fixtures/cxlc0).
-    test-nested-path-spelling-refuses-by-name = {
-      expr =
-        (genMerge.evalModuleTree {
-          modules = [
+    # cxlc0, the deprecated spelling: a kind CYCLE written in that spelling refuses by the SAME name
+    # a hand-written `inherits` cycle does (the cell above). The spelling is read as `inherits`
+    # without forcing the other kind's WHNF, so the cycle reaches `evalSchema`'s name graph instead
+    # of recursing uncatchably inside the entry type.
+    test-deprecated-spelling-cycle-refuses-by-name = {
+      expr = evalSchema {
+        modules = [
+          (
+            { config, ... }:
             {
-              options.schema = genSchema.mkSchemaOption { };
-              config.schema.derived.imports = [
-                ./test-fixtures/cxlc0/nested-kind-top.nix
-              ];
+              config.schema.a.imports = [ config.schema.b ];
+              config.schema.b.imports = [ config.schema.a ];
             }
-          ];
-        }).config.schema.derived.kind;
-      expectedError = {
-        type = "ThrownError";
-        msg = "^gen-schema: kind 'derived': its `imports` carries the kind value 'base', the retired spelling of kind inheritance";
+          )
+        ];
       };
-    };
-    # Two files importing one kind file: the file is walked once (the visited set) and the kind refuses.
-    test-diamond-path-spelling-refuses-by-name = {
-      expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.schema = genSchema.mkSchemaOption { };
-              config.schema.derived.imports = [
-                ./test-fixtures/cxlc0/diamond-left.nix
-                ./test-fixtures/cxlc0/diamond-right.nix
-              ];
-            }
-          ];
-        }).config.schema.derived.kind;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kind 'derived': its `imports` carries the kind value 'base', the retired spelling of kind inheritance";
-      };
-    };
-    test-path-spelling-refuses-by-name = {
-      expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.schema = genSchema.mkSchemaOption { };
-              config.schema.derived.imports = [
-                (builtins.toFile "cxlc0-kind-path.nix" ''{ kind = "base"; __mint.minted = "m"; }'')
-              ];
-            }
-          ];
-        }).config.schema.derived.kind;
-      expectedError = {
-        type = "ThrownError";
-        msg = "^gen-schema: kind 'derived': its `imports` carries the kind value 'base', the retired spelling of kind inheritance";
+        msg = "^gen-schema: inheritance cycle among kinds \\[a b\\] — a kind may inherit only kinds resolved in a strictly earlier pass$";
       };
     };
 

@@ -157,7 +157,7 @@ config.schema.deploy-user.inherits = [
 ];
 ```
 
-All inherited options merge through deferred module merge. Conflicts (two parents declaring the same option with different types) are caught at evaluation time. The retired spelling, a kind value in `imports` (`imports = [ config.schema.user ]`), is refused by name; see the root README's Kind Inheritance section.
+All inherited options merge through deferred module merge. Conflicts (two parents declaring the same option with different types) are caught at evaluation time. The deprecated spelling, a kind value in `imports` (`imports = [ config.schema.user ]`), is read as `inherits` with a warning; see the root README's Kind Inheritance section.
 
 ## Declarative Methods
 

@@ -499,7 +499,7 @@ The identity is the **kind tag joined to a digest of the identity pairs**:
 id_hash = "<kind>:" + sha256(<the ⟨key, value⟩ pairs plus ⟨_identity, the kind's mark⟩, as a JSON attrset>)
 ```
 
-The kind enters the digest as one more pair, `_identity`, whose value is the kind's minted identity (`__mint.minted`), never its name. Two kinds that share a name but are different declarations — the ones `kindEq` calls distinct — therefore mint different identities for instances with equal values. The tag stays the kind's name, for display and for splitting on the first colon. What a relocation or a respelling of a kind preserves is the identity CONTENT: `identityHashForKind oldKind newInstance == oldInstance.id_hash`, over one `_identityKeys` set. The stamp itself follows `kindEq`.
+The kind enters the digest as one more pair, `_identity`, whose value is the kind's minted identity (`__mint.minted`), never its name. Two kinds that share a name but are different declarations — the ones `kindEq` calls distinct — therefore mint different identities for instances with equal values. The tag stays the kind's name, for display and for splitting on the first colon. What a relocation or a respelling of a kind preserves is the identity CONTENT: `identityHashForKind oldKind newInstance == oldInstance.id_hash`, over one `_identityKeys` set. The stamp itself follows `kindEq`. Migrating the deprecated `imports` spelling to `inherits` under `evalSchema` preserves the stamp too, because the spelling is already read as that `inherits`.
 
 **The stamp is defined only where the kind's mark is.** The mark forces an option declaration's `type` and no other attribute of it (`default`, `description`, `example`, `readOnly`, `apply`, …), nor an option's kind-level value: written in a function module, each may read instance data (`config.name`, the instance's own `id_hash` on a non-key field) that the kind level does not have, and the function module is the sealed component that distinguishes it. Their presence enters instead, by path, as sealed components: a kind with a default and one without are distinct, and two kinds whose declarations differ only in such an attribute, or two separate constructions of one declaration carrying one, are refused by `kindEq` naming the `open.*` path. The path carries no module index, so the same content stated in another module or order is the same path; `meta` and every kind-level `_module` key but `freeformType` enter the same way. A kind value carried through gen-merge's `types.anything` is rebuilt, and comparing it with itself is then refused on nix and Determinate and `true` on Lix, never `false`. So a default reading an instance identity leaves the stamp well-founded. A component the mark does force that reads instance data has no mark, and demanding one aborts uncatchably. An instance's own non-key field reading its `id_hash`, and the self-referential `mkInstanceRegistry config.schema.host` idiom, are unaffected.
 
@@ -863,37 +863,55 @@ Multiple parents compose, and a chain two levels deep takes two passes. Each inh
 config.schema.deploy-user.inherits = [ "user" "ssh-access" "sudo-access" ];
 ```
 
-**The retired inheritance spelling is refused where a value test can see it, and nowhere else
-(a declared exception to "a value or a named refusal").** A kind value appearing in a kind entry's `imports` (or a
-shorthand module's `require`), at any depth of plain attrset modules, as a bare non-list `imports`,
-or as the value of a path or string member or anywhere in the tree of files it imports, is refused
-by name. Declare `inherits = [ "<parent>" ]` and build the schema with `evalSchema`. Four
-constructions compose as before and are not refused, because deciding them needs something other
-than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree that
-declares the kind: it has no kind-entry `imports` element, and it is the same value as the relocated
-form; (2) a function module whose body imports a kind: the test does not apply functions, whose
-module arguments it does not have; (3) a kind's functor applied by hand, `k.__functor k`: the result
-carries no mark, and `evalSchema` composes a parent through exactly this form; (4) gen-aspects'
-`__defsModule`, which is not a kind value. Each is a reversible, silent re-accretion, bounded by
-what a consumer writes.
+**The deprecated inheritance spelling is read as `inherits`, with a warning, where a value test can
+see it, and nowhere else (a declared exception to "a value or a named refusal").** A kind value
+appearing in a kind entry's `imports` (or a shorthand module's `require`), at any depth of plain
+attrset modules, as a bare non-list `imports`, or as the value of a path or string member or anywhere
+in the tree of files it imports, records its NAME in the kind's `inherits`: after any declared
+parents, in walk order, once, and never a name already declared. The value still composes where it is
+written, and that is the parent's module, the one `evalSchema` composes for a declared parent. So the
+spelling is the same kind as the hand-written `inherits` that `evalSchema` resolves: same options, same
+`inherits`, same `_edges` entry, same mark and same instance `id_hash`. It is supported until den v1's
+registry has migrated, and then it will be refused. Declare `inherits = [ "<parent>" ]` and build the
+schema with `evalSchema`.
 
-What the test forces, stated exactly: at the kind's WHNF its walk forces (1) every `imports` and
-`require` list of the kind entry's defs and of every attrset module reachable from them, a top-level
-`require` list and a nested `imports` or `require` list included; (2) every member of those lists,
-at every depth; (3) the `__mint` record of any member carrying `kind` and `__mint`, never the
-digest; (4) the `import` of every reachable path or string member, so a path to a file that throws,
-or that does not exist, raises at the kind's WHNF; and (5) the tree of files those imports reach,
-each file once (a visited set keyed by the resolved path, so a cycle of files terminates). The
-module system imports those files anyway, so for (4) and (5) what moves is when, not whether. It
-applies no function module and reads no option, `config` or other attribute value of a member. The
-refusal fires at the offending kind's WHNF, in the entry-type merge, before resolution; a sibling
-kind, `_kindNames`, the parent kind and a registry declared over the kind do not raise it.
+Each spelled kind warns once per evaluation that reads its `inherits`: the collection itself, `_edges`,
+or any mark or `id_hash`, whose preimage carries the collections. A read that forces none of them, such as
+`_kindNames`, does not warn. The warning is `builtins.warn`, so under `abort-on-warn` the evaluation
+aborts at the first spelled kind read, and `tryEval` does not catch it; an evaluator without
+`builtins.warn` prints it through `builtins.trace`.
 
 ```nix
 config.schema.admin-user.imports = [ config.schema.user ];
-# → error: gen-schema: kind 'admin-user': its `imports` carries the kind value 'user', the retired
-#   spelling of kind inheritance; declare `inherits = [ "user" ]` and build the schema with `evalSchema`
+# → evaluation warning: gen-schema: kind 'admin-user': its `imports` carries the kind value 'user', the
+#   deprecated spelling of kind inheritance, read as `inherits = [ "user" ]`; declare `inherits` and
+#   build the schema with `evalSchema`
 ```
+
+A CYCLE written in the spelling, `a` importing `config.schema.b` and `b` importing `config.schema.a`, is
+refused by `evalSchema` with the name a hand-written `inherits` cycle gets (`inheritance cycle among kinds [a b]`). A tree built without `evalSchema` refuses no inheritance cycle; there the spelled
+modules import each other when a kind's options are evaluated, and the evaluation recurses.
+
+Four constructions compose as before, unaliased and unwarned, because deciding them needs something
+other than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree
+that declares the kind: it has no kind-entry `imports` element, and it is the same value as the
+relocated form; (2) a function module whose body imports a kind: the test does not apply functions,
+whose module arguments it does not have; (3) a kind's functor applied by hand, `k.__functor k`: the
+result carries no mark, and `evalSchema` composes a parent through exactly this form, which is why its
+own injection does not warn; (4) gen-aspects' `__defsModule`, which is not a kind value. None of them
+records a name.
+
+What the test forces, stated exactly: where the kind's `inherits` is read (never at the kind's WHNF), its
+walk forces (1) every `imports` and `require` list of the kind entry's defs and of every attrset module
+reachable from them, a top-level `require` list and a nested `imports` or `require` list included; (2)
+every member of those lists, at every depth; (3) the `__mint` record of any member carrying `kind` and
+`__mint`, never the digest; (4) the `import` of every reachable path or string member, so a path to a
+file that throws, or that does not exist, raises there; and (5) the tree of files those imports reach,
+each file once (a visited set keyed by the resolved path, so a cycle of files terminates). The module
+system imports those files anyway, so for (4) and (5) what moves is when, not whether. It applies no
+function module and reads no option, `config` or other attribute value of a member. The walk is kept
+off the kind's WHNF because a spelled parent's own WHNF is forced by it: were it at WHNF, a spelled
+cycle would force each kind's WHNF from the other's and recurse before any name could be read.
 
 `evalSchema` refuses by name a parent whose kind value is not a module (an `mkType` result with no `__functor`): there is nothing to compose.
 
@@ -1359,7 +1377,7 @@ once more per inheritance depth, and at pass n imports into each child the paren
 pass n-1. Each inheritance is an `_edges` entry with `type = "inherits"`. Refused by name: an undeclared
 parent, an inheritance cycle, `schemaOption` together with `specialArgs`, and a parent whose kind value
 has no `__functor` (an `mkType` result that is not a module). See [Kind Inheritance](#kind-inheritance)
-for the retired `imports` spelling, which the kind entry refuses.
+for the deprecated `imports` spelling, which the kind entry reads as `inherits` with a warning.
 
 ### `kindEq`
 

@@ -3,7 +3,8 @@
 # A kind is a node, an inheritance edge is a relation, and a kind may inherit only kinds frozen by
 # a STRICTLY EARLIER pass (ADR-0016 ruling 7). The reference travels as a NAME — `inherits = [ "p" ]`
 # — never as a value read out of the tree being declared, and that is the whole of what separates
-# this from the `imports = [ config.schema.p ]` idiom it replaces (now refused): no `config` is
+# this from the `imports = [ config.schema.p ]` idiom it replaces (now deprecated, and read as
+# `inherits` with a warning): no `config` is
 # read at any point below, so nothing here consumes its own stratum's in-flight output.
 #
 # The user-visible consequence is ruling 7's own: a structure two levels deep takes two passes.
@@ -109,12 +110,13 @@ let
       # refuses a conflict outright.
       #
       # What is imported is the parent's MODULE, its `__functor` applied here, never its kind
-      # value: a kind value in a kind entry's `imports` is the retired spelling, which the entry
-      # type refuses (den-hoag-cxlc0). The module system applies a functor the same way, so nothing
-      # composes differently. ★ The hand-applied functor is a member of that refusal's declared
-      # exception (README, "The retired inheritance spelling"), and this injection composes through
-      # it: a change that decided applied functors would refuse `evalSchema` too, so it moves this
-      # first. A parent with no `__functor` (an `mkType` result that is not a module) has nothing
+      # value: a kind value in a kind entry's `imports` is the deprecated spelling, which the entry
+      # type reads as `inherits` and warns on (den-hoag-cxlc0). Injecting the kind value would make
+      # every declared `inherits` warn on this pass's own injection. The module system applies a
+      # functor the same way, so nothing composes differently. ★ The hand-applied functor is a
+      # member of that alias's declared exception (README, "The deprecated inheritance spelling"),
+      # and this injection composes through it: a change that decided applied functors would make
+      # `evalSchema` warn too, so it moves this first. A parent with no `__functor` (an `mkType` result that is not a module) has nothing
       # to compose and is refused by name.
       injectFor =
         prev: n:

@@ -27,6 +27,8 @@
   keySemanticsRecords,
 }:
 let
+  # `builtins.warn` where the evaluator has it (it honours `abort-on-warn`), a trace otherwise.
+  warn = builtins.warn or (msg: v: builtins.trace "evaluation warning: ${msg}" v);
   # ★ THE PROVENANCE MARK (ADR-0034), minted at the ONE site every kind value reaches — both
   # declaration shapes arrive at `mkSchemaEntryType`'s merge, `mkSchemaOption` directly and
   # gen-aspects through `genSchema.mkSchemaOption`. It is what makes "this value came out of a
@@ -923,10 +925,45 @@ let
                 let
                   merge = inferMerge name collection;
                 in
-                prelude.foldl' (
-                  acc: d: if builtins.isAttrs d.value && d.value ? ${name} then merge acc d.value.${name} else acc
-                ) collection.default defs
+                let
+                  declared = prelude.foldl' (
+                    acc: d: if builtins.isAttrs d.value && d.value ? ${name} then merge acc d.value.${name} else acc
+                  ) collection.default defs;
+                in
+                if name == "inherits" then aliasedInherits declared else declared
               ) allCollections;
+
+              # THE DEPRECATED INHERITANCE SPELLING, READ AS `inherits` (den-hoag-cxlc0): each kind
+              # value the walk below finds in this entry's `imports`/`require` contributes its NAME,
+              # after the declared parents, in walk order, once, and never a name already declared.
+              # The value still composes where it was written: that is the parent's module, the same
+              # one `evalSchema`'s injection composes for a declared `inherits`. The warning rides the
+              # `inherits` value, so it fires where the name is read: the collection itself, `_edges`,
+              # and every mark and `id_hash`, whose preimage carries the collections.
+              #
+              # ★ NOT AT THE KIND'S WHNF, and that is what makes a CYCLE refusable. Walking a spelled
+              # kind forces the OTHER kind's value to WHNF; were the walk at WHNF, `a` importing
+              # `config.schema.b` and `b` importing `config.schema.a` would force each other's WHNF and
+              # recurse uncatchably. Read lazily, each kind's WHNF is its own, the two names are
+              # recorded, and `evalSchema`'s name graph refuses the cycle by name exactly as it
+              # refuses a hand-written one. A tree built without `evalSchema` refuses no inheritance
+              # cycle, and there the spelled modules still import each other when composed.
+              aliasedInherits =
+                declared:
+                let
+                  spelled = builtins.foldl' (acc: n: if builtins.elem n acc then acc else acc ++ [ n ]) [ ] (
+                    map (k: k.kind) kindImports
+                  );
+                  names = builtins.filter (n: !(builtins.elem n declared)) spelled;
+                  quoted = prelude.concatStringsSep " " (map (n: "'${n}'") spelled);
+                  literal = prelude.concatStringsSep " " (map (n: "\"${n}\"") spelled);
+                in
+                if kindImports == [ ] then
+                  declared
+                else
+                  warn
+                    "gen-schema: kind '${kind}': its `imports` carries the kind value ${quoted}, the deprecated spelling of kind inheritance, read as `inherits = [ ${literal} ]`; declare `inherits` and build the schema with `evalSchema`"
+                    (declared ++ names);
 
               # Computed fields from extracted collections + raw defs
               # kind (prelude.last loc) is passed so computed can produce entry-specific fields
@@ -1003,20 +1040,21 @@ let
                   [ ]
               ) defs;
 
-              # THE RETIRED INHERITANCE SPELLING (den-hoag-cxlc0), refused FIRST: a kind VALUE in a
-              # kind entry's `imports` (or a shorthand def's `require`), found by the walk `modulesOf`
-              # makes for the plane. Inheritance travels as a NAME in `inherits`, resolved by
-              # `evalSchema`, which imports the parent's applied functor rather than its kind value.
-              # A VALUE test: a path or string member is imported, which needs no argument and yields
-              # the value gen-merge would compose, and an imported attrset module is walked in turn,
-              # so a kind reached through files is refused too. Each file is imported once per kind
-              # entry (a visited set keyed by the resolved path, as the module system dedupes), so a
-              # cycle of files terminates. It applies no function, so a function module and a
-              # hand-applied functor are admitted — the README's declared ADR-0025 exception. What
-              # it forces, at the kind's WHNF: every `imports` and `require` list of every attrset
-              # module reachable from the defs, every member of those lists, the `__mint` record of
-              # any member carrying `kind` and `__mint`, and the import of every reachable path or
-              # string member. The module system imports those files anyway; what moves is when.
+              # THE DEPRECATED INHERITANCE SPELLING (den-hoag-cxlc0), found for `aliasedInherits`
+              # above: a kind VALUE in a kind entry's `imports` (or a shorthand def's `require`), found
+              # by the walk `modulesOf` makes for the plane. Inheritance travels as a NAME in
+              # `inherits`, resolved by `evalSchema`, which imports the parent's applied functor rather
+              # than its kind value. A VALUE test: a path or string member is imported, which needs no
+              # argument and yields the value gen-merge would compose, and an imported attrset module
+              # is walked in turn, so a kind reached through files is read too. Each file is imported
+              # once per kind entry (a visited set keyed by the resolved path, as the module system
+              # dedupes), so a cycle of files terminates. It applies no function, so a function module
+              # and a hand-applied functor compose unaliased and unwarned — the README's declared
+              # ADR-0025 exception. What it forces, where `inherits` is read: every `imports` and
+              # `require` list of every attrset module reachable from the defs, every member of those
+              # lists, the `__mint` record of any member carrying `kind` and `__mint`, and the import
+              # of every reachable path or string member. The module system imports those files
+              # anyway; what moves is when.
               declListOf =
                 v:
                 let
@@ -1074,9 +1112,7 @@ let
 
               checkDeclarationKeys =
                 result:
-                if kindImports != [ ] then
-                  throw "gen-schema: kind '${kind}': its `imports` carries the kind value '${(builtins.head kindImports).kind}', the retired spelling of kind inheritance; declare `inherits = [ \"${(builtins.head kindImports).kind}\" ]` and build the schema with `evalSchema`"
-                else if reservedNamed != [ ] then
+                if reservedNamed != [ ] then
                   throw "gen-schema: kind '${kind}': declaration key '${builtins.head reservedNamed}' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread"
                 else if surplusOffenders != [ ] then
                   let

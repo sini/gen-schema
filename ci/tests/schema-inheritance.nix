@@ -27,9 +27,9 @@ let
     };
 
   # ── the fixture ──────────────────────────────────────────────────────────────────────────────
-  # base carries `description`; derived carries `spool` and composes base. The retired idiom, the
-  # child reading the parent out of the tree it is declared in, is refused; its cell is in
-  # ci/tests-error.nix.
+  # base carries `description`; derived carries `spool` and composes base. The deprecated idiom, the
+  # child reading the parent out of the tree it is declared in, is read as `inherits`; its cells
+  # are at the end of this file.
 
   # The relocated form: the parent travels as a name, resolved by the pass.
   relModules = withInherit: [
@@ -113,6 +113,28 @@ let
     ];
   };
 
+  # ── the deprecated spelling: `base` beside the given modules, on a tree built without `evalSchema` ──
+  spelledTree =
+    modules:
+    (genMerge.evalModuleTree {
+      modules = [
+        {
+          options.schema = mkSchemaOption { };
+          config.schema.base.options.description = str "";
+        }
+      ]
+      ++ modules;
+    }).config.schema;
+  spelledRecord =
+    modules:
+    let
+      s = spelledTree modules;
+    in
+    {
+      inherit (s.derived) inherits;
+      options = builtins.attrNames s.derived.options;
+    };
+
   # ── C6: `extraModules` is untouched by the relocation ────────────────────────────────────────
   shirring = {
     options.shirring = str "sh";
@@ -125,7 +147,7 @@ in
       expr = builtins.elem "description" (optionSet rel.derived);
       expected = true;
     };
-    # The path member the refusal now imports: a path to an ordinary module still composes.
+    # The path member the spelling's walk imports: a path to an ordinary module still composes.
     test-path-module-member-composes = {
       expr =
         builtins.attrNames
@@ -144,7 +166,7 @@ in
         "spool"
       ];
     };
-    # The walk the refusal makes through imported files: a two-file cycle terminates (each file is
+    # The walk the spelling makes through imported files: a two-file cycle terminates (each file is
     # walked once, keyed by its path) and composes; an ordinary nested file tree composes.
     test-path-cycle-composes = {
       expr =
@@ -348,6 +370,99 @@ in
         "description"
         "spool"
       ];
+    };
+
+    # ── THE DEPRECATED SPELLING, READ AS `inherits` (den-hoag-cxlc0) ───────────────────────────
+    # A kind VALUE in a kind entry's `imports` records its name in `inherits` and still composes
+    # where it is written. Each cell reads a tree built WITHOUT `evalSchema`, the shape den v1
+    # declares. The warning it prints is not readable here.
+    test-deprecated-spelling-reads-as-inherits = {
+      expr = spelledRecord [
+        (
+          { config, ... }:
+          {
+            config.schema.derived = {
+              imports = [ config.schema.base ];
+              options.spool = str "s";
+            };
+          }
+        )
+      ];
+      expected = {
+        inherits = [ "base" ];
+        options = [
+          "description"
+          "spool"
+        ];
+      };
+    };
+    # An imported file is walked in turn: a kind two files down is read (fixtures in
+    # ci/test-fixtures/cxlc0). The fixture's kind is kind-SHAPED, not a module, so nothing composes.
+    test-deprecated-nested-path-spelling-reads-as-inherits = {
+      expr = spelledRecord [
+        { config.schema.derived.imports = [ ../test-fixtures/cxlc0/nested-kind-top.nix ]; }
+      ];
+      expected = {
+        inherits = [ "base" ];
+        options = [ ];
+      };
+    };
+    # Two files importing one kind file: the file is walked once, and the name is recorded once.
+    test-deprecated-diamond-path-spelling-reads-as-inherits = {
+      expr = spelledRecord [
+        {
+          config.schema.derived.imports = [
+            ../test-fixtures/cxlc0/diamond-left.nix
+            ../test-fixtures/cxlc0/diamond-right.nix
+          ];
+        }
+      ];
+      expected = {
+        inherits = [ "base" ];
+        options = [
+          "left"
+          "right"
+        ];
+      };
+    };
+    test-deprecated-path-spelling-reads-as-inherits = {
+      expr = spelledRecord [
+        {
+          config.schema.derived.imports = [
+            (builtins.toFile "cxlc0-kind-path.nix" ''{ kind = "base"; __mint.minted = "m"; }'')
+          ];
+        }
+      ];
+      expected = {
+        inherits = [ "base" ];
+        options = [ ];
+      };
+    };
+    # THE EQUIVALENCE: the spelling on a plain tree is the same kind as a hand-written `inherits`
+    # resolved by `evalSchema` — same mark, same instance identity.
+    test-deprecated-spelling-is-the-inherits-kind = {
+      expr =
+        let
+          spelled = spelledTree [
+            (
+              { config, ... }:
+              {
+                config.schema.derived = {
+                  imports = [ config.schema.base ];
+                  options.spool = str "s";
+                };
+              }
+            )
+          ];
+        in
+        {
+          mark = spelled.derived.__mint.minted == rel.derived.__mint.minted;
+          idHash = (instanceOf spelled.derived { }).id_hash == (instanceOf rel.derived { }).id_hash;
+        };
+      expected = {
+        mark = true;
+        idHash = true;
+      };
     };
   };
 }
