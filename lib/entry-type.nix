@@ -61,8 +61,9 @@ let
   # their SEALED subjects (`__sealed`) for `kindEq`; both come out of one `componentsPreimage` call,
   # so the two cannot read different planes.
   #
-  # Of an option declaration, ONE attribute is a component: its `type` (`optionComponents` below).
-  # An option's kind-level VALUE is not one. The declaration's `freeformType`,
+  # Of an option declaration, ONE attribute is a component by value: its `type` (`optionComponents`
+  # below). Every other attribute, and every kind-level definition, is a component by PATH only,
+  # sealed (`openComponents` below). The declaration's `freeformType`,
   # at either site (top-level or `_module.freeformType`), is a component too: it decides which
   # undeclared instance keys are accepted. Four exclusions, each a projection of a
   # component already present (ADR-0013, a derivable fact is derived once): `refinements`
@@ -119,10 +120,14 @@ let
   # attribute outside `type` is forced; `type` was the whole of znfjq's (c+) ruling and is forced by
   # the mint as before. What distinguishes a term written over `config` is its enclosing function
   # module, already a sealed component (`modules`).
-  # ⇒ the COST, pinned, never silent: two kinds differing only in an INERT literal at any other
-  # attribute, or in a kind-level definition, share one identity (the znfjq gate's F2, reopened,
-  # bounded; `kind-mark-cplus`, `test-f2-reopened-...-until-pa887-c`). The fix is den-hoag-pa887's
-  # arm C, BY CONSTRUCTOR: an option declared in an attrset module is inert and re-enters.
+  # ⇒ each such attribute, and each kind-level definition, enters by its PATH as a sealed component
+  # (den-hoag-egei0, ADR-0034's sealed limb per component): the mark carries the marker, so a kind
+  # with a default and one without mint apart, and two kinds whose open paths agree share a mark and
+  # are REFUSED BY NAME at `open.*` by `kindEq`, never merged (`kind-mark-cplus`,
+  # `test-open-content-*`). ⇒ the COST, a named refusal class: two independent constructions of one
+  # declaration carrying open content are refused too (`test-open-content-twin-is-refused`); one
+  # kind value with itself is decided. Its only remedy is a sealed-literal constructor that puts an
+  # inert literal into the mark.
 
   # ★ THE COMPARED SUBJECT OF A SEALED COMPONENT HOLDING TYPE RECORDS (den-hoag-6b5ia). A type record
   # is cyclic (`functor.type`), so a bare `==` between two constructions can recurse until the
@@ -238,6 +243,61 @@ let
           ];
       walked = modulesOf modules;
       open = map (m: m.open) (builtins.filter (m: m ? open) walked);
+      # The PATHS of an open module's content beyond an option's `type` (den-hoag-egei0): another
+      # attribute of a declaration, or a kind-level definition. Presence only, read by `attrNames`,
+      # `isOptionDecl` and `isAttrs`: no definition value is forced, and the config half stops at the
+      # top-level key set, so nothing past the `m.config` WHNF `freeforms` already takes is read.
+      openPaths = prelude.concatLists (
+        prelude.imap0 (
+          i: m:
+          let
+            at = [
+              "open"
+              (toString i)
+            ];
+            s = isStructuredDecl m;
+            defs = if s then (m.config or { }) else builtins.removeAttrs m merge.moduleSyntax.shorthandMeta;
+            attrsOf =
+              pre: t:
+              prelude.concatMap (
+                n:
+                let
+                  o = t.${n};
+                  q = pre ++ [ n ];
+                in
+                if isOptionDecl o then
+                  map (a: q ++ [ a ]) (builtins.filter (a: a != "type" && a != "_type") (prelude.attrNames o))
+                else if builtins.isAttrs o then
+                  attrsOf q o
+                else
+                  [ ]
+              ) (prelude.attrNames t);
+          in
+          attrsOf (at ++ [ "options" ]) (if s then m.options or { } else { })
+          ++ (
+            if builtins.isAttrs defs && !(defs ? _type) then
+              map (
+                n:
+                at
+                ++ [
+                  "config"
+                  n
+                ]
+              ) (builtins.filter (n: n != "_module") (prelude.attrNames defs))
+            else
+              [ (at ++ [ "config" ]) ]
+          )
+        ) open
+      );
+      # Each is a SEALED component, as a schema's own `functions` are: the mark carries the marker at
+      # its path, and its subject is a closure allocated by this call, equal to itself by reference
+      # and to no other construction's. The content itself is never the subject: comparing it would
+      # force it, and a K3 capture aborts uncatchably when forced.
+      openComponents = map (p: {
+        path = p;
+        value = _: p;
+        sealed = true;
+      }) openPaths;
       freeforms = builtins.filter (t: t != null) (
         prelude.concatMap (m: [
           (m.freeformType or null)
@@ -248,6 +308,7 @@ let
     in
     componentsPreimage identity.hashIdentity (
       optionComponents [ ] options
+      ++ openComponents
       ++ [
         {
           path = [ "collectionNames" ];
@@ -314,8 +375,10 @@ let
 
   # THE DOOR a consumer compares kinds through (c+): `true` iff two kind values carry one identity,
   # `false` if two, and a refusal BY NAME where they mint one identity and differ only at a sealed
-  # component (ADR-0034: "that component's collapse is replaced by a refusal"). An operand that is
-  # not a kind value is refused by name, as the four admission guards refuse it.
+  # component (ADR-0034: "that component's collapse is replaced by a refusal"). Open-module content
+  # beyond an option's `type` is such a component (`openComponents`), so a pair differing there, or
+  # two constructions of one declaration carrying it, is refused naming its `open.*` path. An operand
+  # that is not a kind value is refused by name, as the four admission guards refuse it.
   kindEq =
     let
       subject =

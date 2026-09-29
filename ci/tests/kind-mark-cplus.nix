@@ -1,8 +1,8 @@
 # (c+) — den-hoag-markof-partial-preimage-znfjq. A kind's mark is minted over its distinguishing
-# CONTENT as per-component tags: each option declaration's `type` and no other attribute of it
-# (den-hoag-pa887, arm A), the declaration's `freeformType`, the collection values, `keySemantics`,
-# `refs`, the computed fields and the opaque modules; an option's kind-level value is not a
-# component. A component carrying a minted identity enters by it, an inert
+# CONTENT as per-component tags: each option declaration's `type` (den-hoag-pa887, arm A), the
+# declaration's `freeformType`, the collection values, `keySemantics`, `refs`, the computed fields,
+# the opaque modules, and the PATH of every other attribute of a declaration and every kind-level
+# definition, as a sealed component (den-hoag-egei0). A component carrying a minted identity enters by it, an inert
 # one whole, one with no value at WHNF as `undefined`, anything else as the sealed marker. Two
 # declarations that then mint one mark and differ only at a sealed component are refused BY NAME by
 # `kindEq`, never merged; every other pair is decided.
@@ -342,91 +342,122 @@ in
         category = false;
       };
     };
-    # ★ THE REOPENED COLLISIONS, PINNED — den-hoag-pa887 arm A, bounded, accepted by the owner until
-    # arm C lands. An option enters the mark by its `type` alone, and its kind-level value not at
-    # all, so two kinds differing ONLY at another attribute of a declaration are ONE kind. One cell
-    # per class, each stating its collision so it is never silent. pa887's arm C (by constructor:
-    # an option declared in an attrset module is inert and re-enters the mark) is the fix, and it
-    # flips every `true` below: rewrite each cell then, never widen it.
+    # ★ OPEN CONTENT IS REFUSED BY NAME, NEVER MERGED (den-hoag-egei0). An option enters the mark by
+    # its `type` alone (den-hoag-pa887, arm A) and no other attribute of a declaration, and no
+    # kind-level definition, is forced. Each such attribute's PATH is a sealed component instead: the
+    # mark carries its marker, and `__sealed` a subject equal only to itself. So two kinds whose
+    # open-attribute path sets agree share a mark and `kindEq` refuses them BY NAME at `open.*`; two
+    # whose path sets differ separate and are decided. One cell per class.
     #
-    # F2 (the znfjq gate's pair): an inert literal default, 80 against 443, shares one mark.
-    test-f2-reopened-inert-default-shares-identity-until-pa887-c = {
+    # F2 (the znfjq gate's pair): an inert literal default, 80 against 443, shares one mark and is
+    # refused.
+    test-open-content-f2-inert-default-refused = {
       expr = {
-        default = sharesIdentity "default" 80 443;
+        default = decides (sharesIdentity "default" 80 443);
         sameMark = (attributed "default" 80).__mint.minted == (attributed "default" 443).__mint.minted;
       };
       expected = {
-        default = true;
+        default = false;
         sameMark = true;
       };
     };
-    # F2's definition member: a kind-level definition (`config.port = 443`) is not a component.
-    test-f2-reopened-kind-level-definition-shares-identity-until-pa887-c = {
-      expr = kindEq (attributed "default" 80) defined;
-      expected = true;
-    };
-    # Was sealed and REFUSED by name (F1 and the partly-defined class): a lambda, a partial and a
-    # derivation default are no longer components, so each pair is one kind, silently.
-    test-f1-reopened-non-inert-default-shares-identity-until-pa887-c = {
+    # F2's definition member: a kind-level definition (`config.port = 443`) is a path the other
+    # operand lacks, so the marks differ and the pair is decided two kinds.
+    test-open-content-f2-kind-level-definition-separates = {
       expr = {
-        lambdaDefault = kindEq (lambdaDefault (x: "a")) (lambdaDefault (x: "b"));
-        partialDefault = kindEq (partial 1) (partial 2);
+        decided = kindEq (attributed "default" 80) defined;
+        sameMark = (attributed "default" 80).__mint.minted == defined.__mint.minted;
+      };
+      expected = {
+        decided = false;
+        sameMark = false;
+      };
+    };
+    # F1 and the partly-defined class: a lambda, a partial and a derivation default are each refused
+    # by name at the default's path, and none is forced.
+    test-open-content-f1-non-inert-default-refused = {
+      expr = {
+        lambdaDefault = decides (kindEq (lambdaDefault (x: "a")) (lambdaDefault (x: "b")));
+        partialDefault = decides (kindEq (partial 1) (partial 2));
         partialSealed = builtins.attrNames (partial 1).__sealed;
-        derivationDefault = kindEq (pkgDefault "hello") (pkgDefault "cowsay");
+        derivationDefault = decides (kindEq (pkgDefault "hello") (pkgDefault "cowsay"));
       };
       expected = {
-        lambdaDefault = true;
-        partialDefault = true;
-        partialSealed = [ "options.cfg.type" ];
-        derivationDefault = true;
+        lambdaDefault = false;
+        partialDefault = false;
+        partialSealed = [
+          "open.0.options.cfg.default"
+          "options.cfg.type"
+        ];
+        derivationDefault = false;
       };
     };
-    # Was sealed and REFUSED by name (F1): an `apply` is no longer a component.
-    test-f1-reopened-apply-shares-identity-until-pa887-c = {
-      expr = sharesIdentity "apply" (x: x) (x: x + 1);
-      expected = true;
+    # F1: an `apply` is refused by name.
+    test-open-content-f1-apply-refused = {
+      expr = decides (sharesIdentity "apply" (x: x) (x: x + 1));
+      expected = false;
     };
-    # N3's presentation keys: an instance module can read `options.port.description`, yet a pair
-    # differing there is one kind.
-    test-n3-reopened-presentation-shares-identity-until-pa887-c = {
+    # N3's presentation keys: an instance module can read `options.port.description`, and a pair
+    # differing there is refused.
+    test-open-content-n3-presentation-refused = {
       expr = {
-        description = sharesIdentity "description" "one" "two";
-        example = sharesIdentity "example" 1 2;
-        defaultText = sharesIdentity "defaultText" "80" "443";
-        visible = sharesIdentity "visible" true false;
-        internal = sharesIdentity "internal" false true;
+        description = decides (sharesIdentity "description" "one" "two");
+        example = decides (sharesIdentity "example" 1 2);
+        defaultText = decides (sharesIdentity "defaultText" "80" "443");
+        visible = decides (sharesIdentity "visible" true false);
+        internal = decides (sharesIdentity "internal" false true);
       };
       expected = {
-        description = true;
-        example = true;
-        defaultText = true;
-        visible = true;
-        internal = true;
+        description = false;
+        example = false;
+        defaultText = false;
+        visible = false;
+        internal = false;
       };
     };
     # Behavioural attributes: `readOnly` decides whether an instance may define the option at all,
-    # and `identity = false` removes a primitive option from the instance key set, yet a pair
-    # differing there shares the KIND identity (instances still differ through their key sets).
-    test-reopened-behavioural-attributes-share-identity-until-pa887-c = {
+    # and `identity = false` removes a primitive option from the instance key set; a pair differing
+    # there is refused.
+    test-open-content-behavioural-attributes-refused = {
       expr = {
-        readOnly = sharesIdentity "readOnly" false true;
-        identity = sharesIdentity "identity" true false;
+        readOnly = decides (sharesIdentity "readOnly" false true);
+        identity = decides (sharesIdentity "identity" true false);
       };
       expected = {
-        readOnly = true;
-        identity = true;
+        readOnly = false;
+        identity = false;
       };
     };
-    # Any attribute gen-merge does not know is carried on the declaration and is not a component.
-    test-reopened-unknown-attribute-shares-identity-until-pa887-c = {
-      expr = sharesIdentity "pa887Unknown" 1 2;
-      expected = true;
+    # Any attribute gen-merge does not know is carried on the declaration and refused like a known one.
+    test-open-content-unknown-attribute-refused = {
+      expr = decides (sharesIdentity "pa887Unknown" 1 2);
+      expected = false;
     };
     # F2 under `require`: an attrset module reached through `require` is walked as an open module
-    # like an imported one, so its inert default is not a component either.
-    test-f2-reopened-required-default-shares-identity-until-pa887-c = {
-      expr = kindEq (requireOpen 80) (requireOpen 443);
-      expected = true;
+    # like an imported one, so its inert default is refused too.
+    test-open-content-f2-required-default-refused = {
+      expr = decides (kindEq (requireOpen 80) (requireOpen 443));
+      expected = false;
+    };
+    # ★ THE TWIN COST (the named refusal class). Two independent constructions of ONE declaration
+    # carrying open content are refused: each subject is equal only to itself, and nothing forces the
+    # content to compare it. One kind VALUE with itself is decided (`openReflexive` below). The only
+    # remedy is the sealed-literal constructor (den-hoag-egei0 (i)), which puts an inert literal into
+    # the mark so mark equality decides the pair; K3 captures and lambdas stay refused under it.
+    test-open-content-twin-is-refused = {
+      expr = decides (kindEq (defaulted 80) (defaulted 80));
+      expected = false;
+    };
+    # Presence enters the mark: a default against none is decided two kinds, never refused.
+    test-open-content-presence-one-sided = {
+      expr = {
+        decided = kindEq (attributed "default" 80) fieldInt;
+        sameMark = (attributed "default" 80).__mint.minted == fieldInt.__mint.minted;
+      };
+      expected = {
+        decided = false;
+        sameMark = false;
+      };
     };
     # A function module reached through `require` is a sealed component at `modules`, as one reached
     # through `imports` is: the pair mints and is refused (by name: `kind-mark-cplus-refusal`),
@@ -522,8 +553,8 @@ in
       expr = decides (kindEq { name = "not-a-kind"; } fieldInt);
       expected = false;
     };
-    # Controls: a kind is one kind with itself; minted, inert and valueless twins are one kind
-    # across evaluations; a field NAME separates.
+    # Controls: a kind is one kind with itself, open content included; minted and valueless twins are
+    # one kind across evaluations; a field NAME separates.
     test-kindEq-decides-outside-the-collision = {
       expr = {
         reflexive = kindEq portTcp portTcp;
@@ -533,7 +564,11 @@ in
         mintedTwin = kindEq fieldInt (kindOf {
           options.port = opt T.int;
         });
-        defaultTwin = kindEq (defaulted 80) (defaulted 80);
+        openReflexive =
+          let
+            k = defaulted 80;
+          in
+          kindEq k k;
         requiredTwin = kindEq (kindOf { options.name = opt T.str; }) (kindOf {
           options.name = opt T.str;
         });
@@ -542,7 +577,7 @@ in
         reflexive = true;
         nameDiffers = false;
         mintedTwin = true;
-        defaultTwin = true;
+        openReflexive = true;
         requiredTwin = true;
       };
     };
@@ -577,6 +612,14 @@ in
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'modules'; .*$";
+      };
+    };
+    # den-hoag-egei0: open content is refused naming the attribute's path.
+    test-open-content-collision-names-the-attribute = {
+      expr = kindEq (defaulted 80) (defaulted 443);
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'open\\.0\\.options\\.port\\.default'; .*$";
       };
     };
     test-non-kind-operand-refuses-by-name = {

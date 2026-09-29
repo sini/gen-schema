@@ -60,11 +60,11 @@ gen-merge exports became unreachable.
 
 **Schema kinds** — `lib/entry-type.nix`
 
-| Export              | Signature                                                                                                                                                                                            |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mkSchemaOption`    | `{ strict ? true, baseModule ? null, collections ? {}, computed ? null, mixins ? [], mkType ? null, keySemantics ? {}, specialArgs ? {} } -> option` (typed `schema`)                                |
-| `mkSchemaEntryType` | same argument set `-> type` (the `lazyAttrsOf` element type behind `mkSchemaOption`)                                                                                                                 |
-| `kindEq`            | `kind -> kind -> bool`: `false` on distinct marks, `true` on one mark with `==` sealed subjects, a by-name refusal on one mark with differing sealed subjects; a non-kind operand is refused by name |
+| Export              | Signature                                                                                                                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mkSchemaOption`    | `{ strict ? true, baseModule ? null, collections ? {}, computed ? null, mixins ? [], mkType ? null, keySemantics ? {}, specialArgs ? {} } -> option` (typed `schema`)                                                                                  |
+| `mkSchemaEntryType` | same argument set `-> type` (the `lazyAttrsOf` element type behind `mkSchemaOption`)                                                                                                                                                                   |
+| `kindEq`            | `kind -> kind -> bool`: `false` on distinct marks, `true` on one mark with `==` sealed subjects, a by-name refusal on one mark with differing sealed subjects (open-module content included, named at `open.*`); a non-kind operand is refused by name |
 
 `baseModule` may be a module or `kindName -> module`. `computed : collections -> defs -> attrset`
 (wins over collections of the same name). `mkType : { kindModule, collections, defs, kind } -> attrset`
@@ -199,12 +199,17 @@ as a module. `__mint.minted` is the PROVENANCE MARK (ADR-0034), minted by the on
 distinguishing content as per-component PREIMAGE TAGS (gen-algebra `componentsPreimage`): each
 option declaration's `type` (no other attribute of it), the declaration's `freeformType`, the
 collection values, `keySemantics`, `refs`, the computed fields, the opaque (function) modules reached through `imports` or a shorthand `require`, and
-the schema's `mkType`/`computed`. An option's kind-level value is not a component. Any other
-declaration attribute (`default`, `defaultText`, `description`, `example`, `readOnly`, `apply`,
-`visible`, `internal`, `identity`, an unknown one) and the kind-level value may read instance data
-(`config.name`) that the kind level lacks, so forcing them made the mark partial (den-hoag-pa887,
-arm A). The cost, two kinds differing only there sharing one identity, is pinned class by class by
-the `kind-mark-cplus.test-*-reopened-*-until-pa887-c` cells until pa887's arm C. `__sealed` carries the sealed components' subjects from the
+the schema's `mkType`/`computed`. Any other declaration attribute (`default`, `defaultText`,
+`description`, `example`, `readOnly`, `apply`, `visible`, `internal`, `identity`, an unknown one)
+and any kind-level definition may read instance data (`config.name`) that the kind level lacks, so
+forcing them made the mark partial (den-hoag-pa887, arm A); none is forced. Each enters by its PATH
+instead (`open.<i>.options.<path>.<attr>`, `open.<i>.config.<key>`), as a sealed component whose
+subject is a closure equal only to itself (den-hoag-egei0): a kind with a default and one without
+mint apart, and two whose open paths agree share a mark and are refused by name, class by class in
+the `kind-mark-cplus.test-open-content-*` cells. The cost is a named refusal class: two independent
+constructions of one declaration carrying open content are refused too
+(`test-open-content-twin-is-refused`), and its only remedy is a sealed-literal constructor putting an
+inert literal into the mark. `__sealed` carries the sealed components' subjects from the
 same call; `kindEq` compares two kinds through both and refuses BY NAME a pair that mints one mark
 and differs only at sealed components. A sealed component holding type records (an option's
 `type`, `freeformType`, a `keySemantics` entry's `option.type`, a `refs` entry's `type`) publishes
@@ -265,7 +270,8 @@ first line of each). This library also co-writes gen-types' checker fields `__id
 (`lib/refined.nix`) and writes gen-algebra's `__mint` sum; their owners state those contracts.
 
 - `__sealed` — writer `mkSchemaEntryType` (`lib/entry-type.nix`), reader `kindEq` (same file); read by gen-select (`lib/default.nix`, its kind comparison):
-  the sealed subjects of a kind value, a thunk forced only when two kinds are compared. Kind values
+  the sealed subjects of a kind value, a thunk forced only when two kinds are compared: sealed types
+  and functions, and one reference-equal closure per open-module content path (`open.*`). Kind values
   also carry caller-computed fields, so the key stays under `__` to stay disjoint from them.
 - `__schema` — writer `types.refined` (`lib/refined.nix`), readers `getRefinements`, `isRefined` and the bridge (`lib/refined.nix`, `lib/bridge.nix`):
   refinement metadata added onto a FOREIGN option-type record, so it must stay disjoint from that
