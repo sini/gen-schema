@@ -1,0 +1,1 @@
+{ imports = [ ./kind-shaped.nix ]; }

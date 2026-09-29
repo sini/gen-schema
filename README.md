@@ -866,26 +866,28 @@ config.schema.deploy-user.inherits = [ "user" "ssh-access" "sudo-access" ];
 **The retired inheritance spelling is refused where a value test can see it, and nowhere else
 (ADR-0025 item 1, declared exception).** A kind value appearing in a kind entry's `imports` (or a
 shorthand module's `require`), at any depth of plain attrset modules, as a bare non-list `imports`,
-or as the value of a path or string member, is refused by name. Declare `inherits = [ "<parent>" ]`
-and build the schema with `evalSchema`. Four constructions compose as before and are not refused,
-because deciding them needs something other than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree that declares the kind: it has no kind-entry `imports` element,
-and it is the same value as the relocated form; (2) a function module whose body imports a kind: the
-test does not apply functions, whose module arguments it does not have; (3) a kind's functor applied
-by hand, `k.__functor k`: the result carries no mark, and `evalSchema` composes a parent through
-exactly this form; (4) gen-aspects' `__defsModule`, which is not a kind value. Each is a reversible,
-silent re-accretion, bounded by what a consumer writes. A path or string member is imported and its
-value tested, but the modules inside the imported file are not walked, so a file whose own `imports`
-carry a kind composes; that case is decidable and not yet decided (den-hoag-cxlc0, open).
+or as the value of a path or string member or anywhere in the tree of files it imports, is refused
+by name. Declare `inherits = [ "<parent>" ]` and build the schema with `evalSchema`. Four
+constructions compose as before and are not refused, because deciding them needs something other
+than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree that
+declares the kind: it has no kind-entry `imports` element, and it is the same value as the relocated
+form; (2) a function module whose body imports a kind: the test does not apply functions, whose
+module arguments it does not have; (3) a kind's functor applied by hand, `k.__functor k`: the result
+carries no mark, and `evalSchema` composes a parent through exactly this form; (4) gen-aspects'
+`__defsModule`, which is not a kind value. Each is a reversible, silent re-accretion, bounded by
+what a consumer writes.
 
-What the test forces, stated: at the kind's WHNF it forces every `imports` and `require` list of
-every attrset module reachable from the kind entry's defs, every member of those lists, the `__mint`
-record of any member carrying `kind` and `__mint`, and the `import` of every path or string member.
-So a member whose own WHNF throws (`imports = [ (throw …) ]`), a path to a file that throws and a
-path that does not exist all raise at the kind's WHNF, where they used to raise only at the first
-option read. It applies no function module and reads no option, `config` or other attribute of a
-member beyond those. The refusal fires at the offending kind's WHNF, in the entry-type merge, before
-resolution; a sibling kind, `_kindNames`, the parent kind and a registry declared over the kind do
-not raise it.
+What the test forces, stated exactly: at the kind's WHNF its walk forces (1) every `imports` and
+`require` list of the kind entry's defs and of every attrset module reachable from them, a top-level
+`require` list and a nested `imports` or `require` list included; (2) every member of those lists,
+at every depth; (3) the `__mint` record of any member carrying `kind` and `__mint`, never the
+digest; (4) the `import` of every reachable path or string member, so a path to a file that throws,
+or that does not exist, raises at the kind's WHNF; and (5) the tree of files those imports reach,
+each file once (a visited set keyed by the resolved path, so a cycle of files terminates). The
+module system imports those files anyway, so for (4) and (5) what moves is when, not whether. It
+applies no function module and reads no option, `config` or other attribute value of a member. The
+refusal fires at the offending kind's WHNF, in the entry-type merge, before resolution; a sibling
+kind, `_kindNames`, the parent kind and a registry declared over the kind do not raise it.
 
 ```nix
 config.schema.admin-user.imports = [ config.schema.user ];

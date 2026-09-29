@@ -193,6 +193,43 @@ in
     # way. Pure evaluation cannot write a live kind value into a file, so the file holds a value the
     # test's predicate (`isSchemaKind`: `kind` and a minted `__mint`) holds of; a live kind reached
     # through a path is the gate's `r4Path` probe.
+    # An imported file is walked in turn: a kind two files down refuses (fixtures in ci/test-fixtures/cxlc0).
+    test-nested-path-spelling-refuses-by-name = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = genSchema.mkSchemaOption { };
+              config.schema.derived.imports = [
+                ./test-fixtures/cxlc0/nested-kind-top.nix
+              ];
+            }
+          ];
+        }).config.schema.derived.kind;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'derived': its `imports` carries the kind value 'base', the retired spelling of kind inheritance";
+      };
+    };
+    # Two files importing one kind file: the file is walked once (the visited set) and the kind refuses.
+    test-diamond-path-spelling-refuses-by-name = {
+      expr =
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = genSchema.mkSchemaOption { };
+              config.schema.derived.imports = [
+                ./test-fixtures/cxlc0/diamond-left.nix
+                ./test-fixtures/cxlc0/diamond-right.nix
+              ];
+            }
+          ];
+        }).config.schema.derived.kind;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'derived': its `imports` carries the kind value 'base', the retired spelling of kind inheritance";
+      };
+    };
     test-path-spelling-refuses-by-name = {
       expr =
         (genMerge.evalModuleTree {

@@ -1008,38 +1008,65 @@ let
               # makes for the plane. Inheritance travels as a NAME in `inherits`, resolved by
               # `evalSchema`, which imports the parent's applied functor rather than its kind value.
               # A VALUE test: a path or string member is imported, which needs no argument and yields
-              # the value gen-merge would compose, so a path to a kind is refused too. It applies no
-              # function, so a function module and a hand-applied functor are admitted — the README's
-              # declared ADR-0025 exception. What it forces, at the kind's WHNF: every `imports` and
-              # `require` list of every attrset module reachable from the def, every member of those
-              # lists, the `__mint` record of any member carrying `kind` and `__mint`, and the import
-              # of every path or string member.
-              kindImports = prelude.concatMap (
-                d:
-                if builtins.isAttrs d.value && !(d.value ? __functor) then
-                  let
-                    v = d.value;
-                    i = v.imports or [ ];
-                  in
-                  builtins.filter isSchemaKind (
-                    map
-                      (
-                        m:
-                        if m ? opaque && (builtins.isPath m.opaque || builtins.isString m.opaque) then
-                          import m.opaque
-                        else
-                          m.open or m.opaque
-                      )
-                      (
-                        modulesOf (
-                          (if v ? require && !(isStructuredDecl v) then v.require else [ ])
-                          ++ (if builtins.isList i then i else [ i ])
-                        )
-                      )
-                  )
-                else
-                  [ ]
-              ) defs;
+              # the value gen-merge would compose, and an imported attrset module is walked in turn,
+              # so a kind reached through files is refused too. Each file is imported once per kind
+              # entry (a visited set keyed by the resolved path, as the module system dedupes), so a
+              # cycle of files terminates. It applies no function, so a function module and a
+              # hand-applied functor are admitted — the README's declared ADR-0025 exception. What
+              # it forces, at the kind's WHNF: every `imports` and `require` list of every attrset
+              # module reachable from the defs, every member of those lists, the `__mint` record of
+              # any member carrying `kind` and `__mint`, and the import of every reachable path or
+              # string member. The module system imports those files anyway; what moves is when.
+              declListOf =
+                v:
+                let
+                  i = v.imports or [ ];
+                in
+                (if v ? require && !(isStructuredDecl v) then v.require else [ ])
+                ++ (if builtins.isList i then i else [ i ]);
+              # ponytail: `found ++ [ … ]` is quadratic in the members reached; a kind entry's module
+              # tree is small. Accumulate a list of lists if that stops being true.
+              walkKindMembers =
+                acc: xs:
+                builtins.foldl' (
+                  acc: m:
+                  if m ? opaque && (builtins.isPath m.opaque || builtins.isString m.opaque) then
+                    let
+                      # the path as an attribute name: a store path carries string context, which a name cannot
+                      key = builtins.unsafeDiscardStringContext (toString m.opaque);
+                      v = import m.opaque;
+                      acc' = acc // {
+                        seen = acc.seen // {
+                          ${key} = true;
+                        };
+                        found = acc.found ++ [ v ];
+                      };
+                    in
+                    if acc.seen ? ${key} then
+                      acc
+                    else if builtins.isAttrs v && !(v ? __functor) then
+                      walkKindMembers acc' (declListOf v)
+                    else
+                      acc'
+                  else
+                    acc // { found = acc.found ++ [ (m.open or m.opaque) ]; }
+                ) acc (modulesOf xs);
+              kindImports =
+                builtins.filter isSchemaKind
+                  (builtins.foldl'
+                    (
+                      acc: d:
+                      if builtins.isAttrs d.value && !(d.value ? __functor) then
+                        walkKindMembers acc (declListOf d.value)
+                      else
+                        acc
+                    )
+                    {
+                      seen = { };
+                      found = [ ];
+                    }
+                    defs
+                  ).found;
 
               surplusOffenders = builtins.filter (
                 d: surplusDeclarationKeys { inherit computed mkType; } collectionKeys d.value != [ ]

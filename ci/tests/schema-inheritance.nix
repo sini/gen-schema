@@ -144,6 +144,30 @@ in
         "spool"
       ];
     };
+    # The walk the refusal makes through imported files: a two-file cycle terminates (each file is
+    # walked once, keyed by its path) and composes; an ordinary nested file tree composes.
+    test-path-cycle-composes = {
+      expr =
+        builtins.attrNames
+          (evalSchema {
+            modules = [ { config.schema.derived.imports = [ ../test-fixtures/cxlc0/cycle-a.nix ]; } ];
+          }).derived.options;
+      expected = [
+        "warp"
+        "weft"
+      ];
+    };
+    test-path-tree-composes = {
+      expr =
+        builtins.attrNames
+          (evalSchema {
+            modules = [ { config.schema.derived.imports = [ ../test-fixtures/cxlc0/tree-mid.nix ]; } ];
+          }).derived.options;
+      expected = [
+        "hem"
+        "selvedge"
+      ];
+    };
     test-c1-relocated-option-names = {
       expr = optionSet rel.derived;
       expected = [
