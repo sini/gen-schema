@@ -889,8 +889,11 @@ config.schema.admin-user.imports = [ config.schema.user ];
 ```
 
 A CYCLE written in the spelling, `a` importing `config.schema.b` and `b` importing `config.schema.a`, is
-refused by `evalSchema` with the name a hand-written `inherits` cycle gets (`inheritance cycle among kinds [a b]`). A tree built without `evalSchema` refuses no inheritance cycle; there the spelled
-modules import each other when a kind's options are evaluated, and the evaluation recurses.
+refused by `evalSchema` with the name a hand-written `inherits` cycle gets (`inheritance cycle among kinds [a b]`). **Boundary: on a plain `mkSchemaOption` tree, a spelled kind cycle overflows
+uncatchably** (`stack overflow; max-call-depth exceeded`). That is the module system's own
+composition of the spelled modules importing each other, and it is pre-existing: the spelling
+overflowed the same way before it was aliased. A plain tree refuses no inheritance cycle, since a
+hand-written `inherits` composes nothing there.
 
 Four constructions compose as before, unaliased and unwarned, because deciding them needs something
 other than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree
