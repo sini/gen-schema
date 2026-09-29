@@ -900,8 +900,8 @@ config.schema.admin-user.imports = [ config.schema.user ];
 ```
 
 A CYCLE written in the spelling, `a` importing `config.schema.b` and `b` importing `config.schema.a`, is
-refused by `evalSchema` with the name a hand-written `inherits` cycle gets (`inheritance cycle among kinds [a b]`). **Open ADR-0025 item-1 defect, carried on `den-hoag-8c8pr`: on a plain
-`mkSchemaOption` tree, a spelled kind cycle overflows uncatchably** (`stack overflow; max-call-depth exceeded`). That is the module system's own composition of the spelled modules importing each other,
+refused by `evalSchema` with the name a hand-written `inherits` cycle gets (`inheritance cycle among kinds [a b]`). **An open defect: on a plain
+`mkSchemaOption` tree, a spelled kind cycle is not yet refused by name, and overflows uncatchably** (`stack overflow; max-call-depth exceeded`). That is the module system's own composition of the spelled modules importing each other,
 before any value of this library is read; refusing it by name needs a transitive check over spelled
 parents that the kind value does not yet expose. A hand-written cycle on a plain tree is refused as
 unresolved (`kind 'a' inherits 'b', but nothing resolved it`).

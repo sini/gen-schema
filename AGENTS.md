@@ -74,7 +74,9 @@ the mark reads), and the result's own `__functor` is applied to that same module
 always carries `inherits` and `parent`, written over the result, since `evalSchema` and `_topology` read
 them off it. A declared `inherits` that no `evalSchema` pass resolved (a plain `mkSchemaOption` tree) is
 refused by name at every read built from the defs, on both branches; the declaration keys stay
-readable (`inheritsResolvedFile`; `schema-inheritance-refusals` in `ci/tests-error.nix`).
+readable (`inheritsResolvedFile`; `schema-inheritance-refusals` in `ci/tests-error.nix`). Open: a
+SPELLED kind cycle on a plain tree still overflows uncatchably, an ADR-0025 item-1 defect carried on
+`den-hoag-8c8pr` (README, Kind Inheritance).
 
 **Instances and registries** — `lib/instance.nix`
 
