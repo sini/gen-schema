@@ -2115,7 +2115,7 @@ in
         builtins.deepSeq (genSchema.mkInstanceType kind { }) null;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-merge: `submodule': its called `whenEmpty' does not evaluate the nested tree: a nested tree is a child of the one evaluation that holds it [(]`evalModuleTree'[)], read through its fold's threaded sibling, and no second evaluation is made for it [(]den-hoag-n6dh7[)]$";
+        msg = "^gen-merge: `submodule': its called `whenEmpty' does not evaluate the nested tree: a nested tree is a child of the one evaluation that holds it [(]`evalModuleTree'[)], read through its fold's threaded sibling, and no second evaluation is made for it$";
       };
     };
   };

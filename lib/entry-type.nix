@@ -739,7 +739,7 @@ let
         + "discarded unread. "
       else
         "This declaration is config shorthand, so gen-schema reads every other key as config; a flat "
-        + "option declaration alone is never a read plane here, structured or not (den-hoag-zijk1). "
+        + "option declaration alone is never a read plane here, structured or not. "
     )
     + "Declare '${first}': `options.${first} = mkOption { … };` for an option, "
     + "`config.${first} = …` for a value on an option already declared, `_${first}` for "

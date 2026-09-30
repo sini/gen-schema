@@ -715,7 +715,7 @@ in
       expr = kindEq portTcp portPos;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'options.port.type'; a sealed component has no identity \\(ADR-0034\\): migrate it to a first-order term, a registered constructor over inert arguments, so that it mints$";
+        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'options.port.type'; a sealed component has no identity, because identity is minted from inert structure alone: migrate it to a first-order term, a registered constructor over inert arguments, so that it mints$";
       };
     };
     test-method-body-collision-names-the-method = {
@@ -764,7 +764,7 @@ in
     let
       msg =
         comp:
-        "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) '${comp}'; a sealed component has no identity \\(ADR-0034\\): .*$";
+        "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) '${comp}'; a sealed component has no identity, because identity is minted from inert structure alone: .*$";
       at = attr: "open\\.options\\.port\\.${attr}";
       cell = expr: comp: {
         inherit expr;
