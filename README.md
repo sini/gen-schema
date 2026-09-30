@@ -877,8 +877,9 @@ written.
 
 **An inheritance cycle is refused by name on every tree, in either spelling.** A kind that reaches
 itself through its parents, declared or spelled, would import itself into itself; it is refused,
-catchably, at every read that would compose it, in `evalSchema`'s wording, naming the members and the
-path from the kind read:
+catchably, at every read that would compose it, in `evalSchema`'s wording: the members sorted, as
+`evalSchema` names them, so the bracket is the same whichever member is read, and then the path from
+the kind read:
 `gen-schema: inheritance cycle among kinds [a b] — kind 'a' inherits itself through its parents (a -> b -> a); a kind may inherit only kinds resolved in a strictly earlier pass`.
 A kind that merely reaches a cycle composes the cycle's first member, which refuses under its own
 name. The walk is over parent VALUES, compared by a content witness (the kind's name, where each def
@@ -886,7 +887,10 @@ was written, its parents' names and its declared option names), so a parent reac
 diamond, not a cycle, and another tree's kind of the same name is a different kind. Each kind value
 publishes the two things the walk reads: `__kindImports` (its parent kind values) and
 `__kindWitness`. A kind that composes a parent is also a module keyed by its witness, so a diamond
-composes each parent once and two trees' same-named kinds both compose.
+composes each parent once and two trees' same-named kinds, written apart, both compose. The witness
+does not tell apart two kinds written at the same source position with the same parents' and option
+names, the usual case being one generator function applied twice: those share a key, and the one
+imported first composes while the second is dropped.
 
 **The deprecated inheritance spelling is read as `inherits`, with a warning, where a value test can
 see it, and nowhere else (a declared exception to "a value or a named refusal").** A kind value

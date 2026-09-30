@@ -654,7 +654,9 @@ let
   # the kind's own mark is byte-identical with and without it; a declared `__functor` is applied by
   # gen-merge's module classifier and DELETES the rest of the declaration (`options` ⇒ `[ ]` against
   # `[ "role" ]` on the clean twin). Same class, same strength and same shape as the three reserved
-  # COLLECTION keys `mkAllCollections` refuses above.
+  # COLLECTION keys `mkAllCollections` refuses above. `__kindImports` and `__kindWitness` are written on
+  # both branches too (the inheritance-cycle walk's parents and witness), and a shorthand declaration of
+  # either was discarded without a word, a declared parent with it.
   #
   # ★ WHAT THIS DOOR IS FOR, stated precisely because the obvious reading is wrong. It does NOT
   # repair a swallow that some earlier door was doing `__`-specifically: before this guard existed
@@ -667,11 +669,15 @@ let
     if mkType == null then
       [
         "__functor"
+        "__kindImports"
+        "__kindWitness"
         "__mint"
         "__sealed"
       ]
     else
       [
+        "__kindImports"
+        "__kindWitness"
         "__mint"
         "__sealed"
       ];
@@ -1005,7 +1011,11 @@ let
               resolvedOnly =
                 v:
                 if inheritanceCycle != null then
-                  throw "gen-schema: inheritance cycle among kinds [${prelude.concatStringsSep " " (prelude.init inheritanceCycle)}] — kind '${kind}' inherits itself through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}); a kind may inherit only kinds resolved in a strictly earlier pass"
+                  throw "gen-schema: inheritance cycle among kinds [${
+                    prelude.concatStringsSep " " (
+                      prelude.sort (a: b: a < b) (prelude.unique (prelude.init inheritanceCycle))
+                    )
+                  }] — kind '${kind}' inherits itself through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}); a kind may inherit only kinds resolved in a strictly earlier pass"
                 else if unresolvedInherits == [ ] || tree != null then
                   v
                 else
@@ -1028,7 +1038,8 @@ let
               # parents' names and its declared option names, read before composition. Two trees'
               # same-named kinds differ in it, so they get two module keys and both compose; the
               # residue it cannot tell apart is two kinds written at one source position with the same
-              # parents and option names. Published as `__kindWitness`.
+              # parents and option names — one generator applied twice, say — whose second kind the
+              # module key drops. Published as `__kindWitness`.
               kindWitness = builtins.hashString "sha256" (
                 builtins.unsafeDiscardStringContext "${kind}@${
                   prelude.concatStringsSep ";" (map (d: "${toString (d.file or "?")}=${witnessPos d.value}") defs)
@@ -1052,7 +1063,9 @@ let
               # earlier pass (ADR-0016 ruling 7). A parent reached twice is a diamond, not a cycle: the
               # visited set is keyed by witness, so the walk is linear in the parents reached. Compared
               # by witness, never by name, so another tree's same-named kind is not this one. The
-              # answer is the path, first member to its return, or `null`.
+              # answer is the path, first member to its return, or `null`. The refusal names the members
+              # sorted, as `evalSchema`'s `kindNames` order does, so its bracket does not depend on which
+              # member is read; the path is in walk order from the kind read.
               # ponytail: each kind walks its own ancestry (nothing is shared across kinds, since a
               # shared reach set would itself recurse on a cycle) and copies the path per step, so a
               # depth-n chain costs O(n²) in total, the same order as composing it; carry the path as

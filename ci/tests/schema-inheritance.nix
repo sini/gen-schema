@@ -286,6 +286,22 @@ let
       ]).a;
   };
 
+  # one generator, applied twice: the same source positions, parent names and option names
+  oneGenerator =
+    x:
+    (plainTree [
+      (
+        { config, ... }:
+        {
+          config.schema.p.options.o_p = str "p";
+          config.schema.a = {
+            imports = [ config.schema.p ];
+            options.o_a = str x;
+          };
+        }
+      )
+    ]).a;
+
   spelledRecord =
     modules:
     let
@@ -859,6 +875,25 @@ in
         "o_q"
         "other"
       ];
+    };
+    # The witness's stated residue: ONE generator applied twice writes its two `a`s at one source
+    # position with the same parents and option names, so they share a witness and a module key, and
+    # gen-merge's key dedup composes the first one imported and drops the second.
+    test-one-generator-applied-twice-composes-the-first = {
+      expr = {
+        sameWitness = (oneGenerator "one").__kindWitness == (oneGenerator "two").__kindWitness;
+        composed =
+          (genMerge.evalModuleTree {
+            modules = [
+              (oneGenerator "one")
+              (oneGenerator "two")
+            ];
+          }).config.o_a;
+      };
+      expected = {
+        sameWitness = true;
+        composed = "one";
+      };
     };
     test-another-trees-same-named-kind-is-not-a-cycle = {
       expr =

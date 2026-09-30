@@ -339,7 +339,7 @@ in
   # 2026-09-30): a kind that reaches itself through its parents, declared (`inherits`, desugared onto
   # the import) or spelled (`imports = [ config.schema.<p> ]`), is refused by name in `evalSchema`'s
   # wording, where the module system would otherwise recurse uncatchably. The members are named in
-  # walk order from the kind read, with the path.
+  # sorted order (`evalSchema`'s bracket, whichever member is read), with the path from the kind read.
   flake.testsError.plain-inheritance-cycle-refusals =
     let
       msg =
@@ -406,7 +406,17 @@ in
       };
       test-mixed-cycle-from-the-spelling-end = {
         expr = (plainTree mixedCycle).b.options;
-        expectedError = refuses "b a" "b -> a -> b" "b";
+        expectedError = refuses "a b" "b -> a -> b" "b";
+      };
+      # the declared 2-cycle read from `b`: the bracket is sorted, so it is `evalSchema`'s `[a b]`
+      # from either end, and only the path starts where the read did
+      test-declared-2-cycle-from-the-other-end = {
+        expr =
+          (plainTree (declaredKinds {
+            a = [ "b" ];
+            b = [ "a" ];
+          })).b.options;
+        expectedError = refuses "a b" "b -> a -> b" "b";
       };
       # a kind that reaches a cycle without being on it composes the cycle's first member, which
       # refuses: the cycle is named, never the kind that merely reached it
@@ -848,6 +858,57 @@ in
     # the unknown-key predicate down for a caller-supplied function. The control is the same schema
     # WITHOUT the reserved key: its caller-owned surplus key must still come through untouched,
     # which is what proves the door is reserved-name-specific rather than a second unknown-key guard.
+    # The inheritance-cycle walk's two fields are written onto every kind value on both branches
+    # (8c8pr Q-b arm (i), 2026-09-30), so a SHORTHAND declaration of either, which the module engine
+    # would otherwise read as no module syntax and discard, is refused by name. The control is the
+    # same tree with the parent imported the ordinary way: it composes, so the refusal is the name's.
+    test-kind-imports-is-a-reserved-declaration-key = {
+      expr =
+        assert
+          let
+            control = builtins.tryEval (
+              builtins.attrNames
+                (plainTree (spelledKinds {
+                  a = [ "b" ];
+                  b = [ ];
+                })).a.options
+            );
+          in
+          control.success
+          &&
+            control.value == [
+              "o_a"
+              "o_b"
+            ];
+        builtins.attrNames
+          (plainTree [
+            (
+              { config, ... }:
+              {
+                config.schema.b.options.o_b = strOpt;
+                config.schema.a.__kindImports = [ config.schema.b ];
+              }
+            )
+          ]).a.options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'a': declaration key '__kindImports' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread$";
+      };
+    };
+    test-kind-witness-is-a-reserved-declaration-key = {
+      expr =
+        assert
+          let
+            control = builtins.tryEval (builtins.attrNames (kindOf { } { options.role = strOpt; }).options);
+          in
+          control.success && control.value == [ "role" ];
+        builtins.attrNames (kindOf { } { __kindWitness = "forged"; }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': declaration key '__kindWitness' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread$";
+      };
+    };
+
     test-mint-is-reserved-on-the-mkType-branch-too = {
       expr =
         let
