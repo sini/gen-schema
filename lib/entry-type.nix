@@ -462,6 +462,31 @@ let
   # the nn4 discipline (a declaration key no reader consumes is refused, never discarded) applied to
   # a key whose reader depends on how the tree was built. One derivation, read by both files.
   inheritsResolvedFile = kind: parent: "<gen-schema evalSchema: kind '${kind}' inherits '${parent}'>";
+  inheritsDesugaredFile = kind: parent: "<gen-schema: kind '${kind}' inherits '${parent}'>";
+
+  # Where a def was written, for a kind's content witness: its first attribute's source position, or
+  # its type when it has none (a function or path module, an empty set).
+  witnessPos =
+    v:
+    let
+      p =
+        if builtins.isAttrs v && v != { } then
+          builtins.unsafeGetAttrPos (builtins.head (builtins.attrNames v)) v
+        else
+          null;
+    in
+    if p == null then builtins.typeOf v else "${p.file}:${toString p.line}:${toString p.column}";
+
+  # WHAT a resolved parent contributes to its child, on either tree: the parent's MODULE, its
+  # `__functor` applied, never its kind value — a kind value in a kind entry's `imports` is the
+  # deprecated spelling, which the entry type reads as `inherits` and warns on (den-hoag-cxlc0). One
+  # derivation for `evalSchema`'s pass and the unstaged desugar, so the two compose one module.
+  inheritedModule =
+    kind: parent: v:
+    if v ? __functor then
+      v.__functor v
+    else
+      throw "gen-schema: kind '${kind}' inherits '${parent}', whose kind value is not a module (its `mkType` result carries no `__functor`), so there is nothing to compose";
 
   # THE REFINEMENT PLANE IS A PROJECTION OF AN OPTION PLANE (ADR-0013: a derivable fact is derived,
   # once). Every arm that publishes `refinements` from an evaluated option plane reads it through this
@@ -573,6 +598,10 @@ let
     "__mint"
     # Written beside `__mint` and refused for the same reason: the sealed subjects `kindEq` reads.
     "__sealed"
+    # Written beside `__mint`, both branches, for the same reason: the parents and the witness the
+    # inheritance-cycle walk reads.
+    "__kindImports"
+    "__kindWitness"
   ];
 
   # ★ THE COLLECTION KEY SPACE'S RESERVED SET (den-hoag-6vgwm). A caller-supplied collection NAME
@@ -771,8 +800,14 @@ let
   # forces `checked` where the record is applied — the door's own return is built through
   # `merge.mkOptionType`, an external call whose own strictness this door does not want to depend
   # on for its catchability.
-  mkSchemaEntryType =
-    args:
+  mkSchemaEntryType = mkSchemaEntryTypeIn null;
+
+  # THE ENTRY TYPE OF ONE KIND TREE (den-hoag-8c8pr, owner-ruled 2026-09-30: `inherits` on a tree
+  # `evalSchema` did not build means what `imports = [ config.schema.<p> ]` means there). `tree` is
+  # the tree's own `config` — the kind values the deprecated spelling reads — or `null` for an entry
+  # type built outside a tree, where a declared parent has nothing to be read from.
+  mkSchemaEntryTypeIn =
+    tree: args:
     let
       checked = prelude.checkOptions "gen-schema.mkSchemaEntryType" schemaEntryFormals args;
     in
@@ -942,10 +977,10 @@ let
                     acc
                 ) collection.default defs;
 
-              # A DECLARED parent nothing resolved (den-hoag-8c8pr): no def of this kind carries the
-              # resolver's provenance for it, and it is not spelled either (a spelled parent composes
-              # where it is written). Computed only past a non-empty declaration, so a kind that
-              # inherits nothing pays one comparison.
+              # A DECLARED parent nothing else composes (den-hoag-8c8pr), which the desugar below
+              # imports: no def of this kind carries the resolver's provenance for it, and it is not
+              # spelled either (a spelled parent composes where it is written). Computed only past a
+              # non-empty declaration, so a kind that inherits nothing pays one comparison.
               declaredInherits = declaredOf "inherits" allCollections.inherits;
               unresolvedInherits =
                 if declaredInherits == [ ] then
@@ -960,18 +995,123 @@ let
                   ) declaredInherits;
               # Sited on the COMPOSED value (`merged`, `treeModule`), never the kind's WHNF: `evalSchema`
               # reads `inherits` off pass 0, where no parent is resolved yet, and the collections, `kind`
-              # and `_kindNames` stay readable on an unresolved kind. What refuses is every read that
-              # would show the parent's options missing: `options`, `refs` (so `_edges`), the mark, an
-              # instance.
+              # and `_kindNames` stay readable. It carries two refusals, each at every read that would
+              # compose the parent: `options`, `refs` (so `_edges`), the mark, an instance. An
+              # inheritance cycle, in either spelling, on any tree; and a declared parent on an entry
+              # type built outside a tree, which has no parent to read.
               # A computed field is caller-built from the raw defs as well, so it is read through the
               # guard on both branches, as the `mkType` result's own fields are.
               guardedComputed = prelude.mapAttrs (_: resolvedOnly) computedFields;
               resolvedOnly =
                 v:
-                if unresolvedInherits == [ ] then
+                if inheritanceCycle != null then
+                  throw "gen-schema: inheritance cycle among kinds [${prelude.concatStringsSep " " (prelude.init inheritanceCycle)}] — kind '${kind}' inherits itself through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}); a kind may inherit only kinds resolved in a strictly earlier pass"
+                else if unresolvedInherits == [ ] || tree != null then
                   v
                 else
-                  throw "gen-schema: kind '${kind}' inherits '${builtins.head unresolvedInherits}', but nothing resolved it: `inherits` composes only in a schema built by `evalSchema`, which resolves each parent in a strictly earlier pass, and without it the parent's options would be silently absent. Build the schema with `evalSchema`";
+                  throw "gen-schema: kind '${kind}' inherits '${builtins.head unresolvedInherits}', but nothing resolved it: this entry type was built outside a kind tree, so there is no parent to read. Declare the kind through `mkSchemaOption` or `evalSchema`";
+
+              # THE PARENTS THIS KIND COMPOSES, as kind VALUES, in either spelling: the spelled ones
+              # (`kindImports`) and, on a tree, the declared ones the desugar imports. Both compose
+              # through the same applied functor, so one list carries both to the cycle walk.
+              # Published as `__kindImports`.
+              kindParents =
+                kindImports
+                ++ (
+                  if tree == null then
+                    [ ]
+                  else
+                    map (p: tree.${p}) (builtins.filter (p: builtins.elem p tree._kindNames) unresolvedInherits)
+                );
+
+              # THE CONTENT WITNESS: the kind's name, each def's file and first-attribute position, its
+              # parents' names and its declared option names, read before composition. Two trees'
+              # same-named kinds differ in it, so they get two module keys and both compose; the
+              # residue it cannot tell apart is two kinds written at one source position with the same
+              # parents and option names. Published as `__kindWitness`.
+              kindWitness = builtins.hashString "sha256" (
+                builtins.unsafeDiscardStringContext "${kind}@${
+                  prelude.concatStringsSep ";" (map (d: "${toString (d.file or "?")}=${witnessPos d.value}") defs)
+                }|parents=${prelude.concatStringsSep "," (map (k: k.kind) kindParents)}|opts=${
+                  prelude.concatStringsSep "," (
+                    prelude.concatMap (
+                      d:
+                      if builtins.isAttrs d.value && builtins.isAttrs (d.value.options or null) then
+                        builtins.attrNames d.value.options
+                      else
+                        [ ]
+                    ) defs
+                  )
+                }"
+              );
+
+              # THE ONE INHERITANCE-CYCLE WALK (8c8pr Q-b arm (i), 2026-09-30), for both spellings: a
+              # kind that reaches its own witness through its parents' `__kindImports` would import
+              # itself into itself, and the module system recurses uncatchably. It is refused by name,
+              # in `evalSchema`'s wording, because a kind may inherit only kinds resolved in a strictly
+              # earlier pass (ADR-0016 ruling 7). A parent reached twice is a diamond, not a cycle: the
+              # visited set is keyed by witness, so the walk is linear in the parents reached. Compared
+              # by witness, never by name, so another tree's same-named kind is not this one. The
+              # answer is the path, first member to its return, or `null`.
+              # ponytail: each kind walks its own ancestry (nothing is shared across kinds, since a
+              # shared reach set would itself recurse on a cycle) and copies the path per step, so a
+              # depth-n chain costs O(n²) in total, the same order as composing it; carry the path as
+              # a cons list if a deep spelling-heavy tree ever makes that dominate.
+              inheritanceCycle =
+                let
+                  go =
+                    acc: stack: v:
+                    let
+                      w = v.__kindWitness;
+                    in
+                    # A kind value this entry type did not build (`isSchemaKind` admits any value with a
+                    # `kind` and a mark) publishes no parents, so the walk has nothing past it to read.
+                    if acc.found != null || !(v ? __kindWitness) then
+                      acc
+                    else if w == kindWitness then
+                      acc // { found = stack ++ [ v.kind ]; }
+                    else if acc.seen ? ${w} then
+                      acc
+                    else
+                      builtins.foldl' (a: go a (stack ++ [ v.kind ])) (
+                        acc
+                        // {
+                          seen = acc.seen // {
+                            ${w} = true;
+                          };
+                        }
+                      ) v.__kindImports;
+                in
+                if kindParents == [ ] then
+                  null
+                else
+                  (builtins.foldl' (a: go a [ kind ]) {
+                    found = null;
+                    seen = { };
+                  } kindParents).found;
+
+              # THE DESUGAR (den-hoag-8c8pr): on a tree, a declared parent nothing else composed is
+              # imported into this kind exactly as the deprecated spelling `imports = [ config.schema.<p> ]`
+              # imports it, read off the same tree. The def is the one `evalSchema`'s pass contributes
+              # (`inheritedModule`), so a staged and an unstaged tree compose one module; no name graph,
+              # no pass: the module system's import composes it, as it composes the spelling.
+              desugaredDefs =
+                if tree == null then
+                  [ ]
+                else
+                  map (p: {
+                    file = inheritsDesugaredFile kind p;
+                    value = {
+                      imports = [
+                        (
+                          if !(builtins.elem p tree._kindNames) then
+                            throw "gen-schema: kind '${kind}' inherits '${p}' which is not a declared kind"
+                          else
+                            inheritedModule kind p tree.${p}
+                        )
+                      ];
+                    };
+                  }) unresolvedInherits;
 
               # THE DEPRECATED INHERITANCE SPELLING, READ AS `inherits` (den-hoag-cxlc0): each kind
               # value the walk below finds in this entry's `imports`/`require` contributes its NAME,
@@ -986,8 +1126,8 @@ let
               # `config.schema.b` and `b` importing `config.schema.a` would force each other's WHNF and
               # recurse uncatchably. Read lazily, each kind's WHNF is its own, the two names are
               # recorded, and `evalSchema`'s name graph refuses the cycle by name exactly as it
-              # refuses a hand-written one. A tree built without `evalSchema` refuses no inheritance
-              # cycle, and there the spelled modules still import each other when composed.
+              # refuses a hand-written one. On a tree built without `evalSchema` the same cycle is
+              # refused by `inheritanceCycle` (above), before the spelled modules import each other.
               aliasedInherits =
                 declared:
                 let
@@ -1002,7 +1142,7 @@ let
                   declared
                 else
                   warn
-                    "gen-schema: kind '${kind}': its `imports` carries the kind value ${quoted}, the deprecated spelling of kind inheritance, read as `inherits = [ ${literal} ]`; declare `inherits` and build the schema with `evalSchema`"
+                    "gen-schema: kind '${kind}': its `imports` carries the kind value ${quoted}, the deprecated spelling of kind inheritance, read as `inherits = [ ${literal} ]`; declare `inherits`"
                     (declared ++ names);
 
               # Computed fields from extracted collections + raw defs
@@ -1040,14 +1180,17 @@ let
                 else
                   fields;
 
-              # Strip all collection keys before deferredModule merge
-              strippedDefs = map (
-                d:
-                if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
-                  d // { value = builtins.removeAttrs d.value collectionKeys; }
-                else
-                  d
-              ) defs;
+              # Strip all collection keys before deferredModule merge. The desugared parents join here,
+              # where `evalSchema`'s injected defs arrive, so both branches compose them.
+              strippedDefs =
+                map (
+                  d:
+                  if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
+                    d // { value = builtins.removeAttrs d.value collectionKeys; }
+                  else
+                    d
+                ) defs
+                ++ desugaredDefs;
 
               # Resolve baseModule value (may be a function of kind name)
               resolvedBase =
@@ -1271,6 +1414,8 @@ let
                     minted = markOf { inherit kind strict plane; };
                   };
                   __sealed = plane.sealed;
+                  __kindImports = kindParents;
+                  __kindWitness = kindWitness;
                 }
               else
                 let
@@ -1350,12 +1495,15 @@ let
                 # Precedence: computed overrides collections of the same name.
                 # __functor is reserved — collections/computed must not use it as a key.
                 {
+                  # A kind that composes a parent is keyed by its witness, so a parent reached on two
+                  # branches (a diamond) is composed once, and two trees' same-named kinds keep two keys.
                   __functor =
                     _:
                     { ... }:
                     {
                       imports = [ merged ];
-                    };
+                    }
+                    // prelude.optionalAttrs (kindParents != [ ]) { key = "gen-schema-kind:${kind}#${kindWitness}"; };
                   inherit
                     kind
                     mixins
@@ -1374,6 +1522,9 @@ let
                     minted = markOf { inherit kind strict plane; };
                   };
                   __sealed = plane.sealed;
+                  # the parents as VALUES and the witness, read by the cycle walk of every kind below
+                  __kindImports = kindParents;
+                  __kindWitness = kindWitness;
                 }
             );
         };
@@ -1412,7 +1563,7 @@ let
       let
         # Built once per call, from the SAME accepted set this door itself just checked against —
         # one list, read twice, so no runtime `==` of two reflections is needed to state the premise.
-        entry = mkSchemaEntryType {
+        entryArgs = {
           inherit
             baseModule
             computed
@@ -1424,10 +1575,13 @@ let
             specialArgs
             ;
         };
+        entry = mkSchemaEntryType entryArgs;
         inner = merge.types.submodule (
           { config, options, ... }:
           {
-            freeformType = merge.types.lazyAttrsOf entry;
+            # The kinds are typed by this tree's own entry type, which reads a declared parent off
+            # `config` — the same kind values `imports = [ config.schema.<p> ]` reads (den-hoag-8c8pr).
+            freeformType = merge.types.lazyAttrsOf (mkSchemaEntryTypeIn config entryArgs);
 
             # READ-ONLY, on two measured bases (den-hoag-px98p): a well-typed write to a derived output
             # (`config.schema._collectionKeys = [ "fake" ]`) would otherwise be published silently, and
@@ -1703,5 +1857,6 @@ in
     isSchemaKind
     kindEq
     inheritsResolvedFile
+    inheritedModule
     ;
 }

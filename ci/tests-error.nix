@@ -47,43 +47,44 @@ let
           imports = map (d: d.value) defs;
         };
     };
-  # A kind whose declared parent nothing resolved, built by gen-aspects' `mkType` shape: the functor
-  # ignores `self`, and `__defsModule` is built from the defs.
-  unresolvedAspectsShaped =
+  # A plain tree: the schema option declared in the caller's own module pass (den v1's shape).
+  plainTreeWith =
+    schemaOption: modules:
     (genMerge.evalModuleTree {
-      modules = [
-        {
-          options.schema = mkSchemaOption {
-            mkType =
-              { defs, collections, ... }:
-              let
-                defsModules = map (d: d.value) (builtins.filter (d: builtins.isAttrs d.value) defs);
-              in
-              {
-                __functor =
-                  _:
-                  { ... }:
-                  {
-                    imports = defsModules;
-                  };
-                __defsModule.imports = defsModules;
-              }
-              // collections;
-          };
-          config.schema.base.options.description = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "";
-          };
-          config.schema.derived = {
-            inherits = [ "base" ];
-            options.spool = genMerge.mkOption {
-              type = genMerge.types.str;
-              default = "s";
-            };
-          };
-        }
-      ];
-    }).config.schema.derived;
+      modules = [ { options.schema = schemaOption; } ] ++ modules;
+    }).config.schema;
+  plainTree = plainTreeWith (mkSchemaOption { });
+  # A kind graph, name -> parents, each kind declaring its own option `o_<name>`: the parents
+  # declared, or written in the deprecated spelling.
+  declaredKinds = g: [
+    {
+      config.schema = builtins.mapAttrs (n: ps: {
+        inherits = ps;
+        options."o_${n}" = genMerge.mkOption { type = genMerge.types.str; };
+      }) g;
+    }
+  ];
+  spelledKinds = g: [
+    (
+      { config, ... }:
+      {
+        config.schema = builtins.mapAttrs (n: ps: {
+          imports = map (p: config.schema.${p}) ps;
+          options."o_${n}" = genMerge.mkOption { type = genMerge.types.str; };
+        }) g;
+      }
+    )
+  ];
+  # `a` declares `b`; `b` spells `a`
+  mixedCycle = [
+    (
+      { config, ... }:
+      {
+        config.schema.a.inherits = [ "b" ];
+        config.schema.b.imports = [ config.schema.a ];
+      }
+    )
+  ];
 
   # The door table door-checks.nix also reads, for the doors' own valid fixtures — the message
   # goldens below apply the same rows' violations, so a row edited there cannot drift from what is
@@ -239,85 +240,42 @@ in
       };
     };
 
-    # den-hoag-8c8pr: a declared parent on a tree `evalSchema` did not build is refused BY NAME where
-    # the parent's options would be read, instead of composing nothing. ADR-0016 ruling 7: a
-    # same-pass relatum does not resolve, and the substrate refuses by name.
-    test-unresolved-inherits-refuses-by-name = {
-      expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.schema = mkSchemaOption { };
-              config.schema.base = { };
-              config.schema.derived.inherits = [ "base" ];
-            }
-          ];
-        }).config.schema.derived.options;
+    # den-hoag-8c8pr: on a plain tree a declared `inherits` desugars onto the import the deprecated
+    # spelling makes, so a parent nothing declares has nothing to import and is refused by
+    # `evalSchema`'s own words, where the parent's options would be read and on the edge view.
+    test-plain-undeclared-parent-refuses-by-name = {
+      expr = (plainTree [ { config.schema.derived.inherits = [ "nosuch" ]; } ]).derived.options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: `inherits` composes only in a schema built by `evalSchema`, which resolves each parent in a strictly earlier pass, and without it the parent's options would be silently absent. Build the schema with `evalSchema`$";
+        msg = "^gen-schema: kind 'derived' inherits 'nosuch' which is not a declared kind$";
+      };
+    };
+    test-plain-undeclared-parent-refuses-the-edge-view = {
+      expr = (plainTree [ { config.schema.derived.inherits = [ "nosuch" ]; } ])._edges;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'derived' inherits 'nosuch' which is not a declared kind$";
       };
     };
 
-    # The same on the `mkType` branch: the guard sits on the tree module an instance imports.
-    test-unresolved-inherits-refuses-by-name-mktype = {
+    # An entry type built OUTSIDE a kind tree has no tree to read a declared parent off, so the
+    # parent is refused by name rather than dropped.
+    test-treeless-entry-refuses-by-name = {
       expr =
         (genMerge.evalModuleTree {
           modules = [
             {
-              options.schema = mkSchemaOption {
-                mkType =
-                  { defs, ... }:
-                  {
-                    __functor =
-                      _:
-                      { ... }:
-                      {
-                        imports = map (d: d.value) defs;
-                      };
-                  };
+              options.kinds = genMerge.mkOption {
+                type = genMerge.types.lazyAttrsOf (mkSchemaEntryType { });
               };
-              config.schema.base = { };
-              config.schema.derived.inherits = [ "base" ];
+              config.kinds.base = { };
+              config.kinds.derived.inherits = [ "base" ];
             }
           ];
-        }).config.schema.derived.options;
+        }).config.kinds.derived.options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: .*";
-      };
-    };
-
-    # The READS THAT BYPASS `options` (gate v0 C2): the kind's functor applied by hand, the kind
-    # imported as a module, and a field the caller's `mkType` built from its defs. The fixture is
-    # gen-aspects' shape: a functor that ignores `self`, and a `__defsModule`.
-    test-unresolved-inherits-refuses-through-the-functor =
-      let
-        k = unresolvedAspectsShaped;
-      in
-      {
-        expr = builtins.attrNames (genMerge.evalModuleTree { modules = [ (k.__functor k) ]; }).options;
-        expectedError = {
-          type = "ThrownError";
-          msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: .*";
-        };
-      };
-    test-unresolved-inherits-refuses-imported-as-a-module = {
-      expr =
-        builtins.attrNames
-          (genMerge.evalModuleTree { modules = [ unresolvedAspectsShaped ]; }).options;
-      expectedError = {
-        type = "ThrownError";
-        msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: .*";
-      };
-    };
-    test-unresolved-inherits-refuses-through-a-caller-field = {
-      expr =
-        builtins.attrNames
-          (genMerge.evalModuleTree { modules = [ unresolvedAspectsShaped.__defsModule ]; }).options;
-      expectedError = {
-        type = "ThrownError";
-        msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: .*";
+        msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: this entry type was built outside a kind tree, so there is no parent to read. Declare the kind through `mkSchemaOption` or `evalSchema`$";
       };
     };
 
@@ -336,24 +294,6 @@ in
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kind 'user' declares parent 'nosuch' which is not a declared kind$";
-      };
-    };
-
-    # A hand-written CYCLE on such a tree is refused by the same name: nothing resolves either edge.
-    test-unresolved-inherits-cycle-refuses-by-name = {
-      expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.schema = mkSchemaOption { };
-              config.schema.a.inherits = [ "b" ];
-              config.schema.b.inherits = [ "a" ];
-            }
-          ];
-        }).config.schema.a.options;
-      expectedError = {
-        type = "ThrownError";
-        msg = "^gen-schema: kind 'a' inherits 'b', but nothing resolved it: .*";
       };
     };
 
@@ -394,6 +334,105 @@ in
       };
     };
   };
+
+  # THE INHERITANCE-CYCLE REFUSAL ON A PLAIN TREE, both spellings under one walk (8c8pr Q-b arm (i),
+  # 2026-09-30): a kind that reaches itself through its parents, declared (`inherits`, desugared onto
+  # the import) or spelled (`imports = [ config.schema.<p> ]`), is refused by name in `evalSchema`'s
+  # wording, where the module system would otherwise recurse uncatchably. The members are named in
+  # walk order from the kind read, with the path.
+  flake.testsError.plain-inheritance-cycle-refusals =
+    let
+      msg =
+        members: path: kind:
+        "^gen-schema: inheritance cycle among kinds \\[${members}\\] — kind '${kind}' inherits itself through its parents \\(${path}\\); a kind may inherit only kinds resolved in a strictly earlier pass$";
+      refuses = members: path: kind: {
+        type = "ThrownError";
+        msg = msg members path kind;
+      };
+    in
+    {
+      test-declared-2-cycle = {
+        expr =
+          (plainTree (declaredKinds {
+            a = [ "b" ];
+            b = [ "a" ];
+          })).a.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-spelled-2-cycle = {
+        expr =
+          (plainTree (spelledKinds {
+            a = [ "b" ];
+            b = [ "a" ];
+          })).a.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-declared-self-cycle = {
+        expr =
+          (plainTree (declaredKinds {
+            a = [ "a" ];
+          })).a.options;
+        expectedError = refuses "a" "a -> a" "a";
+      };
+      test-spelled-self-cycle = {
+        expr =
+          (plainTree (spelledKinds {
+            a = [ "a" ];
+          })).a.options;
+        expectedError = refuses "a" "a -> a" "a";
+      };
+      test-declared-3-cycle = {
+        expr =
+          (plainTree (declaredKinds {
+            a = [ "b" ];
+            b = [ "c" ];
+            c = [ "a" ];
+          })).a.options;
+        expectedError = refuses "a b c" "a -> b -> c -> a" "a";
+      };
+      test-spelled-3-cycle = {
+        expr =
+          (plainTree (spelledKinds {
+            a = [ "b" ];
+            b = [ "c" ];
+            c = [ "a" ];
+          })).a.options;
+        expectedError = refuses "a b c" "a -> b -> c -> a" "a";
+      };
+      # one edge declared, one spelled, read from either end
+      test-mixed-cycle-from-the-declaring-end = {
+        expr = (plainTree mixedCycle).a.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-mixed-cycle-from-the-spelling-end = {
+        expr = (plainTree mixedCycle).b.options;
+        expectedError = refuses "b a" "b -> a -> b" "b";
+      };
+      # a kind that reaches a cycle without being on it composes the cycle's first member, which
+      # refuses: the cycle is named, never the kind that merely reached it
+      test-a-kind-reaching-a-cycle-names-the-cycle = {
+        expr =
+          (plainTree (declaredKinds {
+            x = [ "a" ];
+            a = [ "b" ];
+            b = [ "a" ];
+          })).x.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      # the same refusal on the `mkType` branch, read through the caller's functor
+      test-declared-2-cycle-mktype =
+        let
+          k =
+            (plainTreeWith (mkSchemaOption { mkType = bareMkType; }) (declaredKinds {
+              a = [ "b" ];
+              b = [ "a" ];
+            })).a;
+        in
+        {
+          expr = builtins.attrNames (genMerge.evalModuleTree { modules = [ (k.__functor k) ]; }).options;
+          expectedError = refuses "a b" "a -> b -> a" "a";
+        };
+    };
 
   flake.testsError.identity-refusals = {
     # R1. The door takes the kind DECLARATION and refuses a NAME by name: the stamp's preimage
@@ -591,7 +630,7 @@ in
         (kindOf { computed = _: _: { options = "COMPUTED"; }; } { options.role = strOpt; }).options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed$";
+        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness$";
       };
     };
 
@@ -621,7 +660,7 @@ in
         } { }).refs;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed$";
+        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness$";
       };
     };
   };

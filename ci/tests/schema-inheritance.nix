@@ -138,6 +138,154 @@ let
           };
       };
   };
+  # The same result publishing its collections.
+  publishedMkTypeOpt = mkSchemaOption {
+    mkType =
+      { defs, collections, ... }:
+      {
+        __functor =
+          _:
+          { ... }:
+          {
+            imports = map (d: d.value) defs;
+          };
+      }
+      // collections;
+  };
+
+  # ── den-hoag-8c8pr: the plain tree's desugar ─────────────────────────────────────────────────
+  plainTree =
+    modules:
+    (genMerge.evalModuleTree {
+      modules = [ { options.schema = mkSchemaOption { }; } ] ++ modules;
+    }).config.schema;
+  # `derived` beside `spelledTree`'s `base`: declaring its parents, or spelling `base`
+  declaredDerived = inh: {
+    config.schema.derived = {
+      inherits = inh;
+      options.spool = str "s";
+    };
+  };
+  spelledDerived = [
+    (
+      { config, ... }:
+      {
+        config.schema.derived = {
+          imports = [ config.schema.base ];
+          options.spool = str "s";
+        };
+      }
+    )
+  ];
+  # every observable of the pair: instance keys, option names, `inherits`, both marks, the
+  # instance's `id_hash`, and the edges
+  observe = s: {
+    inst = optionSet s.derived;
+    opts = builtins.attrNames s.derived.options;
+    inherits = s.derived.inherits;
+    mark = s.derived.__mint.minted;
+    idHash = (instanceOf s.derived { }).id_hash;
+    baseMark = s.base.__mint.minted;
+    edges = s._edges;
+  };
+  # a 3-chain c -> b -> a, declared
+  chainDecl = {
+    config.schema.a.options.w = str "";
+    config.schema.b = {
+      inherits = [ "a" ];
+      options.x = str "";
+    };
+    config.schema.c = {
+      inherits = [ "b" ];
+      options.y = str "";
+    };
+  };
+  chainObs = s: {
+    inst = optionSet s.c;
+    mark = s.c.__mint.minted;
+    idHash = (instanceOf s.c { }).id_hash;
+  };
+  # a diamond d -> {b, c} -> a, declared or spelled
+  diamondDecl =
+    spell:
+    { config, ... }:
+    let
+      up = ps: if spell then { imports = map (p: config.schema.${p}) ps; } else { inherits = ps; };
+    in
+    {
+      config.schema.a.options.w = str "";
+      config.schema.b = up [ "a" ] // {
+        options.x = str "";
+      };
+      config.schema.c = up [ "a" ] // {
+        options.y = str "";
+      };
+      config.schema.d =
+        up [
+          "b"
+          "c"
+        ]
+        // {
+          options.z = str "";
+        };
+    };
+  # gen-aspects' `mkType` shape: the functor ignores `self`, and `__defsModule` is built from the defs
+  aspectsShaped =
+    (genMerge.evalModuleTree {
+      modules = [
+        {
+          options.schema = mkSchemaOption {
+            mkType =
+              { defs, collections, ... }:
+              let
+                defsModules = map (d: d.value) (builtins.filter (d: builtins.isAttrs d.value) defs);
+              in
+              {
+                __functor =
+                  _:
+                  { ... }:
+                  {
+                    imports = defsModules;
+                  };
+                __defsModule.imports = defsModules;
+              }
+              // collections;
+          };
+          config.schema.base.options.description = str "";
+        }
+        (declaredDerived [ "base" ])
+      ];
+    }).config.schema.derived;
+  # two trees, each with a kind `a` that composes a parent of its own
+  twoTreesA = {
+    one =
+      (plainTree [
+        (
+          { config, ... }:
+          {
+            config.schema.p.options.o_p = str "p";
+            config.schema.a = {
+              imports = [ config.schema.p ];
+              options.o_a = str "a";
+            };
+          }
+        )
+      ]).a;
+    two =
+      (plainTree [
+        (
+          { config, ... }:
+          {
+            config.schema.q.options.o_q = str "q";
+            config.schema.a = {
+              imports = [ config.schema.q ];
+              options.other = str "s2";
+            };
+          }
+        )
+      ]).a;
+  };
+
   spelledRecord =
     modules:
     let
@@ -537,27 +685,19 @@ in
         expected = true;
       };
 
-    # den-hoag-8c8pr: on a tree `evalSchema` did not build, a kind whose declared parent nothing
-    # resolved still answers what it declares — its `inherits`, its name, the schema's kind names —
-    # and refuses only the reads that would show the parent missing (tests-error,
-    # `test-unresolved-inherits-refuses-by-name`).
-    test-unresolved-kind-reads-its-declaration =
+    # ── den-hoag-8c8pr: a declared `inherits` on a plain tree (one `evalSchema` did not build) ─────
+    # It means what `imports = [ config.schema.<p> ]` means there: it is desugared onto the same
+    # import, so the parent composes. Its declaration reads as before.
+    test-plain-inherits-reads-its-declaration-and-composes =
       let
-        t = spelledTree [
-          {
-            config.schema.derived = {
-              inherits = [ "base" ];
-              options.spool = str "s";
-            };
-          }
-        ];
+        t = spelledTree [ (declaredDerived [ "base" ]) ];
       in
       {
         expr = {
           inherits = t.derived.inherits;
           kind = t.derived.kind;
           kinds = t._kindNames;
-          options = (builtins.tryEval t.derived.options).success;
+          options = builtins.attrNames t.derived.options;
         };
         expected = {
           inherits = [ "base" ];
@@ -566,8 +706,168 @@ in
             "base"
             "derived"
           ];
-          options = false;
+          options = [
+            "description"
+            "spool"
+          ];
         };
       };
+
+    # Cell (2): the declaration IS the spelling on a plain tree — every observable byte-identical.
+    # The discriminator is the same tree declaring no parent.
+    test-plain-inherits-is-the-import = {
+      expr = {
+        same =
+          observe (spelledTree [ (declaredDerived [ "base" ]) ]) == observe (spelledTree spelledDerived);
+        discriminator =
+          observe (spelledTree [ (declaredDerived [ ]) ]) == observe (spelledTree spelledDerived);
+      };
+      expected = {
+        same = true;
+        discriminator = false;
+      };
+    };
+
+    # Cell (3): the plain desugar composes the kind `evalSchema` stages — the pair, and a 3-chain's
+    # mark and instance identity.
+    test-plain-inherits-is-the-staged-kind = {
+      expr = {
+        pair = observe (spelledTree [ (declaredDerived [ "base" ]) ]) == observe rel;
+        chain =
+          chainObs (plainTree [ chainDecl ]) == chainObs (evalSchema {
+            modules = [ chainDecl ];
+          });
+      };
+      expected = {
+        pair = true;
+        chain = true;
+      };
+    };
+
+    # The `mkType` branch composes the desugared parent too: a result publishing no collections and
+    # one publishing them.
+    test-plain-inherits-composes-mktype = {
+      expr =
+        map
+          (
+            so:
+            builtins.attrNames
+              (genMerge.evalModuleTree {
+                modules = [
+                  { options.schema = so; }
+                  { config.schema.base.options.description = str ""; }
+                  (declaredDerived [ "base" ])
+                ];
+              }).config.schema.derived.options
+          )
+          [
+            bareMkTypeOpt
+            publishedMkTypeOpt
+          ];
+      expected = [
+        [
+          "description"
+          "spool"
+        ]
+        [
+          "description"
+          "spool"
+        ]
+      ];
+    };
+
+    # The reads that bypass `options` (gen-aspects' `mkType` shape: a functor that ignores `self`,
+    # and a `__defsModule` built from the defs) compose the parent too: the desugared def is one of
+    # the defs the caller's `mkType` receives.
+    test-plain-inherits-composes-through-the-functor = {
+      expr = builtins.elem "description" (
+        builtins.attrNames
+          (genMerge.evalModuleTree { modules = [ (aspectsShaped.__functor aspectsShaped) ]; }).options
+      );
+      expected = true;
+    };
+    test-plain-inherits-composes-imported-as-a-module = {
+      expr = builtins.elem "description" (
+        builtins.attrNames (genMerge.evalModuleTree { modules = [ aspectsShaped ]; }).options
+      );
+      expected = true;
+    };
+    test-plain-inherits-composes-through-a-caller-field = {
+      expr = builtins.elem "description" (
+        builtins.attrNames (genMerge.evalModuleTree { modules = [ aspectsShaped.__defsModule ]; }).options
+      );
+      expected = true;
+    };
+
+    # A diamond (`d` inherits `b` and `c`, both inherit `a`) composes each parent once, and the
+    # plain tree, `evalSchema` and the spelling agree.
+    test-plain-diamond-composes = {
+      expr =
+        let
+          plain = optionSet (plainTree [ (diamondDecl false) ]).d;
+        in
+        {
+          inherit plain;
+          staged = plain == optionSet (evalSchema { modules = [ (diamondDecl false) ]; }).d;
+          spelled = plain == optionSet (plainTree [ (diamondDecl true) ]).d;
+        };
+      expected = {
+        plain = [
+          "_identity"
+          "_identityKeys"
+          "id_hash"
+          "name"
+          "w"
+          "x"
+          "y"
+          "z"
+        ];
+        staged = true;
+        spelled = true;
+      };
+    };
+
+    # ── the kind value publishes its parents and its witness (8c8pr Q-b arm (i), 2026-09-30) ─────
+    # `__kindImports` holds the parent kind VALUES in either spelling; the cycle walk reads them.
+    test-kind-value-publishes-its-parents = {
+      expr = {
+        declared = map (k: k.kind) (spelledTree [ (declaredDerived [ "base" ]) ]).derived.__kindImports;
+        spelled = map (k: k.kind) (spelledTree spelledDerived).derived.__kindImports;
+        root = (spelledTree spelledDerived).base.__kindImports;
+      };
+      expected = {
+        declared = [ "base" ];
+        spelled = [ "base" ];
+        root = [ ];
+      };
+    };
+    # Two trees' same-named kinds that each compose a parent carry two witnesses, so both compose
+    # where one instance imports both; and a kind importing another tree's same-named kind is not a
+    # cycle.
+    test-same-named-kinds-of-two-trees-both-compose = {
+      expr =
+        builtins.attrNames
+          (genMerge.evalModuleTree {
+            modules = [
+              twoTreesA.one
+              twoTreesA.two
+            ];
+          }).options;
+      expected = [
+        "o_a"
+        "o_p"
+        "o_q"
+        "other"
+      ];
+    };
+    test-another-trees-same-named-kind-is-not-a-cycle = {
+      expr =
+        builtins.attrNames
+          (spelledTree [ { config.schema.a.imports = [ twoTreesA.two ]; } ]).a.options;
+      expected = [
+        "o_q"
+        "other"
+      ];
+    };
   };
 }

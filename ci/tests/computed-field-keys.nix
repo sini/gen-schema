@@ -53,6 +53,8 @@ let
 
   refused = [
     "__functor"
+    "__kindImports"
+    "__kindWitness"
     "__mint"
     "__sealed"
     "keySemantics"

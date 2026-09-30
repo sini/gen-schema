@@ -13,6 +13,7 @@
   merge,
   mkSchemaOption,
   inheritsResolvedFile,
+  inheritedModule,
 }:
 let
   # MIXED door (P1, den-hoag-7gp66): `modules` is required, `schemaOption`/`specialArgs` optional —
@@ -130,14 +131,7 @@ let
               # nothing read (den-hoag-8c8pr)
               _file = inheritsResolvedFile k p;
               config.schema.${k} = {
-                imports = [
-                  (
-                    if prev.${p} ? __functor then
-                      prev.${p}.__functor prev.${p}
-                    else
-                      throw "gen-schema: kind '${k}' inherits '${p}', whose kind value is not a module (its `mkType` result carries no `__functor`), so there is nothing to compose"
-                  )
-                ];
+                imports = [ (inheritedModule k p prev.${p}) ];
               };
             }) (parentsOf k)
         ) kindNames;

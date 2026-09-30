@@ -863,14 +863,30 @@ Multiple parents compose, and a chain two levels deep takes two passes. Each inh
 config.schema.deploy-user.inherits = [ "user" "ssh-access" "sudo-access" ];
 ```
 
-`evalSchema` is the only resolver. On a schema it did not build (a plain `mkSchemaOption` tree), a
-declared `inherits` is refused by name, catchably, at every read that would show the parent's options
-missing: `options`, `refs` (so `_edges`), `refinements`, the mark, an instance, the functor applied or
-imported as a module, a computed field and every field an `mkType` result built. The declaration itself
-(`kind`, `inherits`, `parent` and the other collections) stays readable. The refusal is
-`` gen-schema: kind '<k>' inherits '<p>', but nothing resolved it: … Build the schema with `evalSchema`  ``.
-A parent reached through the deprecated spelling below is not refused, since it composes where it is
+On a tree `evalSchema` did not build (a plain `mkSchemaOption` tree), a declared `inherits = [ "<p>" ]`
+means what the spelling `imports = [ config.schema.<p> ]` below means there: the kind entry reads the
+parent off its own tree and imports the parent's module, the one `evalSchema` composes. So the two
+spellings compose byte-identically (options, `inherits`, `_edges`, the mark and an instance's
+`id_hash`), and a plain tree composes the same kind `evalSchema` stages. A parent the tree does not
+declare is refused by name, `gen-schema: kind '<k>' inherits '<p>' which is not a declared kind`,
+as `evalSchema` refuses it. An entry type built outside a tree (`lazyAttrsOf (mkSchemaEntryType { })`)
+has no tree to read a parent off, so there a declared `inherits` is refused by name at every read
+that would compose it (`options`, `refs`, `refinements`, the mark, an instance, the functor, a
+computed field and every field an `mkType` result built), while the spelling composes where it is
 written.
+
+**An inheritance cycle is refused by name on every tree, in either spelling.** A kind that reaches
+itself through its parents, declared or spelled, would import itself into itself; it is refused,
+catchably, at every read that would compose it, in `evalSchema`'s wording, naming the members and the
+path from the kind read:
+`gen-schema: inheritance cycle among kinds [a b] — kind 'a' inherits itself through its parents (a -> b -> a); a kind may inherit only kinds resolved in a strictly earlier pass`.
+A kind that merely reaches a cycle composes the cycle's first member, which refuses under its own
+name. The walk is over parent VALUES, compared by a content witness (the kind's name, where each def
+was written, its parents' names and its declared option names), so a parent reached twice is a
+diamond, not a cycle, and another tree's kind of the same name is a different kind. Each kind value
+publishes the two things the walk reads: `__kindImports` (its parent kind values) and
+`__kindWitness`. A kind that composes a parent is also a module keyed by its witness, so a diamond
+composes each parent once and two trees' same-named kinds both compose.
 
 **The deprecated inheritance spelling is read as `inherits`, with a warning, where a value test can
 see it, and nowhere else (a declared exception to "a value or a named refusal").** A kind value
@@ -880,9 +896,9 @@ in the tree of files it imports, records its NAME in the kind's `inherits`: afte
 parents, in walk order, once, and never a name already declared. The value still composes where it is
 written, and that is the parent's module, the one `evalSchema` composes for a declared parent. So the
 spelling is the same kind as the hand-written `inherits` that `evalSchema` resolves: same options, same
-`inherits`, same `_edges` entry, same mark and same instance `id_hash`. It is supported until den v1's
-registry has migrated, and then it will be refused. Declare `inherits = [ "<parent>" ]` and build the
-schema with `evalSchema`.
+`inherits`, same `_edges` entry, same mark and same instance `id_hash`. It stays supported, and nothing
+retires it automatically: retiring it is a deliberate decision. Declare `inherits = [ "<parent>" ]`,
+which composes the same kind on either tree.
 
 Each spelled kind warns once per MODULE-TREE PASS that reads its `inherits`: once on a plain tree,
 and once per pass under `evalSchema`, which evaluates the tree at pass 0 and again per inheritance
@@ -895,16 +911,12 @@ aborts at the first spelled kind read, and `tryEval` does not catch it; an evalu
 ```nix
 config.schema.admin-user.imports = [ config.schema.user ];
 # → evaluation warning: gen-schema: kind 'admin-user': its `imports` carries the kind value 'user', the
-#   deprecated spelling of kind inheritance, read as `inherits = [ "user" ]`; declare `inherits` and
-#   build the schema with `evalSchema`
+#   deprecated spelling of kind inheritance, read as `inherits = [ "user" ]`; declare `inherits`
 ```
 
 A CYCLE written in the spelling, `a` importing `config.schema.b` and `b` importing `config.schema.a`, is
-refused by `evalSchema` with the name a hand-written `inherits` cycle gets (`inheritance cycle among kinds [a b]`). **An open defect: on a plain
-`mkSchemaOption` tree, a spelled kind cycle is not yet refused by name, and overflows uncatchably** (`stack overflow; max-call-depth exceeded`). That is the module system's own composition of the spelled modules importing each other,
-before any value of this library is read; refusing it by name needs a transitive check over spelled
-parents that the kind value does not yet expose. A hand-written cycle on a plain tree is refused as
-unresolved (`kind 'a' inherits 'b', but nothing resolved it`).
+refused by `evalSchema` with the name a hand-written `inherits` cycle gets (`inheritance cycle among kinds [a b]`), and on a plain tree by the cycle walk above, before the spelled modules import each
+other.
 
 Four constructions compose as before, unaliased and unwarned, because deciding them needs something
 other than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree
@@ -913,7 +925,9 @@ relocated form; (2) a function module whose body imports a kind: the test does n
 whose module arguments it does not have; (3) a kind's functor applied by hand, `k.__functor k`: the
 result carries no mark, and `evalSchema` composes a parent through exactly this form, which is why its
 own injection does not warn; (4) gen-aspects' `__defsModule`, which is not a kind value. None of them
-records a name.
+records a name, and none is a parent to the cycle walk: a cycle closed only through one of them is not
+refused by name. Where its other edges are kind values, the witness key closes it and it composes the
+union of its members' options.
 
 What the test forces, stated exactly: where the kind's `inherits` is read (never at the kind's WHNF), its
 walk forces (1) every `imports` and `require` list of the kind entry's defs and of every attrset module
@@ -1347,7 +1361,7 @@ mkSchemaEntryType {
 
 The return value is merged with `computedFields` (computed wins for same-named keys — except a name in `kindResultKeys`, the kind-value contract `lib/entry-type.nix` reserves and refuses by name on both branches; `computed` may not use one of those at all), so topology and introspection fields remain authoritative.
 
-The kind value always carries the `inherits` and `parent` collections, written over the `mkType` result (a computed field still wins), because `evalSchema` and `_topology` read them off the kind value; a result that publishes no collections still composes its declared parents under `evalSchema`. On a kind whose declared `inherits` nothing resolved (see [Kind Inheritance](#kind-inheritance)), every field the `mkType` result built and its applied `__functor` are read through the same refusal; `kind`, `strict`, `keySemantics`, `inherits` and `parent` stay readable.
+The kind value always carries the `inherits` and `parent` collections, written over the `mkType` result (a computed field still wins), because `evalSchema` and `_topology` read them off the kind value; a result that publishes no collections still composes its declared parents under `evalSchema`. On a plain tree a declared parent reaches the `mkType` result as one more of its `defs`, the import it desugars to. On a kind the entry refuses (an inheritance cycle, or a declared parent on an entry type built outside a tree; see [Kind Inheritance](#kind-inheritance)), every field the `mkType` result built and its applied `__functor` are read through the same refusal; `kind`, `strict`, `keySemantics`, `inherits` and `parent` stay readable.
 
 #### `keySemantics` — opaque per-key category surface
 
@@ -1392,9 +1406,10 @@ kind names its parents in `inherits = [ "<parent>" ]`; `evalSchema` evaluates th
 once more per inheritance depth, and at pass n imports into each child the parent's module as frozen at
 pass n-1. Each inheritance is an `_edges` entry with `type = "inherits"`. Refused by name: an undeclared
 parent, an inheritance cycle, `schemaOption` together with `specialArgs`, and a parent whose kind value
-has no `__functor` (an `mkType` result that is not a module). The kind entry refuses, by name, a
-declared parent that nothing resolved, so a declared `inherits` on a tree `evalSchema` did not build
-never composes nothing silently. See [Kind Inheritance](#kind-inheritance) for the deprecated `imports`
+has no `__functor` (an `mkType` result that is not a module). Outside `evalSchema` the kind entry
+desugars a declared parent onto the import the `imports` spelling makes, reading it off the same tree,
+so a plain `mkSchemaOption` tree composes the same kinds; an undeclared parent and an inheritance cycle
+are refused by name there too. See [Kind Inheritance](#kind-inheritance) for the deprecated `imports`
 spelling, which the kind entry reads as `inherits` with a warning.
 
 ### `kindEq`
