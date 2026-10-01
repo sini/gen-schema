@@ -2630,4 +2630,61 @@ in
         };
       };
     };
+
+  # ★ THE SAME NAMES IN A MODULE THE KIND ENTRY IMPORTS (den-hoag-8x97u). The entry's defs carry
+  # `entryReservation`, so gen-merge's collector refuses the name with this library's text and the
+  # module's attribution. Before the door each cell read the mark at exit 0: the write landed on
+  # every instance. Each carries the clean kind and an ordinary imported option as its control.
+  flake.testsError.imports-route-refusals =
+    let
+      int7 = genMerge.mkOption {
+        type = genMerge.types.int;
+        default = 7;
+      };
+      controls =
+        (forced (kindOf { } { options.role = strOpt; }).__mint.minted).success
+        && (forced (kindOf { } { imports = [ { options.priority = int7; } ]; }).__mint.minted).success
+        && (forced (kindOf { } ({ ... }: { imports = [ { options.priority = int7; } ]; })).__mint.minted)
+          .success;
+      formalMsg =
+        f: file:
+        "^gen-schema: kind 'host': declaration key '${f}' is a construction formal of this schema, written in a module this kind entry imports — it is fixed by the call that builds the schema option [(]`mkSchemaOption`, `mkSchemaEntryType`[)], and written there it is not read as one; pass '${f}' to that constructor, or write `config[.]${f}` for an instance field of that name, which a strict instance must declare as an option [(]module `${file}'[)]$";
+      publishedMsg =
+        n: file:
+        "^gen-schema: kind 'host': declaration key '${n}' is a name gen-schema writes onto the kind value, written in a module this kind entry imports — there it lands on every instance, while reading `config[.]schema[.]host[.]${n}` returns the published one; write `config[.]${n}` for an instance field of that name, which a strict instance must declare as an option [(]module `${file}'[)]$";
+    in
+    {
+      # A formal two `imports` away, on the default branch.
+      test-nested-imports-formal-refuses-by-name = {
+        expr =
+          assert controls;
+          (kindOf { } { imports = [ { imports = [ { keySemantics = [ "darwin" ]; } ]; } ]; }).__mint.minted;
+        expectedError = {
+          type = "ThrownError";
+          msg = formalMsg "keySemantics" "[^']*";
+        };
+      };
+      # A published name through a PATH module, whose attribution is the file.
+      test-path-module-published-name-names-the-file = {
+        expr =
+          assert controls;
+          (kindOf { } { imports = [ ./test-fixtures/imports-route-refs.nix ]; }).__mint.minted;
+        expectedError = {
+          type = "ThrownError";
+          msg = publishedMsg "refs" "/[^']*/test-fixtures/imports-route-refs[.]nix";
+        };
+      };
+      # A FUNCTION entry def importing a formal: the def is wrapped (an applied function's result
+      # would drop an in-place marker). This is the default branch's twin of gen-aspects' functor-def
+      # cell: a functor def is refused at the entry on this branch (`__functor` is reserved there).
+      test-function-def-imports-route-formal-refuses-by-name = {
+        expr =
+          assert controls;
+          (kindOf { } ({ ... }: { imports = [ { keySemantics = [ "darwin" ]; } ]; })).__mint.minted;
+        expectedError = {
+          type = "ThrownError";
+          msg = formalMsg "keySemantics" "[^']*";
+        };
+      };
+    };
 }

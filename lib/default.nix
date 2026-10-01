@@ -224,7 +224,12 @@ in
     defaultOnError
     ;
   inherit (methods) schemaFn;
-  inherit (entryType) mkSchemaOption mkSchemaEntryType kindEq;
+  inherit (entryType)
+    mkSchemaOption
+    mkSchemaEntryType
+    kindEq
+    entryReservation
+    ;
   inherit (evalSchemaLib) evalSchema;
   inherit (instance) mkInstanceType mkInstanceRegistry;
   inherit (validate) validateInstances mkFieldValidator filterValidators;

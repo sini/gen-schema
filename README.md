@@ -1123,7 +1123,7 @@ Every schema has flat `_`-prefixed options for programmatic access:
 ```nix
 config.schema._kindNames                # → [ "host" "service" "user" ]
 config.schema._collectionKeys           # → [ "includes" "methods" "parent" "validators" ]
-config.schema._declarationKeys          # → [ "__pureModule" "_class" "_file" "_module" "config" "disabledModules" "freeformType" "imports" "key" "meta" "options" ]
+config.schema._declarationKeys          # → [ "__pureModule" "__reservedKeys" "_class" "_file" "_module" "config" "disabledModules" "freeformType" "imports" "key" "meta" "options" ]
 
 # Per-kind introspection — available on each kind value
 config.schema.host.options          # → full option declarations (filtered, no _module.*)
@@ -1147,10 +1147,10 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
 with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__kindAncestors`, `__kindCycleParents`,
-`__kindImports`, `__kindWitness`, `__mint`, `__pureModule`, `__sealed`, `_class`, `_file`, `_module`, `baseModule`,
+`__kindImports`, `__kindWitness`, `__mint`, `__pureModule`, `__reservedKeys`, `__sealed`, `_class`, `_file`, `_module`, `baseModule`,
 `collections`, `computed`, `config`, `disabledModules`, `freeformType`, `imports`, `key`,
 `keySemantics`, `kind`, `meta`, `mixins`, `mkType`, `options`, `refinements`, `refs`, `require`,
-`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 30 names: gen-merge's published
+`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 31 names: gen-merge's published
 `moduleSyntax.structured` and `moduleSyntax.shorthandMeta`, the names gen-schema writes onto the kind
 value itself, and the schema's construction formals) is refused when `_collectionKeys` is read, exactly as it is refused when a
 kind is merged.
@@ -1174,8 +1174,22 @@ config.schema.host.keySemantics = …;    # meant to widen the class vocabulary
 A construction formal is changed by a different constructor call, never by a write on a kind entry.
 An instance field of the same name is untouched: write it on the instance, or as
 `config.keySemantics` on the entry (a strict instance must declare it as an option). The refusal
-covers the entry's **direct** definitions; a formal at the top level of a module the entry
-**imports** is not reached yet and still lands as instance config.
+covers every route into the entry. A formal at the top level of a module the entry **imports**
+(nested `imports`, `require`, a function or path module, a whole-module `mkIf`) is refused at
+gen-merge's collector with the same text, saying it was "written in a module this kind entry
+imports" and naming the module. The defs `merged` imports carry `entryReservation kind`, the names
+and their texts as plain data, and gen-merge's `__reservedKeys` scope applies it over their import
+closure; a kind value in `imports` (the deprecated `inherits` spelling) is exempt by the same shape
+`inherits` reads. That refusal fires where a module tree is evaluated: an instance read, or the
+kind's `options`, `refs` and mark. A read of `kind` or `strict` still returns the construction's own
+value, which is correct, because the misread value is never consumed there (ADR-0025 item 1). A
+caller's custom `mkType` that builds instance modules from `defs` applies `entryReservation` itself,
+as gen-aspects does, or that route is outside the door. Three forgeries pass it, as forgeries
+rather than honest routes: a hand-written module carrying `kind` and `__mint.minted` is exempt (the
+`inherits` alias reads it as a kind, by ruling), and so is a function module returning that shape,
+which the exemption tests after application while the alias, reading values before application,
+leaves it unaliased; and a nested `__reservedKeys` in an imported module replaces the reservation
+for its own closure.
 
 ### Unrecognised declaration keys are refused by name
 
