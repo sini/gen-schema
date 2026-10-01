@@ -602,8 +602,10 @@ let
     # inheritance-cycle walk reads.
     "__kindImports"
     "__kindWitness"
-    # Written beside them, both branches, for the same reason: the transitive ancestor map.
+    # Written beside them, both branches, for the same reason: the transitive ancestor map, and the
+    # parents as written, which the cycle walk reads.
     "__kindAncestors"
+    "__kindCycleParents"
   ];
 
   # ★ THE COLLECTION KEY SPACE'S RESERVED SET (den-hoag-6vgwm). A caller-supplied collection NAME
@@ -693,8 +695,8 @@ let
   # COLLECTION keys `mkAllCollections` refuses above. `__kindImports` and `__kindWitness` are written on
   # both branches too (the inheritance-cycle walk's parents and witness), and a shorthand declaration of
   # either was discarded without a word, a declared parent with it; `__kindAncestors` (the ancestor
-  # map) is written beside them. All three are `_`-prefixed, so `publishedEntryKeys` leaves them to
-  # this door.
+  # map) and `__kindCycleParents` (the parents as written) are written beside them. All four are
+  # `_`-prefixed, so `publishedEntryKeys` leaves them to this door.
   #
   # ★ WHAT THIS DOOR IS FOR, stated precisely because the obvious reading is wrong. It does NOT
   # repair a swallow that some earlier door was doing `__`-specifically: before this guard existed
@@ -708,6 +710,7 @@ let
       [
         "__functor"
         "__kindAncestors"
+        "__kindCycleParents"
         "__kindImports"
         "__kindWitness"
         "__mint"
@@ -716,6 +719,7 @@ let
     else
       [
         "__kindAncestors"
+        "__kindCycleParents"
         "__kindImports"
         "__kindWitness"
         "__mint"
@@ -1010,7 +1014,7 @@ let
               # according to the collection's merge strategy.
               extractedCollections = prelude.mapAttrs (
                 name: collection:
-                if name == "inherits" then aliasedInherits declaredInherits else declaredOf name collection
+                if name == "inherits" then aliasedInherits declaredRendered else declaredOf name collection
               ) allCollections;
 
               declaredOf =
@@ -1027,14 +1031,42 @@ let
               # imports: no def of this kind carries the resolver's provenance for it, and it is not
               # spelled either (a spelled parent composes where it is written). Computed only past a
               # non-empty declaration, so a kind that inherits nothing pays one comparison.
-              declaredInherits = declaredOf "inherits" allCollections.inherits;
+              # `inherits` holds names and kind VALUES (den-hoag-l0y F4). A value is the tree's own iff
+              # the tree holds an entry at its name with an equal mark and `kindEq` decides `true` (an
+              # equal mark `kindEq` refuses is that refusal), and then it IS the name; anything else,
+              # and every value off a tree, is foreign and stays a VALUE entry, never resolved against
+              # an in-tree name (ADR-0034: identity through the one mint, never by name). It forces
+              # both marks where `inherits` is read, so the cycle walk reads `cycleParents` instead.
+              formOf =
+                v:
+                if !(isSchemaKind v) then
+                  throw "gen-schema: kind '${kind}' inherits ${
+                    if builtins.isAttrs v then "an attrset with no mark" else "a ${builtins.typeOf v}"
+                  }: an `inherits` entry is a kind name or a kind value (`kind` and a mint-backed mark `__mint.minted`)"
+                else if
+                  tree != null
+                  && builtins.elem v.kind tree._kindNames
+                  && tree.${v.kind}.__mint.minted == v.__mint.minted
+                  && kindEq tree.${v.kind} v
+                then
+                  "name"
+                else
+                  "value";
+              rendered = v: if builtins.isString v || formOf v == "value" then v else v.kind;
+              declaredRaw = declaredOf "inherits" allCollections.inherits;
+              declaredRendered = map rendered declaredRaw;
+              declaredInherits = builtins.filter builtins.isString declaredRendered;
+              declaredValues = builtins.filter (v: !(builtins.isString v)) declaredRendered;
+              # the spelled parents that are the tree's own, by name: a foreign spelled value is not
+              # the same-named declared parent and does not stand in for it
+              spelledNames = map (k: k.kind) (builtins.filter (k: formOf k == "name") kindImports);
               unresolvedInherits =
                 if declaredInherits == [ ] then
                   [ ]
                 else
                   let
                     files = map (d: d.file or null) defs;
-                    spelled = map (k: k.kind) kindImports;
+                    spelled = spelledNames;
                   in
                   builtins.filter (
                     p: !(builtins.elem (inheritsResolvedFile kind p) files) && !(builtins.elem p spelled)
@@ -1175,14 +1207,32 @@ let
               # whenever an option carries a default. Published as `__kindImports`.
               kindParents =
                 kindImports
+                ++ declaredValues
                 ++ (
                   if tree == null then
                     [ ]
                   else
                     map (p: tree.${p}) (
                       builtins.filter (
-                        p: builtins.elem p tree._kindNames && !(builtins.elem p (map (k: k.kind) kindImports))
+                        p: builtins.elem p tree._kindNames && !(builtins.elem p spelledNames)
                       ) declaredInherits
+                    )
+                );
+
+              # THE PARENTS AS WRITTEN, before `formOf` decides any of them: the spelled values, the
+              # declared values and the declared names the tree holds. Read by the witness and by the
+              # cycle walk of every kind, which run before composition and so force no mark: a cycle
+              # through a same-tree VALUE entry would otherwise need each partner's mark to classify
+              # it, and recurse uncatchably. Published as `__kindCycleParents`.
+              cycleParents =
+                kindImports
+                ++ builtins.filter isSchemaKind declaredRaw
+                ++ (
+                  if tree == null then
+                    [ ]
+                  else
+                    map (p: tree.${p}) (
+                      builtins.filter (p: builtins.isString p && builtins.elem p tree._kindNames) declaredRaw
                     )
                 );
 
@@ -1193,7 +1243,7 @@ let
               kindWitness = builtins.hashString "sha256" (
                 builtins.unsafeDiscardStringContext "${kind}@${
                   prelude.concatStringsSep ";" (map (d: "${toString (d.file or "?")}=${witnessPos d.value}") defs)
-                }|parents=${prelude.concatStringsSep "," (map (k: k.kind) kindParents)}|opts=${
+                }|parents=${prelude.concatStringsSep "," (map (k: k.kind) cycleParents)}|opts=${
                   prelude.concatStringsSep "," (
                     prelude.concatMap (
                       d:
@@ -1207,7 +1257,7 @@ let
               );
 
               # THE ONE INHERITANCE-CYCLE WALK (8c8pr Q-b arm (i), 2026-09-30), for both spellings: a
-              # kind that reaches its own witness through its parents' `__kindImports` would import
+              # kind that reaches its own witness through its parents' `__kindCycleParents` would import
               # itself into itself, and the module system recurses uncatchably. It is refused by name,
               # in `evalSchema`'s wording, because a kind may inherit only kinds resolved in a strictly
               # earlier pass (ADR-0016 ruling 7). A parent reached twice is a diamond, not a cycle: the
@@ -1229,7 +1279,7 @@ let
                     in
                     # A kind value this entry type did not build (`isSchemaKind` admits any value with a
                     # `kind` and a mark) publishes no parents, so the walk has nothing past it to read.
-                    if acc.found != null || !(v ? __kindWitness) then
+                    if acc.found != null || !(v ? __kindCycleParents) then
                       acc
                     else if w == kindWitness then
                       acc // { found = stack ++ [ v.kind ]; }
@@ -1243,63 +1293,92 @@ let
                             ${w} = true;
                           };
                         }
-                      ) v.__kindImports;
+                      ) v.__kindCycleParents;
                 in
-                if kindParents == [ ] then
+                if cycleParents == [ ] then
                   null
                 else
                   (builtins.foldl' (a: go a [ kind ]) {
                     found = null;
                     seen = { };
-                  } kindParents).found;
+                  } cycleParents).found;
 
               # THE DESUGAR (den-hoag-8c8pr): on a tree, a declared parent nothing else composed is
               # imported into this kind exactly as the deprecated spelling `imports = [ config.schema.<p> ]`
               # imports it, read off the same tree. The def is the one `evalSchema`'s pass contributes
               # (`inheritedModule`), so a staged and an unstaged tree compose one module; no name graph,
               # no pass: the module system's import composes it, as it composes the spelling.
+              # A foreign VALUE entry composes as itself, through the same applied functor, on any tree
+              # or none: it is already minted, so nothing resolves it.
               desugaredDefs =
-                if tree == null then
-                  [ ]
-                else
-                  map (p: {
-                    file = inheritsDesugaredFile kind p;
-                    value = {
-                      imports = [
-                        (
-                          if !(builtins.elem p tree._kindNames) then
-                            throw "gen-schema: kind '${kind}' inherits '${p}' which is not a declared kind"
-                          else
-                            inheritedModule kind p tree.${p}
-                        )
-                      ];
-                    };
-                  }) unresolvedInherits;
+                map (v: {
+                  file = "<gen-schema: kind '${kind}' inherits the kind value '${v.kind}'>";
+                  value.imports = [ (inheritedModule kind v.kind v) ];
+                }) declaredValues
+                ++ (
+                  if tree == null then
+                    [ ]
+                  else
+                    map (p: {
+                      file = inheritsDesugaredFile kind p;
+                      value = {
+                        imports = [
+                          (
+                            if !(builtins.elem p tree._kindNames) then
+                              throw "gen-schema: kind '${kind}' inherits '${p}' which is not a declared kind"
+                            else
+                              inheritedModule kind p tree.${p}
+                          )
+                        ];
+                      };
+                    }) unresolvedInherits
+                );
 
               # THE DEPRECATED INHERITANCE SPELLING, READ AS `inherits` (den-hoag-cxlc0): each kind
-              # value the walk below finds in this entry's `imports`/`require` contributes its NAME,
-              # after the declared parents, in walk order, once, and never a name already declared.
-              # The value still composes where it was written: that is the parent's module, the same
-              # one `evalSchema`'s injection composes for a declared `inherits`. The warning rides the
-              # `inherits` value, so it fires where the name is read: the collection itself, `_edges`,
-              # and every mark and `id_hash`, whose preimage carries the collections.
+              # value the walk below finds in this entry's `imports`/`require` contributes the entry
+              # `inherits = [ <value> ]` would (den-hoag-l0y K1): through `formOf`, its NAME if it is
+              # the tree's own and the VALUE if it is foreign, after the declared parents, in walk
+              # order, once, and never an entry already declared. The value still composes where it
+              # was written: that is the parent's module, the same one `evalSchema`'s injection
+              # composes for a declared `inherits`. The warning rides the `inherits` value, so it fires
+              # where the entry is read: the collection itself, `_edges`, and every mark and
+              # `id_hash`, whose preimage carries the collections.
               #
-              # ★ NOT AT THE KIND'S WHNF, and that is what makes a CYCLE refusable. Walking a spelled
-              # kind forces the OTHER kind's value to WHNF; were the walk at WHNF, `a` importing
-              # `config.schema.b` and `b` importing `config.schema.a` would force each other's WHNF and
-              # recurse uncatchably. Read lazily, each kind's WHNF is its own, the two names are
-              # recorded, and `evalSchema`'s name graph refuses the cycle by name exactly as it
-              # refuses a hand-written one. On a tree built without `evalSchema` the same cycle is
-              # refused by `inheritanceCycle` (above), before the spelled modules import each other.
+              # ★ NOT AT THE KIND'S WHNF. `formOf` forces each spelled value's mark, and so the other
+              # kind's composition, where `inherits` is read. A CYCLE is therefore refused by the
+              # cycle walk over `cycleParents` (above), which forces no mark, in the entry type's
+              # wording — under `evalSchema` too, whose pass 0 reads `inherits` and so meets the
+              # partner's own guard before its name graph does.
               aliasedInherits =
                 declared:
                 let
-                  spelled = builtins.foldl' (acc: n: if builtins.elem n acc then acc else acc ++ [ n ]) [ ] (
-                    map (k: k.kind) kindImports
+                  entryKey = e: if builtins.isString e then "n:${e}" else "m:${e.__mint.minted}";
+                  spelled =
+                    (builtins.foldl'
+                      (
+                        acc: e:
+                        if acc.seen ? ${entryKey e} then
+                          acc
+                        else
+                          {
+                            seen = acc.seen // {
+                              ${entryKey e} = true;
+                            };
+                            out = acc.out ++ [ e ];
+                          }
+                      )
+                      {
+                        seen = { };
+                        out = [ ];
+                      }
+                      (map rendered kindImports)
+                    ).out;
+                  declaredKeys = map entryKey declared;
+                  names = builtins.filter (e: !(builtins.elem (entryKey e) declaredKeys)) spelled;
+                  quoted = prelude.concatStringsSep " " (prelude.unique (map (k: "'${k.kind}'") kindImports));
+                  literal = prelude.concatStringsSep " " (
+                    map (e: if builtins.isString e then "\"${e}\"" else "<the kind value '${e.kind}'>") spelled
                   );
-                  names = builtins.filter (n: !(builtins.elem n declared)) spelled;
-                  quoted = prelude.concatStringsSep " " (map (n: "'${n}'") spelled);
-                  literal = prelude.concatStringsSep " " (map (n: "\"${n}\"") spelled);
                 in
                 if kindImports == [ ] then
                   declared
@@ -1588,6 +1667,7 @@ let
                   };
                   __sealed = plane.sealed;
                   __kindImports = kindParents;
+                  __kindCycleParents = cycleParents;
                   __kindWitness = kindWitness;
                   __kindAncestors = resolvedOnly kindAncestors;
                 }
@@ -1703,9 +1783,10 @@ let
                     minted = ownMark;
                   };
                   __sealed = plane.sealed;
-                  # the parents as VALUES and the witness, read by the cycle walk of every kind below,
-                  # and the ancestor map
+                  # the parents as VALUES, read by the ancestor map; the parents as written and the
+                  # witness, read by the cycle walk of every kind below
                   __kindImports = kindParents;
+                  __kindCycleParents = cycleParents;
                   __kindWitness = kindWitness;
                   __kindAncestors = resolvedOnly kindAncestors;
                 }
@@ -1839,7 +1920,7 @@ let
               # over the RAW source, comments included — because its comment stripper is line-based
               # and a multi-line string is where that premise could break. Matching `_collectionKeys`
               # above costs nothing and leaves that census's population where it was.
-              description = "The admissible non-collection keys of a kind declaration: gen-merge's published structured-module keys (`merge.moduleSyntax.structured`, which includes `key`). A structured declaration — one carrying `config` or `options` — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. Every other key on a structured declaration is refused by name. A bare top-level option declaration is never read, structured or not: neither module engine collects a top-level `mkOption` as a declaration, so it is refused independently of structuring the moment the surrounding declaration carries ANY module-syntax key at all (`den-hoag-zijk1`). On EVERY declaration, structured or shorthand and on both branches, a top-level key naming one of the schema's construction formals (${builtins.concatStringsSep ", " schemaEntryFormals}) or one of the names gen-schema writes onto the kind value (${builtins.concatStringsSep ", " publishedEntryKeys}) is refused by name: it is fixed by the constructor or published by this library, and written on a kind entry it would land on every instance instead; a module the entry imports is not reached. Exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint`, `__sealed`, `__kindImports`, `__kindWitness` and `__kindAncestors` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. A declaration carrying NO module-syntax key at all is plain data through and through: every key of it is read as config, an option-shaped value among them is no different from any other, and nothing is refused.";
+              description = "The admissible non-collection keys of a kind declaration: gen-merge's published structured-module keys (`merge.moduleSyntax.structured`, which includes `key`). A structured declaration — one carrying `config` or `options` — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. Every other key on a structured declaration is refused by name. A bare top-level option declaration is never read, structured or not: neither module engine collects a top-level `mkOption` as a declaration, so it is refused independently of structuring the moment the surrounding declaration carries ANY module-syntax key at all (`den-hoag-zijk1`). On EVERY declaration, structured or shorthand and on both branches, a top-level key naming one of the schema's construction formals (${builtins.concatStringsSep ", " schemaEntryFormals}) or one of the names gen-schema writes onto the kind value (${builtins.concatStringsSep ", " publishedEntryKeys}) is refused by name: it is fixed by the constructor or published by this library, and written on a kind entry it would land on every instance instead; a module the entry imports is not reached. Exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint`, `__sealed`, `__kindImports`, `__kindWitness`, `__kindAncestors` and `__kindCycleParents` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. A declaration carrying NO module-syntax key at all is plain data through and through: every key of it is read as config, an option-shaped value among them is no different from any other, and nothing is refused.";
             };
             config =
               let

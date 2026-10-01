@@ -73,8 +73,10 @@ let
       # evalModuleTree that `options`/`refs` come from.
       pass0 = evalAt [ ];
       kindNames = pass0._kindNames;
-      # Every kind value carries `inherits`: the entry type writes it on both branches.
-      parentsOf = k: pass0.${k}.inherits;
+      # Every kind value carries `inherits`: the entry type writes it on both branches. A VALUE entry
+      # (a foreign kind, den-hoag-l0y) is already minted, so it is strictly earlier and stages
+      # nothing: the entry type composes it, and the name graph reads names only.
+      parentsOf = k: builtins.filter builtins.isString pass0.${k}.inherits;
 
       undeclared = prelude.concatMap (
         k:

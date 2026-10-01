@@ -218,10 +218,12 @@ in
       };
     };
 
-    # cxlc0, the deprecated spelling: a kind CYCLE written in that spelling refuses by the SAME name
-    # a hand-written `inherits` cycle does (the cell above). The spelling is read as `inherits`
-    # without forcing the other kind's WHNF, so the cycle reaches `evalSchema`'s name graph instead
-    # of recursing uncatchably inside the entry type.
+    # cxlc0, the deprecated spelling: a kind CYCLE written in that spelling refuses by name, never
+    # recursing. Reading the spelling as `inherits` FORCES each spelled kind's mark (den-hoag-l0y:
+    # telling the tree's own kind from a foreign one decides by mark and `kindEq`), and `evalSchema`
+    # reads `inherits` on pass 0, so the cycle partner's own guard refuses first, in the entry
+    # type's wording with the path, before `evalSchema`'s name graph is reached. The members are the
+    # same `[a b]`.
     test-deprecated-spelling-cycle-refuses-by-name = {
       expr = evalSchema {
         modules = [
@@ -236,7 +238,7 @@ in
       };
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: inheritance cycle among kinds \\[a b\\] — a kind may inherit only kinds resolved in a strictly earlier pass$";
+        msg = "^gen-schema: inheritance cycle among kinds \\[a b\\] — kind 'b' inherits itself through its parents \\(b -> a -> b\\); a kind may inherit only kinds resolved in a strictly earlier pass$";
       };
     };
 
@@ -444,6 +446,117 @@ in
         };
     };
 
+  # A SAME-TREE CYCLE IN THE VALUE SPELLING (den-hoag-l0y G1): `inherits = [ config.schema.b ]` is the
+  # name `b` (F4), and telling it from a foreign value forces both marks, so a walk over the
+  # CLASSIFIED parents would need the cycle's own composition and recurse uncatchably. The walk reads
+  # every kind's parents as written (`__kindCycleParents`), so each shape refuses by name, on a plain
+  # tree and under `evalSchema` (whose pass 0 reads `inherits`, so the partner's guard fires first).
+  flake.testsError.same-tree-value-cycle-refusals =
+    let
+      refuses = members: path: kind: {
+        type = "ThrownError";
+        msg = "^gen-schema: inheritance cycle among kinds \\[${members}\\] — kind '${kind}' inherits itself through its parents \\(${path}\\); a kind may inherit only kinds resolved in a strictly earlier pass$";
+      };
+      written = f: [ ({ config, ... }: { config.schema = f config.schema; }) ];
+      val2 = s: {
+        a.inherits = [ s.b ];
+        b.inherits = [ s.a ];
+      };
+      valself = s: { a.inherits = [ s.a ]; };
+      # a value and a name
+      valname = s: {
+        a.inherits = [ s.b ];
+        b.inherits = [ "a" ];
+      };
+      # a value and the deprecated spelling
+      valdep = s: {
+        a.inherits = [ s.b ];
+        b.imports = [ s.a ];
+      };
+      plain = f: builtins.attrNames (plainTree (written f)).a.options;
+      staged = f: evalSchema { modules = written f; };
+    in
+    {
+      test-plain-value-2-cycle = {
+        expr = plain val2;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-plain-value-self-cycle = {
+        expr = plain valself;
+        expectedError = refuses "a" "a -> a" "a";
+      };
+      test-plain-value-and-name-cycle = {
+        expr = plain valname;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-plain-value-and-spelling-cycle = {
+        expr = plain valdep;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-evalSchema-value-2-cycle = {
+        expr = staged val2;
+        expectedError = refuses "a b" "b -> a -> b" "b";
+      };
+      test-evalSchema-value-self-cycle = {
+        expr = staged valself;
+        expectedError = refuses "a" "a -> a" "a";
+      };
+      test-evalSchema-value-and-name-cycle = {
+        expr = staged valname;
+        expectedError = refuses "a b" "b -> a -> b" "b";
+      };
+      test-evalSchema-value-and-spelling-cycle = {
+        expr = staged valdep;
+        expectedError = refuses "a b" "b -> a -> b" "b";
+      };
+    };
+
+  # `inherits` VALUE ENTRIES (den-hoag-l0y N2), the refused half. A foreign value sharing the mark of
+  # the tree's same-named kind is decided by `kindEq`, and an open-content twin is refused by
+  # `kindEq`'s own words, on both spellings; the type-only twin is admitted as the name
+  # (ci/tests/inherits-value-entries.nix). A value that is not a kind is refused by name.
+  flake.testsError.inherits-value-entry-refusals =
+    let
+      openInt = genMerge.mkOption {
+        type = genMerge.types.int;
+        default = 0;
+      };
+      foreignO = (plainTree [ { config.schema.baseO.options.b = openInt; } ]).baseO;
+      openTwin =
+        spelled:
+        (plainTree [
+          { config.schema.baseO.options.b = openInt; }
+          {
+            config.schema.sub = spelled // {
+              options.extra = genMerge.mkOption { type = genMerge.types.int; };
+            };
+          }
+        ]).sub.inherits;
+      twinRefused = {
+        type = "ThrownError";
+        msg = "^gen-schema: kindEq: two declarations of 'baseO' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'open\\.options\\.b\\.default'; ";
+      };
+    in
+    {
+      test-inherits-open-twin-is-refused = {
+        expr = openTwin { inherits = [ foreignO ]; };
+        expectedError = twinRefused;
+      };
+      test-alias-open-twin-is-refused = {
+        expr = openTwin { imports = [ foreignO ]; };
+        expectedError = twinRefused;
+      };
+      test-inherits-entry-that-is-not-a-kind-is-refused = {
+        expr =
+          assert (forced (plainTree [ { config.schema.sub.inherits = [ foreignO ]; } ]).sub.inherits).success;
+          (plainTree [ { config.schema.sub.inherits = [ { kind = "baseO"; } ]; } ]).sub.inherits;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'sub' inherits an attrset with no mark: an `inherits` entry is a kind name or a kind value \\(`kind` and a mint-backed mark `__mint.minted`\\)$";
+        };
+      };
+    };
+
   flake.testsError.identity-refusals = {
     # R1. The door takes the kind DECLARATION and refuses a NAME by name: the stamp's preimage
     # carries the kind's minted identity, which a name does not have. Before this door a name was
@@ -640,7 +753,7 @@ in
         (kindOf { computed = _: _: { options = "COMPUTED"; }; } { options.role = strOpt; }).options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors$";
+        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors, __kindCycleParents$";
       };
     };
 
@@ -670,7 +783,7 @@ in
         } { }).refs;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors$";
+        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors, __kindCycleParents$";
       };
     };
   };
@@ -922,6 +1035,20 @@ in
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kind 'host': declaration key '__kindAncestors' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread$";
+      };
+    };
+    # `__kindCycleParents`, the parents as written, is reserved by the same door for the same reason.
+    test-kind-cycle-parents-is-a-reserved-declaration-key = {
+      expr =
+        assert
+          let
+            control = builtins.tryEval (builtins.attrNames (kindOf { } { options.role = strOpt; }).options);
+          in
+          control.success && control.value == [ "role" ];
+        builtins.attrNames (kindOf { } { __kindCycleParents = [ ]; }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': declaration key '__kindCycleParents' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread$";
       };
     };
 

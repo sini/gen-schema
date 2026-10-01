@@ -302,6 +302,9 @@ let
       )
     ]).a;
 
+  # The kind-shaped stand-in the path fixtures spell (ci/test-fixtures/cxlc0/kind-shaped.nix).
+  standIn = import ../test-fixtures/cxlc0/kind-shaped.nix;
+
   spelledRecord =
     modules:
     let
@@ -550,9 +553,10 @@ in
     };
 
     # ── THE DEPRECATED SPELLING, READ AS `inherits` (den-hoag-cxlc0) ───────────────────────────
-    # A kind VALUE in a kind entry's `imports` records its name in `inherits` and still composes
-    # where it is written. Each cell reads a tree built WITHOUT `evalSchema`, the shape den v1
-    # declares. The warning it prints is not readable here.
+    # A kind VALUE in a kind entry's `imports` records in `inherits` the entry `inherits = [ <value> ]`
+    # would (den-hoag-l0y K1): its name when it is the tree's own kind, the value itself when it is
+    # foreign. It still composes where it is written. Each cell reads a tree built WITHOUT
+    # `evalSchema`, the shape den v1 declares. The warning it prints is not readable here.
     test-deprecated-spelling-reads-as-inherits = {
       expr = spelledRecord [
         (
@@ -574,13 +578,14 @@ in
       };
     };
     # An imported file is walked in turn: a kind two files down is read (fixtures in
-    # ci/test-fixtures/cxlc0). The fixture's kind is kind-SHAPED, not a module, so nothing composes.
+    # ci/test-fixtures/cxlc0). The fixture's kind is kind-SHAPED, not a module, so nothing composes;
+    # its mark is not the mark of any kind the tree holds, so it is foreign and recorded as the value.
     test-deprecated-nested-path-spelling-reads-as-inherits = {
       expr = spelledRecord [
         { config.schema.derived.imports = [ ../test-fixtures/cxlc0/nested-kind-top.nix ]; }
       ];
       expected = {
-        inherits = [ "base" ];
+        inherits = [ standIn ];
         options = [ ];
       };
     };
@@ -595,7 +600,7 @@ in
         }
       ];
       expected = {
-        inherits = [ "base" ];
+        inherits = [ standIn ];
         options = [
           "left"
           "right"
@@ -611,7 +616,7 @@ in
         }
       ];
       expected = {
-        inherits = [ "base" ];
+        inherits = [ standIn ];
         options = [ ];
       };
     };

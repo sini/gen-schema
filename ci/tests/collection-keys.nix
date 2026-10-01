@@ -266,6 +266,7 @@ in
         ++ [
           "__functor"
           "__kindAncestors"
+          "__kindCycleParents"
           "__kindImports"
           "__kindWitness"
           "__mint"

@@ -875,6 +875,17 @@ that would compose it (`options`, `refs`, `refinements`, the mark, an instance, 
 computed field and every field an `mkType` result built), while the spelling composes where it is
 written.
 
+**`inherits` also takes a kind VALUE.** A value that is the tree's own kind (`inherits = [ config.schema.<p> ]`:
+the tree holds a kind at its name, with an equal mark, and `kindEq` decides `true`) is that kind's NAME,
+recorded as `"<p>"` and composed exactly as the name is. Any other value is FOREIGN, another tree's kind:
+it stays a VALUE entry, in `inherits` and in its `_edges` row's `to`, and it composes as itself through
+the same applied functor, on any tree, `evalSchema`'s included (its name graph reads names only, and a
+value is already minted), or none. A foreign value is never resolved against a same-named kind of the
+tree, so a consumer's own `base` and another tree's `base` stay two kinds. A foreign value that shares
+the mark of the tree's same-named kind is decided by `kindEq`: a type-only twin is one kind (the name),
+and a twin that differs at open content is refused in `kindEq`'s words. An entry that is neither a name
+nor a kind value is refused by name.
+
 **An inheritance cycle is refused by name on every tree, in either spelling.** A kind that reaches
 itself through its parents, declared or spelled, would import itself into itself; it is refused,
 catchably, at every read that would compose it, in `evalSchema`'s wording: the members sorted, as
@@ -882,11 +893,13 @@ catchably, at every read that would compose it, in `evalSchema`'s wording: the m
 the kind read:
 `gen-schema: inheritance cycle among kinds [a b] — kind 'a' inherits itself through its parents (a -> b -> a); a kind may inherit only kinds resolved in a strictly earlier pass`.
 A kind that merely reaches a cycle composes the cycle's first member, which refuses under its own
-name. The walk is over parent VALUES, compared by a content witness (the kind's name, where each def
-was written, its parents' names and its declared option names), so a parent reached twice is a
-diamond, not a cycle, and another tree's kind of the same name is a different kind. Each kind value
-publishes the two things the walk reads: `__kindImports` (its parent kind values) and
-`__kindWitness`. A kind that composes a parent is also a module keyed by its MARK, so a diamond
+name. The walk is over parent VALUES as written, compared by a content witness (the kind's name,
+where each def was written, its parents' names and its declared option names), so a parent reached
+twice is a diamond, not a cycle, and another tree's kind of the same name is a different kind. Each
+kind value publishes the two things the walk reads: `__kindCycleParents` (its parents as written,
+before any value is told same-tree from foreign, which forces marks a cycle could not supply) and
+`__kindWitness`. So a cycle through a same-tree value (`a.inherits = [ config.schema.b ]`,
+`b.inherits = [ config.schema.a ]`) is refused by name like any other. A kind that composes a parent is also a module keyed by its MARK, so a diamond
 composes each parent once, and two kinds with different marks both compose: two trees' same-named
 kinds, or one generator applied in two trees with an option's type changed, where gen-merge then
 refuses the declarations that conflict. Two declarations sharing a mark (one generator applied twice,
@@ -908,8 +921,9 @@ never at its WHNF, and after the cycle walk.
 see it, and nowhere else (a declared exception to "a value or a named refusal").** A kind value
 appearing in a kind entry's `imports` (or a shorthand module's `require`), at any depth of plain
 attrset modules, as a bare non-list `imports`, or as the value of a path or string member or anywhere
-in the tree of files it imports, records its NAME in the kind's `inherits`: after any declared
-parents, in walk order, once, and never a name already declared. The value still composes where it is
+in the tree of files it imports, records in the kind's `inherits` the entry `inherits = [ <value> ]`
+would: its NAME if it is the tree's own kind, the VALUE if it is foreign (above). Entries follow any
+declared parents, in walk order, once, and never repeat one already declared. The value still composes where it is
 written, and that is the parent's module, the one `evalSchema` composes for a declared parent. So the
 spelling is the same kind as the hand-written `inherits` that `evalSchema` resolves: same options, same
 `inherits`, same `_edges` entry, same mark and same instance `id_hash`. It stays supported, and nothing
@@ -930,9 +944,12 @@ config.schema.admin-user.imports = [ config.schema.user ];
 #   deprecated spelling of kind inheritance, read as `inherits = [ "user" ]`; declare `inherits`
 ```
 
+For a foreign value the warning names it as `inherits = [ <the kind value 'user'> ]`.
+
 A CYCLE written in the spelling, `a` importing `config.schema.b` and `b` importing `config.schema.a`, is
-refused by `evalSchema` with the name a hand-written `inherits` cycle gets (`inheritance cycle among kinds [a b]`), and on a plain tree by the cycle walk above, before the spelled modules import each
-other.
+refused by the cycle walk above, on a plain tree and under `evalSchema` alike (whose pass 0 reads
+`inherits`, which forces the spelled kinds, so the partner's own guard refuses first), before the
+spelled modules import each other: `inheritance cycle among kinds [a b] — kind 'b' inherits itself through its parents (b -> a -> b); …`.
 
 Four constructions compose as before, unaliased and unwarned, because deciding them needs something
 other than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree
@@ -1129,11 +1146,11 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 **Scope.** That idiom reads collection values on the **default entry-type path**. Two caveats, both
 real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
-with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__kindAncestors`, `__kindImports`,
-`__kindWitness`, `__mint`, `__pureModule`, `__sealed`, `_class`, `_file`, `_module`, `baseModule`,
+with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__kindAncestors`, `__kindCycleParents`,
+`__kindImports`, `__kindWitness`, `__mint`, `__pureModule`, `__sealed`, `_class`, `_file`, `_module`, `baseModule`,
 `collections`, `computed`, `config`, `disabledModules`, `freeformType`, `imports`, `key`,
 `keySemantics`, `kind`, `meta`, `mixins`, `mkType`, `options`, `refinements`, `refs`, `require`,
-`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 29 names: gen-merge's published
+`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 30 names: gen-merge's published
 `moduleSyntax.structured` and `moduleSyntax.shorthandMeta`, the names gen-schema writes onto the kind
 value itself, and the schema's construction formals) is refused when `_collectionKeys` is read, exactly as it is refused when a
 kind is merged.
