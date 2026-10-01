@@ -600,6 +600,12 @@ let
   # in the option's description instead.
   declarationKeys = prelude.sort (a: b: a < b) merge.moduleSyntax.structured;
 
+  # gen-merge reads the key comparison (`__keyEq`) a keyed kind module publishes only where its own
+  # published key list carries it. Over a gen-merge without it the field is read as config, and
+  # every kind that composes a parent would be refused as an undeclared option, so the pairing is
+  # refused by name instead, once, where the key is written.
+  mergeReadsKeyEq = builtins.elem "__keyEq" merge.moduleSyntax.structured;
+
   # ★ THE NAMES `mkSchemaEntryType` WRITES ONTO THE KIND VALUE, each with the writer that earns
   # it. RESTATED because this is gen-schema's OWN contract, not gen-merge's: the record is built
   # inside the merge body while `mkAllCollections` runs outside it, so it cannot be read off the
@@ -755,6 +761,7 @@ let
     if mkType == null then
       [
         "__functor"
+        "__keyEq"
         "__kindAncestors"
         "__kindCycleParents"
         "__kindImports"
@@ -764,6 +771,7 @@ let
       ]
     else
       [
+        "__keyEq"
         "__kindAncestors"
         "__kindCycleParents"
         "__kindImports"
@@ -1594,7 +1602,12 @@ let
                 else if publishedNamed != [ ] then
                   throw "gen-schema: kind '${kind}': declaration key '${builtins.head publishedNamed}' is a name gen-schema writes onto the kind value — written on a kind entry it lands on every instance, while reading `config.schema.${kind}.${builtins.head publishedNamed}` returns the published one; write `config.${builtins.head publishedNamed}` for an instance field of that name, which a strict instance must declare as an option"
                 else if reservedNamed != [ ] then
-                  throw "gen-schema: kind '${kind}': declaration key '${builtins.head reservedNamed}' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread"
+                  throw (
+                    if builtins.head reservedNamed == "__keyEq" then
+                      "gen-schema: kind '${kind}': declaration key '__keyEq' is reserved — gen-schema publishes the key comparison of every kind that composes a parent, beside the key it derives from the kind's mark, and a declaration does not choose it"
+                    else
+                      "gen-schema: kind '${kind}': declaration key '${builtins.head reservedNamed}' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread"
+                  )
                 else if surplusOffenders != [ ] then
                   let
                     offender = builtins.head surplusOffenders;
@@ -1820,6 +1833,28 @@ let
                   # built on every application of `__functor` (every instance, every child), and a
                   # mint inside it would run once per application.
                   ownMark = markOf { inherit kind strict plane; };
+                  # The keyed module's fields, bound once per kind: the key and, beside it, the
+                  # comparison gen-merge's key dedup applies when another occurrence shares the key
+                  # (`__keyEq`, gen-merge's protocol): `sealedCollisionEq` over `kindEq`'s subject, the
+                  # decision the ancestor map makes, so the one construction reached twice is one
+                  # module and two constructions sharing the mark are refused by name, in either order.
+                  keyed =
+                    if kindParents == [ ] then
+                      { }
+                    else if !mergeReadsKeyEq then
+                      throw "gen-schema: kind '${kind}' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq', and the gen-merge it is evaluated with does not read that key (its `moduleSyntax.structured' does not list `__keyEq'). gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
+                    else
+                      {
+                        key = "gen-schema-kind:${kind}#${ownMark}";
+                        __keyEq = {
+                          subject = {
+                            name = kind;
+                            mark = ownMark;
+                            inherit (plane) sealed;
+                          };
+                          decide = sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key";
+                        };
+                      };
                 in
                 # Precedence: computed overrides collections of the same name.
                 # __functor is reserved — collections/computed must not use it as a key.
@@ -1827,15 +1862,16 @@ let
                   # A kind that composes a parent is keyed by its MARK (ADR-0034, identity through the
                   # one mint), so a parent reached on two branches (a diamond) is composed once, and two
                   # kinds with different marks keep two keys and both compose (gen-merge refuses what
-                  # conflicts between them). Two declarations sharing a mark share the key; the ancestor
-                  # map's fold decides that pair.
+                  # conflicts between them). Two declarations sharing a mark share the key: inside a kind
+                  # the ancestor map's fold decides that pair, and outside one gen-merge's key dedup
+                  # applies the same decision through `__keyEq` (`keyed`).
                   __functor =
                     _:
                     { ... }:
                     {
                       imports = [ merged ];
                     }
-                    // prelude.optionalAttrs (kindParents != [ ]) { key = "gen-schema-kind:${kind}#${ownMark}"; };
+                    // keyed;
                   inherit
                     kind
                     mixins

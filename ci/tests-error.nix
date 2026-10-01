@@ -2736,4 +2736,106 @@ in
         };
       };
     };
+
+  # THE KIND INSTANCE COLLISION (den-hoag-kind-generator-collision-d4gnx): two instances of one kind
+  # declaration that share a key, imported side by side outside any kind, are compared by gen-merge's
+  # key dedup with the comparison the kind publishes (`__keyEq`, the ancestor map's
+  # `sealedCollisionEq`). Each cell first forces its LIVE CONTROL, one instance alone. The catchable
+  # half, with the one construction imported twice, is `schema-inheritance.nix`.
+  flake.testsError.kind-instance-collision =
+    let
+      str =
+        default:
+        genMerge.mkOption {
+          type = genMerge.types.str;
+          inherit default;
+        };
+      generatorOver =
+        schemaOption: decl: x:
+        (plainTreeWith schemaOption [
+          {
+            config.schema.p.options.o_p = str "p";
+            config.schema.a = {
+              inherits = [ "p" ];
+              options.o_a = str x;
+            }
+            // decl;
+          }
+        ]).a;
+      oneGenerator = generatorOver (mkSchemaOption { }) { };
+      o_a = modules: (genMerge.evalModuleTree { inherit modules; }).config.o_a;
+      controls = (forced (o_a [ (oneGenerator "two") ])).value == "two";
+      collision = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'a' is imported twice under one key: two declarations of 'a' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'modules', 'open\\.options\\.o_a\\.default'";
+      };
+      reserved = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'a': declaration key '__keyEq' is reserved — gen-schema publishes the key comparison of every kind that composes a parent, beside the key it derives from the kind's mark, and a declaration does not choose it$";
+      };
+      smuggled = {
+        __keyEq = {
+          subject = null;
+          decide = _: _: true;
+        };
+      };
+      # gen-schema over a gen-merge whose published key list does not carry `__keyEq`: the pairing
+      # an older gen-merge makes.
+      withoutProtocol = genMerge // {
+        moduleSyntax = genMerge.moduleSyntax // {
+          structured = builtins.filter (k: k != "__keyEq") genMerge.moduleSyntax.structured;
+        };
+      };
+      oldSchema = import ../lib {
+        inherit prelude;
+        graph = genGraph;
+        merge = withoutProtocol;
+        algebra = genAlgebra;
+        identity = genIdentity;
+      };
+    in
+    {
+      test-two-constructions-side-by-side-refused-by-name = {
+        expr =
+          assert controls;
+          o_a [
+            (oneGenerator "one")
+            (oneGenerator "two")
+          ];
+        expectedError = collision;
+      };
+      test-two-constructions-other-order-refused-by-name = {
+        expr =
+          assert controls;
+          o_a [
+            (oneGenerator "two")
+            (oneGenerator "one")
+          ];
+        expectedError = collision;
+      };
+      # A kind declaration may not choose its own comparison: refused at the declaration, keyed or not.
+      test-declaration-carrying-key-eq-refused-by-name = {
+        expr =
+          assert controls;
+          o_a [ (generatorOver (mkSchemaOption { }) smuggled "one") ];
+        expectedError = reserved;
+      };
+      test-declaration-carrying-key-and-key-eq-refused-by-name = {
+        expr =
+          assert controls;
+          o_a [ (generatorOver (mkSchemaOption { }) (smuggled // { key = "mine"; }) "one") ];
+        expectedError = reserved;
+      };
+      # Over a gen-merge that does not read `__keyEq`, a kind composing a parent is refused by name,
+      # naming the protocol it requires, where the field would otherwise be read as undeclared config.
+      test-gen-merge-without-the-protocol-refused-by-name = {
+        expr =
+          assert controls;
+          o_a [ (generatorOver (oldSchema.mkSchemaOption { }) { } "one") ];
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'a' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq', and the gen-merge it is evaluated with does not read that key \\(its `moduleSyntax\\.structured' does not list `__keyEq'\\)\\. gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; .*$";
+        };
+      };
+    };
 }

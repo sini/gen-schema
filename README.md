@@ -903,8 +903,14 @@ before any value is told same-tree from foreign, which forces marks a cycle coul
 composes each parent once, and two kinds with different marks both compose: two trees' same-named
 kinds, or one generator applied in two trees with an option's type changed, where gen-merge then
 refuses the declarations that conflict. Two declarations sharing a mark (one generator applied twice,
-differing only in an option default, which enters the mark by path) share the key: imported side by
-side, the first composes and the second is dropped; reached by one kind, its ancestor map refuses them.
+differing only in an option default, which enters the mark by path) share the key. Two instances of
+one kind declaration that share a key are compared: **equal** instances are one module; **unequal**
+instances are refused by name. Nothing is dropped silently. The comparison is the one the ancestor
+map makes (`kindEq`'s, through `sealedCollisionEq`), published beside the key as gen-merge's
+`__keyEq` so its key dedup applies it to instances imported side by side, in either order. A sealed
+component compares by its seal, so equal means one construction reached twice: two calls of one
+generator are refused even where their values agree. A declaration may not carry `__keyEq` itself,
+and gen-schema over a gen-merge that does not read `__keyEq` is refused by name.
 
 **Each kind publishes its transitive ancestors, and a subkind must keep its ancestors' classes.**
 `__kindAncestors` maps each ancestor's mark to the ancestor kind value, read off `__kindImports`.

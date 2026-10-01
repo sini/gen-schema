@@ -882,23 +882,50 @@ in
       ];
     };
     # ONE generator applied twice, its two `a`s differing only in an option default (open content,
-    # entered into the mark by path): they share a mark, so a module key, and imported side by side
-    # outside any kind gen-merge's key dedup composes the first one imported and drops the second. A
-    # kind reaching both is refused by its ancestor map instead (`kind-lineage-refusals`).
-    test-one-generator-applied-twice-composes-the-first = {
-      expr = {
-        sameWitness = (oneGenerator "one").__kindWitness == (oneGenerator "two").__kindWitness;
-        composed =
-          (genMerge.evalModuleTree {
-            modules = [
-              (oneGenerator "one")
-              (oneGenerator "two")
-            ];
-          }).config.o_a;
-      };
+    # entered into the mark by path): they share a mark, so a module key. Imported side by side
+    # outside any kind, gen-merge's key dedup applies the kind's published comparison (`__keyEq`), the
+    # one a kind reaching both makes (`kind-lineage-refusals`): two constructions are refused in both
+    # orders, and with equal values too, since a sealed component compares by its seal. The one
+    # construction imported twice is one module; one instance alone is the control. The by-name text
+    # is `kind-instance-collision` in `ci/tests-error.nix`.
+    test-one-generator-applied-twice-is-compared-at-the-key = {
+      expr =
+        let
+          o_a =
+            modules:
+            let
+              r = builtins.tryEval (genMerge.evalModuleTree { inherit modules; }).config.o_a;
+            in
+            if r.success then r.value else "REFUSED";
+          one = oneGenerator "one";
+        in
+        {
+          sameWitness = (oneGenerator "one").__kindWitness == (oneGenerator "two").__kindWitness;
+          oneThenTwo = o_a [
+            (oneGenerator "one")
+            (oneGenerator "two")
+          ];
+          twoThenOne = o_a [
+            (oneGenerator "two")
+            (oneGenerator "one")
+          ];
+          equalValues = o_a [
+            (oneGenerator "one")
+            (oneGenerator "one")
+          ];
+          oneConstructionTwice = o_a [
+            one
+            one
+          ];
+          alone = o_a [ (oneGenerator "two") ];
+        };
       expected = {
         sameWitness = true;
-        composed = "one";
+        oneThenTwo = "REFUSED";
+        twoThenOne = "REFUSED";
+        equalValues = "REFUSED";
+        oneConstructionTwice = "one";
+        alone = "two";
       };
     };
     test-another-trees-same-named-kind-is-not-a-cycle = {
