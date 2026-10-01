@@ -621,6 +621,55 @@ in
     };
   };
 
+  # ★★ THE TWIN COST OF THE CARRY, STATED. gen-merge's `anything` carries a `__mint` carrier whole
+  # through its leaf fold, which compares definitions with `==`. Two INDEPENDENT constructions of one
+  # type-only kind are one identity (the control: `kindEq` answers `true`), but their closures are
+  # distinct, so defined twice through `anything` the whole value is refused. A rebuild handed back a
+  # value `kindEq` decided `true` against either construction: this cell's red.
+  flake.testsError.kind-transport = {
+    test-twin-kind-constructions-defined-twice-through-anything-refused =
+      let
+        kindOf =
+          decl:
+          (genMerge.evalModuleTree {
+            modules = [
+              { options.schema = mkSchemaOption { }; }
+              { config.schema.host = decl; }
+            ];
+          }).config.schema.host;
+        typeOnly = _: kindOf { options.port = genMerge.mkOption { type = genMerge.types.int; }; };
+        k1 = typeOnly 1;
+        k2 = typeOnly 2;
+        carried =
+          (genMerge.evalModuleTree {
+            modules = [
+              { options.k = genMerge.mkOption { type = genMerge.types.anything; }; }
+              {
+                _file = "A";
+                config.k = k1;
+              }
+              {
+                _file = "B";
+                config.k = k2;
+              }
+            ];
+          }).config.k;
+      in
+      {
+        expr =
+          assert
+            let
+              control = builtins.tryEval (genSchema.kindEq k1 k2);
+            in
+            control.success && control.value;
+          genSchema.kindEq k1 carried;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-merge: the option `k' has conflicting definitions:\n- In `B': <a set>\n- In `A': <a set>$";
+        };
+      };
+  };
+
   # den-hoag-ciu4r (ADR-0025). The computed fields are splatted OVER the record mkSchemaEntryType
   # writes, on both branches, so a computed `options` or `refs` replaced the published plane with no
   # signal. Measured at a90bc54: `(kind with computed options = "COMPUTED").options` ⇒ "COMPUTED" on

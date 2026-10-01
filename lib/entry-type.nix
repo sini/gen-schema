@@ -328,12 +328,8 @@ let
       # Each is a SEALED component, as a schema's own `functions` are: the mark carries the marker at
       # its path, and its subject is a closure allocated by this call, never equal to another
       # construction's. The content itself is never the subject: comparing it would force it, and a
-      # K3 capture aborts uncatchably when forced.
-      # ★ ENUMERATED EXCEPTION (den-hoag-egei0 C4, defaulted (a), reversible): whether a subject is
-      # equal to ITSELF after a rebuild is the evaluator's. A kind value carried through gen-merge's
-      # `types.anything` (or `attrsOf`/`listOf anything`) is rebuilt, and nix and Determinate compare
-      # the rebuilt closure unequal (a refusal) while Lix compares it equal (`true`). The comparison is
-      # never `false`: the mark is untouched by transport.
+      # K3 capture aborts uncatchably when forced. A subject is equal to itself only while it is not
+      # rebuilt: a kind value carries `__mint`, so gen-merge's `types.anything` carries it whole.
       openComponents = map (p: {
         path = p;
         value = _: p;
@@ -419,13 +415,10 @@ let
   # component (ADR-0034: "that component's collapse is replaced by a refusal"). Open-module content
   # beyond an option's `type` is such a component (`openComponents`), so a pair differing there, or
   # two constructions of one declaration carrying it, is refused naming its `open.*` path. An operand
-  # that is not a kind value is refused by name, as the four admission guards refuse it.
-  # ★ ENUMERATED EXCEPTION (den-hoag-egei0 C4, defaulted (a), reversible): a kind value compared with
-  # ITSELF CARRIED THROUGH gen-merge's `types.anything` (or `attrsOf anything`, `listOf anything`),
-  # which rebuilds its sealed subjects, is refused on nix and Determinate and `true` on Lix, never
-  # `false` (`kind-mark-cplus.test-open-content-transport-is-never-false`). The class predates the
-  # open-content subjects (function modules, sealed types); they widen it to every kind carrying open
-  # content. Carry a kind value through `raw`, `attrs` or `lazyAttrsOf raw` to keep it decided.
+  # that is not a kind value is refused by name, as the four admission guards refuse it. A kind value
+  # compared with itself carried through gen-merge's `types.anything` (or `attrsOf`/`listOf
+  # anything`) is `true` on every evaluator: `anything` carries a `__mint` carrier whole
+  # (`kind-mark-cplus.test-kind-reflexive-under-anything-transport`).
   kindEq =
     let
       subject =

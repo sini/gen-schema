@@ -1425,10 +1425,11 @@ kindEq kindA kindB   # → true | false, or a refusal by name
 `true` iff two kind values carry one identity, `false` if two. Where they mint one identity and differ
 only at a sealed component, for example open-module content beyond an option's `type`, it
 refuses by name, naming the component (`…only at sealed component(s) 'open.options.<path>.<attr>'…`).
-An operand that is not a kind value carrying a mint-backed mark is refused by name. Enumerated
-exception: a kind value compared with itself after being carried through gen-merge's `types.anything`
-is refused on Nix and Determinate and `true` on Lix, never `false`; carry kind values through `raw`,
-`attrs` or `lazyAttrsOf raw` to keep them decided.
+An operand that is not a kind value carrying a mint-backed mark is refused by name. A kind value
+compared with itself after being carried through gen-merge's `types.anything` decides `true` on Nix,
+Determinate and Lix: `anything` carries a value carrying `__mint` whole. Two independent
+constructions of one kind defined twice through `anything` are refused as conflicting definitions,
+because `anything`'s leaf fold compares values, not identities.
 
 ### `mkInstanceType`
 

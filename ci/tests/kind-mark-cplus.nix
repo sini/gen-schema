@@ -545,19 +545,20 @@ in
         movedSameMark = true;
       };
     };
-    # C4 · ENUMERATED EXCEPTION (the `kindEq` door): a kind carried through gen-merge's `anything`
-    # is rebuilt, so comparing it with itself is refused (nix, Determinate) or `true` (Lix). Never
-    # `false`: the mark is untouched. `raw` carries the value itself and decides `true`.
-    test-open-content-transport-is-never-false = {
+    # C4 · a kind carrying open content, carried through gen-merge's `anything`, is equal to itself on
+    # every evaluator: `anything` carries a `__mint` carrier whole, so its sealed subjects are the
+    # same closures. A rebuilt kind is refused on nix and Determinate and `true` on Lix, so each
+    # position reds on two evaluators when the carry is lost. `raw` never rebuilds: the control.
+    test-kind-reflexive-under-anything-transport = {
       expr =
         let
           k = defaulted 80;
         in
         {
-          anything = tr (kindEq k (via T.anything k)) != false;
-          attrsOfAnything = tr (kindEq k (via (T.attrsOf T.anything) { x = k; }).x) != false;
-          listOfAnything = tr (kindEq k (builtins.head (via (T.listOf T.anything) [ k ]))) != false;
-          raw = kindEq k (via T.raw k);
+          anything = tr (kindEq k (via T.anything k));
+          attrsOfAnything = tr (kindEq k (via (T.attrsOf T.anything) { x = k; }).x);
+          listOfAnything = tr (kindEq k (builtins.head (via (T.listOf T.anything) [ k ])));
+          raw = tr (kindEq k (via T.raw k));
         };
       expected = {
         anything = true;
