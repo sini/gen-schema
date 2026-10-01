@@ -1,6 +1,6 @@
-# Field refs — inert, identity-bearing references to a FIELD of another instance.
+# Field declarations — inert, identity-bearing references to a FIELD of another instance.
 #
-# A field ref is plain data (no functions, no thunk wrappers): a record containing field refs stays
+# A field declaration is plain data (no functions, no thunk wrappers): a record containing field declarations stays
 # fully introspectable, and the cross-instance dependency graph is computable before any resolution
 # (Mokhov, Mitchell & Peyton Jones, *Build Systems à la Carte*, ICFP 2018, §3 — static/applicative
 # task dependencies, known before any value is produced, not dynamic/monadic ones).
@@ -11,13 +11,13 @@
 #
 #   `declarationOf` — an option TYPE on a field, DECLARING that the field points at an instance of
 #                     some kind. Lives in the kind's schema. Derives kind -> kind edges (`_refEdges`).
-#   `fieldRef`      — a VALUE inhabiting such a position, NAMING which instance, and which field of
+#   `mkFieldDeclaration`      — a VALUE inhabiting such a position, NAMING which instance, and which field of
 #                     it. Lives in a default or a contributed value. Derives (instance, field) ->
 #                     (instance, field) edges, from the values a scan finds.
 #
 # So the type declares that a dependence exists and the value says what it is; and neither DECLARES
 # the dependence FACT — both derive it from structure that is present for another reason. Their
-# refusals differ accordingly: `declarationOf` refuses an unresolvable key at merge time, `fieldRef` refuses a
+# refusals differ accordingly: `declarationOf` refuses an unresolvable key at merge time, `mkFieldDeclaration` refuses a
 # non-identity target at application time.
 { prelude }:
 let
@@ -34,16 +34,16 @@ let
     ;
   inherit (prelude) imap0;
 
-  fieldRefMarker = "__genSchemaFieldRef";
+  fieldDeclarationMarker = "__genSchemaFieldDeclaration";
 
-  isFieldRef = v: isAttrs v && (v.${fieldRefMarker} or false) == true;
+  isFieldDeclaration = v: isAttrs v && (v.${fieldDeclarationMarker} or false) == true;
 
   # Scan position, for the refusal's blame. [ ] is the scanned value itself.
   renderAt =
     at: if at == [ ] then "(the scanned value itself)" else concatStringsSep "." (map toString at);
 in
 {
-  inherit fieldRefMarker isFieldRef;
+  inherit fieldDeclarationMarker isFieldDeclaration;
 
   # renderAt is returned so a golden can call the SHIPPED renderer instead of re-implementing it —
   # a re-implementation is not an oracle for the real one, and a throw's message is unreachable to
@@ -52,7 +52,7 @@ in
   # importing this module directly, which is what the suite does.
   inherit renderAt;
 
-  # fieldRef aspect path -> field ref record
+  # mkFieldDeclaration aspect path -> field declaration record
   #   `aspect` is the TARGET INSTANCE. Parameter and record field carry that name because the
   #   incumbent consumer addresses aspects and states its provenance records over it; nothing here
   #   reads the target as anything narrower than an instance carrying id_hash, and renaming it would
@@ -60,34 +60,34 @@ in
   #   It MUST carry id_hash: routing is by identity, and a display key is not one, so a name string
   #   never crosses the boundary. Identity in ≡ identity out — the record carries the given entry,
   #   so the scan hands back the caller's own instance rather than a lookup of it.
-  fieldRef =
+  mkFieldDeclaration =
     aspect: path:
     if !(isAttrs aspect && aspect ? id_hash) then
-      throw "gen-schema: fieldRef: target must be an instance carrying id_hash, never a name string"
+      throw "gen-schema: mkFieldDeclaration: target must be an instance carrying id_hash, never a name string"
     else if !(isList path && path != [ ] && all isString path) then
-      throw "gen-schema: fieldRef: path must be a non-empty list of field-name strings"
+      throw "gen-schema: mkFieldDeclaration: path must be a non-empty list of field-name strings"
     else
       {
-        ${fieldRefMarker} = true;
+        ${fieldDeclarationMarker} = true;
         inherit aspect path;
       };
 
-  # fieldRefsIn v -> [ { at; aspect; path; } ] — deep structural scan.
-  #   `at` is the subpath within v where the ref sits ([ ] = v itself); attrset keys and list
-  #   indices compose it. Refs are inspected as records, never resolved. The scan is structurally
-  #   strict: detecting a ref forces its position to WHNF, since Nix has no primitive that inspects
+  # fieldDeclarationsIn v -> [ { at; aspect; path; } ] — deep structural scan.
+  #   `at` is the subpath within v where the declaration sits ([ ] = v itself); attrset keys and list
+  #   indices compose it. Declarations are inspected as records, never resolved. The scan is structurally
+  #   strict: detecting a declaration forces its position to WHNF, since Nix has no primitive that inspects
   #   a thunk without forcing it.
   #
   #   TOTAL ON ITS DOMAIN, AND THAT DOMAIN EXCLUDES FUNCTIONS. A function found in a scanned
   #   position is REFUSED by name, never treated as a leaf. Three grounds, and they compound:
   #
-  #     1. A ref inside a closure is unreachable to ANY structural scan — Nix exposes no primitive
+  #     1. A declaration inside a closure is unreachable to ANY structural scan — Nix exposes no primitive
   #        that inspects a function body — so treating one as a leaf fails OPEN: the edge is
-  #        missing, the cycle it would have closed goes undetected, and the unresolved ref record
+  #        missing, the cycle it would have closed goes undetected, and the unresolved declaration record
   #        then leaks into consumer output AS DATA. Silent bad data, not a missed diagnostic.
   #     2. The values this scan is applied to are declared data. A schema of `{ default; merge }`
   #        leaves holds nothing parametric — only class *content* is a function, and it *consumes*
-  #        resolved settings rather than containing refs — so on contract-conforming input the
+  #        resolved settings rather than containing declarations — so on contract-conforming input the
   #        refusal is a no-op and observes nothing.
   #     3. Refusing ELIMINATES the underivable case rather than declaring it unanalysable. Every
   #        dependence fact that survives the scan is then a derived one, which is the totality
@@ -109,12 +109,12 @@ in
   #   because a concrete case exists to argue from. Quietly widening this scan's leaf set back out is
   #   not that escape: it converts a stated refusal into an unstated hole, which is the exact trade
   #   the refusal was chosen to reverse. See the README for the governing decision record.
-  fieldRefsIn =
+  fieldDeclarationsIn =
     v:
     let
       go =
         at: val:
-        if isFieldRef val then
+        if isFieldDeclaration val then
           [
             {
               inherit at;
@@ -126,7 +126,7 @@ in
         else if isList val then
           concatLists (imap0 (i: e: go (at ++ [ i ]) e) val)
         else if isFunction val then
-          throw "gen-schema: fieldRefsIn: function at scanned position ${renderAt at} — this scan's domain is data. A function is refused rather than skipped, because a reference inside a closure is unreachable to any structural scan: its edge could never be derived, so the dependency would go missing silently. If this position is a computed value, express it where its reads stay visible — `fieldRef <instance> <path>` for a cross-instance read, or the kind's `computed` hook for a value derived from collections and defs; otherwise, make the position data, or keep the function outside the scanned structure."
+          throw "gen-schema: fieldDeclarationsIn: function at scanned position ${renderAt at} — this scan's domain is data. A function is refused rather than skipped, because a reference inside a closure is unreachable to any structural scan: its edge could never be derived, so the dependency would go missing silently. If this position is a computed value, express it where its reads stay visible — `mkFieldDeclaration <instance> <path>` for a cross-instance read, or the kind's `computed` hook for a value derived from collections and defs; otherwise, make the position data, or keep the function outside the scanned structure."
         else
           [ ];
     in

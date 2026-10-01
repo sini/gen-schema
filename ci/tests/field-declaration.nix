@@ -1,4 +1,4 @@
-# field-ref — the VALUE-level reference datum: its identity law, its structural scan, and the
+# field-declaration — the VALUE-level reference datum: its identity law, its structural scan, and the
 # scan's by-construction refusal of functions.
 #
 # Pure Nix cannot capture a throw's *message* (builtins.tryEval yields only success:bool), so every
@@ -8,8 +8,8 @@
 # A scan that treats a function as a leaf and one that refuses it are indistinguishable on every
 # ordinary value, so a suite of ordinary values cannot tell them apart and a regression from the
 # refusing scan back to the open one would pass in silence. `test-hazard-*` below is the pair that
-# discriminates: the ref-in-data arm is the positive control (one hop under EITHER scan) and the
-# ref-in-a-function-body arm is the discriminator (refused here; silently zero hops under the open
+# discriminates: the declaration-in-data arm is the positive control (one hop under EITHER scan) and the
+# declaration-in-a-function-body arm is the discriminator (refused here; silently zero hops under the open
 # scan, which is the failure-open mode the refusal exists to eliminate).
 {
   genSchema,
@@ -18,9 +18,9 @@
 }:
 let
   inherit (genSchema)
-    fieldRef
-    isFieldRef
-    fieldRefsIn
+    mkFieldDeclaration
+    isFieldDeclaration
+    fieldDeclarationsIn
     ;
 
   # The refusal's position renderer. Nix cannot capture a throw's message — `builtins.tryEval`
@@ -28,12 +28,12 @@ let
   # the SHIPPED renderer, reached by importing the module directly. A golden that re-implemented it
   # would not be an oracle for the one that ships. `renderAt` is deliberately absent from the public
   # `lib`; `test-render-at-is-not-public-surface` below is what keeps that true.
-  fieldRefLib = import ../../lib/field-ref.nix { inherit prelude; };
-  inherit (fieldRefLib) renderAt;
+  fieldDeclarationLib = import ../../lib/field-declaration.nix { inherit prelude; };
+  inherit (fieldDeclarationLib) renderAt;
 
   throws = e: (builtins.tryEval (builtins.deepSeq e e)).success == false;
   # The scan is lazy in its result spine, so a refusal buried in it needs forcing to observe.
-  scanThrows = v: (builtins.tryEval (builtins.deepSeq (fieldRefsIn v) true)).success == false;
+  scanThrows = v: (builtins.tryEval (builtins.deepSeq (fieldDeclarationsIn v) true)).success == false;
 
   theme = {
     name = "theme";
@@ -44,17 +44,17 @@ let
     id_hash = "e5f6a7b8cafef00d";
   };
 
-  r = fieldRef terminal [ "g" ];
+  r = mkFieldDeclaration terminal [ "g" ];
 
-  # The hazard pair: the SAME ref value, once as data and once inside a function body.
-  refInData = {
+  # The hazard pair: the SAME declaration value, once as data and once inside a function body.
+  declarationInData = {
     k = r;
   };
-  refInFunction = {
+  declarationInFunction = {
     k = _: r;
   };
 
-  # Ordinary settings-shaped data — no ref, no function anywhere.
+  # Ordinary settings-shaped data — no declaration, no function anywhere.
   plainData = {
     a = 1;
     b = [
@@ -70,7 +70,7 @@ let
     outer = {
       xs = [
         "lit"
-        (fieldRef theme [
+        (mkFieldDeclaration theme [
           "font"
           "size"
         ])
@@ -79,18 +79,18 @@ let
   };
 in
 {
-  flake.tests.field-ref = {
+  flake.tests.field-declaration = {
     # ── the datum ──
-    test-record-is-a-ref = {
-      expr = isFieldRef r;
+    test-record-is-a-declaration = {
+      expr = isFieldDeclaration r;
       expected = true;
     };
-    test-plain-attrs-is-not-a-ref = {
-      expr = isFieldRef { aspect = terminal; };
+    test-plain-attrs-is-not-a-declaration = {
+      expr = isFieldDeclaration { aspect = terminal; };
       expected = false;
     };
-    test-scalar-is-not-a-ref = {
-      expr = isFieldRef "terminal";
+    test-scalar-is-not-a-declaration = {
+      expr = isFieldDeclaration "terminal";
       expected = false;
     };
     # identity in ≡ identity out: the record carries the caller's own instance, never a name.
@@ -105,39 +105,39 @@ in
 
     # ── the constructor's refusals ──
     test-refuses-string-target = {
-      expr = throws (fieldRef "terminal" [ "g" ]);
+      expr = throws (mkFieldDeclaration "terminal" [ "g" ]);
       expected = true;
     };
     test-refuses-target-without-id-hash = {
-      expr = throws (fieldRef { name = "terminal"; } [ "g" ]);
+      expr = throws (mkFieldDeclaration { name = "terminal"; } [ "g" ]);
       expected = true;
     };
     test-refuses-empty-path = {
-      expr = throws (fieldRef terminal [ ]);
+      expr = throws (mkFieldDeclaration terminal [ ]);
       expected = true;
     };
     test-refuses-non-string-path-component = {
-      expr = throws (fieldRef terminal [ 0 ]);
+      expr = throws (mkFieldDeclaration terminal [ 0 ]);
       expected = true;
     };
 
     # ── the scan ──
     # EMPTY CONTROL: the assertions below are non-emptiness claims, so the instrument must be shown
     # able to report a true zero as well as a hit.
-    test-scan-of-ref-free-data-is-empty = {
-      expr = fieldRefsIn plainData;
+    test-scan-of-declaration-free-data-is-empty = {
+      expr = fieldDeclarationsIn plainData;
       expected = [ ];
     };
-    test-scan-finds-ref-at-root = {
-      expr = builtins.length (fieldRefsIn r);
+    test-scan-finds-declaration-at-root = {
+      expr = builtins.length (fieldDeclarationsIn r);
       expected = 1;
     };
     test-scan-root-position-is-empty-path = {
-      expr = (builtins.head (fieldRefsIn r)).at;
+      expr = (builtins.head (fieldDeclarationsIn r)).at;
       expected = [ ];
     };
     test-scan-composes-attr-keys-and-list-indices = {
-      expr = (builtins.head (fieldRefsIn nested)).at;
+      expr = (builtins.head (fieldDeclarationsIn nested)).at;
       expected = [
         "outer"
         "xs"
@@ -148,7 +148,7 @@ in
       expr = builtins.map (h: {
         inherit (h.aspect) id_hash;
         inherit (h) path;
-      }) (fieldRefsIn nested);
+      }) (fieldDeclarationsIn nested);
       expected = [
         {
           inherit (theme) id_hash;
@@ -161,15 +161,15 @@ in
     };
 
     # ── the hazard pair (see the header) ──
-    # POSITIVE CONTROL: the same ref, as data, is one hop. True under either scan.
-    test-hazard-control-ref-in-data-is-one-hop = {
-      expr = builtins.length (fieldRefsIn refInData);
+    # POSITIVE CONTROL: the same declaration, as data, is one hop. True under either scan.
+    test-hazard-control-declaration-in-data-is-one-hop = {
+      expr = builtins.length (fieldDeclarationsIn declarationInData);
       expected = 1;
     };
-    # DISCRIMINATOR: the same ref inside a function body is REFUSED, not silently skipped.
+    # DISCRIMINATOR: the same declaration inside a function body is REFUSED, not silently skipped.
     # Under the open (function-as-leaf) scan this scan returns [ ] and this assertion goes red.
-    test-hazard-ref-in-function-body-is-refused = {
-      expr = scanThrows refInFunction;
+    test-hazard-declaration-in-function-body-is-refused = {
+      expr = scanThrows declarationInFunction;
       expected = true;
     };
     # NEGATIVE CONTROL: the refusal observes nothing on data, so `scanThrows` is not stuck true.
@@ -223,7 +223,7 @@ in
     # CONTROL for the row above: the same predicate reports true for a name that IS exported, so a
     # renamed or vanished export could not read as "correctly absent".
     test-control-public-surface-predicate-fires = {
-      expr = genSchema ? fieldRefsIn;
+      expr = genSchema ? fieldDeclarationsIn;
       expected = true;
     };
 
