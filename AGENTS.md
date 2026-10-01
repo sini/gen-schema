@@ -313,12 +313,10 @@ first line of each). This library also co-writes gen-types' checker fields `__id
 
 - `__sealed` — writer `mkSchemaEntryType` (`lib/entry-type.nix`), reader `kindEq` (same file); read by gen-select (`lib/default.nix`, its kind comparison):
   the sealed subjects of a kind value, a thunk forced only when two kinds are compared: sealed types
-  and functions, and one per-construction closure per open-module content path (`open.*`). ★
-  ENUMERATED EXCEPTION (den-hoag-egei0 C4, defaulted, reversible): a kind value carried through
-  gen-merge's `types.anything` (or `attrsOf`/`listOf anything`) is rebuilt, and comparing it with
-  itself is refused on nix and Determinate and `true` on Lix, never `false`
-  (`kind-mark-cplus.test-open-content-transport-is-never-false`); `raw`, `attrs` and
-  `lazyAttrsOf raw` carry it unrebuilt and decide `true`. Kind values
+  and functions, and one per-construction closure per open-module content path (`open.*`). A kind
+  value carries `__mint`, so gen-merge's `types.anything` (and `attrsOf`/`listOf anything`) carries
+  it whole and comparing it with itself decides `true` on every evaluator
+  (`kind-mark-cplus.test-kind-reflexive-under-anything-transport`). Kind values
   also carry caller-computed fields, so the key stays under `__` to stay disjoint from them.
 - `__kindImports` — writer `mkSchemaEntryType` (`lib/entry-type.nix`, both branches), reader `kindAncestors` (same file):
   a kind's parent kind VALUES in either spelling, spelled (`kindImports`), the foreign value entries
