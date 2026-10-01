@@ -50,6 +50,9 @@
       # nowhere else to go. Same wiring as gen-merge's and gen-memo's.
       extraModules = [
         ./tests-error.nix
+        # The THIRD plane, `ci --tests-process`: cells whose verdict is a count on stderr (the kind
+        # mint's cost oracle), one evaluator process per cell, run under each column's evaluator.
+        ./tests-process.nix
         # `ref` is a TOMBSTONE (lib/ref.nix, THE RETIRED NAME; den-hoag-2zjg1): `checks.root-surface`
         # excludes it from the walk, and the generated `root-surface-retired.test-retired-ref` cell pins
         # this exact message at the root seam, so a resurrected or reworded tombstone reds.

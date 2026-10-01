@@ -602,6 +602,8 @@ let
     # inheritance-cycle walk reads.
     "__kindImports"
     "__kindWitness"
+    # Written beside them, both branches, for the same reason: the transitive ancestor map.
+    "__kindAncestors"
   ];
 
   # ★ THE COLLECTION KEY SPACE'S RESERVED SET (den-hoag-6vgwm). A caller-supplied collection NAME
@@ -690,7 +692,9 @@ let
   # `[ "role" ]` on the clean twin). Same class, same strength and same shape as the three reserved
   # COLLECTION keys `mkAllCollections` refuses above. `__kindImports` and `__kindWitness` are written on
   # both branches too (the inheritance-cycle walk's parents and witness), and a shorthand declaration of
-  # either was discarded without a word, a declared parent with it.
+  # either was discarded without a word, a declared parent with it; `__kindAncestors` (the ancestor
+  # map) is written beside them. All three are `_`-prefixed, so `publishedEntryKeys` leaves them to
+  # this door.
   #
   # ★ WHAT THIS DOOR IS FOR, stated precisely because the obvious reading is wrong. It does NOT
   # repair a swallow that some earlier door was doing `__`-specifically: before this guard existed
@@ -703,6 +707,7 @@ let
     if mkType == null then
       [
         "__functor"
+        "__kindAncestors"
         "__kindImports"
         "__kindWitness"
         "__mint"
@@ -710,6 +715,7 @@ let
       ]
     else
       [
+        "__kindAncestors"
         "__kindImports"
         "__kindWitness"
         "__mint"
@@ -1050,30 +1056,140 @@ let
                       prelude.sort (a: b: a < b) (prelude.unique (prelude.init inheritanceCycle))
                     )
                   }] — kind '${kind}' inherits itself through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}); a kind may inherit only kinds resolved in a strictly earlier pass"
-                else if unresolvedInherits == [ ] || tree != null then
-                  v
+                else if unresolvedInherits != [ ] && tree == null then
+                  throw "gen-schema: kind '${kind}' inherits '${builtins.head unresolvedInherits}', but nothing resolved it: this entry type was built outside a kind tree, so there is no parent to read. Declare the kind through `mkSchemaOption` or `evalSchema`"
                 else
-                  throw "gen-schema: kind '${kind}' inherits '${builtins.head unresolvedInherits}', but nothing resolved it: this entry type was built outside a kind tree, so there is no parent to read. Declare the kind through `mkSchemaOption` or `evalSchema`";
+                  builtins.seq lineageChecked v;
+
+              # THE LINEAGE REFUSALS, after the cycle walk (the fold forces marks, which a cycle would
+              # recurse through): the ancestor map's diamond refusal and the class check. Read through
+              # `resolvedOnly`, so at the composed reads only; a kind with no parents pays one comparison.
+              lineageChecked =
+                if kindParents == [ ] then
+                  true
+                else if builtins.seq kindAncestors classDefects == [ ] then
+                  true
+                else
+                  let
+                    d = builtins.head classDefects;
+                    show = c: if builtins.isString c then "'${c}'" else "<a ${builtins.typeOf c}>";
+                  in
+                  throw (
+                    "gen-schema: kind '${kind}' inherits '${d.ancestor}', whose keySemantics "
+                    + (
+                      if d.own then
+                        "gives the key '${d.key}' the category ${show d.theirs}, and this kind's keySemantics gives it ${show d.ours}"
+                      else
+                        "declares the key '${d.key}', and this kind's keySemantics does not"
+                    )
+                    + ": a subkind's keySemantics must hold every key of each ancestor's, with the same category; build this kind's schema with '${d.key}' in its keySemantics as the ancestor declares it"
+                  );
+
+              # THE TRANSITIVE ANCESTOR MAP (den-hoag-l0y): mark -> ancestor kind VALUE, read per kind
+              # value and never memoised by mark, so nodes share one reference per kind. A fold over the
+              # ancestor DAG, linear in the ancestors reached: a mark already present is decided through
+              # `sealedCollisionEq`, the decision `kindEq` makes, with a site naming this kind and both
+              # lineage paths. Equal marks decide `true` (a diamond over one kind: one entry, not walked
+              # again) or refuse by name, so two declarations of one identity reached along two paths are
+              # never merged last-wins. Distinct marks are two kinds, and composing both is gen-merge's to
+              # refuse where they conflict. A kind value this entry type did not build publishes no
+              # parents, so the walk stops at it. Published as `__kindAncestors`.
+              kindAncestors =
+                let
+                  arrow = prelude.concatStringsSep " -> ";
+                  subjectOf = p: {
+                    name = p.kind;
+                    mark = p.__mint.minted;
+                    sealed = p.__sealed or null;
+                  };
+                  step =
+                    path: acc: p:
+                    let
+                      m = p.__mint.minted;
+                      here = path ++ [ p.kind ];
+                    in
+                    if acc ? ${m} then
+                      builtins.seq (sealedCollisionEq
+                        "gen-schema: kind '${kind}' reaches '${p.kind}' along ${arrow acc.${m}.path} and along ${arrow here}"
+                        (subjectOf acc.${m}.value)
+                        (subjectOf p)
+                      ) acc
+                    else
+                      builtins.foldl' (step here) (
+                        acc
+                        // {
+                          ${m} = {
+                            value = p;
+                            path = here;
+                          };
+                        }
+                      ) (p.__kindImports or [ ]);
+                in
+                prelude.mapAttrs (_: e: e.value) (builtins.foldl' (step [ kind ]) { } kindParents);
+
+              # THE CLASS RULE IS A CHECK (den-hoag-l0y C2): `keySemantics` is a construction formal,
+              # fixed before the tree resolves `inherits`, so a subkind cannot take a union of its
+              # ancestors' — that would make the formal read the tree it constructs. Each ancestor's key
+              # must be present with the same `category`; categories are compared as values, never
+              # interpreted (the vocabulary is the consumer's).
+              classDefects =
+                let
+                  catOf = e: if builtins.isAttrs e then e.category or null else null;
+                in
+                prelude.concatMap (
+                  a:
+                  let
+                    theirs = a.keySemantics or { };
+                  in
+                  prelude.concatMap (
+                    k:
+                    if !(keySemantics ? ${k}) then
+                      [
+                        {
+                          ancestor = a.kind;
+                          key = k;
+                          own = false;
+                        }
+                      ]
+                    else if catOf keySemantics.${k} != catOf theirs.${k} then
+                      [
+                        {
+                          ancestor = a.kind;
+                          key = k;
+                          own = true;
+                          ours = catOf keySemantics.${k};
+                          theirs = catOf theirs.${k};
+                        }
+                      ]
+                    else
+                      [ ]
+                  ) (prelude.attrNames theirs)
+                ) (builtins.attrValues kindAncestors);
 
               # THE PARENTS THIS KIND COMPOSES, as kind VALUES, in either spelling: the spelled ones
-              # (`kindImports`) and, on a tree, the declared ones the desugar imports. Both compose
-              # through the same applied functor, so one list carries both to the cycle walk.
-              # Published as `__kindImports`.
+              # (`kindImports`) and, on a tree, each declared name the tree holds and nothing spelled.
+              # Both compose through the same applied functor, so one list carries both to the cycle
+              # walk and the ancestor map. A declared parent is published as `tree.${p}`, the value a
+              # caller reads off the tree, whether the desugar or `evalSchema` composed it: the parent
+              # `evalSchema` composed is its pass n-1 twin, which `kindEq` refuses against the value read
+              # whenever an option carries a default. Published as `__kindImports`.
               kindParents =
                 kindImports
                 ++ (
                   if tree == null then
                     [ ]
                   else
-                    map (p: tree.${p}) (builtins.filter (p: builtins.elem p tree._kindNames) unresolvedInherits)
+                    map (p: tree.${p}) (
+                      builtins.filter (
+                        p: builtins.elem p tree._kindNames && !(builtins.elem p (map (k: k.kind) kindImports))
+                      ) declaredInherits
+                    )
                 );
 
               # THE CONTENT WITNESS: the kind's name, each def's file and first-attribute position, its
-              # parents' names and its declared option names, read before composition. Two trees'
-              # same-named kinds differ in it, so they get two module keys and both compose; the
-              # residue it cannot tell apart is two kinds written at one source position with the same
-              # parents and option names — one generator applied twice, say — whose second kind the
-              # module key drops. Published as `__kindWitness`.
+              # parents' names and its declared option names, read before composition. Its one reader
+              # is the inheritance-cycle walk, which runs before composition and so cannot read a mark;
+              # the module key is the mark (below). Published as `__kindWitness`.
               kindWitness = builtins.hashString "sha256" (
                 builtins.unsafeDiscardStringContext "${kind}@${
                   prelude.concatStringsSep ";" (map (d: "${toString (d.file or "?")}=${witnessPos d.value}") defs)
@@ -1473,6 +1589,7 @@ let
                   __sealed = plane.sealed;
                   __kindImports = kindParents;
                   __kindWitness = kindWitness;
+                  __kindAncestors = resolvedOnly kindAncestors;
                 }
               else
                 let
@@ -1548,19 +1665,26 @@ let
                     modules = map (d: d.value) strippedDefs ++ [ effectiveBase ];
                     functions = { inherit mkType computed; };
                   };
+                  # Bound ONCE per kind and read by both the module key and `__mint`: the key is
+                  # built on every application of `__functor` (every instance, every child), and a
+                  # mint inside it would run once per application.
+                  ownMark = markOf { inherit kind strict plane; };
                 in
                 # Precedence: computed overrides collections of the same name.
                 # __functor is reserved — collections/computed must not use it as a key.
                 {
-                  # A kind that composes a parent is keyed by its witness, so a parent reached on two
-                  # branches (a diamond) is composed once, and two trees' same-named kinds keep two keys.
+                  # A kind that composes a parent is keyed by its MARK (ADR-0034, identity through the
+                  # one mint), so a parent reached on two branches (a diamond) is composed once, and two
+                  # kinds with different marks keep two keys and both compose (gen-merge refuses what
+                  # conflicts between them). Two declarations sharing a mark share the key; the ancestor
+                  # map's fold decides that pair.
                   __functor =
                     _:
                     { ... }:
                     {
                       imports = [ merged ];
                     }
-                    // prelude.optionalAttrs (kindParents != [ ]) { key = "gen-schema-kind:${kind}#${kindWitness}"; };
+                    // prelude.optionalAttrs (kindParents != [ ]) { key = "gen-schema-kind:${kind}#${ownMark}"; };
                   inherit
                     kind
                     mixins
@@ -1576,12 +1700,14 @@ let
                   # Applied LAST so the mark cannot be shadowed by a collection or a computed field;
                   # both are refused by name above rather than left to win silently here.
                   __mint = {
-                    minted = markOf { inherit kind strict plane; };
+                    minted = ownMark;
                   };
                   __sealed = plane.sealed;
-                  # the parents as VALUES and the witness, read by the cycle walk of every kind below
+                  # the parents as VALUES and the witness, read by the cycle walk of every kind below,
+                  # and the ancestor map
                   __kindImports = kindParents;
                   __kindWitness = kindWitness;
+                  __kindAncestors = resolvedOnly kindAncestors;
                 }
             );
         };
@@ -1713,7 +1839,7 @@ let
               # over the RAW source, comments included — because its comment stripper is line-based
               # and a multi-line string is where that premise could break. Matching `_collectionKeys`
               # above costs nothing and leaves that census's population where it was.
-              description = "The admissible non-collection keys of a kind declaration: gen-merge's published structured-module keys (`merge.moduleSyntax.structured`, which includes `key`). A structured declaration — one carrying `config` or `options` — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. Every other key on a structured declaration is refused by name. A bare top-level option declaration is never read, structured or not: neither module engine collects a top-level `mkOption` as a declaration, so it is refused independently of structuring the moment the surrounding declaration carries ANY module-syntax key at all (`den-hoag-zijk1`). On EVERY declaration, structured or shorthand and on both branches, a top-level key naming one of the schema's construction formals (${builtins.concatStringsSep ", " schemaEntryFormals}) or one of the names gen-schema writes onto the kind value (${builtins.concatStringsSep ", " publishedEntryKeys}) is refused by name: it is fixed by the constructor or published by this library, and written on a kind entry it would land on every instance instead; a module the entry imports is not reached. Two exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. A declaration carrying NO module-syntax key at all is plain data through and through: every key of it is read as config, an option-shaped value among them is no different from any other, and nothing is refused.";
+              description = "The admissible non-collection keys of a kind declaration: gen-merge's published structured-module keys (`merge.moduleSyntax.structured`, which includes `key`). A structured declaration — one carrying `config` or `options` — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. Every other key on a structured declaration is refused by name. A bare top-level option declaration is never read, structured or not: neither module engine collects a top-level `mkOption` as a declaration, so it is refused independently of structuring the moment the surrounding declaration carries ANY module-syntax key at all (`den-hoag-zijk1`). On EVERY declaration, structured or shorthand and on both branches, a top-level key naming one of the schema's construction formals (${builtins.concatStringsSep ", " schemaEntryFormals}) or one of the names gen-schema writes onto the kind value (${builtins.concatStringsSep ", " publishedEntryKeys}) is refused by name: it is fixed by the constructor or published by this library, and written on a kind entry it would land on every instance instead; a module the entry imports is not reached. Exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint`, `__sealed`, `__kindImports`, `__kindWitness` and `__kindAncestors` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. A declaration carrying NO module-syntax key at all is plain data through and through: every key of it is read as config, an option-shaped value among them is no different from any other, and nothing is refused.";
             };
             config =
               let

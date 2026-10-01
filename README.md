@@ -886,11 +886,23 @@ name. The walk is over parent VALUES, compared by a content witness (the kind's 
 was written, its parents' names and its declared option names), so a parent reached twice is a
 diamond, not a cycle, and another tree's kind of the same name is a different kind. Each kind value
 publishes the two things the walk reads: `__kindImports` (its parent kind values) and
-`__kindWitness`. A kind that composes a parent is also a module keyed by its witness, so a diamond
-composes each parent once and two trees' same-named kinds, written apart, both compose. The witness
-does not tell apart two kinds written at the same source position with the same parents' and option
-names, the usual case being one generator function applied twice: those share a key, and the one
-imported first composes while the second is dropped.
+`__kindWitness`. A kind that composes a parent is also a module keyed by its MARK, so a diamond
+composes each parent once, and two kinds with different marks both compose: two trees' same-named
+kinds, or one generator applied in two trees with an option's type changed, where gen-merge then
+refuses the declarations that conflict. Two declarations sharing a mark (one generator applied twice,
+differing only in an option default, which enters the mark by path) share the key: imported side by
+side, the first composes and the second is dropped; reached by one kind, its ancestor map refuses them.
+
+**Each kind publishes its transitive ancestors, and a subkind must keep its ancestors' classes.**
+`__kindAncestors` maps each ancestor's mark to the ancestor kind value, read off `__kindImports`.
+On an `evalSchema` tree a declared parent is published as the value the tree returns for it. A mark
+reached along two paths is decided as `kindEq` decides it: one kind is one entry, and two declarations
+that share a mark and differ are refused by name, naming the kind and both paths:
+`gen-schema: kind 'd' reaches 'p' along d -> x -> p and along d -> y -> p: two declarations of 'p' mint one identity and differ, compared as values, only at sealed component(s) 'open.options.base.default'; …`.
+A subkind's `keySemantics` must hold every key of each ancestor's, with the same `category`; one that
+omits or re-categorises a key is refused by name, naming the kind, the key and the ancestor. Both
+refusals fire where the kind is composed (its options, refs, mark or an instance, and the map itself),
+never at its WHNF, and after the cycle walk.
 
 **The deprecated inheritance spelling is read as `inherits`, with a warning, where a value test can
 see it, and nowhere else (a declared exception to "a value or a named refusal").** A kind value
@@ -930,7 +942,7 @@ whose module arguments it does not have; (3) a kind's functor applied by hand, `
 result carries no mark, and `evalSchema` composes a parent through exactly this form, which is why its
 own injection does not warn; (4) gen-aspects' `__defsModule`, which is not a kind value. None of them
 records a name, and none is a parent to the cycle walk: a cycle closed only through one of them is not
-refused by name. Where its other edges are kind values, the witness key closes it and it composes the
+refused by name. Where its other edges are kind values, the mark key closes it and it composes the
 union of its members' options.
 
 What the test forces, stated exactly: where the kind's `inherits` is read (never at the kind's WHNF), its
@@ -1117,11 +1129,11 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 **Scope.** That idiom reads collection values on the **default entry-type path**. Two caveats, both
 real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
-with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__kindImports`,
+with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__kindAncestors`, `__kindImports`,
 `__kindWitness`, `__mint`, `__pureModule`, `__sealed`, `_class`, `_file`, `_module`, `baseModule`,
 `collections`, `computed`, `config`, `disabledModules`, `freeformType`, `imports`, `key`,
 `keySemantics`, `kind`, `meta`, `mixins`, `mkType`, `options`, `refinements`, `refs`, `require`,
-`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 28 names: gen-merge's published
+`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 29 names: gen-merge's published
 `moduleSyntax.structured` and `moduleSyntax.shorthandMeta`, the names gen-schema writes onto the kind
 value itself, and the schema's construction formals) is refused when `_collectionKeys` is read, exactly as it is refused when a
 kind is merged.

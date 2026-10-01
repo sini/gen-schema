@@ -265,6 +265,7 @@ in
         ++ genMerge.moduleSyntax.shorthandMeta
         ++ [
           "__functor"
+          "__kindAncestors"
           "__kindImports"
           "__kindWitness"
           "__mint"

@@ -640,7 +640,7 @@ in
         (kindOf { computed = _: _: { options = "COMPUTED"; }; } { options.role = strOpt; }).options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness$";
+        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors$";
       };
     };
 
@@ -670,7 +670,7 @@ in
         } { }).refs;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness$";
+        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors$";
       };
     };
   };
@@ -906,6 +906,22 @@ in
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kind 'host': declaration key '__kindWitness' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread$";
+      };
+    };
+    # `__kindAncestors` is `_`-prefixed, so the construction-formal door's `publishedEntryKeys` (which
+    # drops every `_`-prefixed name of `kindResultKeys`) leaves it to this door, as it leaves its two
+    # siblings: refused here, with this door's text and not the published-name text.
+    test-kind-ancestors-is-a-reserved-declaration-key = {
+      expr =
+        assert
+          let
+            control = builtins.tryEval (builtins.attrNames (kindOf { } { options.role = strOpt; }).options);
+          in
+          control.success && control.value == [ "role" ];
+        builtins.attrNames (kindOf { } { __kindAncestors = { }; }).options;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: kind 'host': declaration key '__kindAncestors' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread$";
       };
     };
 
@@ -2313,6 +2329,177 @@ in
         expectedError = {
           type = "ThrownError";
           msg = "^gen-schema: collection 'computed' is reserved — cannot be used as a collection key$";
+        };
+      };
+    };
+
+  # THE LINEAGE REFUSALS (den-hoag-l0y U1): the ancestor map's diamond refusal, which names the child
+  # and both paths, the class check, and the composition the mark-keyed module key no longer drops.
+  # Each is read at the child's COMPOSED read (an option), where `resolvedOnly` sites it, and each
+  # carries its admitted twin as a live control (`ci/tests/kind-ancestors.nix` holds them as cells).
+  flake.testsError.kind-lineage-refusals =
+    let
+      T = genMerge.types;
+      intOpt = genMerge.mkOption { type = T.int; };
+      openInt =
+        d:
+        genMerge.mkOption {
+          type = T.int;
+          default = d;
+        };
+      tree = plainTree;
+      pOf = d: (tree [ { config.schema.p.options.base = openInt d; } ]).p;
+      mid =
+        p: o:
+        (tree [
+          {
+            config.schema.${o} = {
+              imports = [ p ];
+              options.${o} = intOpt;
+            };
+          }
+        ]).${o};
+      diamondOf =
+        a: b:
+        (tree [
+          {
+            config.schema.d.imports = [
+              a
+              b
+            ];
+          }
+        ]).d;
+      p80 = pOf 80;
+      dOk = diamondOf (mid p80 "x") (mid p80 "y");
+      dBad = diamondOf (mid p80 "x") (mid (pOf 443) "y");
+
+      ksBase = {
+        alpha.category = "class";
+      };
+      baseA =
+        (plainTreeWith (mkSchemaOption { keySemantics = ksBase; }) [
+          { config.schema.base.options.b = intOpt; }
+        ]).base;
+      subUnder =
+        ks:
+        (plainTreeWith (mkSchemaOption { keySemantics = ks; }) [
+          {
+            config.schema.sub = {
+              imports = [ baseA ];
+              options.extra = intOpt;
+            };
+          }
+        ]).sub;
+      subOk = subUnder (ksBase // { beta.category = "class"; });
+
+      # one generator in two trees: `bOpt` is the only difference (a type for K2, a default for K2eq)
+      gen = bOpt: {
+        config.schema.root.options.r = intOpt;
+        config.schema.base = {
+          inherits = [ "root" ];
+          options.b = bOpt;
+        };
+      };
+      consumer =
+        foreignOpt: localOpt:
+        tree [
+          (gen localOpt)
+          {
+            config.schema.sub = {
+              imports = [ (tree [ (gen foreignOpt) ]).base ];
+              options.s = intOpt;
+            };
+          }
+          {
+            config.schema.x = {
+              inherits = [ "base" ];
+              options.xx = intOpt;
+            };
+          }
+          {
+            config.schema.d.inherits = [
+              "sub"
+              "x"
+            ];
+          }
+        ];
+      k2 = consumer intOpt (genMerge.mkOption { type = T.str; });
+      k2eq = consumer (openInt 80) (openInt 443);
+    in
+    {
+      # C3 + P6 · `p` reached along two paths as two declarations of one mark: refused at the child's
+      # composed read, naming the child and both paths, with `kindEq`'s sealed component.
+      test-depth-2-diamond-is-refused-over-transitive-ancestors = {
+        expr =
+          assert (forced dOk.options.base.default).value == 80;
+          dBad.options.base.default;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'd' reaches 'p' along d -> x -> p and along d -> y -> p: two declarations of 'p' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'open.options.base.default'; ";
+        };
+      };
+      # The same refusal at the published map.
+      test-depth-2-diamond-is-refused-at-the-ancestor-map = {
+        expr =
+          assert (forced (builtins.attrNames dOk.__kindAncestors)).success;
+          builtins.attrNames dBad.__kindAncestors;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'd' reaches 'p' along d -> x -> p and along d -> y -> p: two declarations of 'p' ";
+        };
+      };
+      # C2 · a subkind whose keySemantics omits a base class is refused by name, naming the kind, the
+      # key and the ancestor.
+      test-subkind-omitting-a-base-class-is-refused = {
+        expr =
+          assert (forced (builtins.attrNames subOk.options)).success;
+          builtins.attrNames
+            (subUnder {
+              beta.category = "class";
+            }).options;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'sub' inherits 'base', whose keySemantics declares the key 'alpha', and this kind's keySemantics does not: a subkind's keySemantics must hold every key of each ancestor's, with the same category; build this kind's schema with 'alpha' in its keySemantics as the ancestor declares it$";
+        };
+      };
+      # C2 · the same key under another category is refused too.
+      test-subkind-recategorising-a-base-class-is-refused = {
+        expr =
+          assert (forced (builtins.attrNames subOk.options)).success;
+          builtins.attrNames
+            (subUnder {
+              alpha.category = "channel";
+              beta.category = "class";
+            }).options;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'sub' inherits 'base', whose keySemantics gives the key 'alpha' the category 'class', and this kind's keySemantics gives it 'channel': ";
+        };
+      };
+      # K2 · one generator in two trees differing only in an option TYPE: equal witnesses, different
+      # marks. Keyed by mark, both `base`s compose into `d`, and gen-merge refuses the conflicting
+      # declaration; keyed by witness, the second was dropped and `b` read `int`, silently. The message
+      # is gen-merge's and names neither `d` nor the trees (residue: the option-type merge has no kind
+      # in scope). Control: `x`, which reaches only the local `base`, composes.
+      test-differing-mark-parents-are-not-dropped-by-the-module-key = {
+        expr =
+          assert (forced k2.x.options.b.type.name).value == "string";
+          k2.d.options.b.type.name;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-merge: option `b' is declared with types that do not merge \\(`int' and `string'\\); declared in <gen-merge>, via option schema.base, <gen-merge>, via option schema.base$";
+        };
+      };
+      # K2eq · the same topology, the two `base`s differing only in an option DEFAULT: marks and
+      # witnesses both collide, so they share a module key and `d` composed one of them silently.
+      # The ancestor map's fold refuses the pair at `d`'s composed read.
+      test-equal-mark-parents-are-refused-by-the-fold = {
+        expr =
+          assert (forced k2eq.x.options.b.default).value == 443;
+          k2eq.d.options.b.default;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'd' reaches 'base' along d -> sub -> base and along d -> x -> base: two declarations of 'base' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'modules', 'open.options.b.default'; ";
         };
       };
     };

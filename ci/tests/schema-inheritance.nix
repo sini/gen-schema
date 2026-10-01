@@ -857,9 +857,9 @@ in
         root = [ ];
       };
     };
-    # Two trees' same-named kinds that each compose a parent carry two witnesses, so both compose
-    # where one instance imports both; and a kind importing another tree's same-named kind is not a
-    # cycle.
+    # Two trees' same-named kinds that each compose a parent carry two marks, so two module keys, and
+    # both compose where one instance imports both; and a kind importing another tree's same-named
+    # kind is not a cycle (the cycle walk compares witnesses, which differ too).
     test-same-named-kinds-of-two-trees-both-compose = {
       expr =
         builtins.attrNames
@@ -876,9 +876,10 @@ in
         "other"
       ];
     };
-    # The witness's stated residue: ONE generator applied twice writes its two `a`s at one source
-    # position with the same parents and option names, so they share a witness and a module key, and
-    # gen-merge's key dedup composes the first one imported and drops the second.
+    # ONE generator applied twice, its two `a`s differing only in an option default (open content,
+    # entered into the mark by path): they share a mark, so a module key, and imported side by side
+    # outside any kind gen-merge's key dedup composes the first one imported and drops the second. A
+    # kind reaching both is refused by its ancestor map instead (`kind-lineage-refusals`).
     test-one-generator-applied-twice-composes-the-first = {
       expr = {
         sameWitness = (oneGenerator "one").__kindWitness == (oneGenerator "two").__kindWitness;

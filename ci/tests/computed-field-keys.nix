@@ -53,6 +53,7 @@ let
 
   refused = [
     "__functor"
+    "__kindAncestors"
     "__kindImports"
     "__kindWitness"
     "__mint"
