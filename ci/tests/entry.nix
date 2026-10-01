@@ -223,11 +223,11 @@ in
 
   # And the library reached THROUGH the shim actually works, rather than merely having the right
   # keys — a delegation that forwarded the wrong value would satisfy an `attrNames` check. The
-  # field-reference constructor and its recogniser both run inside `field-ref.nix`, which is built
+  # field-reference constructor and its recogniser both run inside `field-declaration.nix`, which is built
   # over the injected `prelude`, so a shim forwarding something that is not gen-prelude fails here
   # rather than passing quietly.
   flake.tests.entry.test-the-shims-library-is-live = {
-    expr = standalone.isFieldRef (standalone.fieldRef { id_hash = "h"; } [ "a" ]);
+    expr = standalone.isFieldDeclaration (standalone.mkFieldDeclaration { id_hash = "h"; } [ "a" ]);
     expected = true;
   };
 

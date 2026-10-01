@@ -149,9 +149,9 @@ let
     inherit (bridgeLib) isOptionDecl;
   };
   refLib = import ./ref.nix { inherit prelude merge constructionRelation; };
-  # The VALUE-level reference vocabulary, kin to refLib's type-level one — see field-ref.nix's
+  # The VALUE-level declaration vocabulary, kin to refLib's type-level one — see field-declaration.nix's
   # header for the axis that separates them.
-  fieldRefLib = import ./field-ref.nix { inherit prelude; };
+  fieldDeclarationLib = import ./field-declaration.nix { inherit prelude; };
   # `identity` is threaded in for the PROVENANCE MARK (ADR-0034) this file's entry-type mints on
   # every kind value. It takes the mint as an injected leaf and constructs with it — the same
   # discipline `id-hash.nix` is under, and the reason `hashIdentity` is still absent from the
@@ -239,7 +239,11 @@ in
     setOf
     toSet
     ;
-  inherit (fieldRefLib)
+  inherit (fieldDeclarationLib)
+    mkFieldDeclaration
+    isFieldDeclaration
+    fieldDeclarationsIn
+    fieldDeclarationMarker
     fieldRef
     isFieldRef
     fieldRefsIn

@@ -53,10 +53,18 @@
         # The THIRD plane, `ci --tests-process`: cells whose verdict is a count on stderr (the kind
         # mint's cost oracle), one evaluator process per cell, run under each column's evaluator.
         ./tests-process.nix
-        # `ref` is a TOMBSTONE (lib/ref.nix, THE RETIRED NAME; den-hoag-2zjg1): `checks.root-surface`
-        # excludes it from the walk, and the generated `root-surface-retired.test-retired-ref` cell pins
-        # this exact message at the root seam, so a resurrected or reworded tombstone reds.
+        # `ref` (lib/ref.nix) and the four `fieldRef*` names (lib/field-declaration.nix) are TOMBSTONES (THE
+        # RETIRED NAME(S); den-hoag-2zjg1): `checks.root-surface` excludes them from the walk, and the
+        # generated `root-surface-retired.test-retired-*` cells pin each exact message at the root seam, so a resurrected or reworded tombstone reds.
         {
+          gen.ci.rootSurface.retired.fieldRef =
+            "gen-schema: `fieldRef` is renamed `mkFieldDeclaration`. The value it builds is a declaration (Neron et al. 2015), so its constructor is `mkFieldDeclaration <instance> <path>`; the arguments and the behaviour are unchanged.";
+          gen.ci.rootSurface.retired.isFieldRef =
+            "gen-schema: `isFieldRef` is renamed `isFieldDeclaration`; the predicate and its behaviour are unchanged.";
+          gen.ci.rootSurface.retired.fieldRefsIn =
+            "gen-schema: `fieldRefsIn` is renamed `fieldDeclarationsIn`; the scan and its behaviour are unchanged.";
+          gen.ci.rootSurface.retired.fieldRefMarker =
+            "gen-schema: `fieldRefMarker` is renamed `fieldDeclarationMarker`; the marker key is now `__genSchemaFieldDeclaration`.";
           gen.ci.rootSurface.retired.ref =
             "gen-schema: `ref` is renamed `declarationOf`. A value denoting a node is a declaration and the name written at a use site is a reference (Neron et al. 2015), so the type of a field holding either is `declarationOf <kind-or-registry>`; the argument and the behaviour are unchanged.";
         }

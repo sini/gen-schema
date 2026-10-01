@@ -30,7 +30,7 @@ gen-schema gives you what `lib.types.submodule` doesn't: open kind definitions t
   - [Custom Ref Coercion](#custom-ref-coercion)
   - [Deferred Coerce](#deferred-coerce-self-referential-registries)
   - [Deduplicated Sets](#deduplicated-sets)
-  - [Field References (Values)](#field-references-values)
+  - [Field Declarations (Values)](#field-declarations-values)
   - [Parent-Child Topology](#parent-child-topology)
   - [Schema Introspection](#schema-introspection)
   - [Scope Graph Bridge](#scope-graph-bridge-consumer-side)
@@ -697,49 +697,49 @@ config.fleet.groups.web.members = [ "igloo" "iceberg" "igloo" ];
 
 Composes with custom coerce hooks — expansion produces duplicates, `setOf` removes them.
 
-### Field References (Values)
+### Field Declarations (Values)
 
-`declarationOf` is a **type**: it declares that a field points at an instance. `fieldRef` is the matching
+`declarationOf` is a **type**: it declares that a field points at an instance. `mkFieldDeclaration` is the matching
 **value**: an inert record naming which instance, and which field of it.
 
 ```nix
-fr = genSchema.fieldRef config.fleet.hosts.igloo [ "net" "addr" ];
-# → { __genSchemaFieldRef = true; aspect = <igloo>; path = [ "net" "addr" ]; }
+fr = genSchema.mkFieldDeclaration config.fleet.hosts.igloo [ "net" "addr" ];
+# → { __genSchemaFieldDeclaration = true; aspect = <igloo>; path = [ "net" "addr" ]; }
 
-genSchema.isFieldRef fr                                    # → true
-genSchema.fieldRefsIn { listen = { bind = fr; }; }
+genSchema.isFieldDeclaration fr                                    # → true
+genSchema.fieldDeclarationsIn { listen = { bind = fr; }; }
 # → [ { at = [ "listen" "bind" ]; aspect = <igloo>; path = [ "net" "addr" ]; } ]
 ```
 
 The target must carry `id_hash` — routing is by identity, and a display key is not one, so a name
-string is refused at application time. `fieldRefsIn` returns one record per ref it finds, with `at`
-giving the subpath (attribute keys and list indices) where the ref sat; `[ ]` means the scanned value
-was itself a ref.
+string is refused at application time. `fieldDeclarationsIn` returns one record per declaration it finds, with `at`
+giving the subpath (attribute keys and list indices) where the declaration sat; `[ ]` means the scanned value
+was itself a declaration.
 
 The two levels are complementary and both are *derived*, never declared:
 
-|            | `declarationOf`                    | `fieldRef`                                 |
+|            | `declarationOf`                    | `mkFieldDeclaration`                       |
 | ---------- | ---------------------------------- | ------------------------------------------ |
 | what it is | an option **type** on a field      | a **value** inhabiting such a field        |
 | lives in   | the kind's schema                  | a default or a contributed value           |
 | edges      | `_refEdges`, kind → kind           | (instance, field) → (instance, field)      |
 | refuses    | an unresolvable key, at merge time | a non-identity target, at application time |
 
-**`fieldRefsIn` refuses functions.** A function found anywhere the scan descends throws, naming the
+**`fieldDeclarationsIn` refuses functions.** A function found anywhere the scan descends throws, naming the
 position, rather than being treated as a leaf:
 
 ```nix
-genSchema.fieldRefsIn { k = _: fr; }
-# → error: gen-schema: fieldRefsIn: function at scanned position k — this scan's domain is data.
+genSchema.fieldDeclarationsIn { k = _: fr; }
+# → error: gen-schema: fieldDeclarationsIn: function at scanned position k — this scan's domain is data.
 #   A function is refused rather than skipped, because a reference inside a closure is unreachable
 #   to any structural scan: its edge could never be derived, so the dependency would go missing
 #   silently. If this position is a computed value, express it where its reads stay visible —
-#   `fieldRef <instance> <path>` for a cross-instance read, or the kind's `computed` hook for a
+#   `mkFieldDeclaration <instance> <path>` for a cross-instance read, or the kind's `computed` hook for a
 #   value derived from collections and defs; otherwise, make the position data, or keep the
 #   function outside the scanned structure.
 ```
 
-That is deliberate. Nix exposes no primitive that inspects a function body, so a ref inside a closure
+That is deliberate. Nix exposes no primitive that inspects a function body, so a declaration inside a closure
 is invisible to any structural scan — and skipping it fails *open*: the edge is missing, a cycle it
 would have closed goes undetected, and the unresolved ref record leaks into output as data. Refusing
 eliminates the case instead of declaring it unanalysable, which keeps every dependence fact the scan
@@ -756,7 +756,7 @@ around it:
 - it reaches **any depth** of the value tree, including a function inside a foreign attrset stapled
   in from elsewhere;
 - a **raw lambda as a computed value is foreclosed**. Computed values are expected to route through
-  constructs whose reads are graph-visible: `fieldRef` for a cross-instance read, `computed` for a
+  constructs whose reads are graph-visible: `mkFieldDeclaration` for a cross-instance read, `computed` for a
   value derived from collections and defs, `derive` on a registry for one derived per instance.
 
 That covers the cases seen so far, and it is the first thing to reach for. If it genuinely does not,
@@ -1584,22 +1584,22 @@ Converts a list of instances to a set with O(1) membership lookup via attrset ba
 }
 ```
 
-### `fieldRef` / `isFieldRef` / `fieldRefsIn`
+### `mkFieldDeclaration` / `isFieldDeclaration` / `fieldDeclarationsIn`
 
 ```nix
-fieldRef instance [ fieldName … ]   # → { __genSchemaFieldRef = true; aspect; path; }
-isFieldRef v                        # → bool
-fieldRefsIn v                       # → [ { at; aspect; path; } ]
+mkFieldDeclaration instance [ fieldName … ]   # → { __genSchemaFieldDeclaration = true; aspect; path; }
+isFieldDeclaration v                        # → bool
+fieldDeclarationsIn v                       # → [ { at; aspect; path; } ]
 ```
 
-The value-level counterpart of `declarationOf` — see [Field References (Values)](#field-references-values).
-`fieldRef` throws unless the target carries `id_hash` and the path is a non-empty list of strings;
+The value-level counterpart of `declarationOf` — see [Field Declarations (Values)](#field-declarations-values).
+`mkFieldDeclaration` throws unless the target carries `id_hash` and the path is a non-empty list of strings;
 the record carries the caller's own instance, so identity in ≡ identity out.
 
-`fieldRefsIn` scans deeply for those records, returning one entry per hit with `at` giving the
+`fieldDeclarationsIn` scans deeply for those records, returning one entry per hit with `at` giving the
 subpath where it sat (`[ ]` = the scanned value itself). It **throws** on a function in any scanned
-position: the scan's domain is data, and a ref inside a closure would be silently invisible. The
-marker key is exported as `fieldRefMarker` for consumers writing their own predicate.
+position: the scan's domain is data, and a declaration inside a closure would be silently invisible. The
+marker key is exported as `fieldDeclarationMarker` for consumers writing their own predicate.
 
 ### `schemaFn`
 
