@@ -1,11 +1,11 @@
-# Field declarations — inert, identity-bearing references to a FIELD of another instance.
+# Field declarations — inert, identity-bearing declarations denoting a FIELD of another instance.
 #
 # A field declaration is plain data (no functions, no thunk wrappers): a record containing field declarations stays
 # fully introspectable, and the cross-instance dependency graph is computable before any resolution
 # (Mokhov, Mitchell & Peyton Jones, *Build Systems à la Carte*, ICFP 2018, §3 — static/applicative
 # task dependencies, known before any value is produced, not dynamic/monadic ones).
 #
-# ── KINSHIP with `declarationOf` (./ref.nix), the other reference vocabulary in this library ──
+# ── KINSHIP with `declarationOf` (./ref.nix), the other declaration vocabulary in this library ──
 #
 # The two are not variants of one construct; they sit on opposite sides of the type/value axis:
 #
@@ -48,9 +48,19 @@ in
   # renderAt is returned so a golden can call the SHIPPED renderer instead of re-implementing it —
   # a re-implementation is not an oracle for the real one, and a throw's message is unreachable to
   # `builtins.tryEval`, which yields only `success`. It is deliberately NOT re-exported by
-  # ./default.nix: the public surface is the four names above, and this one is reachable only by
+  # ./default.nix: the public surface is the four live names above, and this one is reachable only by
   # importing this module directly, which is what the suite does.
   inherit renderAt;
+
+  # ── THE RETIRED NAMES ──
+  # Tombstones rather than silent aliases, as `ref` in ./ref.nix: the old names inverted the primary
+  # (a value denoting a node is a declaration; the name written at a use site is a reference, Neron
+  # et al. 2015), so each is refused by name and the refusal names its replacement. Published values,
+  # not lambdas, so reaching a name refuses as well as applying it; no message interpolates anything.
+  fieldRef = throw "gen-schema: `fieldRef` is renamed `mkFieldDeclaration`. The value it builds is a declaration (Neron et al. 2015), so its constructor is `mkFieldDeclaration <instance> <path>`; the arguments and the behaviour are unchanged.";
+  isFieldRef = throw "gen-schema: `isFieldRef` is renamed `isFieldDeclaration`; the predicate and its behaviour are unchanged.";
+  fieldRefsIn = throw "gen-schema: `fieldRefsIn` is renamed `fieldDeclarationsIn`; the scan and its behaviour are unchanged.";
+  fieldRefMarker = throw "gen-schema: `fieldRefMarker` is renamed `fieldDeclarationMarker`; the marker key is now `__genSchemaFieldDeclaration`.";
 
   # mkFieldDeclaration aspect path -> field declaration record
   #   `aspect` is the TARGET INSTANCE. Parameter and record field carry that name because the

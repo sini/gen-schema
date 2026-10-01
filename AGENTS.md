@@ -9,7 +9,7 @@ parent topology), **instances** (submodules with strictness and a content-addres
 injected), and the **registry** option that binds them — driven on gen-merge's `evalModuleTree`, not
 nixpkgs `lib.evalModules`.
 
-Also the **reference vocabulary at both levels**: `declarationOf`, the option type declaring that a
+Also the **declaration vocabulary at both levels**: `declarationOf`, the option type declaring that a
 field points at an instance (a declaration; the old name `ref` is refused by name), and `mkFieldDeclaration`,
 the inert value naming which instance and which field of it. One library holds both because they
 are the two halves of one relation, and separating them is how a reference type and its inhabitants
@@ -145,6 +145,10 @@ The registry's `apply` is the pipeline: deferred-ref coerce → refinements → 
 | `isFieldDeclaration`     | `v -> bool`                                                                                                                                                                          |
 | `fieldDeclarationsIn`    | `v -> [ { at; aspect; path; } ]` — deep structural scan; `at` is the subpath (attr keys and list indices) where the declaration sits. **Throws** on a function in a scanned position |
 | `fieldDeclarationMarker` | the marker key string, for consumers writing their own predicate                                                                                                                     |
+| `fieldRef`               | retired: a published `throw` naming `mkFieldDeclaration` (den-hoag-2zjg1); reaching it refuses, catchably                                                                            |
+| `isFieldRef`             | retired: a published `throw` naming `isFieldDeclaration` (den-hoag-2zjg1); reaching it refuses, catchably                                                                            |
+| `fieldRefsIn`            | retired: a published `throw` naming `fieldDeclarationsIn` (den-hoag-2zjg1); reaching it refuses, catchably                                                                           |
+| `fieldRefMarker`         | retired: a published `throw` naming `fieldDeclarationMarker` (den-hoag-2zjg1); reaching it refuses, catchably                                                                        |
 
 ★ **The refusal is WIDER than the hazard, deliberately, and it is not the end of the road.** A
 provably declaration-free function refuses; a function at any depth refuses, including one inside a foreign
@@ -419,7 +423,7 @@ nix eval --json .#lib --apply 'l: { top = builtins.attrNames l; internal = built
 Current output (verbatim):
 
 ```json
-{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","constructionRelation","declarationOf","defaultOnError","emitModule","evalSchema","fieldDeclarationMarker","fieldDeclarationsIn","filterValidators","formatErrors","identityHashForKind","identityKeysForKind","isFieldDeclaration","keySemanticsRecords","kindEq","mkCodec","mkFieldDeclaration","mkFieldValidator","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMixin","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","validateInstances"]}
+{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","constructionRelation","declarationOf","defaultOnError","emitModule","evalSchema","fieldDeclarationMarker","fieldDeclarationsIn","fieldRef","fieldRefMarker","fieldRefsIn","filterValidators","formatErrors","identityHashForKind","identityKeysForKind","isFieldDeclaration","isFieldRef","keySemanticsRecords","kindEq","mkCodec","mkFieldDeclaration","mkFieldValidator","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMixin","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","validateInstances"]}
 ```
 
 **Checks.** Test-runner invocation (from the repo root; CI runs the same command with

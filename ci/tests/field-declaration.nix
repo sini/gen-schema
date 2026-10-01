@@ -237,5 +237,31 @@ in
       };
       expected = true;
     };
+
+    # The four retired names are published throws: reaching each refuses CATCHABLY (success = false),
+    # and the live control beside them is each replacement answering. WHICH refusal fired, naming the
+    # replacement, is pinned at the root seam by the harness-generated `root-surface-retired.test-retired-*`.
+    test-old-names-refused-catchably = {
+      expr = builtins.mapAttrs (_: n: (builtins.tryEval (builtins.seq genSchema.${n} true)).success) {
+        fieldRef = "fieldRef";
+        isFieldRef = "isFieldRef";
+        fieldRefsIn = "fieldRefsIn";
+        fieldRefMarker = "fieldRefMarker";
+        mkFieldDeclaration = "mkFieldDeclaration";
+        isFieldDeclaration = "isFieldDeclaration";
+        fieldDeclarationsIn = "fieldDeclarationsIn";
+        fieldDeclarationMarker = "fieldDeclarationMarker";
+      };
+      expected = {
+        fieldRef = false;
+        isFieldRef = false;
+        fieldRefsIn = false;
+        fieldRefMarker = false;
+        mkFieldDeclaration = true;
+        isFieldDeclaration = true;
+        fieldDeclarationsIn = true;
+        fieldDeclarationMarker = true;
+      };
+    };
   };
 }

@@ -149,7 +149,7 @@ let
     inherit (bridgeLib) isOptionDecl;
   };
   refLib = import ./ref.nix { inherit prelude merge constructionRelation; };
-  # The VALUE-level reference vocabulary, kin to refLib's type-level one — see field-declaration.nix's
+  # The VALUE-level declaration vocabulary, kin to refLib's type-level one — see field-declaration.nix's
   # header for the axis that separates them.
   fieldDeclarationLib = import ./field-declaration.nix { inherit prelude; };
   # `identity` is threaded in for the PROVENANCE MARK (ADR-0034) this file's entry-type mints on
@@ -239,6 +239,10 @@ in
     isFieldDeclaration
     fieldDeclarationsIn
     fieldDeclarationMarker
+    fieldRef
+    isFieldRef
+    fieldRefsIn
+    fieldRefMarker
     ;
   inherit (refinedLib) refinements checkRefinements;
   inherit (refinedLib.types) refined;
