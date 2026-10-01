@@ -610,8 +610,9 @@ let
   # `sealedCollisionEq`'s, the one `kindEq` and the ancestor map make; only the refusal is worded
   # here. Two instances sharing a key share a mark, so a refusal means their sealed subjects are
   # unequal, and one construction compared with itself is not: they are two separate constructions.
-  # A sealed component compares by its seal, so they are refused even where their values are equal,
-  # and the text says so rather than that their values differ. Each component named is decided by the
+  # A sealed component is compared by its seal, the whole value under `==` (ADR-0034), where two
+  # separately built functions are never equal, so they are refused even where the values they
+  # compute are equal, and the text says so rather than that their values differ. Each component named is decided by the
   # same comparison over a one-key slice (`intersectAttrs` keeps the slot, as `sealedCollisionEq`'s
   # own slice does). Reached only on a dropped duplicate.
   keyDecide =
@@ -630,7 +631,7 @@ let
     if r.success then
       r.value
     else
-      throw "${site}, as two separate constructions of one declaration: they mint one identity, and a sealed component compares by its seal, never by its value, so two constructions differ there even where their values are equal. The component(s) whose seals differ: ${
+      throw "${site}, as two separate constructions of one declaration: they mint one identity, and a sealed component is compared by its seal, the whole value under Nix `==`, where two separately built functions are never equal, so two constructions differ there even where the values they compute are equal. The component(s) whose seals differ: ${
         builtins.concatStringsSep ", " (
           map (k: "'${k}'") (
             builtins.filter (k: !(same (slice k a) (slice k b))) (builtins.attrNames a.sealed)

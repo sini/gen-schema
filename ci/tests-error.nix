@@ -2767,7 +2767,7 @@ in
       controls = (forced (o_a [ (oneGenerator "two") ])).value == "two";
       collision = {
         type = "ThrownError";
-        msg = "^gen-schema: kind 'a' is imported twice under one key, as two separate constructions of one declaration: they mint one identity, and a sealed component compares by its seal, never by its value, so two constructions differ there even where their values are equal\\. The component\\(s\\) whose seals differ: 'modules', 'open\\.options\\.o_a\\.default'\\. Import one construction of 'a' in both places, or declare the two differently so that they mint two identities\\.$";
+        msg = "^gen-schema: kind 'a' is imported twice under one key, as two separate constructions of one declaration: they mint one identity, and a sealed component is compared by its seal, the whole value under Nix `==`, where two separately built functions are never equal, so two constructions differ there even where the values they compute are equal\\. The component\\(s\\) whose seals differ: 'modules', 'open\\.options\\.o_a\\.default'\\. Import one construction of 'a' in both places, or declare the two differently so that they mint two identities\\.$";
       };
       reserved = {
         type = "ThrownError";
