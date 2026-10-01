@@ -3,9 +3,9 @@
 #
 # The by-name refusals live in `ci/tests-error.nix` (`construction-formal-refusals`), because `tryEval`
 # discards the message. These are the other half: the population refuses on both branches, the routes
-# that are NOT the misreading still write, and the one route the door does not reach is pinned as
-# residue. A door that refused every top-level key, or every instance field named like a formal, reds
-# the controls here.
+# that are NOT the misreading still write, the imports route refuses, and a custom `mkType` that
+# builds its own modules is pinned as the boundary. A door that refused every top-level key, or every
+# instance field named like a formal, reds the controls here.
 {
   genSchema,
   genMerge,
@@ -124,13 +124,37 @@ in
       expected = "schemakind:c169721a65681877bd243ac69b88eab4d51e86838217149f4e14278515a4aa95";
     };
 
-    # ★ THE BOUNDARY PIN (gate C1). A formal at the top level of a module the entry IMPORTS is NOT
-    # refused: gen-merge's collector reads it in the same shorthand position, and only the collector
-    # still knows the module was shorthand once normalisation has run. This is stated residue, carried
-    # by den-hoag-8x97u; the collector-level door flips this cell, which is the point of pinning it.
-    test-imported-formal-still-lands = {
+    # ★ THE IMPORTS ROUTE IS REFUSED (den-hoag-8x97u). A formal at the top level of a module the entry
+    # IMPORTS refuses at gen-merge's collector, which reads the entry defs' `entryReservation`; the
+    # message is pinned in `ci/tests-error.nix` (`imports-route-refusals`). This cell was the
+    # boundary pin while the route was residue, reading `false`.
+    test-imported-formal-refused = {
       expr = refuses (kindOf { } { imports = [ { keySemantics = "x"; } ]; }).__mint.minted;
-      expected = false;
+      expected = true;
+    };
+
+    # ★ THE BOUNDARY PIN for a CUSTOM `mkType` that builds instance modules from `defs` without
+    # applying `entryReservation`: gen-schema cannot reach a module a caller-supplied function
+    # builds, so the imports-route formal lands there, read back as config. `entryReservation` is the
+    # supply route such a caller applies, as gen-aspects does. Pinned so a change to that boundary
+    # is a visible decision.
+    test-custom-mkType-without-the-reservation-still-lands = {
+      expr =
+        (kindOf {
+          mkType =
+            { kind, defs, ... }:
+            {
+              inherit kind;
+              landed =
+                (genMerge.evalModuleTree {
+                  modules = [
+                    { options.keySemantics = genMerge.mkOption { type = genMerge.types.str; }; }
+                  ]
+                  ++ map (d: d.value) defs;
+                }).config.keySemantics;
+            };
+        } { imports = [ { keySemantics = "x"; } ]; }).landed;
+      expected = "x";
     };
   };
 }

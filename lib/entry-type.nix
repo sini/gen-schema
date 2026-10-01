@@ -454,7 +454,22 @@ let
   # extra conjunct: `__mint` is a TAGGED SUM (authored in `gen-algebra/lib/intensional.nix`, whose
   # comment forbids branching on field presence and reading `.minted` raw), so a value carrying no
   # mintable identity has `__mint` present and `minted` absent, and that read aborts uncatchably.
-  isSchemaKind = v: builtins.isAttrs v && v ? kind && v ? __mint && v.__mint ? minted;
+  #
+  # The shape is ONE BINDING read by two predicates: this one, and `entryReservation`'s `exempt`,
+  # which gen-merge's collector tests as data (it cannot call this function). So the alias and the
+  # exemption from the imports-route reservation cannot drift apart.
+  schemaKindShape = [
+    [ "kind" ]
+    [
+      "__mint"
+      "minted"
+    ]
+  ];
+  hasPath =
+    p: v:
+    p == [ ]
+    || (builtins.isAttrs v && v ? ${builtins.head p} && hasPath (builtins.tail p) v.${builtins.head p});
+  isSchemaKind = v: builtins.isAttrs v && builtins.all (p: hasPath p v) schemaKindShape;
 
   # THE RESOLVER'S PROVENANCE (den-hoag-8c8pr). `inherits` has one reader that composes it,
   # `evalSchema`, and it composes a parent by contributing a def to the child. The def carries this
@@ -665,17 +680,41 @@ let
   #     reserved here with no second edit.
   #
   # Refusing is the construction (ADR-0025 item 1): the misreading becomes inexpressible on a
-  # DIRECT entry def. It does not reach a module the entry IMPORTS — gen-merge's collector reads an
-  # imported module's top-level key in the same shorthand position, and only the collector still
-  # knows a module was shorthand once normalisation has run; that route is stated residue, pinned by
-  # `construction-formal-boundary`. An instance field of such a name is untouched: it is written
-  # on the instance, or under `config.` on the entry, where the instance reading is explicit.
+  # DIRECT entry def, here. A module the entry IMPORTS is reached by `entryReservation` below, at
+  # gen-merge's collector, which alone sees an imported module's top level after function modules
+  # are applied and `imports` flattened. The two doors partition the routes, so each write meets
+  # one. An instance field of such a name is untouched: it is written on the instance, or under
+  # `config.` on the entry, where the instance reading is explicit.
   publishedEntryKeys = builtins.filter (
     k:
     !(prelude.hasPrefix "_" k)
     && !(builtins.elem k declarationKeys)
     && !(builtins.elem k schemaEntryFormals)
   ) kindResultKeys;
+
+  # ★ THE SAME NAMES, IN A MODULE THE KIND ENTRY IMPORTS (den-hoag-8x97u). The direct-def door above
+  # reads the entry's own top level; a reserved name one `imports` (or `require`, or function
+  # module, or path) away is read as instance config by gen-merge's collector, which flattens the
+  # closure. gen-merge enforces a reservation over a marked module's import closure
+  # (`__reservedKeys`) and names no kind or formal, so this library supplies the content as plain
+  # data: each reserved name with its refusal text, and the kind shape the cxlc0 `inherits` alias
+  # reads (`schemaKindShape`), which is exempt so a kind value in `imports` stays an inheritance.
+  # The default branch marks the defs `merged` imports; gen-aspects marks its own `defsModules`
+  # with this set and its `cnfKeys` (exported for that). A custom `mkType` that builds instance
+  # modules from `defs` applies it the same way, or that route is outside the door.
+  entryReservation = kind: {
+    exempt = schemaKindShape;
+    names = builtins.listToAttrs (
+      map (f: {
+        name = f;
+        value = "gen-schema: kind '${kind}': declaration key '${f}' is a construction formal of this schema, written in a module this kind entry imports — it is fixed by the call that builds the schema option (`mkSchemaOption`, `mkSchemaEntryType`), and written there it is not read as one; pass '${f}' to that constructor, or write `config.${f}` for an instance field of that name, which a strict instance must declare as an option";
+      }) schemaEntryFormals
+      ++ map (f: {
+        name = f;
+        value = "gen-schema: kind '${kind}': declaration key '${f}' is a name gen-schema writes onto the kind value, written in a module this kind entry imports — there it lands on every instance, while reading `config.schema.${kind}.${f}` returns the published one; write `config.${f}` for an instance field of that name, which a strict instance must declare as an option";
+      }) publishedEntryKeys
+    );
+  };
 
   isStructuredDecl =
     v: builtins.isAttrs v && prelude.any (k: v ? ${k}) merge.moduleSyntax.structuring;
@@ -1537,7 +1576,32 @@ let
                       value = mkMethodsModule kind finalCollections.methods;
                     };
 
-                  merged = resolvedOnly (base.merge loc (strippedDefs ++ injected));
+                  # The defs `merged` imports carry `entryReservation` (den-hoag-8x97u), so a
+                  # reserved name in a module they import refuses at gen-merge's collector. The
+                  # marker rides IN PLACE on a plain attrset def, which adds no collected entry; a
+                  # function, functor or path def is wrapped, because an applied functor's result
+                  # would drop an in-place key. The plane's `modules` stay the unmarked
+                  # `strippedDefs`, so no kind's mark moves.
+                  reservation = entryReservation kind;
+                  merged = resolvedOnly (
+                    base.merge loc (
+                      map (
+                        d:
+                        d
+                        // {
+                          value =
+                            if builtins.isAttrs d.value && !(d.value ? __functor) then
+                              d.value // { __reservedKeys = reservation; }
+                            else
+                              {
+                                __reservedKeys = reservation;
+                                imports = [ d.value ];
+                              };
+                        }
+                      ) strippedDefs
+                      ++ injected
+                    )
+                  );
 
                   introspect = introspectOf merged;
                   plane = planeOf {
@@ -1915,5 +1979,6 @@ in
     kindEq
     inheritsResolvedFile
     inheritedModule
+    entryReservation
     ;
 }

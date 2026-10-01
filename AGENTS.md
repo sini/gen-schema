@@ -245,8 +245,8 @@ ref edges, each tagged `type`), `_roots`, `_leaves`, `_collectionKeys` (the coll
 extracted from kind defs — built-ins plus this schema's declared `collections`; a computed
 field of the same name wins on the kind result, so reading a key through the published set
 may return the computed value), `_declarationKeys` (the admissible non-collection keys of a kind
-declaration — gen-merge's published `moduleSyntax.structured`, 11 names, which includes `key`) and
-`_reservedCollectionKeys` (the 28 collection names refused by name at construction, for a consumer
+declaration — gen-merge's published `moduleSyntax.structured`, 12 names, which includes `key`) and
+`_reservedCollectionKeys` (the 29 collection names refused by name at construction, for a consumer
 that GENERATES collection names rather than writing them).
 
 **A top-level key on a kind entry naming a construction formal, or a name gen-schema writes onto the
@@ -254,8 +254,12 @@ kind value, is refused by name** (`lib/entry-type.nix`, bindings `schemaEntryFor
 `publishedEntryKeys`, `formalNamed` and `checkDeclarationKeys`; `den-hoag-q17cc`). Shorthand or
 structured, on both branches, ahead of the reserved and surplus clauses; tests
 `construction-formal-refusals.*` in `ci/tests-error.nix` and `ci/tests/construction-formals.nix`.
-It covers DIRECT entry defs only: a formal at the top level of an IMPORTED module still lands (stated
-residue, `den-hoag-8x97u`; pinned by `construction-formals.test-imported-formal-still-lands`).
+It covers DIRECT entry defs; a formal at the top level of an IMPORTED module is refused at gen-merge's
+collector through `entryReservation` (binding of that name, exported; `den-hoag-8x97u`), which the
+default branch attaches to the defs `merged` imports as gen-merge's `__reservedKeys`; tests
+`imports-route-refusals.*` and `construction-formals.test-imported-formal-refused`. A custom
+`mkType` that builds modules from `defs` must apply it itself (pinned by
+`construction-formals.test-custom-mkType-without-the-reservation-still-lands`).
 The formals also join `_reservedCollectionKeys`.
 
 **A key on a STRUCTURED kind declaration that no reader consumes is refused by name**
