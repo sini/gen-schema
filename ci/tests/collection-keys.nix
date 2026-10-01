@@ -256,7 +256,7 @@ in
   # without re-deriving it from `lib/entry-type.nix`. One part is `declarationKeys`, one part
   # gen-merge's published `moduleSyntax.shorthandMeta` (den-hoag-1n12c: DERIVED here, not restated
   # — the module-key half is gen-merge's to name, not a literal frozen against it), and one part
-  # restated as `kindResultKeys` -- pinned here so no part moves unremarked.
+  # restated as `kindResultKeys` and `schemaEntryFormals` -- pinned here so no part moves unremarked.
   flake.tests.collection-keys.test-reserved-collection-keys-published = {
     expr = liveConsumerNames.config.schema._reservedCollectionKeys;
     expected = builtins.sort (a: b: a < b) (
@@ -276,6 +276,12 @@ in
           "refinements"
           "refs"
           "strict"
+          # the construction formals not already above (den-hoag-q17cc)
+          "baseModule"
+          "collections"
+          "computed"
+          "mkType"
+          "specialArgs"
         ]
       )
     );

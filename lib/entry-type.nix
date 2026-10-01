@@ -625,8 +625,12 @@ let
   # sound input rather than a checked one.
   #
   # The refusal names ONE key and says nothing about WHY it is reserved: the reason is per-name
-  # (two of them, fifteen names) and the caller's remedy is the same for all — rename the
-  # collection. A maintainer reads the reason here, at the site they would edit.
+  # and the caller's remedy is the same for all — rename the collection. A maintainer reads the
+  # reason here, at the site they would edit.
+  #
+  # `schemaEntryFormals` joins the set for the construction-formal door's sake (den-hoag-q17cc,
+  # below at `formalNamed`): a collection named `computed` would make that top-level key read as a
+  # collection, and the ambiguity the door closes would reopen for exactly that name.
   #
   # ★ UNIFORM ACROSS BOTH BRANCHES, at a stated cost. On the `mkType` branch `finalCollections` is
   # never splatted into the result, so `mixins`, `refs` and `refinements` are inert there and
@@ -640,8 +644,38 @@ let
   # already does. `declarationKeys` alone (gen-merge's STRUCTURED set) does not cover it, because a
   # shorthand-only key is never a structured one.
   reservedCollectionKeys = prelude.sort (a: b: a < b) (
-    prelude.unique (declarationKeys ++ merge.moduleSyntax.shorthandMeta ++ kindResultKeys)
+    prelude.unique (
+      declarationKeys ++ merge.moduleSyntax.shorthandMeta ++ kindResultKeys ++ schemaEntryFormals
+    )
   );
+
+  # ★ THE NAMES WITH A KIND-LEVEL READING THAT A KIND ENTRY'S TOP LEVEL MUST NOT CARRY
+  # (den-hoag-q17cc). A kind entry is a module, and on the shorthand reading its top-level keys are
+  # config for EVERY instance of the kind. Two families of names share that key position and mean
+  # something at the KIND level instead, so a write there is misread silently: it lands on the
+  # instances, and the kind value reads back its own value at the path just written.
+  #
+  #   · `schemaEntryFormals`: the names a schema is BUILT from. A construction formal is fixed by
+  #     the call that builds the schema option, before the tree evaluates; `keySemantics` is
+  #     extensible by ruling, never by accretion (ADR-0027), so reading the write AS the formal is
+  #     not the remedy.
+  #   · `publishedEntryKeys`, below: the rest of what this library WRITES onto the kind value,
+  #     read off `kindResultKeys` — less the module keys gen-merge reads (`options`) and the
+  #     `_`-prefixed names `reservedDeclarationKeysFor` already refuses — so a name added there is
+  #     reserved here with no second edit.
+  #
+  # Refusing is the construction (ADR-0025 item 1): the misreading becomes inexpressible on a
+  # DIRECT entry def. It does not reach a module the entry IMPORTS — gen-merge's collector reads an
+  # imported module's top-level key in the same shorthand position, and only the collector still
+  # knows a module was shorthand once normalisation has run; that route is stated residue, pinned by
+  # `construction-formal-boundary`. An instance field of such a name is untouched: it is written
+  # on the instance, or under `config.` on the entry, where the instance reading is explicit.
+  publishedEntryKeys = builtins.filter (
+    k:
+    !(prelude.hasPrefix "_" k)
+    && !(builtins.elem k declarationKeys)
+    && !(builtins.elem k schemaEntryFormals)
+  ) kindResultKeys;
 
   isStructuredDecl =
     v: builtins.isAttrs v && prelude.any (k: v ? ${k}) merge.moduleSyntax.structuring;
@@ -1220,21 +1254,27 @@ let
               # conditional IS the result, so forcing any field of the kind meets it, and both branches
               # are reached the same way. It does not follow that both branches REFUSE: clause A stands
               # the unknown-key predicate down whenever `computed` or `mkType` is present, so on the
-              # `mkType` branch no input is ever named. What is live on both branches is the reserved
-              # door below, because `__mint` is written there too.
+              # `mkType` branch no input is ever named. What is live on both branches is the
+              # construction-formal door and the reserved door below, because the formals and
+              # `__mint` belong to both.
               #
               # Forcing the result to WHNF forces the conditional, which is what makes a `builtins.seq`
               # unnecessary. The guard is sited HERE, in the descriptor's own `merge` body, rather than
               # on a completed type: gen-merge's `mkOptionType` maps a foreign descriptor's `merge` onto
               # the internal `mergeDefs` and every container dispatches on that, so a `t // { merge = …; }`
               # override is silently ignored.
-              reservedNamed = prelude.concatMap (
-                d:
-                if builtins.isAttrs d.value then
-                  builtins.filter (k: d.value ? ${k}) (reservedDeclarationKeysFor mkType)
-                else
-                  [ ]
-              ) defs;
+              topKeysIn =
+                names:
+                prelude.concatMap (
+                  d: if builtins.isAttrs d.value then builtins.filter (k: d.value ? ${k}) names else [ ]
+                ) defs;
+              reservedNamed = topKeysIn (reservedDeclarationKeysFor mkType);
+              # The construction-formal door (den-hoag-q17cc, at `publishedEntryKeys`). Same site and
+              # same per-def test as `reservedNamed`, so it is live on both branches; it runs FIRST,
+              # so a structured def gets the formal's text and not the surplus clause's "declare an
+              # option" remedy, which points at the wrong surface.
+              formalNamed = topKeysIn schemaEntryFormals;
+              publishedNamed = topKeysIn publishedEntryKeys;
 
               # THE DEPRECATED INHERITANCE SPELLING (den-hoag-cxlc0), found for `aliasedInherits`
               # above: a kind VALUE in a kind entry's `imports` (or a shorthand def's `require`), found
@@ -1308,7 +1348,11 @@ let
 
               checkDeclarationKeys =
                 result:
-                if reservedNamed != [ ] then
+                if formalNamed != [ ] then
+                  throw "gen-schema: kind '${kind}': declaration key '${builtins.head formalNamed}' is a construction formal of this schema — it is fixed by the call that builds the schema option (`mkSchemaOption`, `mkSchemaEntryType`), and written on a kind entry it is not read as one; pass '${builtins.head formalNamed}' to that constructor, or write `config.${builtins.head formalNamed}` for an instance field of that name, which a strict instance must declare as an option"
+                else if publishedNamed != [ ] then
+                  throw "gen-schema: kind '${kind}': declaration key '${builtins.head publishedNamed}' is a name gen-schema writes onto the kind value — written on a kind entry it lands on every instance, while reading `config.schema.${kind}.${builtins.head publishedNamed}` returns the published one; write `config.${builtins.head publishedNamed}` for an instance field of that name, which a strict instance must declare as an option"
+                else if reservedNamed != [ ] then
                   throw "gen-schema: kind '${kind}': declaration key '${builtins.head reservedNamed}' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread"
                 else if surplusOffenders != [ ] then
                   let
@@ -1653,7 +1697,7 @@ let
               type = merge.types.listOf merge.types.str;
               internal = true;
               readOnly = true;
-              description = "The collection names `mkSchemaOption` refuses, by name, at construction: gen-merge's published module-syntax keys — its structured set (`_declarationKeys`) and its shorthand metadata set, e.g. `require`, which joins `imports` on a shorthand declaration (a collection of either would delete that key from every kind declaration before the module merge sees it) — together with the names gen-schema writes onto the kind value itself (a collection of that name would shadow what this library wrote, or — for `__mint`, applied last — be silently overwritten by it). The remedy for all of them is the same: rename the collection.";
+              description = "The collection names `mkSchemaOption` refuses, by name, at construction: gen-merge's published module-syntax keys — its structured set (`_declarationKeys`) and its shorthand metadata set, e.g. `require`, which joins `imports` on a shorthand declaration (a collection of either would delete that key from every kind declaration before the module merge sees it) — together with the names gen-schema writes onto the kind value itself (a collection of that name would shadow what this library wrote, or — for `__mint`, applied last — be silently overwritten by it), and the schema's construction formals (a collection of that name would make the formal's key on a kind entry read as a collection, where the declaration-key guard refuses it as a formal). The remedy for all of them is the same: rename the collection.";
             };
             # Published for the reason `_collectionKeys` was (`den-hoag-4kh.53.55`): consumers
             # hardcode what a library does not publish. The LIST is only the finite, enforced part of
@@ -1669,7 +1713,7 @@ let
               # over the RAW source, comments included — because its comment stripper is line-based
               # and a multi-line string is where that premise could break. Matching `_collectionKeys`
               # above costs nothing and leaves that census's population where it was.
-              description = "The admissible non-collection keys of a kind declaration: gen-merge's published structured-module keys (`merge.moduleSyntax.structured`, which includes `key`). A structured declaration — one carrying `config` or `options` — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. Every other key on a structured declaration is refused by name. A bare top-level option declaration is never read, structured or not: neither module engine collects a top-level `mkOption` as a declaration, so it is refused independently of structuring the moment the surrounding declaration carries ANY module-syntax key at all (`den-hoag-zijk1`). Two exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. A declaration carrying NO module-syntax key at all is plain data through and through: every key of it is read as config, an option-shaped value among them is no different from any other, and nothing is refused.";
+              description = "The admissible non-collection keys of a kind declaration: gen-merge's published structured-module keys (`merge.moduleSyntax.structured`, which includes `key`). A structured declaration — one carrying `config` or `options` — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. Every other key on a structured declaration is refused by name. A bare top-level option declaration is never read, structured or not: neither module engine collects a top-level `mkOption` as a declaration, so it is refused independently of structuring the moment the surrounding declaration carries ANY module-syntax key at all (`den-hoag-zijk1`). On EVERY declaration, structured or shorthand and on both branches, a top-level key naming one of the schema's construction formals (${builtins.concatStringsSep ", " schemaEntryFormals}) or one of the names gen-schema writes onto the kind value (${builtins.concatStringsSep ", " publishedEntryKeys}) is refused by name: it is fixed by the constructor or published by this library, and written on a kind entry it would land on every instance instead; a module the entry imports is not reached. Two exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. A declaration carrying NO module-syntax key at all is plain data through and through: every key of it is read as config, an option-shaped value among them is no different from any other, and nothing is refused.";
             };
             config =
               let

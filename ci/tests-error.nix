@@ -2219,4 +2219,101 @@ in
       };
     };
   };
+
+  # ★ A NAME WITH A KIND-LEVEL READING WRITTEN AT A KIND ENTRY'S TOP LEVEL (den-hoag-q17cc). Before the
+  # door each of these evaluated at exit 0: the shorthand write became config for every instance and
+  # the kind value went on reading its own value at the path just written. Every cell forces the mark,
+  # which a kind with no instances still mints, and carries the clean kind as its control. The
+  # structured cell is the one the nn4 surplus clause used to answer with "declare an option" — the
+  # wrong surface — so it pins that the formal clause runs first.
+  flake.testsError.construction-formal-refusals =
+    let
+      cleanMarks =
+        (forced (kindOf { } { options.role = strOpt; }).__mint.minted).success
+        && (forced (kindOf { } { role = "web"; }).__mint.minted).success;
+      formalMsg =
+        f:
+        "^gen-schema: kind 'host': declaration key '${f}' is a construction formal of this schema — it is fixed by the call that builds the schema option [(]`mkSchemaOption`, `mkSchemaEntryType`[)], and written on a kind entry it is not read as one; pass '${f}' to that constructor, or write `config[.]${f}` for an instance field of that name, which a strict instance must declare as an option$";
+      publishedMsg =
+        n:
+        "^gen-schema: kind 'host': declaration key '${n}' is a name gen-schema writes onto the kind value — written on a kind entry it lands on every instance, while reading `config[.]schema[.]host[.]${n}` returns the published one; write `config[.]${n}` for an instance field of that name, which a strict instance must declare as an option$";
+      publishedCell = n: v: {
+        expr =
+          assert cleanMarks;
+          (kindOf { } { ${n} = v; }).__mint.minted;
+        expectedError = {
+          type = "ThrownError";
+          msg = publishedMsg n;
+        };
+      };
+    in
+    {
+      # G5 · default branch, shorthand.
+      test-formal-as-shorthand-refuses-by-name = {
+        expr =
+          assert cleanMarks;
+          (kindOf { } { keySemantics = [ "darwin" ]; }).__mint.minted;
+        expectedError = {
+          type = "ThrownError";
+          msg = formalMsg "keySemantics";
+        };
+      };
+
+      # G6 · default branch, structured: the formal clause answers, not the surplus clause.
+      test-formal-in-structured-decl-gets-the-formal-text = {
+        expr =
+          assert cleanMarks;
+          (kindOf { } {
+            options.role = strOpt;
+            keySemantics = [ "darwin" ];
+          }).__mint.minted;
+        expectedError = {
+          type = "ThrownError";
+          msg = formalMsg "keySemantics";
+        };
+      };
+
+      # The `mkType` branch, where clause A stands the surplus guard down: the formal door is live
+      # there too. Control: the same schema's caller-owned key still comes through.
+      test-formal-refuses-on-the-mkType-branch = {
+        expr =
+          let
+            args = {
+              mkType =
+                { kind, ... }:
+                {
+                  inherit kind;
+                  custom = true;
+                };
+            };
+          in
+          assert
+            let
+              control = builtins.tryEval (kindOf args { unreadByGenSchema = "kept"; }).custom;
+            in
+            control.success && control.value;
+          (kindOf args { strict = false; }).custom;
+        expectedError = {
+          type = "ThrownError";
+          msg = formalMsg "strict";
+        };
+      };
+
+      # C2 · the names gen-schema writes onto the kind value that are not formals, each with its own
+      # text: reading the path back returns the published plane, never the write.
+      test-kind-is-a-published-name = publishedCell "kind" "forged";
+      test-refs-is-a-published-name = publishedCell "refs" { forged = 1; };
+      test-refinements-is-a-published-name = publishedCell "refinements" { forged = 1; };
+
+      # G7 · a collection named for a formal would make the formal's key read as a collection.
+      test-collection-named-for-a-formal-is-reserved = {
+        expr =
+          assert cleanMarks;
+          (kindOf { collections.computed.default = [ ]; } { options.role = strOpt; }).__mint.minted;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: collection 'computed' is reserved — cannot be used as a collection key$";
+        };
+      };
+    };
 }

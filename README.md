@@ -1117,13 +1117,36 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 **Scope.** That idiom reads collection values on the **default entry-type path**. Two caveats, both
 real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
-with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__mint`,
-`__pureModule`, `__sealed`, `_class`, `_file`, `_module`, `config`, `disabledModules`, `freeformType`,
-`imports`, `key`, `keySemantics`, `kind`, `meta`, `mixins`, `options`, `refinements`, `refs`,
-`require`, `strict` — `schema._reservedCollectionKeys`, 21 names: gen-merge's published
-`moduleSyntax.structured` and `moduleSyntax.shorthandMeta` together with the names gen-schema writes
-onto the kind value itself) is refused when `_collectionKeys` is read, exactly as it is refused when a
+with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__kindImports`,
+`__kindWitness`, `__mint`, `__pureModule`, `__sealed`, `_class`, `_file`, `_module`, `baseModule`,
+`collections`, `computed`, `config`, `disabledModules`, `freeformType`, `imports`, `key`,
+`keySemantics`, `kind`, `meta`, `mixins`, `mkType`, `options`, `refinements`, `refs`, `require`,
+`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 28 names: gen-merge's published
+`moduleSyntax.structured` and `moduleSyntax.shorthandMeta`, the names gen-schema writes onto the kind
+value itself, and the schema's construction formals) is refused when `_collectionKeys` is read, exactly as it is refused when a
 kind is merged.
+
+### A construction formal on a kind entry is refused by name
+
+The names a schema is built from — `mkSchemaOption`'s and `mkSchemaEntryType`'s formals
+(`baseModule`, `collections`, `computed`, `keySemantics`, `mixins`, `mkType`, `specialArgs`,
+`strict`) — share the top-level key position of a kind entry with config shorthand, and so do the
+names gen-schema writes onto the kind value (`kind`, `refs`, `refinements`). Written there, such a
+key used to become config for every instance while the kind value went on reading its own value at
+the path just written. It now aborts, on both entry-type branches and on structured and shorthand
+declarations alike:
+
+```nix
+config.schema.host.keySemantics = …;    # meant to widen the class vocabulary
+# → gen-schema: kind 'host': declaration key 'keySemantics' is a construction formal of this schema —
+#   it is fixed by the call that builds the schema option (`mkSchemaOption`, `mkSchemaEntryType`), …
+```
+
+A construction formal is changed by a different constructor call, never by a write on a kind entry.
+An instance field of the same name is untouched: write it on the instance, or as
+`config.keySemantics` on the entry (a strict instance must declare it as an option). The refusal
+covers the entry's **direct** definitions; a formal at the top level of a module the entry
+**imports** is not reached yet and still lands as instance config.
 
 ### Unrecognised declaration keys are refused by name
 
