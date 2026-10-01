@@ -718,7 +718,7 @@ was itself a declaration.
 
 The two levels are complementary and both are *derived*, never declared:
 
-|            | `declarationOf`                    | `mkFieldDeclaration`                                 |
+|            | `declarationOf`                    | `mkFieldDeclaration`                       |
 | ---------- | ---------------------------------- | ------------------------------------------ |
 | what it is | an option **type** on a field      | a **value** inhabiting such a field        |
 | lives in   | the kind's schema                  | a default or a contributed value           |
