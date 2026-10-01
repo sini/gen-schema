@@ -2767,7 +2767,7 @@ in
       controls = (forced (o_a [ (oneGenerator "two") ])).value == "two";
       collision = {
         type = "ThrownError";
-        msg = "^gen-schema: kind 'a' is imported twice under one key: two declarations of 'a' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'modules', 'open\\.options\\.o_a\\.default'";
+        msg = "^gen-schema: kind 'a' is imported twice under one key, as two separate constructions of one declaration: they mint one identity, and a sealed component compares by its seal, never by its value, so two constructions differ there even where their values are equal\\. The component\\(s\\) whose seals differ: 'modules', 'open\\.options\\.o_a\\.default'\\. Import one construction of 'a' in both places, or declare the two differently so that they mint two identities\\.$";
       };
       reserved = {
         type = "ThrownError";
@@ -2809,6 +2809,17 @@ in
           assert controls;
           o_a [
             (oneGenerator "two")
+            (oneGenerator "one")
+          ];
+        expectedError = collision;
+      };
+      # Two constructions whose values are EQUAL are refused by the same text: it names them separate
+      # constructions compared by seal, and never says that their values differ (O1, gate P3).
+      test-two-constructions-with-equal-values-refused-by-name = {
+        expr =
+          assert controls;
+          o_a [
+            (oneGenerator "one")
             (oneGenerator "one")
           ];
         expectedError = collision;

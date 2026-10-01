@@ -606,6 +606,38 @@ let
   # refused by name instead, once, where the key is written.
   mergeReadsKeyEq = builtins.elem "__keyEq" merge.moduleSyntax.structured;
 
+  # The key comparison a keyed kind module publishes (`__keyEq.decide`). The DECISION is
+  # `sealedCollisionEq`'s, the one `kindEq` and the ancestor map make; only the refusal is worded
+  # here. Two instances sharing a key share a mark, so a refusal means their sealed subjects are
+  # unequal, and one construction compared with itself is not: they are two separate constructions.
+  # A sealed component compares by its seal, so they are refused even where their values are equal,
+  # and the text says so rather than that their values differ. Each component named is decided by the
+  # same comparison over a one-key slice (`intersectAttrs` keeps the slot, as `sealedCollisionEq`'s
+  # own slice does). Reached only on a dropped duplicate.
+  keyDecide =
+    kind: a: b:
+    let
+      site = "gen-schema: kind '${kind}' is imported twice under one key";
+      same =
+        x: y:
+        let
+          t = builtins.tryEval (sealedCollisionEq site x y);
+        in
+        t.success && t.value;
+      r = builtins.tryEval (sealedCollisionEq site a b);
+      slice = k: v: v // { sealed = builtins.intersectAttrs { ${k} = null; } v.sealed; };
+    in
+    if r.success then
+      r.value
+    else
+      throw "${site}, as two separate constructions of one declaration: they mint one identity, and a sealed component compares by its seal, never by its value, so two constructions differ there even where their values are equal. The component(s) whose seals differ: ${
+        builtins.concatStringsSep ", " (
+          map (k: "'${k}'") (
+            builtins.filter (k: !(same (slice k a) (slice k b))) (builtins.attrNames a.sealed)
+          )
+        )
+      }. Import one construction of '${kind}' in both places, or declare the two differently so that they mint two identities.";
+
   # ★ THE NAMES `mkSchemaEntryType` WRITES ONTO THE KIND VALUE, each with the writer that earns
   # it. RESTATED because this is gen-schema's OWN contract, not gen-merge's: the record is built
   # inside the merge body while `mkAllCollections` runs outside it, so it cannot be read off the
@@ -1852,7 +1884,7 @@ let
                             mark = ownMark;
                             inherit (plane) sealed;
                           };
-                          decide = sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key";
+                          decide = keyDecide kind;
                         };
                       };
                 in
