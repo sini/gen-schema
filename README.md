@@ -1182,7 +1182,8 @@ and their texts as plain data, and gen-merge's `__reservedKeys` scope applies it
 closure; a kind value in `imports` (the deprecated `inherits` spelling) is exempt by the same shape
 `inherits` reads. That refusal fires where a module tree is evaluated: an instance read, or the
 kind's `options`, `refs` and mark. A read of `kind` or `strict` still returns the construction's own
-value, which is correct, because the misread value is never consumed there (ADR-0025 item 1). A
+value, which is correct, because the misread value is never consumed there; the residue is stated
+here so that it is never silent. A
 caller's custom `mkType` that builds instance modules from `defs` applies `entryReservation` itself,
 as gen-aspects does, or that route is outside the door. Three forgeries pass it, as forgeries
 rather than honest routes: a hand-written module carrying `kind` and `__mint.minted` is exempt (the
