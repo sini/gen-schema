@@ -382,15 +382,29 @@ let
             }
         )
       ]
-      # The schema's own functions are sealed BY CONSTRUCTOR — declared, never forced.
-      ++ map (n: {
-        path = [
-          "functions"
-          n
-        ];
-        value = functions.${n};
-        sealed = functions.${n} != null;
-      }) (prelude.attrNames functions)
+      # The schema's own functions are sealed BY CONSTRUCTOR — declared, never forced. Bound by a
+      # lambda's formal, never selected: upstream Nix `==` keeps a function's identity only for the
+      # one slot it was bound to, and a selection `functions.${n}` is a fresh slot, so one shared
+      # `mkType` handed to two constructions would be refused on Nix and merged on Lix
+      # (den-hoag-jzatq). The formal IS the attribute's own slot, and `componentsPreimage` carries
+      # it into `sealed` unchanged. An absent function is inert and minted as `null`, so the mark
+      # does not move.
+      ++ builtins.attrValues (
+        builtins.mapAttrs (
+          n: f:
+          let
+            sealed = f != null;
+          in
+          {
+            path = [
+              "functions"
+              n
+            ];
+            value = f;
+            inherit sealed;
+          }
+        ) functions
+      )
     );
 
   markOf =

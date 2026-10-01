@@ -675,6 +675,36 @@ in
         refinedVsBare = false;
       };
     };
+    # F3 — one shared `mkType` (gen-aspects binds its own once) handed to two constructions is one
+    # kind on every evaluator, and a second lambda of the same text is still refused (den-hoag-1fo91).
+    test-mktype-arm-twin-over-one-shared-mktype-is-one-kind = {
+      expr = {
+        twin = builtins.tryEval (
+          kindEq (kindIn { mkType = aspectShaped; } { options.port = opt T.int; }) (
+            kindIn { mkType = aspectShaped; } { options.port = opt T.int; }
+          )
+        );
+        otherLambda = decides (
+          kindEq (kindIn { mkType = aspectShaped; } { options.port = opt T.int; }) (
+            kindIn {
+              mkType =
+                { defs, kind, ... }:
+                {
+                  __functor = _: _: { imports = map (d: d.value) defs; };
+                  inherit kind;
+                };
+            } { options.port = opt T.int; }
+          )
+        );
+      };
+      expected = {
+        twin = {
+          success = true;
+          value = true;
+        };
+        otherLambda = false;
+      };
+    };
     # F4 — a non-kind operand is refused by name, catchably.
     test-kindEq-refuses-a-non-kind-catchably = {
       expr = decides (kindEq { name = "not-a-kind"; } fieldInt);
