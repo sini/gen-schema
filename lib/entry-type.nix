@@ -383,12 +383,12 @@ let
         )
       ]
       # The schema's own functions are sealed BY CONSTRUCTOR — declared, never forced. Bound by a
-      # lambda's formal, never selected, and held as a list's element, as `constructionRelation`'s
-      # `closuresFirst` holds its value: upstream Nix `==` keeps a function's identity only for the
-      # one slot it was bound to, and both a selection and `componentsPreimage`'s own copy into
-      # `sealed` are fresh slots, so one shared `mkType` handed to two constructions would be
-      # refused on Nix and merged on Lix (den-hoag-jzatq). The element is the attribute's own slot.
-      # An absent function is inert and minted as `null`, unwrapped, so the mark does not move.
+      # lambda's formal, never selected: upstream Nix `==` keeps a function's identity only for the
+      # one slot it was bound to, and a selection `functions.${n}` is a fresh slot, so one shared
+      # `mkType` handed to two constructions would be refused on Nix and merged on Lix
+      # (den-hoag-jzatq). The formal IS the attribute's own slot, and `componentsPreimage` carries
+      # it into `sealed` unchanged. An absent function is inert and minted as `null`, so the mark
+      # does not move.
       ++ builtins.attrValues (
         builtins.mapAttrs (
           n: f:
@@ -400,7 +400,7 @@ let
               "functions"
               n
             ];
-            value = if sealed then [ f ] else f;
+            value = f;
             inherit sealed;
           }
         ) functions
