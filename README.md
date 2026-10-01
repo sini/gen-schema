@@ -917,7 +917,7 @@ and gen-schema over a gen-merge that does not read `__keyEq` is refused by name.
 On an `evalSchema` tree a declared parent is published as the value the tree returns for it. A mark
 reached along two paths is decided as `kindEq` decides it: one kind is one entry, and two declarations
 that share a mark and differ are refused by name, naming the kind and both paths:
-`gen-schema: kind 'd' reaches 'p' along d -> x -> p and along d -> y -> p: two declarations of 'p' mint one identity and differ, compared as values, only at sealed component(s) 'open.options.base.default'; …`.
+`gen-schema: kind 'd' reaches 'p' along d -> x -> p and along d -> y -> p: two declarations of 'p' mint one identity and are unequal only at sealed component(s) 'open.options.base.default': …`.
 A subkind's `keySemantics` must hold every key of each ancestor's, with the same `category`; one that
 omits or re-categorises a key is refused by name, naming the kind, the key and the ancestor. Both
 refusals fire where the kind is composed (its options, refs, mark or an instance, and the map itself),
@@ -1495,7 +1495,7 @@ spelling, which the kind entry reads as `inherits` with a warning.
 kindEq kindA kindB   # → true | false, or a refusal by name
 ```
 
-`true` iff two kind values carry one identity, `false` if two. Where they mint one identity and differ
+`true` iff two kind values carry one identity, `false` if two. Where they mint one identity and are unequal
 only at a sealed component, for example open-module content beyond an option's `type`, it
 refuses by name, naming the component (`…only at sealed component(s) 'open.options.<path>.<attr>'…`).
 An operand that is not a kind value carrying a mint-backed mark is refused by name. A kind value

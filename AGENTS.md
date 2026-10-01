@@ -240,7 +240,7 @@ constructions of one declaration carrying open content are refused too
 (`test-open-content-twin-is-refused`), and its only remedy is a sealed-literal constructor putting an
 inert literal into the mark. `__sealed` carries the sealed components' subjects from the
 same call; `kindEq` compares two kinds through both and refuses BY NAME a pair that mints one mark
-and differs only at sealed components. A sealed component holding type records (an option's
+and is unequal only at sealed components. A sealed component holding type records (an option's
 `type`, `freeformType`, a `keySemantics` entry's `option.type`, a `refs` entry's `type`) publishes
 gen-merge's `closuresFirst records value` as its subject, so two constructions of one cyclic type
 record refuse rather than overflow `==` (`ci/tests/kind-eq-typed-components.nix`; the enumerated

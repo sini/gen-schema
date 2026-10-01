@@ -746,14 +746,14 @@ in
       expr = kindEq portTcp portPos;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'options.port.type'; a sealed component has no identity, because identity is minted from inert structure alone: migrate it to a first-order term, a registered constructor over inert arguments, so that it mints$";
+        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and are unequal only at sealed component\\(s\\) 'options.port.type': a sealed component is compared by its seal, the whole value under Nix `==`, where two separately built functions are never equal, so two separate constructions are refused even where the values they compute are equal; a sealed component has no identity, because identity is minted from inert structure alone: migrate it to a first-order term, a registered constructor over inert arguments, so that it mints$";
       };
     };
     test-method-body-collision-names-the-method = {
       expr = kindEq hello bye;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'collections.methods.greeting'; .*$";
+        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and are unequal only at sealed component\\(s\\) 'collections.methods.greeting': .*$";
       };
     };
     # den-hoag-pa887: an open term reading an instance's `name` is distinguished by its function
@@ -762,14 +762,14 @@ in
       expr = kindEq (readsName "default" "x") (readsName "default" "y");
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'modules'; .*$";
+        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and are unequal only at sealed component\\(s\\) 'modules': .*$";
       };
     };
     test-open-term-under-require-names-its-module = {
       expr = kindEq (requireFn "x") (requireFn "y");
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'modules'; .*$";
+        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and are unequal only at sealed component\\(s\\) 'modules': .*$";
       };
     };
     # den-hoag-egei0: open content is refused naming the attribute's path.
@@ -777,7 +777,7 @@ in
       expr = kindEq (defaulted 80) (defaulted 443);
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'open\\.options\\.port\\.default'; .*$";
+        msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and are unequal only at sealed component\\(s\\) 'open\\.options\\.port\\.default': .*$";
       };
     };
     test-non-kind-operand-refuses-by-name = {
@@ -795,7 +795,7 @@ in
     let
       msg =
         comp:
-        "^gen-schema: kindEq: two declarations of 'host' mint one identity and differ, compared as values, only at sealed component\\(s\\) '${comp}'; a sealed component has no identity, because identity is minted from inert structure alone: .*$";
+        "^gen-schema: kindEq: two declarations of 'host' mint one identity and are unequal only at sealed component\\(s\\) '${comp}': a sealed component is compared by its seal, the whole value under Nix `==`, where two separately built functions are never equal, so two separate constructions are refused even where the values they compute are equal; a sealed component has no identity, because identity is minted from inert structure alone: .*$";
       at = attr: "open\\.options\\.port\\.${attr}";
       cell = expr: comp: {
         inherit expr;

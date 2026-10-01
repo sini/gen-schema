@@ -534,7 +534,7 @@ in
         ]).sub.inherits;
       twinRefused = {
         type = "ThrownError";
-        msg = "^gen-schema: kindEq: two declarations of 'baseO' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'open\\.options\\.b\\.default'; ";
+        msg = "^gen-schema: kindEq: two declarations of 'baseO' mint one identity and are unequal only at sealed component\\(s\\) 'open\\.options\\.b\\.default': ";
       };
     in
     {
@@ -2611,7 +2611,7 @@ in
           dBad.options.base.default;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: kind 'd' reaches 'p' along d -> x -> p and along d -> y -> p: two declarations of 'p' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'open.options.base.default'; ";
+          msg = "^gen-schema: kind 'd' reaches 'p' along d -> x -> p and along d -> y -> p: two declarations of 'p' mint one identity and are unequal only at sealed component\\(s\\) 'open.options.base.default': ";
         };
       };
       # The same refusal at the published map.
@@ -2675,7 +2675,7 @@ in
           k2eq.d.options.b.default;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: kind 'd' reaches 'base' along d -> sub -> base and along d -> x -> base: two declarations of 'base' mint one identity and differ, compared as values, only at sealed component\\(s\\) 'modules', 'open.options.b.default'; ";
+          msg = "^gen-schema: kind 'd' reaches 'base' along d -> sub -> base and along d -> x -> base: two declarations of 'base' mint one identity and are unequal only at sealed component\\(s\\) 'modules', 'open.options.b.default': ";
         };
       };
     };
@@ -2767,7 +2767,7 @@ in
       controls = (forced (o_a [ (oneGenerator "two") ])).value == "two";
       collision = {
         type = "ThrownError";
-        msg = "^gen-schema: kind 'a' is imported twice under one key, as two separate constructions of one declaration: they mint one identity, and a sealed component is compared by its seal, the whole value under Nix `==`, where two separately built functions are never equal, so two constructions differ there even where the values they compute are equal\\. The component\\(s\\) whose seals differ: 'modules', 'open\\.options\\.o_a\\.default'\\. Import one construction of 'a' in both places, or declare the two differently so that they mint two identities\\.$";
+        msg = "^gen-schema: kind 'a' is imported twice under one key: two declarations of 'a' mint one identity and are unequal only at sealed component\\(s\\) 'modules', 'open\\.options\\.o_a\\.default': a sealed component is compared by its seal, the whole value under Nix `==`, where two separately built functions are never equal, so two separate constructions are refused even where the values they compute are equal; a sealed component has no identity, because identity is minted from inert structure alone: migrate it to a first-order term, a registered constructor over inert arguments, so that it mints$";
       };
       reserved = {
         type = "ThrownError";
