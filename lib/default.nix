@@ -184,7 +184,7 @@ let
   };
   instance = import ./instance.nix {
     inherit prelude merge;
-    inherit (entryType) isSchemaKind;
+    inherit (entryType) isSchemaKind stampOk stampRefusal;
     inherit (strictLib) mkStrictModule;
     inherit (idHashLib) mkIdentityModule identityKeysForKind;
     inherit (validate)
