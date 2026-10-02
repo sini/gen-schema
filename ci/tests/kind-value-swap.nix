@@ -215,6 +215,28 @@ in
         "m"
       ];
     };
+    # ★ ENUMERATED EXCEPTIONS (ADR-0025's cxlc0 rider; den-hoag-jrbis, where the `__functor`
+    # self-stamp fix is evaluated). The kind's `__functor` ignores its `self`, so a `//` copy
+    # reached through either door composes the ORIGINAL silently. These cells assert today's
+    # admission: the closure reds them on purpose.
+    test-swapped-kind-in-a-function-module-composes-unread = {
+      expr = opts (aliasOf [ ({ ... }: { imports = [ (foreign // { options = { }; }) ]; }) ]);
+      expected = [
+        "b"
+        "extra"
+      ];
+    };
+    test-swapped-kind-under-types-submodule-composes-unread = {
+      expr = builtins.attrNames (
+        (genMerge.evalModuleTree {
+          modules = [
+            { options.h = genMerge.mkOption { type = T.submodule (foreign // { options = { }; }); }; }
+            { config.h.b = 1; }
+          ];
+        }).config.h
+      );
+      expected = [ "b" ];
+    };
     test-instance-of-the-kind-value-builds = {
       expr = builtins.attrNames (instanceOf k80);
       expected = [

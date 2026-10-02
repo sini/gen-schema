@@ -1302,10 +1302,15 @@ let
                         (subjectOf acc.${m}.value)
                         (subjectOf p)
                       ) acc
-                    # Every ancestor's stamp is read on entry, not only at a diamond: a parent spelled
-                    # in `imports`, or one reached through a parent, meets no `formOf`, and a `//` copy
-                    # there would compose the original while this map published the copy. Guarded as
-                    # `formOf` is, so a stamp-less kind-shaped value is walked as before.
+                    # Every ancestor's stamp is read on entry, not only at a diamond: a kind reached
+                    # through the `imports` spelling, at any depth, meets no `formOf`, and a `//` copy
+                    # there would compose the original while this map published the copy (an
+                    # `inherits` parent's own `formOf` already refuses what it reaches). Guarded as
+                    # `formOf` is, so a stamp-less kind-shaped value is walked as before. ★ TWO DOORS
+                    # STILL COMPOSE A `//` COPY UNREAD, enumerated, not closed: a kind value imported
+                    # inside a FUNCTION module, and `types.submodule k`. Neither reaches this fold; both
+                    # apply the kind's `__functor`, which ignores its `self`. ADR-0025's cxlc0 rider;
+                    # pinned by `kind-value-swap.test-*-composes-unread`, closed under den-hoag-jrbis.
                     else if p ? __kindSelf && !(stampOk p) then
                       stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${arrow here}" p
                     else

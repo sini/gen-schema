@@ -1501,12 +1501,18 @@ refuses by name, naming the component (`…only at sealed component(s) 'open.opt
 An operand that is not a kind value carrying a mint-backed mark is refused by name, and so is a kind
 value that is not the value its schema built: each kind value carries a completion stamp, `__kindSelf`, a
 function returning the value the schema's merge built, so a `//` copy (`k // { options = …; }`), which
-keeps the mark while changing what it stands for, is refused naming the kind (`…the kind value '<k>' is not the value its schema built…`). The same refusal guards every other door that decides by the mark:
-the `inherits` value door, the ancestor fold (a parent spelled in `imports` or reached through a parent
-included) and `mkInstanceType`'s import of the kind. A content-equal rebind (`k // { }`) is the constructed
+keeps the mark while changing what it stands for, is refused naming the kind (`…the kind value '<k>' is not the value its schema built…`). The same refusal guards these doors:
+the `inherits` value door, the ancestor fold (a kind reached through the `imports` spelling, at any depth)
+and `mkInstanceType`'s import of the kind. Two doors compose a `//` copy unread, enumerated here as
+exceptions (ADR-0025's cxlc0 rider; closure evaluated under den-hoag-jrbis): a kind value imported inside
+a function module, and `types.submodule k`. Their `__functor` ignores its `self`, so the copy composes the
+original. Other doors that decide by the mark are outside this refusal (the 1a4f6 spec's §3b.1 censuses them).
+A content-equal rebind (`k // { }`) is the constructed
 content and is admitted. The stamp is decided by `==` against the witness, descending through slots
 where `==` throws, so an honest kind with a throwing computed field decides alike on Nix, Determinate
-and Lix. A kind value carrying no stamp or no sealed subjects is refused naming what it lacks. A kind value
+and Lix. A kind value carrying no stamp or no sealed subjects is refused naming what it lacks at `kindEq` and
+the ancestor fold's diamond; the `inherits` value door, the `imports` alias, a grandparent and
+`mkInstanceType` ADMIT a stamp-less kind, as a producer that does not stamp builds one. A kind value
 compared with itself after being carried through gen-merge's `types.anything` decides `true` on Nix,
 Determinate and Lix: `anything` carries a value carrying `__mint` whole. Two independent
 constructions of one kind defined twice through `anything` are refused as conflicting definitions,
