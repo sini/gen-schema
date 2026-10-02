@@ -1153,7 +1153,7 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
 with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__kindAncestors`, `__kindCycleParents`,
-`__kindImports`, `__kindWitness`, `__mint`, `__pureModule`, `__reservedKeys`, `__sealed`, `_class`, `_file`, `_module`, `baseModule`,
+`__kindImports`, `__kindSelf`, `__kindWitness`, `__mint`, `__pureModule`, `__reservedKeys`, `__sealed`, `_class`, `_file`, `_module`, `baseModule`,
 `collections`, `computed`, `config`, `disabledModules`, `freeformType`, `imports`, `key`,
 `keySemantics`, `kind`, `meta`, `mixins`, `mkType`, `options`, `refinements`, `refs`, `require`,
 `specialArgs`, `strict` — `schema._reservedCollectionKeys`, 31 names: gen-merge's published
@@ -1498,7 +1498,15 @@ kindEq kindA kindB   # → true | false, or a refusal by name
 `true` iff two kind values carry one identity, `false` if two. Where they mint one identity and are unequal
 only at a sealed component, for example open-module content beyond an option's `type`, it
 refuses by name, naming the component (`…only at sealed component(s) 'open.options.<path>.<attr>'…`).
-An operand that is not a kind value carrying a mint-backed mark is refused by name. A kind value
+An operand that is not a kind value carrying a mint-backed mark is refused by name, and so is a kind
+value that is not the value its schema built: each kind value carries a completion stamp, `__kindSelf`, a
+function returning the value the schema's merge built, so a `//` copy (`k // { options = …; }`), which
+keeps the mark while changing what it stands for, is refused naming the kind (`…the kind value '<k>' is not the value its schema built…`). The same refusal guards every other door that decides by the mark:
+the `inherits` value door, the ancestor fold (a parent spelled in `imports` or reached through a parent
+included) and `mkInstanceType`'s import of the kind. A content-equal rebind (`k // { }`) is the constructed
+content and is admitted. The stamp is decided by `==` against the witness, descending through slots
+where `==` throws, so an honest kind with a throwing computed field decides alike on Nix, Determinate
+and Lix. A kind value carrying no stamp or no sealed subjects is refused naming what it lacks. A kind value
 compared with itself after being carried through gen-merge's `types.anything` decides `true` on Nix,
 Determinate and Lix: `anything` carries a value carrying `__mint` whole. Two independent
 constructions of one kind defined twice through `anything` are refused as conflicting definitions,
