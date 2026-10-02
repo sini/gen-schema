@@ -1838,6 +1838,14 @@ let
                   # (`__keyEq`, gen-merge's protocol): `sealedCollisionEq` over `kindEq`'s subject, the
                   # decision the ancestor map makes, so the one construction reached twice is one
                   # module and two constructions sharing the mark are refused by name, in either order.
+                  #
+                  # ★ STRUCTURED, so `__keyEq` is module syntax under EVERY engine that reads it, never
+                  # configuration. `mergeReadsKeyEq` sees only the gen-merge gen-schema is built with,
+                  # and the engine evaluating the instance can be another (a consumer whose gen-merge
+                  # predates the protocol). A shorthand module hands every key that engine does not
+                  # know to config, where `__keyEq` became an instance value, silently on a freeform
+                  # kind and as a STRICT MODE option refusal on a strict one; a structured module's
+                  # keys are the syntax plane, closed, so that engine refuses `__keyEq` by name.
                   keyed =
                     if kindParents == [ ] then
                       { }
@@ -1854,6 +1862,7 @@ let
                           };
                           decide = sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key";
                         };
+                        config = { };
                       };
                 in
                 # Precedence: computed overrides collections of the same name.
@@ -2027,7 +2036,7 @@ let
               # over the RAW source, comments included — because its comment stripper is line-based
               # and a multi-line string is where that premise could break. Matching `_collectionKeys`
               # above costs nothing and leaves that census's population where it was.
-              description = "The admissible non-collection keys of a kind declaration: gen-merge's published structured-module keys (`merge.moduleSyntax.structured`, which includes `key`). A structured declaration — one carrying `config` or `options` — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. Every other key on a structured declaration is refused by name. A bare top-level option declaration is never read, structured or not: neither module engine collects a top-level `mkOption` as a declaration, so it is refused independently of structuring the moment the surrounding declaration carries ANY module-syntax key at all (`den-hoag-zijk1`). On EVERY declaration, structured or shorthand and on both branches, a top-level key naming one of the schema's construction formals (${builtins.concatStringsSep ", " schemaEntryFormals}) or one of the names gen-schema writes onto the kind value (${builtins.concatStringsSep ", " publishedEntryKeys}) is refused by name: it is fixed by the constructor or published by this library, and written on a kind entry it would land on every instance instead; a module the entry imports is not reached. Exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__mint`, `__sealed`, `__kindImports`, `__kindWitness`, `__kindAncestors` and `__kindCycleParents` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. A declaration carrying NO module-syntax key at all is plain data through and through: every key of it is read as config, an option-shaped value among them is no different from any other, and nothing is refused.";
+              description = "The admissible non-collection keys of a kind declaration: gen-merge's published structured-module keys (`merge.moduleSyntax.structured`, which includes `key`). A structured declaration — one carrying `config` or `options` — is read ONLY through this set, this schema's `_collectionKeys`, and one rule that is not a list: any key beginning with `_` is admitted as consumer-private metadata gen-schema must not read. Every other key on a structured declaration is refused by name. A bare top-level option declaration is never read, structured or not: neither module engine collects a top-level `mkOption` as a declaration, so it is refused independently of structuring the moment the surrounding declaration carries ANY module-syntax key at all (`den-hoag-zijk1`). On EVERY declaration, structured or shorthand and on both branches, a top-level key naming one of the schema's construction formals (${builtins.concatStringsSep ", " schemaEntryFormals}) or one of the names gen-schema writes onto the kind value (${builtins.concatStringsSep ", " publishedEntryKeys}) is refused by name: it is fixed by the constructor or published by this library, and written on a kind entry it would land on every instance instead; a module the entry imports is not reached. Exceptions to the `_` prefix rule, refused by name because gen-schema writes them onto every kind value and a declared one is discarded unread: `__keyEq`, `__mint`, `__sealed`, `__kindImports`, `__kindWitness`, `__kindAncestors` and `__kindCycleParents` always, and `__functor` on a schema built without `mkType`. The guard stands down entirely for a schema constructed with `computed` or `mkType`, whose caller-supplied function receives the raw or stripped defs and so owns a key space gen-schema cannot enumerate. A declaration carrying NO module-syntax key at all is plain data through and through: every key of it is read as config, an option-shaped value among them is no different from any other, and nothing is refused.";
             };
             config =
               let

@@ -928,6 +928,27 @@ in
         alone = "two";
       };
     };
+    # The module a parent-composing kind publishes carries `__keyEq` as module SYNTAX: it is
+    # structured, and every top-level key is one gen-merge reads structurally. A shorthand module
+    # hands a key its engine does not know to config, so under a gen-merge predating the protocol
+    # `__keyEq` became an instance value (silent on a freeform kind, a STRICT MODE refusal on a
+    # strict one) where a structured module is refused by name.
+    test-the-keyed-kind-module-is-structured = {
+      expr =
+        let
+          m = rel.derived { };
+        in
+        {
+          publishesKeyEq = m ? __keyEq;
+          structured = builtins.any (k: m ? ${k}) genMerge.moduleSyntax.structuring;
+          surplus = builtins.attrNames (builtins.removeAttrs m genMerge.moduleSyntax.structured);
+        };
+      expected = {
+        publishesKeyEq = true;
+        structured = true;
+        surplus = [ ];
+      };
+    };
     test-another-trees-same-named-kind-is-not-a-cycle = {
       expr =
         builtins.attrNames
