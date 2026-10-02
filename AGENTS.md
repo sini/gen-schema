@@ -60,11 +60,11 @@ gen-merge exports became unreachable.
 
 **Schema kinds** — `lib/entry-type.nix`
 
-| Export              | Signature                                                                                                                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `mkSchemaOption`    | `{ strict ? true, baseModule ? null, collections ? {}, computed ? null, mixins ? [], mkType ? null, keySemantics ? {}, specialArgs ? {} } -> option` (typed `schema`)                                                                                  |
-| `mkSchemaEntryType` | same argument set `-> type` (the `lazyAttrsOf` element type behind `mkSchemaOption`)                                                                                                                                                                   |
-| `kindEq`            | `kind -> kind -> bool`: `false` on distinct marks, `true` on one mark with `==` sealed subjects, a by-name refusal on one mark with differing sealed subjects (open-module content included, named at `open.*`); a non-kind operand is refused by name |
+| Export              | Signature                                                                                                                                                                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mkSchemaOption`    | `{ strict ? true, baseModule ? null, collections ? {}, computed ? null, mixins ? [], mkType ? null, keySemantics ? {}, specialArgs ? {} } -> option` (typed `schema`)                                                                                                                                              |
+| `mkSchemaEntryType` | same argument set `-> type` (the `lazyAttrsOf` element type behind `mkSchemaOption`)                                                                                                                                                                                                                               |
+| `kindEq`            | `kind -> kind -> bool`: `false` on distinct marks, `true` on one mark with `==` sealed subjects, a by-name refusal on one mark with differing sealed subjects (open-module content included, named at `open.*`); a non-kind operand, and a `//` copy of a kind value (the `__kindSelf` stamp), are refused by name |
 
 `baseModule` may be a module or `kindName -> module`. `computed : collections -> defs -> attrset`
 (wins over collections of the same name). `mkType : { kindModule, collections, defs, kind } -> attrset`
@@ -220,7 +220,7 @@ A codec is `{ encode; decode; encodeAll; decodeAll; serialize; deserialize; seri
 **Internal**: `_internal.mkMethodsModule` — the only member.
 
 **Kind value shape** (produced, not exported). Each `config.schema.<name>` is
-`{ __functor; __kindAncestors; __kindCycleParents; __kindImports; __kindWitness; __mint; __sealed; kind; options; refs; refinements; strict; keySemantics; mixins; methods; validators; parent; }` plus user collections and computed fields. `__functor` makes the kind directly importable
+`{ __functor; __kindAncestors; __kindCycleParents; __kindImports; __kindSelf; __kindWitness; __mint; __sealed; kind; options; refs; refinements; strict; keySemantics; mixins; methods; validators; parent; }` plus user collections and computed fields. `__functor` makes the kind directly importable
 as a module. `__mint.minted` is the PROVENANCE MARK (ADR-0034), minted by the one authority
 (`gen-identity`'s `hashIdentity`, ADR-0016 ruling 5) and tagged `"schemakind"` over the kind's
 distinguishing content as per-component PREIMAGE TAGS (gen-algebra `componentsPreimage`): each
@@ -247,9 +247,9 @@ record refuse rather than overflow `==` (`ci/tests/kind-eq-typed-components.nix`
 residue is stated at `comparedTyped`). The mark is what `mkInstanceType`, `mkInstanceRegistry`, `validateInstances` and `mkCodec`
 read to decide a value is a kind value, replacing the `? kind && ? options` presence test that
 admitted any hand-written attrset. It is LAZY and the admission read never forces it — see
-`lib/entry-type.nix`'s `isSchemaKind`. `__mint`, `__sealed`, `__kindImports`, `__kindWitness`, `__kindAncestors` and `__kindCycleParents` are reserved as
+`lib/entry-type.nix`'s `isSchemaKind`. `__mint`, `__sealed`, `__kindImports`, `__kindWitness`, `__kindAncestors`, `__kindCycleParents` and `__kindSelf` are reserved as
 collection keys, as computed fields and as DECLARATION keys, all refused by name. A computed field may take no name
-from `lib/entry-type.nix`'s `kindResultKeys` (`__functor kind mixins strict keySemantics options refs refinements __mint __sealed __kindImports __kindWitness __kindAncestors __kindCycleParents`) — refused by name UNIFORMLY on both branches, at a stated
+from `lib/entry-type.nix`'s `kindResultKeys` (`__functor kind mixins strict keySemantics options refs refinements __mint __sealed __kindImports __kindWitness __kindAncestors __kindCycleParents __kindSelf`) — refused by name UNIFORMLY on both branches, at a stated
 over-fire cost on the `mkType` branch: `mixins` is never written there (always over-fires) and
 `__functor` only when the `mkType` result is itself a functor (over-fires otherwise); `kind` is
 written unconditionally on both branches (den-hoag-3x3bi) and is not in that set. The computed
@@ -329,6 +329,13 @@ first line of each). This library also co-writes gen-types' checker fields `__id
   the kind's transitive ancestors as a map from mark to ancestor kind VALUE, read per kind value and
   never memoised by mark; a mark reached twice is decided by `sealedCollisionEq` (den-hoag-l0y).
   Reserved as a collection, computed-field and declaration key.
+- `__kindSelf` — writer `mkSchemaEntryType` (`lib/entry-type.nix`, both branches, binding `completed`), readers `kindSubject` (`kindEq` and the ancestor fold), `formOf`'s value door (same file) and `mkInstanceType` (`lib/instance.nix`); read by gen-select (`lib/kind-stamp.nix`, its selector doors):
+  the kind value's completion stamp (den-hoag-1a4f6), a FUNCTION returning the value the schema's merge
+  built, so a `//` copy keeps a witness to the original and is refused by name where the mark decides. A
+  function and never the record, so no walker meets a cycle. The type side's live discipline is a
+  per-field witness (gen-merge's `_checkWitness`); a record-wide completion stamp for types is unbuilt
+  (den-hoag-lpm1w), and unifying the two disciplines waits on it. Reserved as a collection,
+  computed-field and declaration key.
 - `__kindWitness` — writer `mkSchemaEntryType` (`lib/entry-type.nix`, both branches), reader `inheritanceCycle` (same file):
   the kind's content witness, a sha256 over its name, each def's file and first-attribute position, its
   parents' names and its declared option names; not injective (one generator applied twice shares it).
