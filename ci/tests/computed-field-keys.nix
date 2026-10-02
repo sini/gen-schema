@@ -56,6 +56,7 @@ let
     "__kindAncestors"
     "__kindCycleParents"
     "__kindImports"
+    "__kindSelf"
     "__kindWitness"
     "__mint"
     "__sealed"

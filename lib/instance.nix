@@ -11,6 +11,8 @@
   prelude,
   merge,
   isSchemaKind,
+  stampOk,
+  stampRefusal,
   mkStrictModule,
   mkIdentityModule,
   identityKeysForKind,
@@ -69,8 +71,18 @@ let
     (merge.types.submodule (
       { name, config, ... }:
       {
+        # The kind's module is imported at config-demand time, where the operand check is forced.
+        # The completion stamp is read at the same stratum (den-hoag-1a4f6): the import is the
+        # kind's `__functor`, the original module, so a `//` copy of the kind would otherwise build
+        # instances of the original and drop the caller's change. Read here, never at the guard
+        # above, which runs at option-DECLARATION time and must not force the kind's slots.
         imports = [
-          (builtins.seq _ kindValue)
+          (builtins.seq _ (
+            if kindValue ? __kindSelf && !(stampOk kindValue) then
+              stampRefusal "gen-schema: mkInstanceType" kindValue
+            else
+              kindValue
+          ))
         ]
         ++ [
           (

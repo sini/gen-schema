@@ -565,6 +565,231 @@ in
       };
     };
 
+  # THE COMPLETION STAMP (den-hoag-1a4f6), the refused half: a `//` copy of a kind value is refused
+  # by name at every door that decides by mark — `kindEq`, the `inherits` value door, the ancestor
+  # fold, and an instance's kind import. Each cell is pinned by message, so a refusal from anywhere
+  # else cannot pass for it. The controls are `ci/tests/kind-value-swap.nix`.
+  flake.testsError.kind-value-swap-refusals =
+    let
+      inherit (genSchema) kindEq mkInstanceType;
+      T = genMerge.types;
+      intOpt = genMerge.mkOption { type = T.int; };
+      hostOf =
+        port:
+        (plainTree [
+          {
+            config.schema.host.options.port = genMerge.mkOption {
+              type = T.int;
+              default = port;
+            };
+          }
+        ]).host;
+      k80 = hostOf 80;
+      typeOnly = (plainTree [ { config.schema.host.options.port = intOpt; } ]).host;
+      swapped = k80 // {
+        options = { };
+      };
+      viaAnything =
+        v:
+        (genMerge.evalModuleTree {
+          modules = [
+            { options.v = genMerge.mkOption { type = T.anything; }; }
+            { config.v = v; }
+          ];
+        }).config.v;
+      kindWith =
+        computed:
+        (genMerge.evalModuleTree {
+          modules = [
+            { options.schema = mkSchemaOption { inherit computed; }; }
+            { config.schema.host.options.port = intOpt; }
+          ];
+        }).config.schema.host;
+      boomy = kindWith (_: _: { boom = throw "boom"; });
+      kMeta = kindWith (
+        _: _: {
+          meta = {
+            boom = throw "meta-boom";
+            ok = 1;
+          };
+        }
+      );
+      kList = kindWith (
+        _: _: {
+          l = [
+            (x: x)
+            (throw "list-boom")
+          ];
+        }
+      );
+      # a foreign kind, from a tree of its own
+      foreign = (plainTree [ { config.schema.base.options.b = intOpt; } ]).base;
+      foreignSwapped = foreign // {
+        options = { };
+      };
+      sub =
+        spelling: parents:
+        (plainTree [
+          {
+            config.schema.sub = {
+              ${spelling} = parents;
+              options.extra = intOpt;
+            };
+          }
+        ]).sub;
+      mid =
+        (plainTree [
+          {
+            config.schema.mid = {
+              imports = [ foreignSwapped ];
+              options.m = intOpt;
+            };
+          }
+        ]).mid;
+      opts = k: builtins.attrNames k.options;
+      instanceOf =
+        kind:
+        (genMerge.evalModuleTree {
+          modules = [
+            { options.h = genMerge.mkOption { type = mkInstanceType kind { }; }; }
+            { config.h.name = "a"; }
+          ];
+        }).config.h;
+      notBuilt = site: kind: {
+        type = "ThrownError";
+        msg = "^${site}: the kind value '${kind}' is not the value its schema built: a `//` over a kind value keeps its mark while changing what the mark stands for; declare the change in the kind entry, or pass the kind value the schema published$";
+      };
+      kindEqRefuses = notBuilt "gen-schema: kindEq" "host";
+    in
+    {
+      # S1–S6: the swap, either operand order, carried through `anything`, on a type-only kind, a
+      # same-shape swap, and an added key
+      test-swapped-options-refused = {
+        expr = kindEq k80 swapped;
+        expectedError = kindEqRefuses;
+      };
+      test-swapped-options-refused-in-either-order = {
+        expr = kindEq swapped k80;
+        expectedError = kindEqRefuses;
+      };
+      test-swapped-options-refused-through-anything = {
+        expr = kindEq k80 (viaAnything swapped);
+        expectedError = kindEqRefuses;
+      };
+      test-type-only-swap-refused = {
+        expr = kindEq typeOnly (typeOnly // { options = { }; });
+        expectedError = kindEqRefuses;
+      };
+      test-same-shape-swap-refused = {
+        expr = kindEq k80 (k80 // { inherit (hostOf 443) options; });
+        expectedError = kindEqRefuses;
+      };
+      test-added-key-refused = {
+        expr = kindEq k80 (k80 // { extra = 1; });
+        expectedError = kindEqRefuses;
+      };
+      # S9 and C2: a throwing slot replaced by a value, and an inner slot rebound unequal
+      test-throwing-slot-replaced-refused = {
+        expr = kindEq boomy (boomy // { boom = 1; });
+        expectedError = kindEqRefuses;
+      };
+      test-inner-throwing-attrset-rebound-unequal-refused = {
+        expr = kindEq kMeta (
+          kMeta
+          // {
+            meta = kMeta.meta // {
+              ok = 2;
+            };
+          }
+        );
+        expectedError = kindEqRefuses;
+      };
+      test-inner-throwing-list-rebound-unequal-refused = {
+        expr = kindEq kList (
+          kList
+          // {
+            l = [
+              (builtins.head kList.l)
+              2
+            ];
+          }
+        );
+        expectedError = kindEqRefuses;
+      };
+      # P2 and P6: a kind value short of the stamp, or of its sealed subjects, is refused naming what
+      # it lacks, never with the `//` message or the no-mark one
+      test-stampless-kind-refused-by-its-own-name = {
+        expr = kindEq k80 (builtins.removeAttrs k80 [ "__kindSelf" ]);
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kindEq: the kind value 'host' carries a mark but no completion stamp \\(`__kindSelf`\\), so nothing ties the mark to this value; take the kind from a gen-schema that stamps it$";
+        };
+      };
+      test-unsealed-kind-refused-by-its-own-name = {
+        expr = kindEq k80 (builtins.removeAttrs k80 [ "__sealed" ]);
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kindEq: the kind value 'host' carries a mark but no sealed subjects \\(`__sealed`\\), so it cannot be compared by its mark; take the kind from a gen-schema that publishes both$";
+        };
+      };
+      # S7: a same-tree value is the NAME, decided by `kindEq`
+      test-same-tree-swapped-value-refused = {
+        expr =
+          opts
+            (plainTree [
+              { config.schema.host.options.port = intOpt; }
+              (
+                { config, ... }:
+                {
+                  config.schema.sub = {
+                    inherits = [ (config.schema.host // { options = { }; }) ];
+                    options.x = intOpt;
+                  };
+                }
+              )
+            ]).sub;
+        expectedError = kindEqRefuses;
+      };
+      # S7′ (gate C1): a FOREIGN value decides by no `kindEq`; `formOf` reads its stamp
+      test-foreign-swapped-value-refused = {
+        expr = opts (sub "inherits" [ foreignSwapped ]);
+        expectedError = notBuilt "gen-schema: kind 'sub' inherits" "base";
+      };
+      test-foreign-added-key-value-refused = {
+        expr = opts (sub "inherits" [ (foreign // { extra2 = 1; }) ]);
+        expectedError = notBuilt "gen-schema: kind 'sub' inherits" "base";
+      };
+      test-foreign-swapped-value-refused-where-inherits-is-read = {
+        expr = (sub "inherits" [ foreignSwapped ]).inherits;
+        expectedError = notBuilt "gen-schema: kind 'sub' inherits" "base";
+      };
+      # S11 (gate P1): a diamond the fold decides, spelled in `imports`, which meets no `formOf`
+      test-foreign-swapped-diamond-refused-by-the-fold = {
+        expr = opts (
+          sub "imports" [
+            foreign
+            foreignSwapped
+          ]
+        );
+        expectedError = notBuilt "gen-schema: kind 'sub' inherits" "base";
+      };
+      # S12: one parent the fold reaches with no diamond, spelled in `imports` or reached through a
+      # parent; the fold reads every ancestor's stamp on entry
+      test-foreign-swapped-spelled-parent-refused = {
+        expr = opts (sub "imports" [ foreignSwapped ]);
+        expectedError = notBuilt "gen-schema: kind 'sub' reaches 'base' along sub -> base" "base";
+      };
+      test-foreign-swapped-grandparent-refused = {
+        expr = opts (sub "inherits" [ mid ]);
+        expectedError = notBuilt "gen-schema: kind 'mid' reaches 'base' along mid -> base" "base";
+      };
+      # gate C3: an instance of a swapped kind, refused at the kind's import
+      test-instance-of-swapped-kind-refused = {
+        expr = (instanceOf swapped).port;
+        expectedError = notBuilt "gen-schema: mkInstanceType" "host";
+      };
+    };
+
   flake.testsError.identity-refusals = {
     # R1. The door takes the kind DECLARATION and refuses a NAME by name: the stamp's preimage
     # carries the kind's minted identity, which a name does not have. Before this door a name was
@@ -810,7 +1035,7 @@ in
         (kindOf { computed = _: _: { options = "COMPUTED"; }; } { options.role = strOpt; }).options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors, __kindCycleParents$";
+        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors, __kindCycleParents, __kindSelf$";
       };
     };
 
@@ -840,7 +1065,7 @@ in
         } { }).refs;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors, __kindCycleParents$";
+        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors, __kindCycleParents, __kindSelf$";
       };
     };
   };
