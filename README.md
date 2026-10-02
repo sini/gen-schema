@@ -1504,7 +1504,7 @@ function returning the value the schema's merge built, so a `//` copy (`k // { o
 keeps the mark while changing what it stands for, is refused naming the kind (`…the kind value '<k>' is not the value its schema built…`). The same refusal guards these doors:
 the `inherits` value door, the ancestor fold (a kind reached through the `imports` spelling, at any depth)
 and `mkInstanceType`'s import of the kind. Two doors compose a `//` copy unread, enumerated here as
-exceptions (ADR-0025's cxlc0 rider; closure evaluated under den-hoag-jrbis): a kind value imported inside
+exceptions: a kind value imported inside
 a function module, and `types.submodule k`. Their `__functor` ignores its `self`, so the copy composes the
 original. Other doors that decide by the mark are outside this refusal (the 1a4f6 spec's §3b.1 censuses them).
 A content-equal rebind (`k // { }`) is the constructed
