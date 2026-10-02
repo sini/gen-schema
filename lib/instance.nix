@@ -20,6 +20,7 @@
   isCanonicalOf,
   declarationForm,
   filterValidators,
+  getRefinements,
 }:
 let
   mkInstanceType =
@@ -459,12 +460,27 @@ let
                 ) instance deferredFields
               ) instances;
 
-          # Refinement pass: strict refinements throw immediately, lazy refinements
-          # wrap values with addErrorContext for deferred checking at access time.
-          effectiveRefinements = if refinements != { } then refinements else kindValue.refinements or { };
+          # Refinement pass. A refined TYPE enforces its own refinements whenever its value is demanded
+          # (`lib/refined.nix`, `verify`), so this pass checks only the refinements no type carries (the
+          # `refinements` argument, or a kind refinement on a field whose type is not refined), and
+          # decides WHEN a field is demanded. A field whose every top-level refinement is `lazy`, its
+          # type's and the pass's alike, is left unforced and checked at access (§ Chitil 2012). One
+          # strict refinement makes construction demand the field, and its whole conjunction is decided
+          # then: on a flat value a demanded field has nothing left to defer (Chitil §7.3).
+          typeRefinements = prelude.filterAttrs (_: rs: rs != [ ]) (
+            prelude.mapAttrs (
+              _: o: if (o._type or null) == "option" && o ? type then getRefinements o.type else [ ]
+            ) (kindValue.options or { })
+          );
+          passRefinements =
+            if refinements != { } then
+              refinements
+            else
+              prelude.filterAttrs (f: _: !(typeRefinements ? ${f})) (kindValue.refinements or { });
+          refinedFields = builtins.attrNames (typeRefinements // passRefinements);
 
           refinementChecked =
-            if effectiveRefinements == { } then
+            if refinedFields == [ ] then
               coerced
             else
               prelude.mapAttrs (
@@ -472,53 +488,30 @@ let
                 builtins.foldl' (
                   inst: fieldName:
                   let
-                    refs' = effectiveRefinements.${fieldName};
+                    refs' = passRefinements.${fieldName} or [ ];
+                    at = "${kind}:${instanceName}.${fieldName}";
+                    deferred = builtins.all (r: r.lazy or false) ((typeRefinements.${fieldName} or [ ]) ++ refs');
                     value = inst.${fieldName} or null;
+                    failing = builtins.filter (r: !(r.check value)) refs';
                   in
-                  if value == null then
+                  if deferred && inst ? ${fieldName} then
+                    inst
+                    // {
+                      ${fieldName} = builtins.foldl' (
+                        v: r:
+                        if v == null then
+                          v
+                        else
+                          builtins.addErrorContext "gen-schema: lazy contract at ${at}: \"${r.message}\"" (
+                            if r.check v then v else throw "gen-schema: lazy contract violated at ${at}: ${r.message}"
+                          )
+                      ) inst.${fieldName} refs';
+                    }
+                  else if value == null || failing == [ ] then
                     inst
                   else
-                    let
-                      failures = builtins.concatMap (
-                        r:
-                        if r.check value then
-                          [ ]
-                        else
-                          [
-                            {
-                              inherit (r) message;
-                              lazy = r.lazy or false;
-                              field = "${kind}:${instanceName}.${fieldName}";
-                              inherit value;
-                            }
-                          ]
-                      ) refs';
-                      strictFailures = builtins.filter (f: !f.lazy) failures;
-                      lazyRefs = builtins.filter (r: r.lazy or false) refs';
-                    in
-                    if strictFailures != [ ] then
-                      let
-                        f = builtins.head strictFailures;
-                      in
-                      throw "gen-schema: refinement failed at ${f.field}\n  check: \"${f.message}\"\n  value: ${builtins.toJSON f.value}"
-                    else if lazyRefs != [ ] then
-                      let
-                        wrapped = builtins.foldl' (
-                          v: r:
-                          builtins.addErrorContext
-                            "gen-schema: lazy contract at ${kind}:${instanceName}.${fieldName}: \"${r.message}\""
-                            (
-                              if r.check v then
-                                v
-                              else
-                                throw "gen-schema: lazy contract violated at ${kind}:${instanceName}.${fieldName}: ${r.message}"
-                            )
-                        ) value lazyRefs;
-                      in
-                      inst // { ${fieldName} = wrapped; }
-                    else
-                      inst
-                ) instance (builtins.attrNames effectiveRefinements)
+                    throw "gen-schema: refinement failed at ${at}\n  check: \"${(builtins.head failing).message}\"\n  value: ${builtins.toJSON value}"
+                ) instance refinedFields
               ) coerced;
 
           # Validators run on refinement-checked instances — deferred ref fields are resolved,

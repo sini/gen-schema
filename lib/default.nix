@@ -193,6 +193,7 @@ let
       filterValidators
       ;
     inherit (refLib) dedupByHash isCanonicalOf declarationForm;
+    inherit (refinedLib) getRefinements;
   };
   docs = import ./docs.nix { inherit prelude; };
   codecLib = import ./codec.nix {

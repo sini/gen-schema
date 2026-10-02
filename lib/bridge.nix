@@ -11,16 +11,13 @@ let
   # NixOS option declarations have _type = "option"
   isOptionDecl = v: builtins.isAttrs v && v ? _type && v._type == "option";
 
-  # Strip refinement metadata from a type, returning the base NixOS type
-  stripRefinements = type: if isRefined type then type.__schema.baseType else type;
-
   # Extract refinement metadata from option declarations
   # Returns { fieldName = [refinements]; } for refined fields
   extractRefinements =
     attrs:
     prelude.filterAttrs (_: v: v != [ ]) (
       prelude.mapAttrs (
-        _: v: if isOptionDecl v && v ? type && v.type ? __schema then getRefinements v.type else [ ]
+        _: v: if isOptionDecl v && v ? type && isRefined v.type then getRefinements v.type else [ ]
       ) attrs
     );
 
@@ -36,18 +33,15 @@ let
       options = prelude.filterAttrs (_: isOptionDecl) content;
       config = builtins.removeAttrs content (builtins.attrNames options);
 
-      strippedOptions = prelude.mapAttrs (
-        _: opt:
-        if opt ? type && opt.type ? __schema then opt // { type = stripRefinements opt.type; } else opt
-      ) options;
-
       refinements = extractRefinements content;
     in
     {
       module =
         { ... }:
         {
-          options = strippedOptions;
+          # A refined type is published as declared: it enforces its own refinements
+          # (`refined.nix`, `verify`), so a registry argument cannot drop them.
+          inherit options;
           config = config;
         };
       inherit collections refinements;

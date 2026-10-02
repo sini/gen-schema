@@ -35,11 +35,9 @@
           echo "tests-process: FAILED at cell $1: $2" >&2
           exit 1
         }
-        # evalArm <arm>: runs one cell in its own process; leaves rc, val and n (the spy's count) set.
-        evalArm() {
-          rc=0
-          val=$(nix-instantiate --eval --strict --readonly-mode \
-            --argstr arm "$1" \
+        # inst <flag>...: one evaluation of the cells file, in its own process.
+        inst() {
+          nix-instantiate --eval --strict --readonly-mode "$@" \
             --argstr label "$label" \
             --argstr libSrc ${../lib} \
             --argstr preludeSrc ${inputs.gen-prelude} \
@@ -50,7 +48,12 @@
             --argstr memoSrc ${inputs.gen-merge.inputs.gen-memo} \
             --argstr scopeSrc ${inputs.gen-merge.inputs.gen-scope} \
             --argstr mergeSrc ${inputs.gen-merge} \
-            "$cells" 2> "$TMPDIR/err") || rc=$?
+            "$cells"
+        }
+        # evalArm <arm>: runs one cell in its own process; leaves rc, val and n (the spy's count) set.
+        evalArm() {
+          rc=0
+          val=$(inst --argstr arm "$1" 2> "$TMPDIR/err") || rc=$?
           n=$(grep -c "trace: $label\$" "$TMPDIR/err" || true)
           ran=$((ran + 1))
           [ "$rc" -eq 0 ] || die "$1" "expected exit 0, got $rc: $(tail -n 3 "$TMPDIR/err")"
@@ -72,9 +75,32 @@
         [ "$val" = "8" ] || die mints-eight-kinds "expected value 8, got '$val'"
         [ "$n" -ge 8 ] || die mints-eight-kinds "the spy's control expected at least 8 mints, counted $n"
 
+        control=$n
+
+        # den-hoag-refined-outside-kind-silent-1jlsq · a refined type applies each predicate once per
+        # demanded value, inside a kind (strict or lazy) and outside one.
+        for c in refined-cost-in-kind:5:1 refined-cost-in-kind-lazy:5:1 refined-cost-outside:5:1 \
+          "refined-cost-outside-list:[ 1 2 3 ]:3"; do
+          cell=''${c%%:*}
+          rest=''${c#*:}
+          evalArm "$cell"
+          [ "$val" = "''${rest%:*}" ] || die "$cell" "expected value ''${rest%:*}, got '$val'"
+          [ "$n" = "''${rest##*:}" ] || die "$cell" "expected ''${rest##*:} predicate applications, counted $n"
+        done
+        # An ill-typed predicate aborts uncatchably, and the abort names the refinement. --show-trace is
+        # passed here rather than read from nix.conf: without it Lix truncates the frame that names it.
+        rc=0
+        inst --show-trace --argstr arm refined-attribution > /dev/null 2> "$TMPDIR/err" || rc=$?
+        ran=$((ran + 1))
+        [ "$rc" -ne 0 ] || die refined-attribution "expected a refusal, got exit 0"
+        grep -q 'cannot compare an integer with a string' "$TMPDIR/err" ||
+          die refined-attribution "expected the comparison abort: $(tail -n 3 "$TMPDIR/err")"
+        attributed=$(grep -c 'gen-schema: refined: while checking the refinement "must be positive"' "$TMPDIR/err" || true)
+        [ "$attributed" = "1" ] || die refined-attribution "expected 1 attribution line, counted $attributed"
+
         # 0/0 is a false pass: the runner must have executed every cell above.
-        [ "$ran" = "3" ] || die runner "expected 3 evaluations, ran $ran"
-        echo "tests-process: 3 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $n"
+        [ "$ran" = "8" ] || die runner "expected 8 evaluations, ran $ran"
+        echo "tests-process: 8 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; refined predicate applications 1/1/1/3; attribution $attributed"
       '';
     };
 }

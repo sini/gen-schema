@@ -87,6 +87,36 @@ let
         }).config.hosts;
     in
     builtins.deepSeq (builtins.seq t.sub.__mint.minted (builtins.mapAttrs (_: h: h.b + h.s0) reg)) n;
+  # A refined type's predicate applications (den-hoag-refined-outside-kind-silent-1jlsq): the spy
+  # refinement traces `label` once per application, so the label's count is the cost.
+  T = merge.types;
+  spyPos = {
+    check = v: builtins.trace label (v > 0);
+    message = "must be positive";
+  };
+  inKindRead =
+    ty:
+    (merge.evalModuleTree {
+      modules = [
+        { options.schema = S.mkSchemaOption { }; }
+        (
+          { config, ... }:
+          {
+            config.schema.widget.options.n = merge.mkOption { type = ty; };
+            options.widgets = S.mkInstanceRegistry config.schema.widget { };
+          }
+        )
+        { config.widgets.w1.n = 5; }
+      ];
+    }).config.widgets.w1.n;
+  outsideRead =
+    ty: v:
+    (merge.evalModuleTree {
+      modules = [
+        { options.o = merge.mkOption { type = ty; }; }
+        { config.o = v; }
+      ];
+    }).config.o;
 in
 {
   # ONE kind, one instance and eight: the kind marks minted must not move with the instance count.
@@ -97,5 +127,20 @@ in
   mints-eight-kinds = builtins.foldl' (a: i: builtins.seq (treeOf i).sub.__mint.minted (a + 1)) 0 (
     builtins.genList (i: i) 8
   );
+  # One application per demanded value: the type decides its own refinements, and the kind pass
+  # does not re-check them.
+  refined-cost-in-kind = inKindRead (S.refined T.int spyPos);
+  refined-cost-in-kind-lazy = inKindRead (S.refined T.int (spyPos // { lazy = true; }));
+  refined-cost-outside = outsideRead (S.refined T.int spyPos) 5;
+  refined-cost-outside-list = outsideRead (T.listOf (S.refined T.int spyPos)) [
+    1
+    2
+    3
+  ];
+  # A predicate ill-typed over its base aborts uncatchably; the abort names the refinement.
+  refined-attribution = outsideRead (S.refined T.str {
+    check = v: v > 0;
+    message = "must be positive";
+  }) "a";
 }
 .${arm}

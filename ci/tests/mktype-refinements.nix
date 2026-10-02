@@ -217,7 +217,7 @@ in
       expr = hostsWith mkKind 70000;
       expectedError = {
         type = "ThrownError";
-        msg = "gen-schema: refinement failed at host:a[.]myPort";
+        msg = "^gen-merge: a definition for option `hosts[.]a[.]myPort' is not of the expected type: must be a valid TCP port [(]1-65535[)]";
       };
     };
   };
