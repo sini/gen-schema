@@ -36,6 +36,20 @@ let
       }
     ];
   };
+  # `_module` is the engine's namespace, never a kind (den-hoag-fpxsd Unit 0): a schema whose module
+  # states a module argument, which every gen-merge child evaluation positioned under a container holds
+  # as nixpkgs' does, enumerates its kinds without it.
+  moduleArgsEval = genMerge.evalModuleTree {
+    modules = [
+      {
+        options.schema = mkSchemaOption { };
+        config.schema.host = {
+          options.name = genMerge.mkOption { type = genMerge.types.str; };
+        };
+        config.schema._module.args.q = 1;
+      }
+    ];
+  };
   reservedKindNamesAttempt = builtins.tryEval (
     builtins.deepSeq reservedEval.config.schema._kindNames reservedEval.config.schema._kindNames
   );
@@ -62,6 +76,10 @@ in
       "_collectionKeys"
     ];
     expected = true;
+  };
+  flake.tests.introspect-names.test-module-args-are-not-a-kind = {
+    expr = moduleArgsEval.config.schema._kindNames;
+    expected = [ "host" ];
   };
   flake.tests.introspect-names.test-underscore-kind-name-throws = {
     expr = reservedKindNamesAttempt.success;

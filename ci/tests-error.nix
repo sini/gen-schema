@@ -1077,6 +1077,49 @@ in
   # name. These cells are here rather than under ./tests because `tryEval` discards the message and
   # WHICH key was named is the whole subject: a refusal that misdiagnoses passes a `.success` cell
   # perfectly. The keys the guard must NOT refuse are in `ci/tests/declaration-keys.nix`.
+  # `_module` in a schema (den-hoag-fpxsd Unit 0): the engine's keys there are not a kind, and anything
+  # else under `_module` refuses by name, where a filter would have dropped it in silence. The `_x`
+  # cell is the control: the `_` reservation still refuses a kind so named.
+  flake.testsError.schema-module-namespace =
+    let
+      kindsOf =
+        extra:
+        (genMerge.evalModuleTree {
+          modules = [
+            {
+              options.schema = genSchema.mkSchemaOption { };
+              config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+            }
+            extra
+          ];
+        }).config.schema._kindNames;
+      stray = {
+        type = "ThrownError";
+        msg = "^gen-schema: `_module' is the module engine's namespace and declares no kind; a schema module wrote something under it other than the engine's own `args', `check', `freeformType', `specialArgs' \\(a kind body there is read as a kind named `_module', and the `_' prefix is reserved\\)$";
+      };
+    in
+    {
+      test-an-unread-module-key-refuses-by-name = {
+        expr = kindsOf { config.schema._module.foo = 1; };
+        expectedError = stray;
+      };
+      test-a-kind-body-under-module-refuses-by-name = {
+        expr = kindsOf {
+          config.schema._module.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        };
+        expectedError = stray;
+      };
+      test-control-an-underscore-kind-still-refuses = {
+        expr = kindsOf {
+          config.schema._x.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind name '_x' is reserved — names starting with '_' are internal use only \\(_kindNames, _topology, etc\\.\\)$";
+        };
+      };
+    };
+
   flake.testsError.declaration-key-refusals = {
     # O1. The key no reader consumes, named — and the live control in the same cell is what makes
     # the green mean something: a guard that refused EVERY declaration would satisfy the

@@ -2164,20 +2164,45 @@ let
                 # and the check falls through to `false` — never internal by construction.
                 isInternalField = n: options.${n}.internal or false;
 
+                # `_module` is the module engine's namespace, which a module's own `config` holds as
+                # nixpkgs' does (the arguments it is applied to, its `freeformType`): never a kind, and
+                # never enumerated as one. What the engine reads there is these four keys, nixpkgs'
+                # `_module` options; anything else written under `_module` is neither a kind nor an
+                # engine setting, and refuses by name rather than vanishing from the kind set. The
+                # stray keys are not named: the schema's freeform plane coerces whatever was written
+                # there to a kind value, so its keys are the kind's fields, not the author's.
+                engineModuleKeys = [
+                  "args"
+                  "check"
+                  "freeformType"
+                  "specialArgs"
+                ];
+                strayModuleKeys =
+                  if config ? _module then
+                    builtins.filter (k: !(builtins.elem k engineModuleKeys)) (prelude.attrNames config._module)
+                  else
+                    [ ];
+
                 # Reserving the `_` prefix (README: "kind names starting with `_` are
                 # reserved for internal use") must be enforced, not merely documented — a
                 # reserved name that silently vanished from _kindNames/_topology instead of
                 # being refused is exactly the absence-collapse this schema's own reserved
                 # collection keys (__functor, kind — above) already refuse loudly.
-                reservedKindNames = builtins.filter (n: !(isInternalField n) && prelude.hasPrefix "_" n) (
-                  prelude.attrNames config
-                );
+                reservedKindNames = builtins.filter (
+                  n: n != "_module" && !(isInternalField n) && prelude.hasPrefix "_" n
+                ) (prelude.attrNames config);
 
                 kindNames =
-                  if reservedKindNames != [ ] then
+                  if strayModuleKeys != [ ] then
+                    throw "gen-schema: `_module' is the module engine's namespace and declares no kind; a schema module wrote something under it other than the engine's own ${
+                      builtins.concatStringsSep ", " (map (k: "`${k}'") engineModuleKeys)
+                    } (a kind body there is read as a kind named `_module', and the `_' prefix is reserved)"
+                  else if reservedKindNames != [ ] then
                     throw "gen-schema: kind name '${builtins.head reservedKindNames}' is reserved — names starting with '_' are internal use only (_kindNames, _topology, etc.)"
                   else
-                    prelude.sort (a: b: a < b) (prelude.filter (n: !(isInternalField n)) (prelude.attrNames config));
+                    prelude.sort (a: b: a < b) (
+                      prelude.filter (n: n != "_module" && !(isInternalField n)) (prelude.attrNames config)
+                    );
 
                 # Containment, read off gen-graph (ADR-0012: one graph notion). `parent` is validated
                 # here — the refusal is this library's — and the relation is then handed to gen-graph
