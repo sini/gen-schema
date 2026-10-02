@@ -64,6 +64,16 @@ let
       identityKeys = identityKeysForKind { inherit specialArgs; } kindValue;
       # Once per TYPE, not once per instance: the operand check and the module value are shared.
       identityModule = mkIdentityModule kindValue identityKeys;
+      # THE COMPLETION STAMP (den-hoag-1a4f6), read where the kind's module is imported: the import
+      # is the kind's `__functor`, the original module, so a `//` copy of the kind would otherwise
+      # build instances of the original and drop the caller's change. Lazy and once per TYPE, forced
+      # at the first instance's import, at config-demand time; never at the guard above, which runs
+      # at option-DECLARATION time and must not force the kind's slots.
+      importedKind =
+        if kindValue ? __kindSelf && !(stampOk kindValue) then
+          stampRefusal "gen-schema: mkInstanceType" kindValue
+        else
+          kindValue;
     in
     # ★ THE INLET IS ON THE TYPE, NOT THE CONSTRUCTOR, and it is applied UNCONDITIONALLY rather than
     # behind an `if specialArgs == { }` — one path, so every instance gen-schema builds goes through
@@ -71,18 +81,8 @@ let
     (merge.types.submodule (
       { name, config, ... }:
       {
-        # The kind's module is imported at config-demand time, where the operand check is forced.
-        # The completion stamp is read at the same stratum (den-hoag-1a4f6): the import is the
-        # kind's `__functor`, the original module, so a `//` copy of the kind would otherwise build
-        # instances of the original and drop the caller's change. Read here, never at the guard
-        # above, which runs at option-DECLARATION time and must not force the kind's slots.
         imports = [
-          (builtins.seq _ (
-            if kindValue ? __kindSelf && !(stampOk kindValue) then
-              stampRefusal "gen-schema: mkInstanceType" kindValue
-            else
-              kindValue
-          ))
+          (builtins.seq _ importedKind)
         ]
         ++ [
           (
