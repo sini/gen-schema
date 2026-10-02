@@ -388,27 +388,26 @@ in
     # `checkRefinements` returning `[ ]`. Now the declaration refuses before any value is produced.
     #
     # The control is the other arm, and it is what makes this non-vacuous: the SAME refinement
-    # declared twice merges, the value is produced, and `70000` VIOLATES it. So a construction that
-    # refused every declaration fails the control, and a `checkRefinements` that had stopped
-    # checking fails it too.
+    # declared twice merges, `checkRefinements` reports that `70000` VIOLATES it, and the option
+    # refuses the value (the refined type is its own membership). So a construction that refused
+    # every declaration fails the control, and a `checkRefinements` that had stopped checking fails
+    # it too. The control's refusal text is pinned in `refined-membership-refusals`.
     test-dropped-refinement-cannot-accept-the-value-it-forbade = {
       expr =
         let
           declare =
             tA: tB:
             let
+              tree = genMerge.evalModuleTree {
+                modules = [
+                  { options.probe = genMerge.mkOption { type = tA; }; }
+                  { options.probe = genMerge.mkOption { type = tB; }; }
+                  { config.probe = 70000; }
+                ];
+              };
               attempt = builtins.tryEval (
                 let
-                  tree = genMerge.evalModuleTree {
-                    modules = [
-                      { options.probe = genMerge.mkOption { type = tA; }; }
-                      { options.probe = genMerge.mkOption { type = tB; }; }
-                      { config.probe = 70000; }
-                    ];
-                  };
-                  violations = map (x: x.message) (
-                    checkRefinements "probe" tree.options.probe.type tree.config.probe
-                  );
+                  violations = map (x: x.message) (checkRefinements "probe" tree.options.probe.type 70000);
                 in
                 builtins.deepSeq violations violations
               );
@@ -417,11 +416,13 @@ in
               {
                 answer = "declared";
                 violations = attempt.value;
+                value = if (builtins.tryEval tree.config.probe).success then "admitted" else "refused";
               }
             else
               {
                 answer = "refused";
                 violations = [ ];
+                value = "refused";
               };
         in
         {
@@ -434,10 +435,12 @@ in
         twoDifferentRefinements = {
           answer = "refused";
           violations = [ ];
+          value = "refused";
         };
         control = {
           answer = "declared";
           violations = [ "must be a valid TCP port (1-65535)" ];
+          value = "refused";
         };
       };
     };

@@ -1704,7 +1704,7 @@ Returns a codec record with `encode`/`decode` (attrset ↔ attrset), format-para
 
 ### `refined`
 
-Refinement contracts co-located with type declarations (§ Findler 2002, § Rondon 2008). Predicates validate during `applyPipeline` (strict by default).
+Refinement contracts co-located with type declarations (§ Findler 2002, § Rondon 2008). The refinements are part of the type's membership wherever it is used — `{v:B | e}` has no member failing `e` — so a refined option in a plain `mkOption`, under `listOf` or any other container, or inside a kind refuses a violating value by name, with gen-types' `refined` wording: `` gen-merge: a definition for option `o' is not of the expected type: must be positive ``. The base is checked first, then the refinements in order, and the first that fails is the reason, so an earlier refinement guards a later one. Inside a kind, the instance registry also checks refinements supplied apart from a type (its `refinements` argument), which never replace the ones a type carries.
 
 ```nix
 # Single refinement
@@ -1715,7 +1715,7 @@ port = mkOption {
   };
 };
 
-# Composed refinements (all must pass)
+# Composed refinements (all must pass; checked in order)
 port = mkOption {
   type = genSchema.refined lib.types.int [
     { check = self: self > 0; message = "must be positive"; }
@@ -1727,7 +1727,7 @@ port = mkOption {
 port = mkOption { type = genSchema.refined lib.types.int genSchema.refinements.tcpPort; };
 ```
 
-Set `lazy = true` on a refinement to defer validation to access time via `builtins.addErrorContext` (§ Chitil 2012):
+Set `lazy = true` on a refinement to defer its check until the value is demanded (§ Chitil 2012). Inside a kind, a field whose refinements are **all** `lazy` is left unforced when the instance is built and checked when it is read, so reading a sibling never fails on it. One strict refinement on the field makes construction demand it, and its whole conjunction, lazy refinements included, is decided then: on a flat value (an `int`, a `str`) the demanded value has nothing left to defer (Chitil §7.3, *lazy contracts behave like eager contracts*). On a non-flat base (`lazyAttrsOf`, `listOf`, `submodule`) a lazy predicate decided then may force parts of the value nothing else demanded:
 
 ```nix
 { check = self: self > 0; message = "must be positive"; lazy = true; }
@@ -1792,7 +1792,7 @@ Applies a single mixin to a record-algebra record. Validates structural compatib
 
 ### `emitModule`
 
-Bridges record-algebra records to NixOS modules (§ Cardelli 1997). Strips refinement metadata from types. Extracts collections with full shadow stacks.
+Bridges record-algebra records to NixOS modules (§ Cardelli 1997). Publishes option types as declared, so a refined type keeps enforcing its refinements, and extracts them as the kind's refinements. Extracts collections with full shadow stacks.
 
 ```nix
 emitted = genSchema.emitModule [ "validators" "methods" ] recordAlgebraRecord;
@@ -1907,12 +1907,12 @@ gen-schema draws on seven papers. Four are directly implemented in the codebase;
 
 ### Implements
 
-| Feature                                  | Paper                                                                       | Where                                                                                                                                                                                                                       |
-| ---------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Refinement contracts with blame tracking | § Findler & Felleisen -- *Contracts for Higher-Order Functions* (ICFP 2002) | `refined.nix`: predicate contracts co-located with NixOS type declarations; `blame.nix`: field-level error attribution with `{ field, message }` blame records; `instance.nix`: strict contract checking in `applyPipeline` |
-| Lazy contracts with deferred validation  | § Chitil -- *Practical Typed Lazy Contracts* (ICFP 2012)                    | `instance.nix`: `lazy = true` refinements wrap values with `builtins.addErrorContext`, deferring validation to access time -- matching Chitil's partial-identity semantics where unevaluated parts never trigger violations |
-| Mixin composition                        | § Bracha & Cook -- *Mixin-Based Inheritance* (OOPSLA 1990)                  | `mixin.nix`: `mkMixin`/`composeMixins` implement Bracha's `M1 * M2 = fun(i) M1(M2(i) + i) + M2(i)` formula; `beta` reverses direction so parent controls; `applyMixin` validates structural requires                        |
-| Refinement types                         | § Rondon, Kawaguchi & Jhala -- *Liquid Types* (PLDI 2008)                   | `refined.nix`: `refined` attaches predicate refinements to base NixOS types via `__schema` metadata, following Rondon's model of `{v:B \| e}` base refinements co-located with type declarations                            |
+| Feature                                  | Paper                                                                       | Where                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Refinement contracts with blame tracking | § Findler & Felleisen -- *Contracts for Higher-Order Functions* (ICFP 2002) | `refined.nix`: predicate contracts co-located with NixOS type declarations; `blame.nix`: field-level error attribution with `{ field, message }` blame records; `instance.nix`: the instance registry checks refinements no type carries                                                                         |
+| Lazy contracts with deferred validation  | § Chitil -- *Practical Typed Lazy Contracts* (ICFP 2012)                    | `instance.nix`: a field whose refinements are all `lazy = true` is left unforced and checked at access -- matching Chitil's partial-identity semantics where unevaluated parts never trigger violations; one strict refinement on the field decides its whole conjunction at construction (§7.3, on flat values) |
+| Mixin composition                        | § Bracha & Cook -- *Mixin-Based Inheritance* (OOPSLA 1990)                  | `mixin.nix`: `mkMixin`/`composeMixins` implement Bracha's `M1 * M2 = fun(i) M1(M2(i) + i) + M2(i)` formula; `beta` reverses direction so parent controls; `applyMixin` validates structural requires                                                                                                             |
+| Refinement types                         | § Rondon, Kawaguchi & Jhala -- *Liquid Types* (PLDI 2008)                   | `refined.nix`: `refined` attaches predicate refinements to base NixOS types via `__schema` metadata, following Rondon's model of `{v:B \| e}` base refinements co-located with type declarations                                                                                                                 |
 
 ### Informed by
 

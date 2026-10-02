@@ -1177,8 +1177,8 @@ in
   };
 
   # den-hoag-zijk1 · the REVERSE half-read, by name. An option the engine collects through `imports`
-  # lands its refinement contract too, so an out-of-contract value is refused as the refinement,
-  # naming the field. The control is the in-contract value on the same shape.
+  # keeps its refined type, so an out-of-contract value is refused as the refinement, naming the
+  # field. The control is the in-contract value on the same shape.
   flake.testsError.reverse-half-read-refusals = {
     test-imported-refined-option-is-enforced = {
       expr =
@@ -1190,7 +1190,7 @@ in
         portOf { imports = [ { options.myPort = portOpt; } ]; } 70000;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: refinement failed at host:a.myPort";
+        msg = "^gen-merge: a definition for option `hosts[.]a[.]myPort' is not of the expected type: must be a valid TCP port [(]1-65535[)]";
       };
     };
 

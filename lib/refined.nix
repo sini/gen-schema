@@ -200,6 +200,43 @@ let
           "__id"
         ]
         // {
+          # THE REFINEMENT IS PART OF THE TYPE'S MEMBERSHIP, wherever the type is used (§ Rondon 2008:
+          # `{v:B | e}` has no member failing `e`). The base answers first, then the first failing
+          # refinement by its own message, evaluated in order and stopping there — gen-types' `refined`
+          # (`firstFailingRefinement`) matched, through the `verify` reason channel gen-merge reads, so
+          # an earlier refinement guards a later one. Every refinement is included, `lazy` ones too:
+          # gen-merge runs `verify` when the value is demanded, which is a lazy refinement's access. A
+          # refinement's `check` is a caller lambda; one ill-typed over the base aborts uncatchably, so
+          # each application carries the refinement's message as error context.
+          verify =
+            v:
+            let
+              baseReason =
+                if baseType ? verify then
+                  baseType.verify v
+                else if baseType.check v then
+                  null
+                else
+                  "not of type `${baseType.name or "?"}'";
+              firstFailing =
+                i:
+                let
+                  r = builtins.elemAt normalized i;
+                in
+                if i == builtins.length normalized then
+                  null
+                else if
+                  builtins.addErrorContext "gen-schema: refined: while checking the refinement \"${r.message or "?"}\"" (
+                    r.check v
+                  )
+                then
+                  firstFailing (i + 1)
+                else
+                  r.message;
+            in
+            if baseReason != null then baseReason else firstFailing 0;
+          # No `check` is stated: gen-merge derives the published `check` and its witness from
+          # `verify` (`exportType`, "check <- verify"), so the domain is stated once.
           __schema = {
             refinements = normalized;
             baseType = baseType;

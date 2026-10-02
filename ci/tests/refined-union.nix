@@ -14,6 +14,16 @@ let
   inherit (genSchema) refined refinements;
   r = [ refinements.positive ];
   R = b: refined b r;
+  # A refinement well-typed over each base: the refined type applies it wherever a value is checked.
+  # One shared list, as `r` is, so both declarations carry the same refinement.
+  rs = [
+    {
+      check = builtins.isAttrs;
+      message = "must be an attribute set";
+    }
+  ];
+  Rs = b: refined b rs;
+  Re = b: refined b [ refinements.nonEmpty ];
 
   subA = t.submodule {
     options.a = genMerge.mkOption {
@@ -99,21 +109,21 @@ in
 {
   flake.tests.refined-union = {
     test-union-keeps-the-earlier-submodule-options = {
-      expr = valueOf (R subA) (R subB) { b = 1; };
+      expr = valueOf (Rs subA) (Rs subB) { b = 1; };
       expected = {
         a = "d";
         b = 1;
       };
     };
     test-union-keeps-the-earlier-submodule-options-other-order = {
-      expr = valueOf (R subB) (R subA) { b = 1; };
+      expr = valueOf (Rs subB) (Rs subA) { b = 1; };
       expected = {
         a = "d";
         b = 1;
       };
     };
     test-union-keeps-the-earlier-enum-member = {
-      expr = map (o: (typeOf (R (nt.enum [ o.a ])) (R (nt.enum [ o.b ]))).check o.a) [
+      expr = map (o: (typeOf (Re (nt.enum [ o.a ])) (Re (nt.enum [ o.b ]))).check o.a) [
         {
           a = "a";
           b = "b";

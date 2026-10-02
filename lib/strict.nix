@@ -43,8 +43,9 @@ let
   # A path rendered as Nix SOURCE, so the printed remedy parses and declares the key it names. Each
   # segment follows nixpkgs' `showOption`/`escapeNixIdentifier` rule: bare when it is an identifier
   # and not a keyword, else a string literal — `renderValue`'s JSON string with `$` escaped, which
-  # is nixpkgs' `escapeNixString`. `merge.showOption` joins with `.` and quotes nothing, so a key
-  # holding a dot would print as a nested path and the remedy would declare the wrong option.
+  # is nixpkgs' `escapeNixString`. The rule is applied here rather than read off `merge.showOption`,
+  # whose rendering is the refusal's display: a key holding a dot must print as one quoted segment,
+  # or the remedy would declare a nested option instead of the one it names.
   keywords = [
     "assert"
     "else"
