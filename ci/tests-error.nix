@@ -546,9 +546,17 @@ in
         expr = openTwin { imports = [ foreignO ]; };
         expectedError = twinRefused;
       };
+      # The control forces each entry only as far as the kind/not-a-kind decision (its WHNF), never
+      # the kind value whole: a kind carries published option records, and a deep force reaches the
+      # evaluated keys gen-merge refuses by name there, as nixpkgs' own `value` throws for an
+      # undefined option.
       test-inherits-entry-that-is-not-a-kind-is-refused = {
         expr =
-          assert (forced (plainTree [ { config.schema.sub.inherits = [ foreignO ]; } ]).sub.inherits).success;
+          assert
+            (builtins.tryEval (
+              builtins.foldl' (ok: e: builtins.seq e ok) true
+                (plainTree [ { config.schema.sub.inherits = [ foreignO ]; } ]).sub.inherits
+            )).success;
           (plainTree [ { config.schema.sub.inherits = [ { kind = "baseO"; } ]; } ]).sub.inherits;
         expectedError = {
           type = "ThrownError";
