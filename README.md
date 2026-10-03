@@ -917,7 +917,8 @@ closed:
   same-tree, across trees, and a kind inheriting a member alike, and a name held by a descendant (local
   `b` inherits `a`, `a` inherits another tree's `b`) is one case of it. The kind's value is the caller's
   result, which reads the defs, and the defs' spine forces each partner's result before any guard runs.
-  A cycle through names is refused by name on this arm too. Closing it is `den-hoag-24zdh`.
+  A cycle through names is refused by name on this arm too. The value cycle is a known exception,
+  pinned by `cross-tree-cycle-refusals.test-a-cross-tree-cycle-on-the-mkType-arm-aborts`.
 - **A cycle every member of which reaches through a witness twin first is missed.** The walk's visited
   set is keyed by witness, so of two twins (below) it reads the first and skips the second. A cycle
   reached only through the second is not seen by that walk. Where some member's own walk does reach
@@ -926,7 +927,7 @@ closed:
   `b`'s cycle (`b -> x -> p -> k -> b`). Where EVERY member lists a twin with no cycle behind it before
   its cycle branch (`a` inherits `x1` then `x2`, `x2` inherits `b`; `b` inherits `y1` then `y2`, `y2`
   inherits `a`), no walk finds the cycle and composition recurses uncatchably on all three evaluators
-  (`den-hoag-95cv0`); the same shape with the cycle branch listed first is refused by name. Giving each
+  (a known exception, pinned by `witness-collision-refusals.test-a-fully-shadowed-cycle-aborts`); the same shape with the cycle branch listed first is refused by name. Giving each
   application its own provenance dissolves it. No key closes it: the walk reads parent values, not
   addresses, so a key that tells twins apart never repeats on a cycle that does not pass through the
   kind read, and a walk with no visited set pays every path through a diamond lattice.
