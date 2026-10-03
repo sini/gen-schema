@@ -34,6 +34,14 @@ let
             type = setOf (declarationOf "host");
             default = [ ];
           };
+          options.byName = genMerge.mkOption {
+            type = genMerge.types.attrsOf (declarationOf "host");
+            default = { };
+          };
+          options.byNameLazy = genMerge.mkOption {
+            type = genMerge.types.lazyAttrsOf (declarationOf "host");
+            default = { };
+          };
         };
       }
     ];
@@ -48,6 +56,8 @@ let
           refs.replicas = eval.config.hosts;
           refs.primary = eval.config.hosts;
           refs.backends = eval.config.hosts;
+          refs.byName = eval.config.hosts;
+          refs.byNameLazy = eval.config.hosts;
         };
         config.hosts = {
           igloo = {
@@ -70,6 +80,8 @@ let
             "iceberg"
             "igloo"
           ];
+          byName.front = "igloo";
+          byNameLazy.front = "igloo";
         };
         config.services.solo = {
           port = 443;
@@ -111,6 +123,15 @@ in
         "iceberg"
         "igloo"
       ];
+    };
+    # attrsOf and lazyAttrsOf of a declaration encode the NAME at every value, alike.
+    test-attrsof-ref-encodes-names = {
+      expr = encoded.byName;
+      expected.front = "igloo";
+    };
+    test-lazyattrsof-ref-encodes-names = {
+      expr = encoded.byNameLazy;
+      expected.front = "igloo";
     };
     test-ref-decode-identity = {
       expr = codec.decode {

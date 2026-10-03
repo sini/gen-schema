@@ -16,6 +16,7 @@
 #   nix-unit --flake ./ci#tests        # the suites
 #   nix-unit --flake ./ci#testsError   # these cells
 {
+  lib,
   genSchema,
   genMerge,
   genAlgebra,
@@ -3494,6 +3495,104 @@ in
           type = "ThrownError";
           msg = "^gen-schema: ref field 'host' on kind 'svc': reference 'nope' not found in instance registry \\(available: a\\)$";
         };
+      };
+    };
+
+  # den-hoag-4tgvb: the registry binding walks attrsOf / lazyAttrsOf and refuses every other container that
+  # wraps a declaration BY NAME, naming the field, the kind and the container.
+  flake.testsError.unwalked-container-refusals =
+    let
+      inherit (genSchema) declarationOf setOf evalSchema;
+      T = genMerge.types;
+      D = declarationOf "host";
+      FT = lib.types;
+      read =
+        {
+          type,
+          value,
+          bind ? (hosts: hosts),
+        }:
+        let
+          schema = evalSchema {
+            modules = [
+              {
+                config.schema.host = { };
+                config.schema.svc.options.f = genMerge.mkOption { inherit type; };
+              }
+            ];
+          };
+        in
+        builtins.deepSeq
+          (genMerge.evalModuleTree {
+            modules = [
+              (
+                { config, ... }:
+                {
+                  options.hosts = mkInstanceRegistry schema.host { };
+                  options.svcs = mkInstanceRegistry schema.svc { refs.f = bind config.hosts; };
+                  config.hosts.a = { };
+                  config.hosts.b = { };
+                  config.svcs.s.f = value;
+                }
+              )
+            ];
+          }).config.svcs.s.f
+          null;
+      thrown = msg: {
+        type = "ThrownError";
+        inherit msg;
+      };
+      unwalked =
+        name:
+        thrown "^gen-schema: ref field 'f' on kind 'svc': its type wraps its declaration in `${name}', which the registry binding does not walk \\(walked: nullOr, listOf, setOf, attrsOf, lazyAttrsOf, refined\\)\\. Declare the field with one of those\\.$";
+    in
+    {
+      test-attrsof-dangling-key-refused = {
+        expr = read {
+          type = T.attrsOf D;
+          value.x = "nope";
+        };
+        expectedError = thrown "^gen-schema: ref field 'f' on kind 'svc': reference 'nope' not found in instance registry";
+      };
+      # A set of non-instances cannot be deduplicated: admitted at construction, refused at the first value.
+      test-setof-attrsof-refused-at-first-value = {
+        expr = read {
+          type = setOf (T.attrsOf D);
+          value = [ { x = "a"; } ];
+        };
+        expectedError = thrown "dedupByHash: element missing id_hash";
+      };
+      test-attrsof-list-returning-custom-coerce-refused = {
+        expr = read {
+          type = T.attrsOf D;
+          value.x = "a";
+          bind = hosts: {
+            instances = hosts;
+            coerce = default: _: [ default ];
+          };
+        };
+        expectedError = thrown "custom coerce returned a list in scalar context";
+      };
+      test-functionto-refused-by-name = {
+        expr = read {
+          type = FT.functionTo D;
+          value = _: "a";
+        };
+        expectedError = unwalked "functionTo";
+      };
+      test-uniq-refused-by-name = {
+        expr = read {
+          type = FT.uniq D;
+          value = "a";
+        };
+        expectedError = unwalked "unique";
+      };
+      test-foreign-attrsof-refused-at-the-type-merge = {
+        expr = read {
+          type = FT.attrsOf D;
+          value.x = "a";
+        };
+        expectedError = thrown "types that do not merge";
       };
     };
 }

@@ -198,6 +198,7 @@ let
     inherit (refLib)
       dedupByHash
       bindRefType
+      unwalkedContainer
       isCanonicalOf
       declarationForm
       ;

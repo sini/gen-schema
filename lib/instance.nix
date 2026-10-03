@@ -20,6 +20,7 @@
   defaultOnError,
   dedupByHash,
   bindRefType,
+  unwalkedContainer,
   isCanonicalOf,
   declarationForm,
   filterValidators,
@@ -128,6 +129,13 @@ let
   elemTypeOf = t: (t.nestedTypes or { }).elemType or null;
   isNullOr = t: (t.name or "") == "nullOr";
   isSetOf = t: t.isSetOf or false;
+  isAttrsOf =
+    t:
+    builtins.elem (t.name or "") [
+      "attrsOf"
+      "lazyAttrsOf"
+    ];
+  isListOf = t: (t.name or "") == "listOf";
 
   # Build a coercion function matching the nesting structure of a ref type.
   # Walks the type tree at binding time so the runtime dispatch is exact.
@@ -208,12 +216,17 @@ let
                 listInner = goList et;
               in
               v: dedupByHash (builtins.concatMap listInner v)
-            else
+            else if isAttrsOf t then
+              # attrsOf: each value is a scalar position of its own, so it takes `go`, not the 1→many `goList`
+              v: builtins.mapAttrs (_: inner) v
+            else if isListOf t then
               # listOf: use concatMap with list-producing coerce for 1→many expansion
               let
                 listInner = goList et;
               in
-              v: builtins.concatMap listInner v;
+              v: builtins.concatMap listInner v
+            else
+              unwalkedContainer field kind t;
 
       # List-context walker: produces a list per element for concatMap.
       goList =
@@ -237,8 +250,12 @@ let
                 listInner = goList et;
               in
               v: [ (dedupByHash (builtins.concatMap listInner v)) ]
+            else if isAttrsOf t then
+              v: [ (builtins.mapAttrs (_: inner) v) ]
+            else if isListOf t then
+              v: [ (builtins.concatMap (goList et) v) ]
             else
-              v: [ (builtins.concatMap (goList et) v) ];
+              unwalkedContainer field kind t;
     in
     go type;
 
@@ -324,7 +341,7 @@ let
         { ... }:
         {
           options.${field} = (kindOptions.${field} or { }) // {
-            type = bindRefType refFields.${field}.type;
+            type = bindRefType field kind refFields.${field}.type;
             apply = b.coerceChain;
           };
         }
@@ -335,7 +352,7 @@ let
         { ... }:
         {
           options.${field} = (kindOptions.${field} or { }) // {
-            type = bindRefType refFields.${field}.type;
+            type = bindRefType field kind refFields.${field}.type;
           };
         }
       ) deferredBindings;

@@ -1441,7 +1441,7 @@ codec.serialize toml config.hosts.igloo;
 
 - Internals (`name`, `id_hash`, methods, collections) are always excluded
 - Ref fields auto-encode to `v.name` (scalar), `map (v: v.name)` (listOf/setOf), with null-guard for nullOr
-- `types` parameter registers codecs by NixOS type name — auto-wrapped through `nullOr`/`listOf`/`attrsOf`/`setOf`
+- `types` parameter registers codecs by NixOS type name — auto-wrapped through `nullOr`/`listOf`/`attrsOf`/`lazyAttrsOf`/`setOf`
 - `either`/`oneOf` fields dispatch to the matching branch's codec via `.check` (left-biased)
 - Custom `encode`/`decode` in `fields` overrides auto-detection
 - `fields.x = { fields = { ... }; }` recurses into submodule structure
@@ -1634,11 +1634,11 @@ declarationOf target
 
 `target` is a string -> deferred ref (kind name, bound via `refs` on `mkInstanceRegistry`). `target` is an attrset -> direct ref (resolved immediately). Both modes accept string keys or instance values.
 
-An unbound deferred ref refuses by name (see *Deferred ref* above). The binding rebuilds the field's type with every deferred leaf bound, through the wrappers `mkCoerceChain` walks — `nullOr`, `listOf`, `setOf` — and through `refined`, whose layer is rebuilt over the bound base with the same refinements, so a refinement over a deferred ref is served in a kind and still enforced there. The guarantee covers types built through gen-schema's and gen-merge's constructors: a hand-written `// { check = …; }` over a ref leaf is refused in a kind by gen-merge's dropped-check rule, because the binding's rebuilt leaf drops the check the override added. One kind's unbound and bound leaves join to the bound one in either order; two kinds are refused by gen-merge's declaration path on the differing names before the relation's own refusal is reached, which the relation keeps as defence in depth.
+An unbound deferred ref refuses by name (see *Deferred ref* above). The binding rebuilds the field's type with every deferred leaf bound, through the wrappers `mkCoerceChain` walks — `nullOr`, `listOf`, `setOf`, `attrsOf`, `lazyAttrsOf` — and through `refined`, whose layer is rebuilt over the bound base with the same refinements, so a refinement over a deferred ref is served in a kind and still enforced there. Any other container around the ref (`functionTo`, `uniq`, …) is refused by name at the binding (`ref field 'f' on kind 'k': its type wraps its declaration in `functionTo', which the registry binding does not walk`), never an interpreter abort. `attrsOf`/`lazyAttrsOf`coerce each value as a scalar position, so`setOf (attrsOf (declarationOf k))` is admitted at construction and refused at its first value (`dedupByHash: element missing id_hash`). The guarantee covers types built through gen-schema's and gen-merge's constructors: a hand-written `// { check = …; }\` over a ref leaf is refused in a kind by gen-merge's dropped-check rule, because the binding's rebuilt leaf drops the check the override added. One kind's unbound and bound leaves join to the bound one in either order; two kinds are refused by gen-merge's declaration path on the differing names before the relation's own refusal is reached, which the relation keeps as defence in depth.
 
 The former name `ref` is retired: it is a published `throw` that names `declarationOf`, so reaching it or applying it refuses by name, catchably. The rename follows Néron et al. 2015 (*A Theory of Name Resolution*): a reference resolves to a declaration, and this type's values are declarations.
 
-The deferred ref's `refKind` sits inside the descriptor handed to `mkOptionType`, not stapled onto the finished type afterwards. `mkOptionType` stamps the protocol onto the record it is handed and mints a functor pointing back at that completed record, so a `// { refKind = ...; }` over a completed type leaves every protocol answer — `typeMerge`'s rebuild included — describing a `declarationOf` without its kind. Declaring the same option twice as `declarationOf "host"` therefore merges to a `declarationOf(host)` that `getRefKind` still reads through any `nullOr` / `listOf` / `setOf` wrapper and `mkCoerceChain` still builds a coercion for, rather than to a bare `declarationOf` whose string keys reach the instance unresolved.
+The deferred ref's `refKind` sits inside the descriptor handed to `mkOptionType`, not stapled onto the finished type afterwards. `mkOptionType` stamps the protocol onto the record it is handed and mints a functor pointing back at that completed record, so a `// { refKind = ...; }` over a completed type leaves every protocol answer — `typeMerge`'s rebuild included — describing a `declarationOf` without its kind. Declaring the same option twice as `declarationOf "host"` therefore merges to a `declarationOf(host)` that `getRefKind` still reads through any `nullOr` / `listOf` / `setOf` / `attrsOf` / `lazyAttrsOf` wrapper and `mkCoerceChain` still builds a coercion for, rather than to a bare `declarationOf` whose string keys reach the instance unresolved.
 
 ### `setOf`
 
@@ -1755,7 +1755,7 @@ Returns a markdown string with a table per kind.
 ```nix
 mkCodec kindValue {
   fields ? {},           # per-field overrides: { name = { encode?; decode?; exclude?; fields?; }; }
-  types ? {},            # codecs by NixOS type name — auto-wrapped through nullOr/listOf/attrsOf/setOf
+  types ? {},            # codecs by NixOS type name — auto-wrapped through nullOr/listOf/attrsOf/lazyAttrsOf/setOf
   excludeFields ? [],    # additional field names to exclude from serialization
 }
 ```

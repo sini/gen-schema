@@ -137,8 +137,14 @@ let
             encode = v: map inner.encode v;
             decode = v: map inner.decode v;
           }
-        # attrsOf wrapper — mapAttrs over elemType
-        else if typeName == "attrsOf" && et != null then
+        # attrsOf / lazyAttrsOf wrapper — mapAttrs over elemType
+        else if
+          builtins.elem typeName [
+            "attrsOf"
+            "lazyAttrsOf"
+          ]
+          && et != null
+        then
           let
             inner = mkTypeEncoder name et;
           in

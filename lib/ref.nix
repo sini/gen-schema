@@ -145,29 +145,38 @@ let
 
   mkDeferredRef = mkRef false;
 
+  # A container the bind and coerce walks do not know carries a ref they cannot reach: refused by name.
+  unwalkedContainer =
+    field: kind: t:
+    throw "gen-schema: ref field '${field}' on kind '${kind}': its type wraps its declaration in `${t.name or "unknown"}', which the registry binding does not walk (walked: nullOr, listOf, setOf, attrsOf, lazyAttrsOf, refined). Declare the field with one of those.";
+
   # Rebuild a ref type with every deferred leaf bound, through the wrappers mkCoerceChain walks.
   # A refined node is matched FIRST: mkRefinedType inherits its base's refKind, isSetOf and name, so a
   # later arm would rebuild the bare base and drop the refinement. It is rebuilt over a bound base with
   # the same refinements, which refined's relation accepts against the kind's own declaration.
   bindRefType =
-    t:
+    field: kind: t:
     let
       et = (t.nestedTypes or { }).elemType or null;
     in
     if t ? __schema then
-      mkRefinedType (bindRefType t.__schema.baseType) t.__schema.refinements
+      mkRefinedType (bindRefType field kind t.__schema.baseType) t.__schema.refinements
     else if (t.refKind or null) != null then
       mkRef true t.refKind
     else if et == null then
       t
     else if (t.name or "") == "nullOr" then
-      merge.types.nullOr (bindRefType et)
+      merge.types.nullOr (bindRefType field kind et)
     else if t.isSetOf or false then
-      setOf (bindRefType et)
+      setOf (bindRefType field kind et)
     else if (t.name or "") == "listOf" then
-      merge.types.listOf (bindRefType et)
+      merge.types.listOf (bindRefType field kind et)
+    else if (t.name or "") == "attrsOf" then
+      merge.types.attrsOf (bindRefType field kind et)
+    else if (t.name or "") == "lazyAttrsOf" then
+      merge.types.lazyAttrsOf (bindRefType field kind et)
     else
-      t;
+      unwalkedContainer field kind t;
 
   # Extract refKind from a type, traversing nullOr/listOf wrappers safely.
   # Returns the target kind name string, or null if not a ref type.
@@ -288,6 +297,7 @@ in
   inherit
     getRefKind
     bindRefType
+    unwalkedContainer
     dedupByHash
     setOf
     isCanonicalOf
