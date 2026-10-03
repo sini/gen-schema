@@ -426,7 +426,7 @@ pre-fix (silent) behavior. Shared fixtures: `sc` = a schema built with
 
 ## Theory
 
-Claimed in `README.md:1465-1484`, which splits its sources into **Implements** and **Informed by**,
+Claimed in `README.md:1983-2002`, which splits its sources into **Implements** and **Informed by**,
 and restated in the file-header comments.
 
 **Implements**
