@@ -906,22 +906,30 @@ one; with no cycle the value is foreign, its completion stamp is read, and it is
 is decided before any mark is read, because that entry's mark is the declaring kind's own, still being
 computed. The kind's own name is tested by the name, never by forcing the kind, and the descendant by
 the cycle walk, which reads witnesses only to route the value: the verdict stays with the cycle walk and
-the stamp. Two cases are exceptions to "a value or a named refusal", enumerated and pinned
-(`ci/tests-error.nix`, `inherits-value-entry-refusals` and `witness-collision-refusals`), not closed:
+the stamp. A kind on an inheritance cycle classifies no parent: the cycle walk's verdict is read before
+any stamp or mark, because a cycle member's stamp read would re-enter the cycle. Two cases are
+exceptions to "a value or a named refusal", enumerated and pinned (`ci/tests-error.nix`,
+`inherits-value-entry-refusals`, `cross-tree-cycle-refusals` and `witness-collision-refusals`), not
+closed:
 
-- **A name held by a descendant, on the `mkType` arm**, with a caller `mkType` whose result reads the
-  defs (as gen-aspects' does), aborts uncatchably with `infinite recursion encountered`: the walk
-  reaches the declaring kind through the same-tree hop, and that kind's value is the caller's result,
-  which reads the defs being classified.
-- **A cycle behind a witness twin is missed.** The walk's visited set is keyed by witness, so of two
-  twins (below) it reads the first and skips the second. A cycle reached only through the second
-  (`k` inherits `a` and `b`, `a` reaches one application of a helper and `b` another, and only `b`'s
-  leads back to `k`) is not seen by `k`'s walk. Then the evaluator decides: on nix and Determinate
-  composing `k` recurses uncatchably, and Lix forces `b` first, whose own walk refuses it by name as
-  `b`'s cycle (`b -> x -> p -> k -> b`). The pin holds each outcome on its own family. Giving each application its own provenance dissolves it. No key closes it: the walk
-  reads parent values, not addresses, so a key that tells twins apart never repeats on a cycle that
-  does not pass through the kind read, and a walk with no visited set pays every path through a
-  diamond lattice.
+- **A value-entry cycle on the `mkType` arm**, with a caller `mkType` whose result reads the defs (as
+  gen-aspects' does), aborts uncatchably with `infinite recursion encountered` on every evaluator:
+  same-tree, across trees, and a kind inheriting a member alike, and a name held by a descendant (local
+  `b` inherits `a`, `a` inherits another tree's `b`) is one case of it. The kind's value is the caller's
+  result, which reads the defs, and the defs' spine forces each partner's result before any guard runs.
+  A cycle through names is refused by name on this arm too. Closing it is `den-hoag-24zdh`.
+- **A cycle every member of which reaches through a witness twin first is missed.** The walk's visited
+  set is keyed by witness, so of two twins (below) it reads the first and skips the second. A cycle
+  reached only through the second is not seen by that walk. Where some member's own walk does reach
+  it (`k` inherits `a` and `b`, `a` reaches one application of a helper and `b` another, and only
+  `b`'s leads back to `k`), that member refuses it by name, so `k` is refused on every evaluator as
+  `b`'s cycle (`b -> x -> p -> k -> b`). Where EVERY member lists a twin with no cycle behind it before
+  its cycle branch (`a` inherits `x1` then `x2`, `x2` inherits `b`; `b` inherits `y1` then `y2`, `y2`
+  inherits `a`), no walk finds the cycle and composition recurses uncatchably on all three evaluators
+  (`den-hoag-95cv0`); the same shape with the cycle branch listed first is refused by name. Giving each
+  application its own provenance dissolves it. No key closes it: the walk reads parent values, not
+  addresses, so a key that tells twins apart never repeats on a cycle that does not pass through the
+  kind read, and a walk with no visited set pays every path through a diamond lattice.
 
 **One declaration applied in several trees.** A helper that declares a kind, applied in two trees with
 the same parent names and the same directly declared option names, gives two kinds one witness: the
@@ -939,9 +947,13 @@ refused. A module imported by PATH is named the same way: by the `_file` its own
 its path (a `_file` on a module that merely imports it does not reach it), so a path module that sets a
 per-application `_file` is served too, while two distinct path modules that set one `_file` share a
 file and so a witness. Pinned by `witness-collision-refusals`
-(`ci/tests-error.nix`) and `kind-witness-collision` (`ci/tests/`).
+(`ci/tests-error.nix`) and `kind-witness-collision` (`ci/tests/`). Such a kind is refused before
+composition too: reading an entry of its `inherits`, or its `__kindImports`, is refused, since a kind
+the walk answers for classifies no parent.
 
-**An inheritance cycle is refused by name on every tree, in either spelling.** A kind that reaches
+**An inheritance cycle is refused by name on every tree, in either spelling**, but for the two
+exceptions enumerated above (a value-entry cycle on the `mkType` arm, and a cycle every member reaches
+through a witness twin first). A kind that reaches
 itself through its parents, declared or spelled, would import itself into itself; it is refused,
 catchably, at every read that would compose it, in `evalSchema`'s wording: the members sorted, as
 `evalSchema` names them, so the bracket is the same whichever member is read, and then the path from
@@ -950,7 +962,8 @@ the kind read:
 The walk compares witnesses, so its refusal claims only what a hit establishes: the first reading, or
 the collision above.
 A kind that merely reaches a cycle composes the cycle's first member, which refuses under its own
-name. The walk is over parent VALUES as written, compared by a content witness (the kind's name,
+name: at any depth, through a diamond, and across trees with distinct names alike (`a` in one tree
+inherits `b` of another, which inherits `a`), pinned by `cross-tree-cycle-refusals`. The walk is over parent VALUES as written, compared by a content witness (the kind's name,
 where each def was written, its parents' names and its declared option names), so a parent reached
 twice is a diamond, not a cycle, and another tree's kind of the same name is a different kind unless
 it is the same declaration's twin (above). Each
