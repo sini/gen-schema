@@ -238,7 +238,7 @@ in
       };
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: inheritance cycle among kinds \\[a b\\] — kind 'b' inherits itself through its parents \\(b -> a -> b\\); a kind may inherit only kinds resolved in a strictly earlier pass$";
+        msg = "^gen-schema: inheritance cycle among kinds \\[a b\\] — kind 'a' inherits itself through its parents \\(a -> b -> a\\); a kind may inherit only kinds resolved in a strictly earlier pass$";
       };
     };
 
@@ -495,7 +495,7 @@ in
       };
       test-evalSchema-value-2-cycle = {
         expr = staged val2;
-        expectedError = refuses "a b" "b -> a -> b" "b";
+        expectedError = refuses "a b" "a -> b -> a" "a";
       };
       test-evalSchema-value-self-cycle = {
         expr = staged valself;
@@ -503,11 +503,11 @@ in
       };
       test-evalSchema-value-and-name-cycle = {
         expr = staged valname;
-        expectedError = refuses "a b" "b -> a -> b" "b";
+        expectedError = refuses "a b" "a -> b -> a" "a";
       };
       test-evalSchema-value-and-spelling-cycle = {
         expr = staged valdep;
-        expectedError = refuses "a b" "b -> a -> b" "b";
+        expectedError = refuses "a b" "a -> b -> a" "a";
       };
     };
 
@@ -546,6 +546,86 @@ in
         expr = openTwin { imports = [ foreignO ]; };
         expectedError = twinRefused;
       };
+      # a SELF-NAMED subkind over a `//` copy of a foreign kind: decided by witness (the tree's entry
+      # at that name is the declaring kind), and the copy's stamp is still read
+      test-self-named-swap-is-refused = {
+        expr =
+          builtins.attrNames
+            (plainTree [
+              {
+                config.schema.baseO = {
+                  inherits = [ (foreignO // { options = { }; }) ];
+                  options.extra = genMerge.mkOption { type = genMerge.types.int; };
+                };
+              }
+            ]).baseO.options;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'baseO' inherits: the kind value 'baseO' is not the value its schema built: ";
+        };
+      };
+      # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): the name held by a DESCENDANT on the `mkType` arm,
+      # with a caller `mkType` whose result shape reads the defs. The reach walk passes through `sub`
+      # to the declaring kind, whose value is in flight, so it aborts uncatchably, as it did before the
+      # reach step. Host evaluator only; the other two are the guarantee's.
+      test-name-held-by-a-descendant-on-the-mkType-arm-aborts = {
+        expr =
+          let
+            mkType =
+              {
+                defs ? [ ],
+                kind,
+                ...
+              }:
+              {
+                __functor = _: _: {
+                  imports = map (d: d.value) (builtins.filter (d: builtins.isAttrs d.value) defs);
+                };
+                inherit kind;
+              }
+              // (if builtins.length defs > 0 then { hasDefs = true; } else { });
+          in
+          builtins.attrNames
+            (plainTreeWith (mkSchemaOption { inherit mkType; }) [
+              {
+                config.schema.baseO = {
+                  inherits = [ "sub" ];
+                  options.lb = genMerge.mkOption { type = genMerge.types.int; };
+                };
+                config.schema.sub = {
+                  inherits = [ foreignO ];
+                  options.extra = genMerge.mkOption { type = genMerge.types.int; };
+                };
+              }
+            ]).sub.options;
+        expectedError = {
+          type = "EvalError";
+          msg = "infinite recursion encountered";
+        };
+      };
+      # ★ ENUMERATED, NOT CLOSED: a FALSE cycle. Three self-named layers from one generator (one
+      # source position, the same parent and option names) carry equal witnesses, so the cycle walk
+      # meets the tip's witness on the middle layer and refuses an acyclic chain by name. The witness
+      # does not tell two trees from one generator apart. A layer with another option name composes
+      # (`ci/tests/inherits-value-entries.nix`, `test-self-named-chain-of-three-composes`).
+      test-witness-collision-refuses-an-acyclic-chain =
+        let
+          layer = parent: o: {
+            config.schema.baseO = {
+              inherits = [ parent ];
+              options.${o} = genMerge.mkOption { type = genMerge.types.int; };
+            };
+          };
+          t1 = plainTree [ (layer foreignO "x") ];
+          t2 = plainTree [ (layer t1.baseO "x") ];
+        in
+        {
+          expr = builtins.attrNames t2.baseO.options;
+          expectedError = {
+            type = "ThrownError";
+            msg = "^gen-schema: inheritance cycle among kinds \\[baseO\\] — kind 'baseO' inherits itself through its parents \\(baseO -> baseO\\); ";
+          };
+        };
       # The control forces each entry only as far as the kind/not-a-kind decision (its WHNF), never
       # the kind value whole: a kind carries published option records, and a deep force reaches the
       # evaluated keys gen-merge refuses by name there, as nixpkgs' own `value` throws for an
@@ -2877,6 +2957,45 @@ in
         ];
       k2 = consumer intOpt (genMerge.mkOption { type = T.str; });
       k2eq = consumer (openInt 80) (openInt 443);
+
+      # an ancestor sharing the declaring kind's name is a foreign kind value (in one tree a name is
+      # one entry): a SELF-NAMED `base` over `baseA`, and a `base` reaching two foreign `base`s
+      selfUnder =
+        ks:
+        (plainTreeWith (mkSchemaOption { keySemantics = ks; }) [
+          {
+            config.schema.base = {
+              inherits = [ baseA ];
+              options.extra = intOpt;
+            };
+          }
+        ]).base;
+      viaBoth =
+        d:
+        tree [
+          (gen (openInt d))
+          {
+            config.schema.sub = {
+              inherits = [ "base" ];
+              options.s = intOpt;
+            };
+            config.schema.x = {
+              inherits = [ "base" ];
+              options.xx = intOpt;
+            };
+          }
+        ];
+      a80 = viaBoth 80;
+      selfDiamond =
+        x:
+        (tree [
+          {
+            config.schema.base.inherits = [
+              a80.sub
+              x
+            ];
+          }
+        ]).base;
     in
     {
       # C3 + P6 · `p` reached along two paths as two declarations of one mark: refused at the child's
@@ -2952,6 +3071,27 @@ in
         expectedError = {
           type = "ThrownError";
           msg = "^gen-schema: kind 'd' reaches 'base' along d -> sub -> base and along d -> x -> base: two declarations of 'base' mint one identity and are unequal only at sealed component\\(s\\) 'modules', 'open.options.b.default': ";
+        };
+      };
+      # An ancestor named as the kind is named as the foreign kind value, at the class check and at
+      # the fold's diamond, so the text never reads as a kind inheriting itself.
+      test-self-named-subkind-omitting-a-base-class-names-the-foreign-value = {
+        expr =
+          assert
+            (forced (builtins.attrNames (selfUnder (ksBase // { beta.category = "class"; })).options)).success;
+          builtins.attrNames (selfUnder { beta.category = "class"; }).options;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'base' inherits the foreign kind value 'base', whose keySemantics declares the key 'alpha', and this kind's keySemantics does not: ";
+        };
+      };
+      test-diamond-over-a-same-named-ancestor-names-the-foreign-value = {
+        expr =
+          assert (forced (selfDiamond a80.x).options.b.default).value == 80;
+          (selfDiamond (viaBoth 443).x).options.b.default;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'base' reaches the foreign kind value 'base' along base -> sub -> base and along base -> x -> base: two declarations of 'base' mint one identity and are unequal only at sealed component\\(s\\) 'modules', 'open.options.b.default': ";
         };
       };
     };

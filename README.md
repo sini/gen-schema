@@ -886,6 +886,26 @@ the mark of the tree's same-named kind is decided by `kindEq`: a type-only twin 
 and a twin that differs at open content is refused in `kindEq`'s words. An entry that is neither a name
 nor a kind value is refused by name.
 
+**A value whose name the tree holds at an entry that reaches the declaring kind is foreign.** That entry
+is the declaring kind itself (`base` inherits another tree's `base`, a self-named subkind) or a kind that
+inherits it (`base` inherits `sub`, and `sub` inherits another tree's `base`). Were the value that
+entry, the kind would inherit itself through it, so the cycle walk below refuses it by name if it is
+one; with no cycle the value is foreign, its completion stamp is read, and it is a VALUE entry. This
+is decided before any mark is read, because that entry's mark is the declaring kind's own, still being
+computed. The kind's own name is tested by the name, never by forcing the kind, and the descendant by
+the cycle walk, which reads witnesses only to route the value: the verdict stays with the cycle walk and
+the stamp. Two cases are exceptions to "a value or a named refusal", enumerated and pinned
+(`ci/tests-error.nix`, `inherits-value-entry-refusals`), not closed:
+
+- **A name held by a descendant, on the `mkType` arm**, with a caller `mkType` whose result reads the
+  defs (as gen-aspects' does), aborts uncatchably with `infinite recursion encountered`: the walk
+  reaches the declaring kind through the same-tree hop, and that kind's value is the caller's result,
+  which reads the defs being classified.
+- **A false cycle.** The witness does not tell two trees apart when one source position (one layer
+  generator, one shared module file) declares kinds of one name with the same parent names and option
+  names. A self-named chain of three such layers (`t2.base` \<- `t1.base` \<- `t0.base`) is acyclic and
+  is refused as `inheritance cycle among kinds [base] — kind 'base' inherits itself through its parents (base -> base)`. A layer that differs in an option name composes.
+
 **An inheritance cycle is refused by name on every tree, in either spelling.** A kind that reaches
 itself through its parents, declared or spelled, would import itself into itself; it is refused,
 catchably, at every read that would compose it, in `evalSchema`'s wording: the members sorted, as
@@ -919,7 +939,9 @@ reached along two paths is decided as `kindEq` decides it: one kind is one entry
 that share a mark and differ are refused by name, naming the kind and both paths:
 `gen-schema: kind 'd' reaches 'p' along d -> x -> p and along d -> y -> p: two declarations of 'p' mint one identity and are unequal only at sealed component(s) 'open.options.base.default': …`.
 A subkind's `keySemantics` must hold every key of each ancestor's, with the same `category`; one that
-omits or re-categorises a key is refused by name, naming the kind, the key and the ancestor. Both
+omits or re-categorises a key is refused by name, naming the kind, the key and the ancestor. An
+ancestor that carries the kind's own name is foreign (one tree holds one entry per name), and both
+refusals name it as `the foreign kind value '<k>'`. Both
 refusals fire where the kind is composed (its options, refs, mark or an instance, and the map itself),
 never at its WHNF, and after the cycle walk.
 
@@ -953,9 +975,8 @@ config.schema.admin-user.imports = [ config.schema.user ];
 For a foreign value the warning names it as `inherits = [ <the kind value 'user'> ]`.
 
 A CYCLE written in the spelling, `a` importing `config.schema.b` and `b` importing `config.schema.a`, is
-refused by the cycle walk above, on a plain tree and under `evalSchema` alike (whose pass 0 reads
-`inherits`, which forces the spelled kinds, so the partner's own guard refuses first), before the
-spelled modules import each other: `inheritance cycle among kinds [a b] — kind 'b' inherits itself through its parents (b -> a -> b); …`.
+refused by the cycle walk above, on a plain tree and under `evalSchema` alike, by the kind read,
+before the spelled modules import each other: `inheritance cycle among kinds [a b] — kind 'a' inherits itself through its parents (a -> b -> a); …`.
 
 Four constructions compose as before, unaliased and unwarned, because deciding them needs something
 other than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree

@@ -1182,9 +1182,11 @@ let
               # imports: no def of this kind carries the resolver's provenance for it, and it is not
               # spelled either (a spelled parent composes where it is written). Computed only past a
               # non-empty declaration, so a kind that inherits nothing pays one comparison.
-              # `inherits` holds names and kind VALUES (den-hoag-l0y F4). A value is the tree's own iff
-              # the tree holds an entry at its name with an equal mark and `kindEq` decides `true` (an
-              # equal mark `kindEq` refuses is that refusal), and then it IS the name; anything else,
+              # `inherits` holds names and kind VALUES (den-hoag-l0y F4). A value whose name the tree
+              # holds at an entry that reaches this kind is foreign (the reach step below). Otherwise a
+              # value is the tree's own iff the tree holds an entry at its name with an equal mark and
+              # `kindEq` decides `true` (an equal mark `kindEq` refuses is that refusal), and then it IS
+              # the name; anything else,
               # and every value off a tree, is foreign and stays a VALUE entry, never resolved against
               # an in-tree name (ADR-0034: identity through the one mint, never by name). It forces
               # both marks where `inherits` is read, so the cycle walk reads `cycleParents` instead.
@@ -1194,6 +1196,24 @@ let
                   throw "gen-schema: kind '${kind}' inherits ${
                     if builtins.isAttrs v then "an attrset with no mark" else "a ${builtins.typeOf v}"
                   }: an `inherits` entry is a kind name or a kind value (`kind` and a mint-backed mark `__mint.minted`)"
+                # THE REACH STEP (den-hoag-l0y, foreign arm): the tree's entry at the value's name
+                # reaches THIS kind (it is this kind, or inherits it). Were the value that entry, this
+                # kind would inherit itself through it, which the cycle walk refuses; so with no cycle
+                # it is foreign, and its stamp is read. Taken before any mark, because that entry's
+                # mark is this kind's, in flight. The witness walk only ROUTES the value here: the
+                # verdict stays with the cycle walk and the stamp, never a witness comparison.
+                # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): on the `mkType` arm, a name held by a
+                # DESCENDANT (local `b` inherits `a`, `a` inherits the foreign `b`) still aborts
+                # uncatchably: the walk reaches this kind through the same-tree hop, and this kind's
+                # value is the caller's result, which reads these defs. Pinned by
+                # `inherits-value-entry-refusals.test-name-held-by-a-descendant-on-the-mkType-arm-aborts`.
+                else if tree != null && builtins.elem v.kind tree._kindNames && reachesThis v.kind then
+                  if inheritanceCycle != null then
+                    cycleRefusal
+                  else if v ? __kindSelf && !(stampOk v) then
+                    stampRefusal "gen-schema: kind '${kind}' inherits" v
+                  else
+                    "value"
                 else if
                   tree != null
                   && builtins.elem v.kind tree._kindNames
@@ -1238,14 +1258,21 @@ let
               # A computed field is caller-built from the raw defs as well, so it is read through the
               # guard on both branches, as the `mkType` result's own fields are.
               guardedComputed = prelude.mapAttrs (_: resolvedOnly) computedFields;
+              # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): a FALSE cycle. The witness does not tell
+              # two trees apart when one source position (one layer generator, one shared module file)
+              # declares kinds of one name with the same parent and option names, so an ACYCLIC chain
+              # of such kinds (`t2.base` <- `t1.base` <- `t0.base`) meets this kind's witness on
+              # another kind and is refused here, by name, as a cycle. Pinned by
+              # `inherits-value-entry-refusals.test-witness-collision-refuses-an-acyclic-chain`.
+              cycleRefusal = throw "gen-schema: inheritance cycle among kinds [${
+                prelude.concatStringsSep " " (
+                  prelude.sort (a: b: a < b) (prelude.unique (prelude.init inheritanceCycle))
+                )
+              }] — kind '${kind}' inherits itself through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}); a kind may inherit only kinds resolved in a strictly earlier pass";
               resolvedOnly =
                 v:
                 if inheritanceCycle != null then
-                  throw "gen-schema: inheritance cycle among kinds [${
-                    prelude.concatStringsSep " " (
-                      prelude.sort (a: b: a < b) (prelude.unique (prelude.init inheritanceCycle))
-                    )
-                  }] — kind '${kind}' inherits itself through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}); a kind may inherit only kinds resolved in a strictly earlier pass"
+                  cycleRefusal
                 else if unresolvedInherits != [ ] && tree == null then
                   throw "gen-schema: kind '${kind}' inherits '${builtins.head unresolvedInherits}', but nothing resolved it: this entry type was built outside a kind tree, so there is no parent to read. Declare the kind through `mkSchemaOption` or `evalSchema`"
                 else
@@ -1265,7 +1292,7 @@ let
                     show = c: if builtins.isString c then "'${c}'" else "<a ${builtins.typeOf c}>";
                   in
                   throw (
-                    "gen-schema: kind '${kind}' inherits '${d.ancestor}', whose keySemantics "
+                    "gen-schema: kind '${kind}' inherits ${ancestorName d.ancestor}, whose keySemantics "
                     + (
                       if d.own then
                         "gives the key '${d.key}' the category ${show d.theirs}, and this kind's keySemantics gives it ${show d.ours}"
@@ -1274,6 +1301,11 @@ let
                     )
                     + ": a subkind's keySemantics must hold every key of each ancestor's, with the same category; build this kind's schema with '${d.key}' in its keySemantics as the ancestor declares it"
                   );
+
+              # An ancestor that carries this kind's name is a foreign kind value (within one tree a
+              # name is one entry, and this kind reaching its own entry is a cycle), so the lineage
+              # refusals name it as one rather than reading as a kind inheriting itself.
+              ancestorName = n: if n == kind then "the foreign kind value '${n}'" else "'${n}'";
 
               # THE TRANSITIVE ANCESTOR MAP (den-hoag-l0y): mark -> ancestor kind VALUE, read per kind
               # value and never memoised by mark, so nodes share one reference per kind. A fold over the
@@ -1298,7 +1330,7 @@ let
                     in
                     if acc ? ${m} then
                       builtins.seq (sealedCollisionEq
-                        "gen-schema: kind '${kind}' reaches '${p.kind}' along ${arrow acc.${m}.path} and along ${arrow here}"
+                        "gen-schema: kind '${kind}' reaches ${ancestorName p.kind} along ${arrow acc.${m}.path} and along ${arrow here}"
                         (subjectOf acc.${m}.value)
                         (subjectOf p)
                       ) acc
@@ -1437,38 +1469,39 @@ let
               # shared reach set would itself recurse on a cycle) and copies the path per step, so a
               # depth-n chain costs O(n²) in total, the same order as composing it; carry the path as
               # a cons list if a deep spelling-heavy tree ever makes that dominate.
-              inheritanceCycle =
+              cycleGo =
+                acc: stack: v:
                 let
-                  go =
-                    acc: stack: v:
-                    let
-                      w = v.__kindWitness;
-                    in
-                    # A kind value this entry type did not build (`isSchemaKind` admits any value with a
-                    # `kind` and a mark) publishes no parents, so the walk has nothing past it to read.
-                    if acc.found != null || !(v ? __kindCycleParents) then
-                      acc
-                    else if w == kindWitness then
-                      acc // { found = stack ++ [ v.kind ]; }
-                    else if acc.seen ? ${w} then
-                      acc
-                    else
-                      builtins.foldl' (a: go a (stack ++ [ v.kind ])) (
-                        acc
-                        // {
-                          seen = acc.seen // {
-                            ${w} = true;
-                          };
-                        }
-                      ) v.__kindCycleParents;
+                  w = v.__kindWitness;
                 in
-                if cycleParents == [ ] then
-                  null
+                # A kind value this entry type did not build (`isSchemaKind` admits any value with a
+                # `kind` and a mark) publishes no parents, so the walk has nothing past it to read.
+                if acc.found != null || !(v ? __kindCycleParents) then
+                  acc
+                else if w == kindWitness then
+                  acc // { found = stack ++ [ v.kind ]; }
+                else if acc.seen ? ${w} then
+                  acc
                 else
-                  (builtins.foldl' (a: go a [ kind ]) {
-                    found = null;
-                    seen = { };
-                  } cycleParents).found;
+                  builtins.foldl' (a: cycleGo a (stack ++ [ v.kind ])) (
+                    acc
+                    // {
+                      seen = acc.seen // {
+                        ${w} = true;
+                      };
+                    }
+                  ) v.__kindCycleParents;
+              walkFrom =
+                vs:
+                (builtins.foldl' (a: cycleGo a [ kind ]) {
+                  found = null;
+                  seen = { };
+                } vs).found;
+              # The entry at this kind's own name IS this kind, decided by the name and never by
+              # forcing it: on the `mkType` arm this kind's value is the caller's result, which reads
+              # these very defs, so it has no WHNF while `inherits` is classified.
+              reachesThis = name: name == kind || walkFrom [ tree.${name} ] != null;
+              inheritanceCycle = if cycleParents == [ ] then null else walkFrom cycleParents;
 
               # THE DESUGAR (den-hoag-8c8pr): on a tree, a declared parent nothing else composed is
               # imported into this kind exactly as the deprecated spelling `imports = [ config.schema.<p> ]`

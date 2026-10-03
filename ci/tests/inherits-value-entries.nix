@@ -153,6 +153,159 @@ in
           alias = r;
         };
     };
+    # A SELF-NAMED SUBKIND: the declaring kind keeps the foreign value's name (`base` inherits the
+    # foreign `base`). The tree's entry at that name is the declaring kind itself, whose mark is in
+    # flight, so the discriminator decides it by witness before any mark: a foreign VALUE entry.
+    test-self-named-subkind-composes-a-foreign-value = {
+      expr =
+        let
+          rec' = t: {
+            inherits = map (render t) t.base.inherits;
+            edges = map (e: render t e.to) (builtins.filter (e: e.type == "inherits") t._edges);
+            options = builtins.attrNames t.base.options;
+            isAForeign = isA foreign t.base;
+          };
+          decl = spelling: { config.schema.base = entry spelling foreign; };
+        in
+        {
+          inherits = rec' (tree [ (decl "inherits") ]);
+          alias = rec' (tree [ (decl "alias") ]);
+          evalSchema = rec' (evalSchema {
+            modules = [ (decl "inherits") ];
+          });
+        };
+      expected =
+        let
+          r = {
+            inherits = [ "value:foreign" ];
+            edges = [ "value:foreign" ];
+            options = [
+              "b"
+              "extra"
+            ];
+            isAForeign = true;
+          };
+        in
+        {
+          inherits = r;
+          alias = r;
+          evalSchema = r;
+        };
+    };
+    # The same, on the `mkType` arm, with a caller `mkType` whose result's SHAPE reads the defs (as
+    # gen-aspects' `optionalAttrs (defsModules != [ ])` does): the declaring kind has no value while
+    # its `inherits` is classified, so its own name is decided by the name, never by forcing it.
+    test-self-named-subkind-on-the-mkType-arm = {
+      expr =
+        let
+          mkType =
+            {
+              defs ? [ ],
+              kind,
+              ...
+            }:
+            {
+              __functor = _: _: {
+                imports = map (d: d.value) (builtins.filter (d: builtins.isAttrs d.value) defs);
+              };
+              inherit kind;
+            }
+            // (if builtins.length defs > 0 then { hasDefs = true; } else { });
+          k =
+            (genMerge.evalModuleTree {
+              modules = [
+                { options.schema = mkSchemaOption { inherit mkType; }; }
+                { config.schema.base = entry "inherits" foreign; }
+              ];
+            }).config.schema.base;
+        in
+        {
+          inherits = map (e: mark e == mark foreign) k.inherits;
+          isAForeign = isA foreign k;
+          hasDefs = k.hasDefs;
+        };
+      expected = {
+        inherits = [ true ];
+        isAForeign = true;
+        hasDefs = true;
+      };
+    };
+    # The general case: the value's name is held in-tree by a kind that INHERITS the declaring kind
+    # (local `base` inherits `sub` by name; `sub` inherits the foreign `base`). No cycle.
+    test-name-held-by-a-descendant-composes-a-foreign-value = {
+      expr =
+        let
+          t =
+            spelling:
+            tree [
+              {
+                config.schema.base = {
+                  inherits = [ "sub" ];
+                  options.lb = intOpt;
+                };
+              }
+              { config.schema.sub = entry spelling foreign; }
+            ];
+          rec' = t: {
+            inherits = map (render t) t.sub.inherits;
+            sub = builtins.attrNames t.sub.options;
+            base = builtins.attrNames t.base.options;
+            isAForeign = isA foreign t.sub;
+          };
+        in
+        {
+          inherits = rec' (t "inherits");
+          alias = rec' (t "alias");
+        };
+      expected =
+        let
+          r = {
+            inherits = [ "value:foreign" ];
+            sub = [
+              "b"
+              "extra"
+            ];
+            base = [
+              "b"
+              "extra"
+              "lb"
+            ];
+            isAForeign = true;
+          };
+        in
+        {
+          inherits = r;
+          alias = r;
+        };
+    };
+    # The self-named topology at depth 3 (each tree's `base` inherits the previous tree's), its layers
+    # from one generator. Each layer adds its own option, so no two layers share a witness; the
+    # equal-witness chain is refused, enumerated in `ci/tests-error.nix`.
+    test-self-named-chain-of-three-composes = {
+      expr =
+        let
+          layer = parent: o: {
+            config.schema.base = {
+              inherits = [ parent ];
+              options.${o} = intOpt;
+            };
+          };
+          t1 = tree [ (layer foreign "x") ];
+          t2 = tree [ (layer t1.base "y") ];
+        in
+        {
+          options = builtins.attrNames t2.base.options;
+          isAForeign = isA foreign t2.base;
+        };
+      expected = {
+        options = [
+          "b"
+          "x"
+          "y"
+        ];
+        isAForeign = true;
+      };
+    };
     # OQ8: a value needs no tree to resolve, so an entry type built outside a kind tree composes it
     test-treeless-entry-composes-a-value-entry = {
       expr =
