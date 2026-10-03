@@ -136,12 +136,18 @@ in
     };
 
     # PROPAGATION through the kind: kinds over gen-types' `listOf (typedef R1)` and `listOf (typedef R9)`
-    # share a mark and decide `false`. (gen-merge's `listOf` carries no mint yet, so a kind over it
-    # compares the type record and refuses the pair by name; `refusedOverUnminted` pins that.)
+    # share a mark and decide `false`. gen-merge's `listOf` mints per component too, so a kind over it
+    # decides the same way (`overGenMerge*`) and is no longer refused as an unminted pair.
     test-sealed-subjects-propagate-into-the-kind = {
       expr = {
-        refusedOverUnminted = refused (
+        overGenMergeRefused = refused (
           kindEq (kindOf (T.listOf (T.typedef "stitched" t1))) (kindOf (T.listOf (T.typedef "stitched" t9)))
+        );
+        overGenMergeDifferent = kindEq (kindOf (T.listOf (T.typedef "stitched" t1))) (
+          kindOf (T.listOf (T.typedef "stitched" t9))
+        );
+        overGenMergeTwins = kindEq (kindOf (T.listOf (T.typedef "stitched" t1))) (
+          kindOf (T.listOf (T.typedef "stitched" t1'))
         );
         markShared =
           (kindOf (genTypes.listOf (T.typedef "stitched" t1))).__mint.minted
@@ -154,7 +160,9 @@ in
         );
       };
       expected = {
-        refusedOverUnminted = true;
+        overGenMergeRefused = false;
+        overGenMergeDifferent = false;
+        overGenMergeTwins = true;
         markShared = true;
         different = false;
         twins = true;
