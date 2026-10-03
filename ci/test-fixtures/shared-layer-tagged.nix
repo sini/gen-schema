@@ -1,4 +1,4 @@
-# The shared layer FILE setting its own `_file` per application: a path module takes its file from the path.
+# The shared layer FILE setting its own `_file` per application: a path module is named by it.
 {
   parent,
   intOpt,

@@ -238,7 +238,7 @@ in
       };
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: kind 'a' reaches a kind with its own content witness through its parents \\(a -> b -> a\\), among kinds \\[a b\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named 'a' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them \\(a module imported by path takes its file from the path: import it as a value, or give each application a distinct path\\)$";
+        msg = "^gen-schema: kind 'a' reaches a kind with its own content witness through its parents \\(a -> b -> a\\), among kinds \\[a b\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named 'a' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module its own `_file` separates them \\(a module imported by path is named by the `_file` its own content sets, else by its path; an importing module's `_file` does not reach it\\)$";
       };
     };
 
@@ -346,7 +346,7 @@ in
     let
       msg =
         members: path: kind:
-        "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them \\(a module imported by path takes its file from the path: import it as a value, or give each application a distinct path\\)$";
+        "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module its own `_file` separates them \\(a module imported by path is named by the `_file` its own content sets, else by its path; an importing module's `_file` does not reach it\\)$";
       refuses = members: path: kind: {
         type = "ThrownError";
         msg = msg members path kind;
@@ -455,7 +455,7 @@ in
     let
       refuses = members: path: kind: {
         type = "ThrownError";
-        msg = "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them \\(a module imported by path takes its file from the path: import it as a value, or give each application a distinct path\\)$";
+        msg = "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module its own `_file` separates them \\(a module imported by path is named by the `_file` its own content sets, else by its path; an importing module's `_file` does not reach it\\)$";
       };
       written = f: [ ({ config, ... }: { config.schema = f config.schema; }) ];
       val2 = s: {
@@ -1909,6 +1909,32 @@ in
           msg = "^STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME \\(defined in <gen-merge>\\)\\.\n${fixLine "OFFENDINGKEY"}$";
         };
       };
+      # S4b. A PATH module's definition is attributed to the `_file` its own content sets, else its
+      # path (den-hoag-6fqay); the control is the same evaluation with the offending key removed.
+      test-strict-names-the-path-modules-own-file = {
+        expr =
+          assert
+            (genMerge.evalModuleTree {
+              modules = [
+                (genSchema.mkStrictModule "KINDNAME")
+                { options.DECLAREDOPTION = opt; }
+                { config.DECLAREDOPTION = 1; }
+              ];
+            }).config.DECLAREDOPTION == 1;
+          builtins.deepSeq
+            (genMerge.evalModuleTree {
+              modules = [
+                (genSchema.mkStrictModule "KINDNAME")
+                { options.DECLAREDOPTION = opt; }
+                ./test-fixtures/strict-own-file.nix
+              ];
+            }).config
+            null;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME \\(defined in /real/ST\\.nix\\)\\.\n${fixLine "OFFENDINGKEY"}$";
+        };
+      };
       # S5. The same undeclared key defined by two modules is ONE key: named once, one remedy. Two
       # copies of the remedy would not parse (`attribute already defined`).
       test-strict-names-a-key-defined-twice-once = {
@@ -3300,8 +3326,9 @@ in
       };
       i1 = plainTree [ (ilayer b0.base { options.y1 = intOpt; }) ];
       i2 = plainTree [ (ilayer i1.base { options.y2 = intOpt; }) ];
-      # one module FILE applied in two trees: a module imported by path takes its file from the path,
-      # so neither a `_file` it sets itself nor one on a module importing it separates the two
+      # one module FILE applied in two trees: a module imported by path is named by the `_file` its
+      # own content sets, else its path, so a `_file` on a module importing it does not separate the
+      # two
       byPath =
         file: args:
         (genMerge.evalModuleTree {
@@ -3310,14 +3337,6 @@ in
           };
           modules = [ { options.schema = mkSchemaOption { }; } ] ++ [ file ];
         }).config.schema;
-      st1 = byPath ./test-fixtures/shared-layer-tagged.nix {
-        parent = b0.base;
-        tag = "1";
-      };
-      st2 = byPath ./test-fixtures/shared-layer-tagged.nix {
-        parent = st1.base;
-        tag = "2";
-      };
       sw1 = byPath {
         _file = "w1";
         imports = [ ./test-fixtures/shared-layer.nix ];
@@ -3380,7 +3399,7 @@ in
         k.k;
       refuses = members: path: kind: {
         type = "ThrownError";
-        msg = "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them \\(a module imported by path takes its file from the path: import it as a value, or give each application a distinct path\\)$";
+        msg = "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module its own `_file` separates them \\(a module imported by path is named by the `_file` its own content sets, else by its path; an importing module's `_file` does not reach it\\)$";
       };
     in
     {
@@ -3398,10 +3417,6 @@ in
       };
       test-options-through-imports-are-not-read-by-the-witness = {
         expr = builtins.attrNames i2.base.options;
-        expectedError = refuses "base" "base -> base" "base";
-      };
-      test-a-path-module-setting-its-own-file-still-collides = {
-        expr = builtins.attrNames st2.base.options;
         expectedError = refuses "base" "base -> base" "base";
       };
       test-a-path-module-under-a-tagged-importer-still-collides = {
