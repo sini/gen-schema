@@ -18,6 +18,7 @@
   prelude,
   merge,
   constructionRelation,
+  mkRefinedType,
 }:
 let
   # ── THE CANONICAL-MEMBER PREDICATE (den-hoag-a4158, den-hoag-2zjg1 arm (B)) ──
@@ -92,9 +93,14 @@ let
           instances.${resolve (merge.showOption loc) val};
     };
 
-  # Deferred ref — marker type carrying target kind name.
-  # Unresolved: merge passes through the raw value (string or attrset).
-  # mkInstanceRegistry detects .refKind and injects apply-based resolution.
+  # Deferred ref — marker type carrying target kind name, in two leaves that differ only in merge.
+  # Unbound (what `declarationOf "<kind>"` returns): merge refuses by name, because no scope resolves
+  # the reference. Bound: merge passes the raw value through, and the binding resolves it.
+  # mkInstanceRegistry detects .refKind, swaps in the bound leaf (bindRefType) and injects resolution.
+  #
+  # The relation joins bound over unbound for one kind (`bound = a.bound || b.bound`), so the binding's
+  # redeclaration wins in either order. Two kinds never reach binOp: gen-merge's declaration path
+  # refuses differing functor names first, so binOp's null arm is defence in depth.
   #
   # refKind sits INSIDE the descriptor rather than being stapled on afterwards. mkOptionType
   # completes a type by stamping the protocol onto the record it is handed, and the functor it
@@ -105,19 +111,63 @@ let
   # The construction is the kind name alone, so two `declarationOf "host"`s are one type and merge,
   # and a `declarationOf "host"` against a `declarationOf "user"` is refused (`constructionRelation`,
   # den-hoag-bfc0k).
-  mkDeferredRef =
-    kindName:
+  mkRef =
+    bound: kindName:
     let
+      relation = constructionRelation "declarationOf(${kindName})" { minted.kind = kindName; } self;
       self = merge.mkOptionType {
         name = "declarationOf(${kindName})";
         description = "reference to a ${kindName} instance";
         check = v: builtins.isString v || builtins.isAttrs v;
-        merge = loc: defs: merge.mergeOneOption loc defs;
+        merge =
+          if bound then
+            loc: defs: merge.mergeOneOption loc defs
+          else
+            loc: _:
+            throw "gen-schema: ${merge.showOption loc}: `declarationOf \"${kindName}\"' is unbound here. A deferred declaration resolves only through a registry binding (`refs.<field>' on `mkInstanceRegistry'), so outside one its value is never resolved or checked; bind it, or name the registry directly with `declarationOf <registry>'.";
         refKind = kindName;
-        functor = constructionRelation "declarationOf(${kindName})" { minted.kind = kindName; } self;
+        isBoundRef = bound;
+        functor = relation // {
+          payload = relation.payload // {
+            inherit bound;
+          };
+          binOp =
+            a: b:
+            let
+              r = relation.binOp a b;
+            in
+            if r == null then null else r // { bound = (a.bound or false) || (b.bound or false); };
+          type = p: mkRef (p.bound or false) kindName;
+        };
       };
     in
     self;
+
+  mkDeferredRef = mkRef false;
+
+  # Rebuild a ref type with every deferred leaf bound, through the wrappers mkCoerceChain walks.
+  # A refined node is matched FIRST: mkRefinedType inherits its base's refKind, isSetOf and name, so a
+  # later arm would rebuild the bare base and drop the refinement. It is rebuilt over a bound base with
+  # the same refinements, which refined's relation accepts against the kind's own declaration.
+  bindRefType =
+    t:
+    let
+      et = (t.nestedTypes or { }).elemType or null;
+    in
+    if t ? __schema then
+      mkRefinedType (bindRefType t.__schema.baseType) t.__schema.refinements
+    else if (t.refKind or null) != null then
+      mkRef true t.refKind
+    else if et == null then
+      t
+    else if (t.name or "") == "nullOr" then
+      merge.types.nullOr (bindRefType et)
+    else if t.isSetOf or false then
+      setOf (bindRefType et)
+    else if (t.name or "") == "listOf" then
+      merge.types.listOf (bindRefType et)
+    else
+      t;
 
   # Extract refKind from a type, traversing nullOr/listOf wrappers safely.
   # Returns the target kind name string, or null if not a ref type.
@@ -237,6 +287,7 @@ in
 
   inherit
     getRefKind
+    bindRefType
     dedupByHash
     setOf
     isCanonicalOf

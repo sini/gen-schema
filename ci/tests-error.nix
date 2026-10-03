@@ -3425,4 +3425,71 @@ in
         };
       };
     };
+
+  # den-hoag-registry-types-outside-kind-d24lq: a deferred declaration merged where no registry binds
+  # it refuses by name, naming the binding and the direct form, and a bound one keeps its own wording.
+  flake.testsError.unbound-declaration-refusals =
+    let
+      inherit (genSchema) declarationOf setOf evalSchema;
+      outside =
+        type: v:
+        (genMerge.evalModuleTree {
+          modules = [
+            { options.o = genMerge.mkOption { inherit type; }; }
+            { o = v; }
+          ];
+        }).config.o;
+      unbound = {
+        type = "ThrownError";
+        msg = "^gen-schema: o.*: `declarationOf \"host\"' is unbound here\\. A deferred declaration resolves only through a registry binding .*$";
+      };
+      schema = evalSchema {
+        modules = [
+          {
+            config.schema.host = { };
+            config.schema.svc.options.host = genMerge.mkOption { type = declarationOf "host"; };
+          }
+        ];
+      };
+    in
+    {
+      test-unbound-scalar-refused-by-name = {
+        expr = outside (declarationOf "host") "nope";
+        expectedError = unbound;
+      };
+      test-unbound-set-element-refused-by-name = {
+        expr = builtins.deepSeq (outside (setOf (declarationOf "host")) [
+          "a"
+          "a"
+        ]) null;
+        expectedError = unbound;
+      };
+      test-unbound-refined-refused-by-name = {
+        expr = outside (genSchema.refined (declarationOf "host") {
+          check = _: true;
+          message = "any";
+        }) "a";
+        expectedError = unbound;
+      };
+      test-bound-dangling-keeps-its-wording = {
+        expr =
+          (genMerge.evalModuleTree {
+            modules = [
+              (
+                { config, ... }:
+                {
+                  options.hosts = mkInstanceRegistry schema.host { };
+                  options.svcs = mkInstanceRegistry schema.svc { refs.host = config.hosts; };
+                  config.hosts.a = { };
+                  config.svcs.s.host = "nope";
+                }
+              )
+            ];
+          }).config.svcs.s.host.name;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: ref field 'host' on kind 'svc': reference 'nope' not found in instance registry \\(available: a\\)$";
+        };
+      };
+    };
 }
