@@ -1735,6 +1735,8 @@ Set `lazy = true` on a refinement to defer its check until the value is demanded
 
 A refined type keeps its base's `name` — a refined `int` still says `int` in its error messages — but carries a distinct functor name, `refined<int>`, which is the identity two declarations of the same option are compared on. Declaring an option twice as the same refined type merges to that type with its refinements intact; declaring it once refined and once as the bare base is a reported type conflict rather than a silent drop to the unrefined type.
 
+A refined type's **identity** is gen-types' per-component construction (`mkIdentity`): it mints over the constructor, the base and each refinement's inert content, with each refinement's `check` a sealed component carried in `__sealed`. A `check` may be a lambda or a registered construction (gen-algebra `mkIntensional`); a registered one is compared by its declared subject, so two constructions of one registered term are one type under `typeEq` and one kind under `kindEq`, and a different argument or revision is another. The base enters by its mark, or **sealed** where it carries no mint or a wrapper rewrote its `check`, so `refined int r` and `refined (addCheck int odd) r` are two types.
+
 ### `refinements`
 
 Built-in reusable refinements: `tcpPort`, `nonEmpty`, `positive`. Use with `genSchema.refined` to avoid repeating common predicates.

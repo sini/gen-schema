@@ -308,8 +308,9 @@ otherwise exempt them for carrying the prefix that marks a key as none of gen-sc
 defaults to the registry key.
 
 **`__` keys crossing the boundary** (R12 stated contracts; the census that reads these lines takes the
-first line of each). This library also co-writes gen-types' checker fields `__id` and `__okAt`
-(`lib/refined.nix`) and writes gen-algebra's `__mint` sum; their owners state those contracts.
+first line of each). This library also writes gen-types' checker identity fields (`__mint`, `__id`,
+`__payload`, `__sealed`, `__okAt`) on `refined` through gen-types' `mkIdentity` (`lib/refined.nix`);
+their owner states those contracts.
 
 - `__sealed` — writer `mkSchemaEntryType` (`lib/entry-type.nix`), reader `kindEq` (same file); read by gen-select (`lib/default.nix`, its kind comparison):
   the sealed subjects of a kind value, a thunk forced only when two kinds are compared: sealed types

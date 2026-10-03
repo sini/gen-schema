@@ -1,28 +1,17 @@
 # Refinement contracts (§ Findler 2002, co-location from § Rondon 2008).
 # Predicate metadata stored in __schema attr on gen-merge/gen-types types.
 #
-# `identity` is threaded in for the MINT (ADR-0034). It is taken as an injected leaf and
-# CONSTRUCTED with — gen-schema does not re-export `hashIdentity`, which is the discipline
-# `./id-hash.nix` and `./entry-type.nix` are already under and the reason ADR-0034's "no second
-# minting authority" holds with the count of authorities still at one.
+# The type's IDENTITY is built through gen-types' exported identity half (`mkIdentity`, reached
+# through gen-merge's injected leaf vocabulary), so a refined type here is identified by the same
+# per-component construction as gen-types' own `refined` and decided by the same `typeEq`; this file
+# mints nothing itself and ADR-0034's count of minting authorities stays at one.
 {
   merge,
-  identity,
-  preimageTagOf,
+  hasDeclaredSubject,
+  sealedMarker,
 }:
 let
   normalizeRefinements = r: if builtins.isList r then r else [ r ];
-
-  # A refinement whose `check` is a REGISTERED construction (gen-algebra `mkIntensional`) enters
-  # the preimage by its minted identity, read through gen-algebra's one reader of the tagged sum;
-  # any other `check` enters as itself, so a caller lambda still reaches the encoder and is refused
-  # there (ADR-0034's migration: minted once it is a term, a refusal until then).
-  refinementPreimage =
-    r:
-    let
-      tag = preimageTagOf identity.hashIdentity (r.check or null);
-    in
-    if tag ? minted then r // { check = tag; } else r;
 
   # A refined type is DERIVED from its base rather than described from scratch: it keeps the
   # base's value behaviour and adds the predicate metadata. That derivation still has to go
@@ -43,71 +32,81 @@ let
   # silently drops to its unrefined base. The relation below is NOT gated on the name; it decides
   # both components structurally (see its comment).
   #
-  # IDENTITY. A refinement's distinguishing content is a caller-supplied lambda, so ADR-0034 puts
-  # this constructor on the arm where "that component's collapse is replaced by a refusal rather
-  # than by a structural identity" until a first-order predicate vocabulary migrates. The base's
-  # `__mint`/`__id` therefore join the removal list below: the inherited pair is never present to
+  # IDENTITY. A refinement's `check` is a caller-supplied lambda or a registered construction, so
+  # ADR-0034's per-component clause makes it a SEALED COMPONENT: the type mints over the rest and
+  # carries the check in `__sealed`. The construction is gen-types' own (`mkIdentity`, below), shared
+  # rather than re-authored, so the two `refined` implementations cannot drift apart on the regime.
+  # The base's identity fields join the removal list below: the inherited ones are never present to
   # be overwritten, so there is no shadowing order for a later reader to get wrong — the shape
   # `./id-hash.nix` argues for as "an expression with nowhere to attach".
-  #
-  # THE REGIME IS DECIDED BY THE MINT, never by a second predicate here. Nothing below asks
-  # whether a refinement is a lambda. The encoder is total — it encodes or it refuses by name — so
-  # handing it `args` and reading the answer IS the classification, and it cannot fall out of date
-  # when a new refinement shape appears. The construction is `gen-types/lib/checkers.nix`'s
-  # `mkChecker`, matched rather than re-authored, so the two implementations cannot drift apart on
-  # the regime.
   mkRefinedType =
     baseType: refinements:
     let
       normalized = normalizeRefinements refinements;
 
-      # The base enters the preimage as an IDENTITY, never as a value — `gen-types`' `idOf` is the
-      # binding matched, and it is what keeps type NESTING off the encoder's depth bound, since an
-      # identity is a fixed width whatever it stands for — and onto gen-types' type-identity bound,
-      # which `guard` below steps.
+      # ★ THE IDENTITY, PER COMPONENT (ADR-0034's per-component clause; den-hoag-6orb8 U1.5): the
+      # constructor, the base and each refinement, built by gen-types' `mkIdentity`. The base enters
+      # by its mark where it carries one, and SEALED where it does not or where a wrapper rewrote its
+      # `check` (gen-types' check-witness protocol), never by its base's mint: `refined int` and
+      # `refined (addCheck int odd)` then mint apart, where reading the base's `__mint.minted` gave
+      # them one mark while they admit different values. Each refinement enters with its `check` as a
+      # sealed component — a caller lambda in its own slot, a registered construction (gen-algebra
+      # `mkIntensional`) by its declared subject — and its `message` inert. So a registered digest
+      # never enters the mark (it is a decision predicate, never a key), and two constructions of one
+      # registered term decide `true` under `typeEq` and `kindEq`.
       #
-      # ★ THE BASE HAS THREE STATES AND THE THIRD IS THE COMMON ONE, so the missing attribute is
-      # refused HERE rather than left to an `or` that would name something false. Every structural
-      # type gen-merge ships — `listOf`, `attrsOf`, `nullOr`, `either`, `submodule` — and every raw
-      # nixpkgs type carries NO `__mint` key at all, which is a different fact from carrying the
-      # tagged sum's sealed arm. "Carries no mint" is what is true of them; "has no mintable
-      # identity" would suggest a sealed arm that is not there.
-      baseIdentity =
-        if !(baseType ? __mint) then
-          throw "gen-schema: refined: base type `${baseType.name or "?"}' carries no mint at all, so a refinement of it has no base identity to compose from"
-        else
-          baseType.__mint.minted
-            or (throw "gen-schema: refined: base type `${baseType.name or "?"}' has no mintable identity");
-
-      mint =
-        identity.hashIdentity "type"
-          [
-            "ctor"
-            "args"
-          ]
-          (
-            l:
-            {
-              ctor = "refined";
-              args = {
-                base = baseIdentity;
-                refinements = map refinementPreimage normalized;
-              };
-            }
-            .${l}
-          );
-      # ★ THIS CONSTRUCTOR MINTS OVER ITS BASE'S MINT, SO IT STEPS gen-types' TYPE-IDENTITY INDEX
-      # ITSELF (`identityGuard`, reached through gen-merge's injected leaf vocabulary so the bound and
-      # its refusal stay single-sourced). Passing the base's `__okAt` through unstepped is sound for a
-      # cycle, which always crosses a gen-types composite, and unsound for depth: a chain of
-      # refinements never meets a guarded node and overflows the stack about 830 deep, uncatchably.
-      # A leaf vocabulary without the guard refuses by name here rather than as a missing attribute.
-      guard =
-        (merge.types.identityGuard
-          or (throw "gen-schema: refined: the leaf vocabulary behind this gen-merge exports no `identityGuard`, so a refinement cannot bound its type nesting; wire a gen-types that exports it")
+      # `mkIdentity` steps gen-types' type-identity index over the base (`identityGuard`), so a chain
+      # of refinements meets the bound and refuses by name rather than overflowing.
+      identityFields =
+        (merge.types.mkIdentity
+          or (throw "gen-schema: refined: the leaf vocabulary behind this gen-merge exports no `mkIdentity`, so a refinement has no identity to build; wire a gen-types that exports it")
         )
-          [ baseType ];
-      attempt = if guard.ok then builtins.tryEval mint else { success = false; };
+          "refined"
+          [ baseType ]
+          (tags: {
+            base = builtins.head tags;
+            # a refinement's `check` is sealed; one with no `check` is inert and enters whole, and
+            # one that is not a record is sealed whole
+            refinements = map (
+              r:
+              if !(builtins.isAttrs r) then
+                sealedMarker
+              else if r ? check then
+                r // { check = sealedMarker; }
+              else
+                r
+            ) normalized;
+          })
+          (builtins.concatLists (
+            builtins.genList (
+              i:
+              let
+                r = builtins.elemAt normalized i;
+                path = [
+                  "refinements"
+                  (toString i)
+                ];
+              in
+              if !(builtins.isAttrs r) then
+                [
+                  {
+                    inherit path;
+                    value = r;
+                  }
+                ]
+              else if !(r ? check) then
+                [ ]
+              else
+                [
+                  {
+                    inherit path;
+                    # a slice keeps the check's slot, where a selection would be a fresh thunk
+                    value = if hasDeclaredSubject r.check then r.check else builtins.intersectAttrs { check = null; } r;
+                  }
+                ]
+            ) (builtins.length normalized)
+          ))
+          functorName;
 
       functorName = "refined<${baseType.name or "?"}>";
 
@@ -198,7 +197,11 @@ let
           "typeMerge"
           "__mint"
           "__id"
+          "__okAt"
+          "__payload"
+          "__sealed"
         ]
+        // identityFields
         // {
           # THE REFINEMENT IS PART OF THE TYPE'S MEMBERSHIP, wherever the type is used (§ Rondon 2008:
           # `{v:B | e}` has no member failing `e`). The base answers first, then the first failing
@@ -242,22 +245,9 @@ let
             baseType = baseType;
           };
 
-          # `__mint` is the tagged sum `gen-algebra/lib/intensional.nix` authors, computed through
-          # `tryEval`; `__id` is the SAME mint uncaught, so demanding an identity of a sealed
-          # refined type IS the named refusal rather than a paraphrase kept in step by hand. A
-          # reader dispatches on the TAG, never on the field's presence.
-          __mint =
-            if attempt.success then
-              { minted = attempt.value; }
-            else
-              {
-                unmintable = {
-                  ctor = "refined";
-                  reason = "the mint refuses this construction's arguments; demand `__id` for its named refusal";
-                };
-              };
-          __id = if guard.ok then mint else guard.refusal;
-          __okAt = guard.okAt;
+          # `__mint`, `__id`, `__payload`, `__sealed` and `__okAt` are gen-types' identity fields for
+          # this construction (`identityFields` above), so a reader dispatches on the TAG and `typeEq`
+          # decides over the mark and the sealed subjects, as for every gen-types type.
 
           typeMerge = relation;
           # payload null is the honest shape for a metadata decoration: there is nothing to fold

@@ -3,14 +3,12 @@
   genSchema,
   genMerge,
   genAlgebra,
-  genIdentity,
   ...
 }:
 let
   refinedLib = import ../../lib/refined.nix {
     merge = genMerge;
-    identity = genIdentity;
-    inherit (genAlgebra) preimageTagOf;
+    inherit (genAlgebra) hasDeclaredSubject sealedMarker;
   };
   inherit (refinedLib)
     types

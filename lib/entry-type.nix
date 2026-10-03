@@ -1280,8 +1280,10 @@ let
               # ancestor DAG, linear in the ancestors reached: a mark already present is decided through
               # `sealedCollisionEq`, the decision `kindEq` makes, with a site naming this kind and both
               # lineage paths. Equal marks decide `true` (a diamond over one kind: one entry, not walked
-              # again) or refuse by name, so two declarations of one identity reached along two paths are
-              # never merged last-wins. Distinct marks are two kinds, and composing both is gen-merge's to
+              # again), `false` (two kinds the mark cannot tell apart, differing only at an inert
+              # declared subject such as a registered construction) or refuse by name; `false` is refused
+              # here too, since the map is keyed by the mark and cannot hold both, so two kinds reached
+              # along two paths are never merged last-wins. Distinct marks are two kinds, and composing both is gen-merge's to
               # refuse where they conflict. A kind value this entry type did not build publishes no
               # parents, so the walk stops at it. Published as `__kindAncestors`. Each side's subject
               # is `kindSubject`'s, so a diamond reaching a `//` copy of an ancestor refuses by the
@@ -1297,11 +1299,15 @@ let
                       here = path ++ [ p.kind ];
                     in
                     if acc ? ${m} then
-                      builtins.seq (sealedCollisionEq
-                        "gen-schema: kind '${kind}' reaches '${p.kind}' along ${arrow acc.${m}.path} and along ${arrow here}"
-                        (subjectOf acc.${m}.value)
-                        (subjectOf p)
-                      ) acc
+                      if
+                        sealedCollisionEq
+                          "gen-schema: kind '${kind}' reaches '${p.kind}' along ${arrow acc.${m}.path} and along ${arrow here}"
+                          (subjectOf acc.${m}.value)
+                          (subjectOf p)
+                      then
+                        acc
+                      else
+                        throw "gen-schema: kind '${kind}' reaches two kinds named '${p.kind}' that share one mark, along ${arrow acc.${m}.path} and along ${arrow here}: they differ only at a declared subject (a registered construction), which the mark is blind to, and the ancestor map is keyed by the mark, so it cannot hold both; give the two kinds different names or one construction"
                     # Every ancestor's stamp is read on entry, not only at a diamond: a kind reached
                     # through the `imports` spelling, at any depth, meets no `formOf`, and a `//` copy
                     # there would compose the original while this map published the copy (an

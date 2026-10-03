@@ -3,7 +3,6 @@
   genSchema,
   genMerge,
   genAlgebra,
-  genIdentity,
   prelude,
   ...
 }:
@@ -12,8 +11,7 @@ let
   record = R;
   refinedLib = import ../../lib/refined.nix {
     merge = genMerge;
-    identity = genIdentity;
-    inherit (genAlgebra) preimageTagOf;
+    inherit (genAlgebra) hasDeclaredSubject sealedMarker;
   };
   bridgeLib = import ../../lib/bridge.nix {
     inherit prelude record;

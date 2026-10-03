@@ -99,15 +99,16 @@ in
           b = refined t.int [ refinements.positive ];
         in
         {
-          mintIsSealed = a.__mint ? unmintable;
-          sealedCtor = a.__mint.unmintable.ctor;
+          # its own mark, beside the refinement's `check` as a sealed component (U1.5)
+          ownMark = a.__mint.minted != t.int.__mint.minted;
+          sealedComponents = builtins.attrNames a.__sealed;
           idDemandAnswers = answers a.__id;
           twoRefinementsCompare = answers (a.__id == b.__id);
           refinementVsBaseCompares = answers (a.__id == t.int.__id);
         };
       expected = {
-        mintIsSealed = true;
-        sealedCtor = "refined";
+        ownMark = true;
+        sealedComponents = [ "refinements.0" ];
         idDemandAnswers = false;
         twoRefinementsCompare = false;
         refinementVsBaseCompares = false;
@@ -115,24 +116,29 @@ in
     };
 
     # A refined type over a PARAMETRIC base reaches the same outcome by a different route: every
-    # structural type gen-merge ships carries no `__mint` AT ALL, so the base has no identity to
-    # contribute and the composite cannot mint even with inert refinements.
+    # structural type gen-merge ships carries no `__mint` AT ALL, so the base enters as a SEALED
+    # component beside the refinement's check, and the type still mints over the rest.
     test-refined-over-a-parametric-base-is-sealed-too = {
       expr = {
         parametric = regime (refined L [ refinements.nonEmpty ]);
+        parametricSealed = builtins.attrNames (refined L [ refinements.nonEmpty ]).__sealed;
         nullary = regime (refined t.int [ refinements.tcpPort ]);
       };
       expected = {
-        parametric = "unmintable";
-        nullary = "unmintable";
+        parametric = "minted";
+        parametricSealed = [
+          "members.0"
+          "refinements.0"
+        ];
+        nullary = "minted";
       };
     };
 
     # ── O1's live controls: the mint is not dead, and `unmintable` is ATTRIBUTABLE ─────────────
     # An INERT refinement set — no `check`, so no lambda — MINTS over a nullary base and its `__id`
-    # ANSWERS, and two inert sets SEPARATE. The same inert set over a PARAMETRIC base reads
-    # `unmintable`, which attributes that reading to the base's missing mint rather than to the
-    # predicate. Without these, every row above is satisfied by a constructor that refuses
+    # ANSWERS, and two inert sets SEPARATE. The same inert set over a PARAMETRIC base mints with the
+    # base sealed and refuses an `__id` demand, which attributes that refusal to the base's missing
+    # mint rather than to the predicate. Without these, every row above is satisfied by a constructor that refuses
     # everything.
     test-control-an-inert-refinement-still-mints-and-separates = {
       expr =
@@ -145,12 +151,14 @@ in
           idAnswers = answers one.__id;
           separates = one.__id != two.__id;
           overParametricBase = regime (refined L [ { message = "inert"; } ]);
+          overParametricBaseId = answers (refined L [ { message = "inert"; } ]).__id;
         };
       expected = {
         mints = "minted";
         idAnswers = true;
         separates = true;
-        overParametricBase = "unmintable";
+        overParametricBase = "minted";
+        overParametricBaseId = false;
       };
     };
 

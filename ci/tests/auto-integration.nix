@@ -7,7 +7,6 @@
   genSchema,
   genMerge,
   genAlgebra,
-  genIdentity,
   ...
 }:
 let
@@ -15,8 +14,7 @@ let
   R = genAlgebra.record;
   refinedLib = import ../../lib/refined.nix {
     merge = genMerge;
-    identity = genIdentity;
-    inherit (genAlgebra) preimageTagOf;
+    inherit (genAlgebra) hasDeclaredSubject sealedMarker;
   };
 
   # --- Test 1: Auto-extracted refinements from inline type declarations ---
