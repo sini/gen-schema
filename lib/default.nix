@@ -148,7 +148,10 @@ let
     inherit prelude merge constructionRelation;
     inherit (bridgeLib) isOptionDecl;
   };
-  refLib = import ./ref.nix { inherit prelude merge constructionRelation; };
+  refLib = import ./ref.nix {
+    inherit prelude merge constructionRelation;
+    inherit (refinedLib) mkRefinedType;
+  };
   # The VALUE-level declaration vocabulary, kin to refLib's type-level one — see field-declaration.nix's
   # header for the axis that separates them.
   fieldDeclarationLib = import ./field-declaration.nix { inherit prelude; };
@@ -192,7 +195,12 @@ let
       defaultOnError
       filterValidators
       ;
-    inherit (refLib) dedupByHash isCanonicalOf declarationForm;
+    inherit (refLib)
+      dedupByHash
+      bindRefType
+      isCanonicalOf
+      declarationForm
+      ;
     inherit (refinedLib) getRefinements;
   };
   docs = import ./docs.nix { inherit prelude; };

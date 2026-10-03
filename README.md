@@ -574,6 +574,18 @@ options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
 };
 ```
 
+The binding is what makes the deferred form a reference: `refs.<field>` swaps the kind's leaf for a
+bound one, which resolves. Where nothing binds it — a plain option, or a kind instantiated through
+`mkInstanceType` alone — there is no scope to resolve the reference in, so the value is refused by
+name rather than admitted raw:
+
+```
+gen-schema: o: `declarationOf "host"' is unbound here. A deferred declaration resolves only through a registry binding (`refs.<field>' on `mkInstanceRegistry'), so outside one its value is never resolved or checked; bind it, or name the registry directly with `declarationOf <registry>'.
+```
+
+The wording is pinned by the `unbound-declaration-refusals` cells in `ci/tests-error.nix`. A `null`
+under `nullOr`, or an empty list, still evaluates: no element reaches the leaf.
+
 **Direct ref** — resolve immediately when the registry is in scope:
 
 ```nix
@@ -1597,6 +1609,8 @@ declarationOf target
 
 `target` is a string -> deferred ref (kind name, bound via `refs` on `mkInstanceRegistry`). `target` is an attrset -> direct ref (resolved immediately). Both modes accept string keys or instance values.
 
+An unbound deferred ref refuses by name (see *Deferred ref* above). The binding rebuilds the field's type with every deferred leaf bound, through the wrappers `mkCoerceChain` walks — `nullOr`, `listOf`, `setOf` — and through `refined`, whose layer is rebuilt over the bound base with the same refinements, so a refinement over a deferred ref is served in a kind and still enforced there. The guarantee covers types built through gen-schema's and gen-merge's constructors: a hand-written `// { check = …; }` over a ref leaf is refused in a kind by gen-merge's dropped-check rule, because the binding's rebuilt leaf drops the check the override added. One kind's unbound and bound leaves join to the bound one in either order; two kinds are refused by gen-merge's declaration path on the differing names before the relation's own refusal is reached, which the relation keeps as defence in depth.
+
 The former name `ref` is retired: it is a published `throw` that names `declarationOf`, so reaching it or applying it refuses by name, catchably. The rename follows Néron et al. 2015 (*A Theory of Name Resolution*): a reference resolves to a declaration, and this type's values are declarations.
 
 The deferred ref's `refKind` sits inside the descriptor handed to `mkOptionType`, not stapled onto the finished type afterwards. `mkOptionType` stamps the protocol onto the record it is handed and mints a functor pointing back at that completed record, so a `// { refKind = ...; }` over a completed type leaves every protocol answer — `typeMerge`'s rebuild included — describing a `declarationOf` without its kind. Declaring the same option twice as `declarationOf "host"` therefore merges to a `declarationOf(host)` that `getRefKind` still reads through any `nullOr` / `listOf` / `setOf` wrapper and `mkCoerceChain` still builds a coercion for, rather than to a bare `declarationOf` whose string keys reach the instance unresolved.
@@ -1608,6 +1622,8 @@ setOf elemType
 ```
 
 A list type that deduplicates by `id_hash`, preserving first-seen order. Only meaningful with `declarationOf` element types — `setOf` requires instance refs. Composes with custom coerce hooks: expansion produces duplicates, `setOf` removes them. Uses `nestedTypes.elemType` so `getRefKind` traverses through it like `listOf`.
+
+Outside a registry binding, a `setOf` of an unbound `declarationOf "<kind>"` refuses at its first element, in the element's words: deduplication is by `id_hash`, a property of resolved declarations, so an unresolved list has nothing to deduplicate by. An empty `setOf` still evaluates to `[ ]`.
 
 `setOf` borrows `listOf`'s value behaviour — the merge, the check — but is built through `mkOptionType` rather than as an override over a completed `listOf`, so it answers the option-type protocol as itself. A rebuild through `substSubModules`, and a `typeMerge` against a second declaration of the same option, both return a `setOf` with the `isSetOf` discriminator that `mkCoerceChain` and the codec dispatch on. A `setOf` and a plain `listOf` of the same element are different types and do not merge.
 

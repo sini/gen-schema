@@ -19,6 +19,7 @@
   runValidators,
   defaultOnError,
   dedupByHash,
+  bindRefType,
   isCanonicalOf,
   declarationForm,
   filterValidators,
@@ -323,13 +324,24 @@ let
         { ... }:
         {
           options.${field} = (kindOptions.${field} or { }) // {
+            type = bindRefType refFields.${field}.type;
             apply = b.coerceChain;
           };
         }
       ) immediateBindings;
+      # A deferred binding coerces in applyPipeline, so its module only binds the type.
+      deferredModules = prelude.mapAttrsToList (
+        field: _:
+        { ... }:
+        {
+          options.${field} = (kindOptions.${field} or { }) // {
+            type = bindRefType refFields.${field}.type;
+          };
+        }
+      ) deferredBindings;
     in
     {
-      modules = immediateModules;
+      modules = immediateModules ++ deferredModules;
       deferredCoerce = deferredBindings;
     };
 

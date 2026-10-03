@@ -49,6 +49,17 @@ let
         { options.x = genMerge.mkOption { type = b; }; }
         { x = val; }
       ]).x;
+  # The joined TYPE, never a value: an unbound declaration's value refuses for its own reason, which
+  # would answer REFUSED for a pair the relation merges.
+  xt =
+    a: b:
+    verdict
+      (genMerge.evalModuleTree {
+        modules = [
+          { options.x = genMerge.mkOption { type = a; }; }
+          { options.x = genMerge.mkOption { type = b; }; }
+        ];
+      }).options.x.type.name;
   inst =
     mods: val:
     verdict
@@ -136,9 +147,9 @@ in
     # ── ref(<kind>) and the setOf over it ──
     test-ref-kind-is-its-construction = {
       expr = {
-        twoCalls = x (declarationOf "host") (declarationOf "host") "a";
-        setOfTwoCalls = x (setOf (declarationOf "host")) (setOf (declarationOf "host")) [ ];
-        differing = x (declarationOf "host") (declarationOf "user") "a";
+        twoCalls = xt (declarationOf "host") (declarationOf "host");
+        setOfTwoCalls = xt (setOf (declarationOf "host")) (setOf (declarationOf "host"));
+        differing = xt (declarationOf "host") (declarationOf "user");
       };
       expected = {
         twoCalls = "MERGED";
