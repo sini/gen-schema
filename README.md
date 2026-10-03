@@ -895,27 +895,51 @@ is decided before any mark is read, because that entry's mark is the declaring k
 computed. The kind's own name is tested by the name, never by forcing the kind, and the descendant by
 the cycle walk, which reads witnesses only to route the value: the verdict stays with the cycle walk and
 the stamp. Two cases are exceptions to "a value or a named refusal", enumerated and pinned
-(`ci/tests-error.nix`, `inherits-value-entry-refusals`), not closed:
+(`ci/tests-error.nix`, `inherits-value-entry-refusals` and `witness-collision-refusals`), not closed:
 
 - **A name held by a descendant, on the `mkType` arm**, with a caller `mkType` whose result reads the
   defs (as gen-aspects' does), aborts uncatchably with `infinite recursion encountered`: the walk
   reaches the declaring kind through the same-tree hop, and that kind's value is the caller's result,
   which reads the defs being classified.
-- **A false cycle.** The witness does not tell two trees apart when one source position (one layer
-  generator, one shared module file) declares kinds of one name with the same parent names and option
-  names. A self-named chain of three such layers (`t2.base` \<- `t1.base` \<- `t0.base`) is acyclic and
-  is refused as `inheritance cycle among kinds [base] — kind 'base' inherits itself through its parents (base -> base)`. A layer that differs in an option name composes.
+- **A cycle behind a witness twin is missed.** The walk's visited set is keyed by witness, so of two
+  twins (below) it reads the first and skips the second. A cycle reached only through the second
+  (`k` inherits `a` and `b`, `a` reaches one application of a helper and `b` another, and only `b`'s
+  leads back to `k`) is not seen, and composition recurses uncatchably on nix and Determinate (Lix
+  refuses it). Giving each application its own provenance dissolves it. No key closes it: the walk
+  reads parent values, not addresses, so a key that tells twins apart never repeats on a cycle that
+  does not pass through the kind read, and a walk with no visited set pays every path through a
+  diamond lattice.
+
+**One declaration applied in several trees.** A helper that declares a kind, applied in two trees with
+the same parent names and the same directly declared option names, gives two kinds one witness: the
+witness is read before composition, and nothing it can read tells them apart (two trees one helper
+built agree on every tree-level field, and a chain of such applications and a cycle through them agree
+to any finite depth). Options reached through the kind entry's `imports`, or a function body, are not
+directly declared and are not read. So a chain through such kinds meets the kind's own witness exactly
+as a cycle does, and the refusal names both readings and the remedy:
+`gen-schema: kind 'base' reaches a kind with its own content witness through its parents (base -> base), among kinds [base]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named 'base' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `\_file` separates them (a module imported by path takes its file from the path: import it as a value, or give each application a distinct path)`.
+The remedy is provenance, which the witness reads as each def's file. A module VALUE takes its file
+from `_file`, so a helper sets one per application
+(`layer = tag: parent: { _file = "layer:${tag}"; config.schema.base = { inherits = [ parent ]; … }; }`),
+and the chain composes while a genuine cycle through two applications with equal tags is still
+refused. A module imported by PATH takes its file from the path, whatever `_file` it or an importing
+module sets: import it as a value and tag the application (`import ./layer.nix args // { _file = …; }`),
+or give each application a file of its own. Pinned by `witness-collision-refusals`
+(`ci/tests-error.nix`) and `kind-witness-collision` (`ci/tests/`).
 
 **An inheritance cycle is refused by name on every tree, in either spelling.** A kind that reaches
 itself through its parents, declared or spelled, would import itself into itself; it is refused,
 catchably, at every read that would compose it, in `evalSchema`'s wording: the members sorted, as
 `evalSchema` names them, so the bracket is the same whichever member is read, and then the path from
 the kind read:
-`gen-schema: inheritance cycle among kinds [a b] — kind 'a' inherits itself through its parents (a -> b -> a); a kind may inherit only kinds resolved in a strictly earlier pass`.
+`gen-schema: kind 'a' reaches a kind with its own content witness through its parents (a -> b -> a), among kinds [a b]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named 'a' were declared from one source …`.
+The walk compares witnesses, so its refusal claims only what a hit establishes: the first reading, or
+the collision above.
 A kind that merely reaches a cycle composes the cycle's first member, which refuses under its own
 name. The walk is over parent VALUES as written, compared by a content witness (the kind's name,
 where each def was written, its parents' names and its declared option names), so a parent reached
-twice is a diamond, not a cycle, and another tree's kind of the same name is a different kind. Each
+twice is a diamond, not a cycle, and another tree's kind of the same name is a different kind unless
+it is the same declaration's twin (above). Each
 kind value publishes the two things the walk reads: `__kindCycleParents` (its parents as written,
 before any value is told same-tree from foreign, which forces marks a cycle could not supply) and
 `__kindWitness`. So a cycle through a same-tree value (`a.inherits = [ config.schema.b ]`,
@@ -976,7 +1000,7 @@ For a foreign value the warning names it as `inherits = [ <the kind value 'user'
 
 A CYCLE written in the spelling, `a` importing `config.schema.b` and `b` importing `config.schema.a`, is
 refused by the cycle walk above, on a plain tree and under `evalSchema` alike, by the kind read,
-before the spelled modules import each other: `inheritance cycle among kinds [a b] — kind 'a' inherits itself through its parents (a -> b -> a); …`.
+before the spelled modules import each other: `kind 'a' reaches a kind with its own content witness through its parents (a -> b -> a), among kinds [a b]: either it inherits itself, …`.
 
 Four constructions compose as before, unaliased and unwarned, because deciding them needs something
 other than a value test: (1) the crossing, `mkInstanceRegistry config.schema.<k>` read off the tree

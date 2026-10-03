@@ -1258,17 +1258,19 @@ let
               # A computed field is caller-built from the raw defs as well, so it is read through the
               # guard on both branches, as the `mkType` result's own fields are.
               guardedComputed = prelude.mapAttrs (_: resolvedOnly) computedFields;
-              # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): a FALSE cycle. The witness does not tell
-              # two trees apart when one source position (one layer generator, one shared module file)
-              # declares kinds of one name with the same parent and option names, so an ACYCLIC chain
-              # of such kinds (`t2.base` <- `t1.base` <- `t0.base`) meets this kind's witness on
-              # another kind and is refused here, by name, as a cycle. Pinned by
-              # `inherits-value-entry-refusals.test-witness-collision-refuses-an-acyclic-chain`.
-              cycleRefusal = throw "gen-schema: inheritance cycle among kinds [${
+              # THE WALK'S REFUSAL STATES WHAT THE WALK KNOWS (den-hoag-4i0o5). The walk compares content
+              # witnesses, and a witness is read before composition, so it cannot tell this kind from
+              # another kind of the same name declared from the same source with the same parent names
+              # and directly declared option names (one helper applied in two trees, `t2.base` <-
+              # `t1.base` <- `t0.base`). No pre-composition reading can: a chain of such applications
+              # and a cycle through them agree to any finite depth. So the refusal names both readings,
+              # and the remedy that separates the second: provenance, which the witness reads as each
+              # def's file. A module VALUE takes its `_file`; a module imported by path takes its path.
+              cycleRefusal = throw "gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}), among kinds [${
                 prelude.concatStringsSep " " (
                   prelude.sort (a: b: a < b) (prelude.unique (prelude.init inheritanceCycle))
                 )
-              }] — kind '${kind}' inherits itself through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}); a kind may inherit only kinds resolved in a strictly earlier pass";
+              }]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them (a module imported by path takes its file from the path: import it as a value, or give each application a distinct path)";
               resolvedOnly =
                 v:
                 if inheritanceCycle != null then
@@ -1465,6 +1467,15 @@ let
               # answer is the path, first member to its return, or `null`. The refusal names the members
               # sorted, as `evalSchema`'s `kindNames` order does, so its bracket does not depend on which
               # member is read; the path is in walk order from the kind read.
+              # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1, den-hoag-4i0o5): keyed by witness, the visited
+              # set conflates witness twins (see `cycleRefusal`), so a cycle reached only through the
+              # second of two twins, the first visited with no cycle behind it, is MISSED, and
+              # composition recurses uncatchably (nix and Determinate abort; Lix refuses). Giving each
+              # twin its own provenance dissolves it. No key closes it: the walk reads values, not
+              # addresses, so a key that tells twins apart (a name path) never repeats on a cycle not
+              # through this kind and the walk diverges there, and a walk with no visited set pays every
+              # path through a diamond lattice. Pinned by
+              # `witness-collision-refusals.test-a-cycle-behind-an-untagged-twin-aborts`.
               # ponytail: each kind walks its own ancestry (nothing is shared across kinds, since a
               # shared reach set would itself recurse on a cycle) and copies the path per step, so a
               # depth-n chain costs O(n²) in total, the same order as composing it; carry the path as

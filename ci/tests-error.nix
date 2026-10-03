@@ -238,7 +238,7 @@ in
       };
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: inheritance cycle among kinds \\[a b\\] — kind 'a' inherits itself through its parents \\(a -> b -> a\\); a kind may inherit only kinds resolved in a strictly earlier pass$";
+        msg = "^gen-schema: kind 'a' reaches a kind with its own content witness through its parents \\(a -> b -> a\\), among kinds \\[a b\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named 'a' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them \\(a module imported by path takes its file from the path: import it as a value, or give each application a distinct path\\)$";
       };
     };
 
@@ -346,7 +346,7 @@ in
     let
       msg =
         members: path: kind:
-        "^gen-schema: inheritance cycle among kinds \\[${members}\\] — kind '${kind}' inherits itself through its parents \\(${path}\\); a kind may inherit only kinds resolved in a strictly earlier pass$";
+        "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them \\(a module imported by path takes its file from the path: import it as a value, or give each application a distinct path\\)$";
       refuses = members: path: kind: {
         type = "ThrownError";
         msg = msg members path kind;
@@ -455,7 +455,7 @@ in
     let
       refuses = members: path: kind: {
         type = "ThrownError";
-        msg = "^gen-schema: inheritance cycle among kinds \\[${members}\\] — kind '${kind}' inherits itself through its parents \\(${path}\\); a kind may inherit only kinds resolved in a strictly earlier pass$";
+        msg = "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them \\(a module imported by path takes its file from the path: import it as a value, or give each application a distinct path\\)$";
       };
       written = f: [ ({ config, ... }: { config.schema = f config.schema; }) ];
       val2 = s: {
@@ -603,11 +603,12 @@ in
           msg = "infinite recursion encountered";
         };
       };
-      # ★ ENUMERATED, NOT CLOSED: a FALSE cycle. Three self-named layers from one generator (one
-      # source position, the same parent and option names) carry equal witnesses, so the cycle walk
-      # meets the tip's witness on the middle layer and refuses an acyclic chain by name. The witness
-      # does not tell two trees from one generator apart. A layer with another option name composes
-      # (`ci/tests/inherits-value-entries.nix`, `test-self-named-chain-of-three-composes`).
+      # A WITNESS COLLISION (den-hoag-4i0o5). Three self-named layers from one generator (one source
+      # position, the same parent and option names) carry equal witnesses, so the cycle walk meets the
+      # tip's witness on the middle layer. The refusal names both readings and the remedy, since no
+      # reading before composition tells this acyclic chain from a cycle (`witness-collision-refusals`
+      # below). A layer with another option name composes (`ci/tests/inherits-value-entries.nix`,
+      # `test-self-named-chain-of-three-composes`).
       test-witness-collision-refuses-an-acyclic-chain =
         let
           layer = parent: o: {
@@ -623,7 +624,7 @@ in
           expr = builtins.attrNames t2.baseO.options;
           expectedError = {
             type = "ThrownError";
-            msg = "^gen-schema: inheritance cycle among kinds \\[baseO\\] — kind 'baseO' inherits itself through its parents \\(baseO -> baseO\\); ";
+            msg = "^gen-schema: kind 'baseO' reaches a kind with its own content witness through its parents \\(baseO -> baseO\\), among kinds \\[baseO\\]: either it inherits itself, an inheritance cycle, .*; or two kinds named 'baseO' were declared from one source ";
           };
         };
       # The control forces each entry only as far as the kind/not-a-kind decision (its WHNF), never
@@ -3262,6 +3263,165 @@ in
         expectedError = {
           type = "ThrownError";
           msg = "^gen-schema: kind 'a' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq', and the gen-merge it is evaluated with does not read that key \\(its `moduleSyntax\\.structured' does not list `__keyEq'\\)\\. gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; .*$";
+        };
+      };
+    };
+
+  # THE WALK'S REFUSAL ON A WITNESS COLLISION (den-hoag-4i0o5). One declaration applied in two trees
+  # gives two kinds one content witness, so an acyclic chain through them and a genuine cycle through
+  # them meet the walk identically. Both cells read the same refusal, which names both readings and
+  # the remedy; `ci/tests/kind-witness-collision.nix` holds the remedy's admitted twin.
+  flake.testsError.witness-collision-refusals =
+    let
+      intOpt = genMerge.mkOption { type = genMerge.types.int; };
+      layer = name: parent: o: {
+        config.schema.${name} = {
+          inherits = [ parent ];
+          options.${o} = intOpt;
+        };
+      };
+      m0 = plainTree [ { config.schema.mid.options.m = intOpt; } ];
+      u1 = plainTree [ (layer "base" m0.mid "x") ];
+      m1 = plainTree [ (layer "mid" u1.base "m2") ];
+      u2 = plainTree [ (layer "base" m1.mid "x") ];
+      gA = plainTree [ (layer "base" gB.base "x") ];
+      gB = plainTree [ (layer "base" gA.base "x") ];
+      tagged =
+        tag: name: parent: o:
+        layer name parent o // { _file = "layer:${tag}"; };
+      tA = plainTree [ (tagged "g" "base" tB.base "x") ];
+      tB = plainTree [ (tagged "g" "base" tA.base "x") ];
+      b0 = plainTree [ { config.schema.base.options.b = intOpt; } ];
+      # options through the kind entry's own `imports` are not directly declared, so the witness does
+      # not read them: `y1` and `y2` differ, and the two applications still collide
+      ilayer = parent: extra: {
+        config.schema.base = {
+          inherits = [ parent ];
+          imports = [ extra ];
+        };
+      };
+      i1 = plainTree [ (ilayer b0.base { options.y1 = intOpt; }) ];
+      i2 = plainTree [ (ilayer i1.base { options.y2 = intOpt; }) ];
+      # one module FILE applied in two trees: a module imported by path takes its file from the path,
+      # so neither a `_file` it sets itself nor one on a module importing it separates the two
+      byPath =
+        file: args:
+        (genMerge.evalModuleTree {
+          specialArgs = args // {
+            inherit intOpt;
+          };
+          modules = [ { options.schema = mkSchemaOption { }; } ] ++ [ file ];
+        }).config.schema;
+      st1 = byPath ./test-fixtures/shared-layer-tagged.nix {
+        parent = b0.base;
+        tag = "1";
+      };
+      st2 = byPath ./test-fixtures/shared-layer-tagged.nix {
+        parent = st1.base;
+        tag = "2";
+      };
+      sw1 = byPath {
+        _file = "w1";
+        imports = [ ./test-fixtures/shared-layer.nix ];
+      } { parent = b0.base; };
+      sw2 = byPath {
+        _file = "w2";
+        imports = [ ./test-fixtures/shared-layer.nix ];
+      } { parent = sw1.base; };
+      # THE ENUMERATED MISS (ADR-0025 item 1): `k` reaches itself only through `x2`, whose witness twin
+      # `x1` (no cycle behind it) the walk visits first and so skips `x2`; the twin given its own
+      # `_file` is visited, and the cycle is refused by name
+      xl = parent: {
+        config.schema.x = {
+          inherits = [ parent ];
+          options.o = intOpt;
+        };
+      };
+      vK =
+        x1Tag:
+        let
+          p1 = plainTree [ { config.schema.p.options.p1 = intOpt; } ];
+          x1 = plainTree [ (xl p1.p // x1Tag) ];
+          a = plainTree [
+            {
+              config.schema.a = {
+                inherits = [ x1.x ];
+                options.oa = intOpt;
+              };
+            }
+          ];
+          p2 = plainTree [
+            {
+              config.schema.p = {
+                inherits = [ k.k ];
+                options.p2 = intOpt;
+              };
+            }
+          ];
+          x2 = plainTree [ (xl p2.p) ];
+          b = plainTree [
+            {
+              config.schema.b = {
+                inherits = [ x2.x ];
+                options.ob = intOpt;
+              };
+            }
+          ];
+          k = plainTree [
+            {
+              config.schema.k = {
+                inherits = [
+                  a.a
+                  b.b
+                ];
+                options.ok = intOpt;
+              };
+            }
+          ];
+        in
+        k.k;
+      refuses = members: path: kind: {
+        type = "ThrownError";
+        msg = "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them \\(a module imported by path takes its file from the path: import it as a value, or give each application a distinct path\\)$";
+      };
+    in
+    {
+      test-an-acyclic-chain-through-one-declaration-names-both-readings = {
+        expr = builtins.attrNames u2.base.options;
+        expectedError = refuses "base mid" "base -> mid -> base" "base";
+      };
+      test-a-cycle-through-one-declaration-reads-the-same = {
+        expr = builtins.attrNames gA.base.options;
+        expectedError = refuses "base" "base -> base" "base";
+      };
+      test-a-cycle-through-equal-tags-reads-the-same = {
+        expr = builtins.attrNames tA.base.options;
+        expectedError = refuses "base" "base -> base" "base";
+      };
+      test-options-through-imports-are-not-read-by-the-witness = {
+        expr = builtins.attrNames i2.base.options;
+        expectedError = refuses "base" "base -> base" "base";
+      };
+      test-a-path-module-setting-its-own-file-still-collides = {
+        expr = builtins.attrNames st2.base.options;
+        expectedError = refuses "base" "base -> base" "base";
+      };
+      test-a-path-module-under-a-tagged-importer-still-collides = {
+        expr = builtins.attrNames sw2.base.options;
+        expectedError = refuses "base" "base -> base" "base";
+      };
+      test-a-tagged-twin-reveals-the-cycle-behind-it = {
+        expr = builtins.attrNames (vK { _file = "x:1"; }).options;
+        expectedError = refuses "b k p x" "k -> b -> x -> p -> k" "k";
+      };
+      # ★ ENUMERATED, NOT CLOSED: the walk's visited set is keyed by witness, so a cycle reached only
+      # through the second of two twins is missed, and composition recurses uncatchably. Host
+      # evaluator only: Determinate aborts likewise, Lix refuses (the guarantee's).
+      test-a-cycle-behind-an-untagged-twin-aborts = {
+        expr = builtins.attrNames (vK { }).options;
+        expectedError = {
+          type = "EvalError";
+          msg = "infinite recursion encountered";
         };
       };
     };
