@@ -3378,6 +3378,58 @@ in
           ];
         in
         k.k;
+      # THE FULLY-SHADOWED CYCLE: `a -> x2 -> b -> y2 -> a`, each member listing its twin first
+      # (`x1`, `y1`, inheriting harmless same-named kinds of other trees); `sA'` lists the cycle
+      # branch first
+      hx = parent: {
+        config.schema.x = {
+          inherits = [ parent ];
+          options.o = intOpt;
+        };
+      };
+      hy = parent: {
+        config.schema.y = {
+          inherits = [ parent ];
+          options.o = intOpt;
+        };
+      };
+      sx1 = (plainTree [ (hx (plainTree [ { config.schema.b.options.q = intOpt; } ]).b) ]).x;
+      sy1 = (plainTree [ (hy (plainTree [ { config.schema.a.options.p = intOpt; } ]).a) ]).y;
+      shadowed =
+        first:
+        let
+          ta = plainTree [
+            {
+              config.schema.a = {
+                inherits = first sx1 x2;
+                options.p = intOpt;
+              };
+            }
+          ];
+          tb = plainTree [
+            {
+              config.schema.b = {
+                inherits = first sy1 y2;
+                options.q = intOpt;
+              };
+            }
+          ];
+          x2 = (plainTree [ (hx tb.b) ]).x;
+          y2 = (plainTree [ (hy ta.a) ]).y;
+        in
+        ta;
+      sA = shadowed (
+        twin: cyc: [
+          twin
+          cyc
+        ]
+      );
+      sA' = shadowed (
+        twin: cyc: [
+          cyc
+          twin
+        ]
+      );
       refuses = members: path: kind: {
         type = "ThrownError";
         msg = "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them \\(a module imported by path takes its file from the path: import it as a value, or give each application a distinct path\\)$";
@@ -3412,21 +3464,200 @@ in
         expr = builtins.attrNames (vK { _file = "x:1"; }).options;
         expectedError = refuses "b k p x" "k -> b -> x -> p -> k" "k";
       };
-      # ★ ENUMERATED, NOT CLOSED: the walk's visited set is keyed by witness, so `k`'s walk, reaching
-      # the cycle only through the second of two twins, misses it. What follows is the evaluator's:
-      # nix and Determinate recurse uncatchably composing `k`, while Lix forces `b` first, whose own
-      # walk meets `b`'s witness, and refuses by name. Each outcome is pinned on its own family, read
-      # off `builtins.nixVersion` as gen-harness's `error-plane-engines.nix` reads it (`-lix` suffix).
-      test-a-cycle-behind-an-untagged-twin-aborts = {
+      # The walk's visited set is keyed by witness, so `k`'s walk, reaching the cycle only through the
+      # second of two twins, misses it. `b`'s own walk meets `b`'s witness, and since a cycle member
+      # classifies no parent, `k`'s stamp read catches `b`'s refusal and `k` meets it at composition,
+      # under `b`'s name, on every evaluator (den-hoag-1o0o1).
+      test-a-cycle-behind-an-untagged-twin-refuses-by-a-member = {
         expr = builtins.attrNames (vK { }).options;
-        expectedError =
-          if builtins.match ".*-lix" builtins.nixVersion != null then
-            refuses "b k p x" "b -> x -> p -> k -> b" "b"
-          else
-            {
-              type = "EvalError";
-              msg = "infinite recursion encountered";
+        expectedError = refuses "b k p x" "b -> x -> p -> k -> b" "b";
+      };
+      # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1, den-hoag-95cv0): a cycle EVERY member of which lists
+      # a witness twin first (`a` inherits `x1` then `x2`, `x2` inherits `b`; `b` inherits `y1` then
+      # `y2`, `y2` inherits `a`; each twin pair from one helper) is missed by every member's walk, so
+      # composition recurses uncatchably on all three evaluators. The control is the same shape with
+      # the cycle branch listed first: the walk sees it, and it is refused by name.
+      test-a-fully-shadowed-cycle-aborts = {
+        expr = builtins.attrNames sA.a.options;
+        expectedError = {
+          type = "EvalError";
+          msg = "infinite recursion encountered";
+        };
+      };
+      test-a-shadowed-cycle-with-the-cycle-branch-first-refuses = {
+        expr = builtins.attrNames sA'.a.options;
+        expectedError = refuses "a b x y" "a -> x -> b -> y -> a" "a";
+      };
+    };
+
+  # A CROSS-TREE VALUE CYCLE WITH DISTINCT NAMES (den-hoag-1o0o1). `a` and `b` inherit each other's
+  # kind values across two trees. A kind that merely reaches the cycle is refused under the first
+  # member's own name, at every depth and through a diamond, on the composed read and on `inherits`.
+  flake.testsError.cross-tree-cycle-refusals =
+    let
+      intOpt = genMerge.mkOption { type = genMerge.types.int; };
+      refuses = members: path: kind: {
+        type = "ThrownError";
+        msg = "^gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents \\(${path}\\), among kinds \\[${members}\\]: ";
+      };
+      xA = plainTree [
+        {
+          config.schema.a = {
+            inherits = [ xB.b ];
+            options.p = intOpt;
+          };
+        }
+      ];
+      xB = plainTree [
+        {
+          config.schema.b = {
+            inherits = [ xA.a ];
+            options.q = intOpt;
+          };
+        }
+      ];
+      yA = plainTree [
+        {
+          config.schema.a = {
+            inherits = [ yC.c ];
+            options.p = intOpt;
+          };
+        }
+      ];
+      yB = plainTree [
+        {
+          config.schema.b = {
+            inherits = [ yA.a ];
+            options.q = intOpt;
+          };
+        }
+      ];
+      yC = plainTree [
+        {
+          config.schema.c = {
+            inherits = [ yB.b ];
+            options.r = intOpt;
+          };
+        }
+      ];
+      kOn =
+        ps:
+        plainTree [
+          {
+            config.schema.k = {
+              inherits = ps;
+              options.ok = intOpt;
             };
+          }
+        ];
+      j = (kOn [ xA.a ]).k;
+      l =
+        (plainTree [
+          {
+            config.schema.l = {
+              inherits = [ xA.a ];
+              options.ol = intOpt;
+            };
+          }
+        ]).l;
+      r =
+        (plainTree [
+          {
+            config.schema.r = {
+              inherits = [ xA.a ];
+              options.orr = intOpt;
+            };
+          }
+        ]).r;
+      # the caller `mkType` of `inherits-value-entry-refusals`, whose result shape reads the defs
+      mkType =
+        {
+          defs ? [ ],
+          kind,
+          ...
+        }:
+        {
+          __functor = _: _: {
+            imports = map (d: d.value) (builtins.filter (d: builtins.isAttrs d.value) defs);
+          };
+          inherit kind;
+        }
+        // (if builtins.length defs > 0 then { hasDefs = true; } else { });
+      mA = plainTreeWith (mkSchemaOption { inherit mkType; }) [
+        {
+          config.schema.a = {
+            inherits = [ mB.b ];
+            options.p = intOpt;
+          };
+        }
+      ];
+      mB = plainTreeWith (mkSchemaOption { inherit mkType; }) [
+        {
+          config.schema.b = {
+            inherits = [ mA.a ];
+            options.q = intOpt;
+          };
+        }
+      ];
+    in
+    {
+      test-a-member-refuses-by-its-own-name = {
+        expr = builtins.attrNames xA.a.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-a-kind-inheriting-a-member-refuses-by-the-member-name = {
+        expr = builtins.attrNames (kOn [ xA.a ]).k.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-a-three-tree-cycle-refuses-by-the-member-name = {
+        expr = builtins.attrNames (kOn [ yA.a ]).k.options;
+        expectedError = refuses "a b c" "a -> c -> b -> a" "a";
+      };
+      test-two-steps-from-the-cycle-refuses = {
+        expr = builtins.attrNames (kOn [ j ]).k.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-a-diamond-onto-the-cycle-refuses = {
+        expr =
+          builtins.attrNames
+            (kOn [
+              l
+              r
+            ]).k.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-the-mark-refuses = {
+        expr = (kOn [ xA.a ]).k.__mint.minted;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-a-member-inherits-entry-refuses = {
+        expr = builtins.elemAt xA.a.inherits 0;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-under-evalSchema = {
+        expr =
+          builtins.attrNames
+            (evalSchema {
+              modules = [
+                {
+                  config.schema.k = {
+                    inherits = [ xA.a ];
+                    options.ok = intOpt;
+                  };
+                }
+              ];
+            }).k.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1; closed by den-hoag-24zdh): on the `mkType` arm a
+      # value-entry cycle aborts uncatchably on every evaluator. The kind's value is the caller's
+      # result, which reads the defs, whose spine forces the partner's result before any guard runs.
+      test-a-cross-tree-cycle-on-the-mkType-arm-aborts = {
+        expr = builtins.attrNames mA.a.options;
+        expectedError = {
+          type = "EvalError";
+          msg = "infinite recursion encountered";
+        };
       };
     };
 

@@ -1203,21 +1203,30 @@ let
                   throw "gen-schema: kind '${kind}' inherits ${
                     if builtins.isAttrs v then "an attrset with no mark" else "a ${builtins.typeOf v}"
                   }: an `inherits` entry is a kind name or a kind value (`kind` and a mint-backed mark `__mint.minted`)"
+                # A KIND ON AN INHERITANCE CYCLE CLASSIFIES NO PARENT (den-hoag-1o0o1): its verdict is
+                # read before every arm that reads a stamp or a mark. A partner's stamp read forces the
+                # partner's own classification of this kind (nix and Determinate force both slots under
+                # `==`), which re-enters this kind's in-flight defs and blackholes; refused here, the
+                # partner's `stampAgrees` catches this refusal and the cycle is refused by name at
+                # composition. The walk reads witnesses and `__kindCycleParents` only, so no mark.
+                # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): on the `mkType` arm a value-entry cycle
+                # aborts uncatchably on every evaluator: this kind's value is the caller's result, which
+                # reads these defs, and the defs' spine forces each partner's result before any guard
+                # runs. Same-tree, cross-tree and a kind inheriting a member alike; a name held by a
+                # DESCENDANT (local `b` inherits `a`, `a` inherits the foreign `b`) is one case. Closed
+                # by den-hoag-24zdh. Pinned by
+                # `inherits-value-entry-refusals.test-name-held-by-a-descendant-on-the-mkType-arm-aborts`
+                # and `cross-tree-cycle-refusals.test-a-cross-tree-cycle-on-the-mkType-arm-aborts`.
+                else if inheritanceCycle != null then
+                  cycleRefusal
                 # THE REACH STEP (den-hoag-l0y, foreign arm): the tree's entry at the value's name
                 # reaches THIS kind (it is this kind, or inherits it). Were the value that entry, this
                 # kind would inherit itself through it, which the cycle walk refuses; so with no cycle
                 # it is foreign, and its stamp is read. Taken before any mark, because that entry's
                 # mark is this kind's, in flight. The witness walk only ROUTES the value here: the
                 # verdict stays with the cycle walk and the stamp, never a witness comparison.
-                # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): on the `mkType` arm, a name held by a
-                # DESCENDANT (local `b` inherits `a`, `a` inherits the foreign `b`) still aborts
-                # uncatchably: the walk reaches this kind through the same-tree hop, and this kind's
-                # value is the caller's result, which reads these defs. Pinned by
-                # `inherits-value-entry-refusals.test-name-held-by-a-descendant-on-the-mkType-arm-aborts`.
                 else if tree != null && builtins.elem v.kind tree._kindNames && reachesThis v.kind then
-                  if inheritanceCycle != null then
-                    cycleRefusal
-                  else if v ? __kindSelf && !(stampOk v) then
+                  if v ? __kindSelf && !(stampOk v) then
                     stampRefusal "gen-schema: kind '${kind}' inherits" v
                   else
                     "value"
@@ -1482,13 +1491,17 @@ let
               # member is read; the path is in walk order from the kind read.
               # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1, den-hoag-4i0o5): keyed by witness, the visited
               # set conflates witness twins (see `cycleRefusal`), so a cycle reached only through the
-              # second of two twins, the first visited with no cycle behind it, is MISSED, and
-              # composition recurses (nix, Determinate abort; Lix refuses at a parent's own walk). Giving each
-              # twin its own provenance dissolves it. No key closes it: the walk reads values, not
+              # second of two twins, the first visited with no cycle behind it, is MISSED by this walk.
+              # Where some member's own walk reaches the cycle, that member refuses by name at
+              # composition on every evaluator (`formOf` classifies nothing on a cycle), pinned by
+              # `witness-collision-refusals.test-a-cycle-behind-an-untagged-twin-refuses-by-a-member`. Where EVERY
+              # member's walk is shadowed by a twin listed first, no walk finds it and composition
+              # recurses uncatchably on all three evaluators (den-hoag-95cv0), pinned by
+              # `witness-collision-refusals.test-a-fully-shadowed-cycle-aborts`. Giving each twin its own
+              # provenance dissolves it. No key closes it: the walk reads values, not
               # addresses, so a key that tells twins apart (a name path) never repeats on a cycle not
               # through this kind and the walk diverges there, and a walk with no visited set pays every
-              # path through a diamond lattice. Pinned by
-              # `witness-collision-refusals.test-a-cycle-behind-an-untagged-twin-aborts`.
+              # path through a diamond lattice.
               # ponytail: each kind walks its own ancestry (nothing is shared across kinds, since a
               # shared reach set would itself recurse on a cycle) and copies the path per step, so a
               # depth-n chain costs O(n²) in total, the same order as composing it; carry the path as
