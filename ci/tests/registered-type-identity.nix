@@ -187,6 +187,21 @@ in
       };
     };
 
+    # The completion stamp (U1b): a `refined` type drops its base's stamp and is stamped by the
+    # boundary that completes it (gen-merge's `mkOptionType`), so it decides; a `//` copy of it is
+    # refused by name.
+    test-a-refined-type-carries-its-own-stamp = {
+      expr = {
+        stampOk = T.stampOk (srf T.int t1);
+        twins = T.typeEq (srf T.int t1) (srf T.int t1');
+        copyRefused = refused (T.typeEq (srf T.int t1) ((srf T.int t1) // { verify = _: null; }));
+      };
+      expected = {
+        stampOk = true;
+        twins = true;
+        copyRefused = true;
+      };
+    };
     # P2: the ancestor fold keys by mark, so two kinds named alike that share a mark and differ only
     # at a registered construction are refused by name, never kept first-wins; one kind reached twice
     # is one ancestor (the control).
