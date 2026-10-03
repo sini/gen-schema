@@ -3414,15 +3414,21 @@ in
         expr = builtins.attrNames (vK { _file = "x:1"; }).options;
         expectedError = refuses "b k p x" "k -> b -> x -> p -> k" "k";
       };
-      # ★ ENUMERATED, NOT CLOSED: the walk's visited set is keyed by witness, so a cycle reached only
-      # through the second of two twins is missed, and composition recurses uncatchably. Host
-      # evaluator only: Determinate aborts likewise, Lix refuses (the guarantee's).
+      # ★ ENUMERATED, NOT CLOSED: the walk's visited set is keyed by witness, so `k`'s walk, reaching
+      # the cycle only through the second of two twins, misses it. What follows is the evaluator's:
+      # nix and Determinate recurse uncatchably composing `k`, while Lix forces `b` first, whose own
+      # walk meets `b`'s witness, and refuses by name. Each outcome is pinned on its own family, read
+      # off `builtins.nixVersion` as gen-harness's `error-plane-engines.nix` reads it (`-lix` suffix).
       test-a-cycle-behind-an-untagged-twin-aborts = {
         expr = builtins.attrNames (vK { }).options;
-        expectedError = {
-          type = "EvalError";
-          msg = "infinite recursion encountered";
-        };
+        expectedError =
+          if builtins.match ".*-lix" builtins.nixVersion != null then
+            refuses "b k p x" "b -> x -> p -> k -> b" "b"
+          else
+            {
+              type = "EvalError";
+              msg = "infinite recursion encountered";
+            };
       };
     };
 

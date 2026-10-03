@@ -1470,7 +1470,7 @@ let
               # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1, den-hoag-4i0o5): keyed by witness, the visited
               # set conflates witness twins (see `cycleRefusal`), so a cycle reached only through the
               # second of two twins, the first visited with no cycle behind it, is MISSED, and
-              # composition recurses uncatchably (nix and Determinate abort; Lix refuses). Giving each
+              # composition recurses (nix, Determinate abort; Lix refuses at a parent's own walk). Giving each
               # twin its own provenance dissolves it. No key closes it: the walk reads values, not
               # addresses, so a key that tells twins apart (a name path) never repeats on a cycle not
               # through this kind and the walk diverges there, and a walk with no visited set pays every

@@ -916,8 +916,9 @@ the stamp. Two cases are exceptions to "a value or a named refusal", enumerated 
 - **A cycle behind a witness twin is missed.** The walk's visited set is keyed by witness, so of two
   twins (below) it reads the first and skips the second. A cycle reached only through the second
   (`k` inherits `a` and `b`, `a` reaches one application of a helper and `b` another, and only `b`'s
-  leads back to `k`) is not seen, and composition recurses uncatchably on nix and Determinate (Lix
-  refuses it). Giving each application its own provenance dissolves it. No key closes it: the walk
+  leads back to `k`) is not seen by `k`'s walk. Then the evaluator decides: on nix and Determinate
+  composing `k` recurses uncatchably, and Lix forces `b` first, whose own walk refuses it by name as
+  `b`'s cycle (`b -> x -> p -> k -> b`). The pin holds each outcome on its own family. Giving each application its own provenance dissolves it. No key closes it: the walk
   reads parent values, not addresses, so a key that tells twins apart never repeats on a cycle that
   does not pass through the kind read, and a walk with no visited set pays every path through a
   diamond lattice.
