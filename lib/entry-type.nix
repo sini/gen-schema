@@ -1272,12 +1272,12 @@ let
               # `t1.base` <- `t0.base`). No pre-composition reading can: a chain of such applications
               # and a cycle through them agree to any finite depth. So the refusal names both readings,
               # and the remedy that separates the second: provenance, which the witness reads as each
-              # def's file. A module VALUE takes its `_file`; a module imported by path takes its path.
+              # def's file. A module takes the `_file` its own content sets (a path module's too), else its path.
               cycleRefusal = throw "gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}), among kinds [${
                 prelude.concatStringsSep " " (
                   prelude.sort (a: b: a < b) (prelude.unique (prelude.init inheritanceCycle))
                 )
-              }]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `_file` separates them (a module imported by path takes its file from the path: import it as a value, or give each application a distinct path)";
+              }]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module its own `_file` separates them (a module imported by path is named by the `_file` its own content sets, else by its path; an importing module's `_file` does not reach it)";
               resolvedOnly =
                 v:
                 if inheritanceCycle != null then

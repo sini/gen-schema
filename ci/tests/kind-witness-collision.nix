@@ -5,8 +5,8 @@
 # two kinds one witness, and the cycle walk cannot tell a chain through them from a cycle. The
 # refusal says so (`ci/tests-error.nix`, `witness-collision-refusals`); these cells pin the remedy it
 # names, provenance: the same chain with each application given its own module `_file` is served
-# (a module VALUE; a module imported by path takes its file from the path, so it is imported as a
-# value and tagged, or given a distinct path). The tagged cycle's refusal is pinned by message there.
+# (a module VALUE or a module imported by path, which is named by the `_file` its own content sets,
+# else its path). The tagged cycle's refusal is pinned by message there.
 {
   genSchema,
   genMerge,
@@ -73,6 +73,22 @@ let
         file
       ];
     }).config.schema;
+  # one layer FILE that sets its own `_file` per application, imported by path (tag via specialArgs)
+  byPathTagged =
+    file: tag: parent:
+    (genMerge.evalModuleTree {
+      specialArgs = { inherit parent intOpt tag; };
+      modules = [
+        { options.schema = mkSchemaOption { }; }
+        file
+      ];
+    }).config.schema;
+  pt1 = byPathTagged ../test-fixtures/shared-layer-tagged.nix "1" t0.base;
+  pt2 = byPathTagged ../test-fixtures/shared-layer-tagged.nix "2" pt1.base;
+  # the same applications from two DISTINCT path modules that set ONE `_file`
+  ga = byPathTagged ../test-fixtures/shared-layer-generated-a.nix "" t0.base;
+  gb = byPathTagged ../test-fixtures/shared-layer-generated-b.nix "" t0.base;
+  pt1b = byPathTagged ../test-fixtures/shared-layer-tagged.nix "1" t0.base;
   sh1 = byPath ../test-fixtures/shared-layer.nix t0.base;
   sc2 = byPath ../test-fixtures/shared-layer-copy.nix sh1.base;
 in
@@ -115,6 +131,32 @@ in
         "b"
         "x"
       ];
+    };
+    # A path module is named by the `_file` its own content sets (den-hoag-6fqay): two applications
+    # tagged differently separate the witness, and the chain through them is served. Was a refusal.
+    test-a-path-module-setting-its-own-file-separates-the-witness = {
+      expr = pt1.base.__kindWitness == pt2.base.__kindWitness;
+      expected = false;
+    };
+    test-a-path-module-setting-its-own-file-is-served = {
+      expr = builtins.attrNames pt2.base.options;
+      expected = [
+        "b"
+        "x"
+      ];
+    };
+    # The converse direction: two DISTINCT path modules with one `_file` and a generated (position-less)
+    # value, the same parents and the same option names, are named alike, so their witnesses agree (they
+    # differed by path before). A literal value still differs by its source position.
+    test-two-path-modules-setting-one-file-share-a-witness = {
+      expr = {
+        distinctPaths = ga.base.__kindWitness == gb.base.__kindWitness;
+        samePathSameApplication = pt1.base.__kindWitness == pt1b.base.__kindWitness;
+      };
+      expected = {
+        distinctPaths = true;
+        samePathSameApplication = true;
+      };
     };
     test-a-path-module-at-a-distinct-path-is-served = {
       expr = builtins.attrNames sc2.base.options;

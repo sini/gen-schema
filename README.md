@@ -930,14 +930,15 @@ built agree on every tree-level field, and a chain of such applications and a cy
 to any finite depth). Options reached through the kind entry's `imports`, or a function body, are not
 directly declared and are not read. So a chain through such kinds meets the kind's own witness exactly
 as a cycle does, and the refusal names both readings and the remedy:
-`gen-schema: kind 'base' reaches a kind with its own content witness through its parents (base -> base), among kinds [base]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named 'base' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module value its own `\_file` separates them (a module imported by path takes its file from the path: import it as a value, or give each application a distinct path)`.
-The remedy is provenance, which the witness reads as each def's file. A module VALUE takes its file
-from `_file`, so a helper sets one per application
+`gen-schema: kind 'base' reaches a kind with its own content witness through its parents (base -> base), among kinds [base]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named 'base' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module its own `\_file`separates them (a module imported by path is named by the`\_file`its own content sets, else by its path; an importing module's`\_file` does not reach it)`.
+The remedy is provenance, which the witness reads as each def's file. A module takes its file
+from the `_file` its own content sets, so a helper sets one per application
 (`layer = tag: parent: { _file = "layer:${tag}"; config.schema.base = { inherits = [ parent ]; … }; }`),
 and the chain composes while a genuine cycle through two applications with equal tags is still
-refused. A module imported by PATH takes its file from the path, whatever `_file` it or an importing
-module sets: import it as a value and tag the application (`import ./layer.nix args // { _file = …; }`),
-or give each application a file of its own. Pinned by `witness-collision-refusals`
+refused. A module imported by PATH is named the same way: by the `_file` its own content sets, else by
+its path (a `_file` on a module that merely imports it does not reach it), so a path module that sets a
+per-application `_file` is served too, while two distinct path modules that set one `_file` share a
+file and so a witness. Pinned by `witness-collision-refusals`
 (`ci/tests-error.nix`) and `kind-witness-collision` (`ci/tests/`).
 
 **An inheritance cycle is refused by name on every tree, in either spelling.** A kind that reaches
