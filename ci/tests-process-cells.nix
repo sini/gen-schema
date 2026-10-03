@@ -30,7 +30,10 @@ let
   graph = import graphSrc { inherit prelude; };
   merge = import mergeSrc {
     inherit prelude;
-    types = import typesSrc { inherit prelude identity; };
+    types = import typesSrc {
+      inherit prelude identity;
+      algebra = import "${algebraSrc}/lib";
+    };
     memo = import memoSrc { inherit prelude graph; };
     scope = import scopeSrc { inherit prelude graph identity; };
   };

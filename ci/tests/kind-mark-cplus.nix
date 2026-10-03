@@ -29,6 +29,17 @@ let
   decides = e: (builtins.tryEval e).success;
 
   portTcp = kindOf { options.port = opt (genSchema.refined T.int refinements.tcpPort); };
+  # A pair differing ONLY in a caller predicate: the message is inert content and enters the mark.
+  predA = {
+    check = v: v > 0;
+    message = "in range";
+  };
+  predB = {
+    check = v: v < 9;
+    message = "in range";
+  };
+  portA = kindOf { options.port = opt (genSchema.refined T.int predA); };
+  portB = kindOf { options.port = opt (genSchema.refined T.int predB); };
   portPos = kindOf { options.port = opt (genSchema.refined T.int refinements.positive); };
   fieldInt = kindOf { options.port = opt T.int; };
   fieldStr = kindOf { options.port = opt T.str; };
@@ -44,6 +55,13 @@ let
   };
   portWide = kindOf { options.port = opt (genSchema.refined T.int (between 1 65535)); };
   portLow = kindOf { options.port = opt (genSchema.refined T.int (between 1 1023)); };
+  # The same two terms under ONE message, so nothing but the registered construction differs.
+  inRange = lo: hi: {
+    check = its "between" { inherit lo hi; };
+    message = "must be in range";
+  };
+  rangeWide = kindOf { options.port = opt (genSchema.refined T.int (inRange 1 65535)); };
+  rangeLow = kindOf { options.port = opt (genSchema.refined T.int (inRange 1 1023)); };
 
   # F1 · a METHOD BODY is content: the option it answers through is typed `str`, the body is a lambda.
   greeter =
@@ -320,22 +338,29 @@ in
         decided = false;
       };
     };
-    # A SEALED field enters as the marker: the predicate-only pair shares a mark and is REFUSED.
+    # A SEALED component enters as the marker: the predicate-only pair shares a mark and is REFUSED.
+    # Two stock refinements carry different messages, which are inert content, so they separate.
     test-a-sealed-field-shares-the-mark-and-is-refused = {
       expr = {
-        sameMark = portTcp.__mint.minted == portPos.__mint.minted;
-        decided = decides (kindEq portTcp portPos);
+        sameMark = portA.__mint.minted == portB.__mint.minted;
+        decided = decides (kindEq portA portB);
+        messagesSeparate = kindEq portTcp portPos;
       };
       expected = {
         sameMark = true;
         decided = false;
+        messagesSeparate = false;
       };
     };
-    # A REGISTERED predicate mints, so its field enters by digest and the pair separates, decided.
-    test-a-registered-predicate-mints-and-separates = {
+    # A REGISTERED predicate is COMPARED, never minted (den-hoag-hhki8): its field enters the kind's
+    # mark blind to the term, so a pair differing only in the term shares a mark and is decided `false`
+    # by its declared subject; a pair whose messages differ separates by mark.
+    test-a-registered-predicate-is-compared-and-separates = {
       expr = {
         marksDiffer = portWide.__mint.minted != portLow.__mint.minted;
         decided = kindEq portWide portLow;
+        termOnlyMarksDiffer = rangeWide.__mint.minted != rangeLow.__mint.minted;
+        termOnlyDecided = kindEq rangeWide rangeLow;
         enforces = map (r: [
           (r.check 80)
           (r.check 8080)
@@ -344,6 +369,8 @@ in
       expected = {
         marksDiffer = true;
         decided = false;
+        termOnlyMarksDiffer = false;
+        termOnlyDecided = false;
         enforces = [
           [
             true
@@ -666,7 +693,7 @@ in
     # and a refined against a bare field separates.
     test-mktype-arm-reads-one-plane = {
       expr = {
-        predicateOnly = decides (kindEq (mkTypeKind refinements.tcpPort) (mkTypeKind refinements.positive));
+        predicateOnly = decides (kindEq (mkTypeKind predA) (mkTypeKind predB));
         refinedVsBare = kindEq (mkTypeKind refinements.tcpPort) (
           kindIn { mkType = aspectShaped; } { options.port = opt T.int; }
         );
@@ -742,8 +769,9 @@ in
   };
 
   flake.testsError.kind-mark-cplus-refusal = {
+    # the predicate-only pair: its refined type's sealed `check` reaches the kind under the option's path
     test-sealed-only-collision-refuses-by-name = {
-      expr = kindEq portTcp portPos;
+      expr = kindEq portA portB;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kindEq: two declarations of 'host' mint one identity and are unequal only at sealed component\\(s\\) 'options.port.type': a sealed component is compared by its seal, the whole value under Nix `==`, where two separately built functions are never equal, so two separate constructions are refused even where the values they compute are equal; a sealed component has no identity, because identity is minted from inert structure alone: migrate it to a first-order term, a registered constructor over inert arguments, so that it mints$";

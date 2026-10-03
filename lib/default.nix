@@ -135,8 +135,8 @@ let
     ) (builtins.attrValues ks);
 
   refinedLib = import ./refined.nix {
-    inherit merge identity;
-    inherit (algebra) preimageTagOf;
+    inherit merge;
+    inherit (algebra) hasDeclaredSubject sealedMarker;
   };
   blameLib = import ./blame.nix;
   mixinLib = import ./mixin.nix { inherit prelude record; };
