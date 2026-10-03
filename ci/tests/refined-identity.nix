@@ -118,7 +118,7 @@ in
     # A refined type over a PARAMETRIC base reaches the same outcome by a different route: every
     # structural type gen-merge ships carries no `__mint` AT ALL, so the base enters as a SEALED
     # component beside the refinement's check, and the type still mints over the rest.
-    test-refined-over-a-parametric-base-is-sealed-too = {
+    test-refined-over-a-parametric-base-seals-the-base = {
       expr = {
         parametric = regime (refined L [ refinements.nonEmpty ]);
         parametricSealed = builtins.attrNames (refined L [ refinements.nonEmpty ]).__sealed;

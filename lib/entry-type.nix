@@ -109,7 +109,14 @@ let
   # (den-hoag-markof-partial-preimage-znfjq, ruling (c+): decided by the mint unless the constructor
   # declares it) — this reads it, it does not declare it; what the grammar declares is the POSITION
   # of the records (`recordsOf` below), which is what `comparedTyped` needs.
-  isSealedType = t: !(builtins.isAttrs t) || !(identityOf t ? minted);
+  # A type CARRYING A MARK enters by it, sealed subjects and all (`componentsPreimage` propagates
+  # them); gen-algebra's `identityOf` puts a mark beside sealed components on its compared arm, so
+  # the mark is read here directly.
+  isSealedType =
+    t:
+    !(builtins.isAttrs t)
+    || !(t ? __mint && builtins.isAttrs t.__mint && t.__mint ? minted)
+    || (identityOf t ? unmigrated);
 
   # ★ AN OPTION ENTERS THE MARK BY ITS `type` ALONE (den-hoag-pa887, arm A). Every other attribute of
   # a declaration — `default`, `defaultText`, `description`, `example`, `readOnly`, `apply`,

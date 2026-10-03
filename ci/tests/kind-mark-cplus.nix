@@ -355,7 +355,7 @@ in
     # A REGISTERED predicate is COMPARED, never minted (den-hoag-hhki8): its field enters the kind's
     # mark blind to the term, so a pair differing only in the term shares a mark and is decided `false`
     # by its declared subject; a pair whose messages differ separates by mark.
-    test-a-registered-predicate-mints-and-separates = {
+    test-a-registered-predicate-is-compared-and-separates = {
       expr = {
         marksDiffer = portWide.__mint.minted != portLow.__mint.minted;
         decided = kindEq portWide portLow;
