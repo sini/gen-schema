@@ -200,6 +200,9 @@ let
           "__okAt"
           "__payload"
           "__sealed"
+          # the base's completion stamp names the BASE's record; this record is completed by
+          # gen-merge's `mkOptionType`, whose boundary stamps it
+          "__typeSelf"
         ]
         // identityFields
         // {
