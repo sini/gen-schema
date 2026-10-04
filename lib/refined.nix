@@ -187,10 +187,7 @@ let
           null
         else
           let
-            joined = merge.mergeTypes {
-              deciding = baseType;
-              partner = partner.__schema.baseType;
-            };
+            joined = merge.mergeTypes baseType partner.__schema.baseType;
           in
           if joined == null then null else mkRefinedType joined normalized;
 
