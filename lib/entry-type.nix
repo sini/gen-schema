@@ -1209,14 +1209,14 @@ let
                 # `==`), which re-enters this kind's in-flight defs and blackholes; refused here, the
                 # partner's `stampAgrees` catches this refusal and the cycle is refused by name at
                 # composition. The walk reads witnesses and `__kindCycleParents` only, so no mark.
-                # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): on the `mkType` arm a value-entry cycle
-                # aborts uncatchably on every evaluator: this kind's value is the caller's result, which
-                # reads these defs, and the defs' spine forces each partner's result before any guard
-                # runs. Same-tree, cross-tree and a kind inheriting a member alike; a name held by a
-                # DESCENDANT (local `b` inherits `a`, `a` inherits the foreign `b`) is one case. Closed
-                # by den-hoag-24zdh. Pinned by
-                # `inherits-value-entry-refusals.test-name-held-by-a-descendant-on-the-mkType-arm-aborts`
-                # and `cross-tree-cycle-refusals.test-a-cross-tree-cycle-on-the-mkType-arm-aborts`.
+                # On the `mkType` arm this kind's value is the caller's result, which reads the caller's
+                # `defs`; their shape reads no parent (den-hoag-24zdh, at `custom`), so the kind has a
+                # WHNF before this runs and a value cycle meets the walk as on the default arm.
+                # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): a caller whose result SHAPE reads what a
+                # parent IS (the desugared def's `imports`, an `inherits` entry) forces each partner's
+                # WHNF at this kind's own, before this runs, and aborts uncatchably on every evaluator.
+                # Pinned by
+                # `cross-tree-cycle-refusals.test-a-caller-reading-the-parent-imports-at-its-result-shape-aborts`.
                 else if inheritanceCycle != null then
                   cycleRefusal
                 # THE REACH STEP (den-hoag-l0y, foreign arm): the tree's entry at the value's name
@@ -1546,7 +1546,9 @@ let
               # (`inheritedModule`), so a staged and an unstaged tree compose one module; no name graph,
               # no pass: the module system's import composes it, as it composes the spelling.
               # A foreign VALUE entry composes as itself, through the same applied functor, on any tree
-              # or none: it is already minted, so nothing resolves it.
+              # or none: it is already minted, so nothing resolves it. One def per composed parent, so
+              # this list's spine is the parents' classification; the `mkType` caller receives it
+              # nested under one def instead (at `custom`).
               desugaredDefs =
                 map (v: {
                   file = "<gen-schema: kind '${kind}' inherits the kind value '${v.kind}'>";
@@ -1660,7 +1662,8 @@ let
                   fields;
 
               # Strip all collection keys before deferredModule merge. The desugared parents join here,
-              # where `evalSchema`'s injected defs arrive, so both branches compose them.
+              # where `evalSchema`'s injected defs arrive: the default branch composes this list and both
+              # planes read it, while the `mkType` caller receives the parents nested (at `custom`).
               strippedDefs =
                 map (
                   d:
@@ -1815,10 +1818,33 @@ let
                   # strippedDefs are passed so mkType implementations can wire user-declared
                   # options/config from the schema kind entry into their own type systems.
                   let
+                    # THE CALLER'S `defs` HAVE A DECLARATION-LEVEL SHAPE (den-hoag-24zdh): the raw defs,
+                    # stripped, then the desugared parents as ONE def, present iff `inherits` is
+                    # non-empty, nesting each parent under its own `_file`. `strippedDefs`' spine is the
+                    # parents' classification, and the caller's result is this kind's WHNF, so a caller
+                    # reading that spine made each kind on a value cycle consume its partner's WHNF before
+                    # any guard ran. Scoped to this arm: the default arm's key set reads no parent, so it
+                    # keeps `strippedDefs` and pays nothing, and the plane below keeps it on both arms,
+                    # so no mark moves. The stripping is re-mapped here rather than bound beside
+                    # `strippedDefs`, which would cost the default arm a thunk per kind.
                     custom = mkType {
                       kindModule = resolvedBase;
                       collections = extractedCollections;
-                      defs = strippedDefs;
+                      defs =
+                        map (
+                          d:
+                          if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
+                            d // { value = builtins.removeAttrs d.value collectionKeys; }
+                          else
+                            d
+                        ) defs
+                        ++ prelude.optional (declaredRaw != [ ]) {
+                          file = "<gen-schema: kind '${kind}' inherits>";
+                          value.imports = map (d: {
+                            _file = d.file;
+                            inherit (d.value) imports;
+                          }) desugaredDefs;
+                        };
                       inherit kind;
                     };
                     # The keys the arm applies over the `mkType` result. `options = { }` and `refs = { }`

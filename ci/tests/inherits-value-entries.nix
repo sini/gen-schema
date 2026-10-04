@@ -278,6 +278,55 @@ in
           alias = r;
         };
     };
+    # The same topology on the `mkType` arm, with a caller `mkType` whose result shape reads the defs
+    # (den-hoag-24zdh): the kind has a WHNF before any parent is classified, so the reach walk reads
+    # the declaring kind's witness and the foreign value composes as on the default arm.
+    test-name-held-by-a-descendant-on-the-mkType-arm-composes = {
+      expr =
+        let
+          mkType =
+            {
+              defs ? [ ],
+              kind,
+              ...
+            }:
+            {
+              __functor = _: _: {
+                imports = map (d: d.value) (builtins.filter (d: builtins.isAttrs d.value) defs);
+              };
+              inherit kind;
+            }
+            // (if builtins.length defs > 0 then { hasDefs = true; } else { });
+          t =
+            (genMerge.evalModuleTree {
+              modules = [
+                { options.schema = mkSchemaOption { inherit mkType; }; }
+                {
+                  config.schema.base = {
+                    inherits = [ "sub" ];
+                    options.lb = intOpt;
+                  };
+                }
+                { config.schema.sub = entry "inherits" foreign; }
+              ];
+            }).config.schema;
+        in
+        {
+          sub = builtins.attrNames t.sub.options;
+          base = builtins.attrNames t.base.options;
+        };
+      expected = {
+        sub = [
+          "b"
+          "extra"
+        ];
+        base = [
+          "b"
+          "extra"
+          "lb"
+        ];
+      };
+    };
     # The self-named topology at depth 3 (each tree's `base` inherits the previous tree's), its layers
     # from one generator. Each layer adds its own option, so no two layers share a witness; the
     # equal-witness chain is refused, enumerated in `ci/tests-error.nix`.

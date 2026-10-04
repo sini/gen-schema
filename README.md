@@ -912,13 +912,23 @@ exceptions to "a value or a named refusal", enumerated and pinned (`ci/tests-err
 `inherits-value-entry-refusals`, `cross-tree-cycle-refusals` and `witness-collision-refusals`), not
 closed:
 
-- **A value-entry cycle on the `mkType` arm**, with a caller `mkType` whose result reads the defs (as
-  gen-aspects' does), aborts uncatchably with `infinite recursion encountered` on every evaluator:
-  same-tree, across trees, and a kind inheriting a member alike, and a name held by a descendant (local
-  `b` inherits `a`, `a` inherits another tree's `b`) is one case of it. The kind's value is the caller's
-  result, which reads the defs, and the defs' spine forces each partner's result before any guard runs.
-  A cycle through names is refused by name on this arm too. The value cycle is a known exception,
-  pinned by `cross-tree-cycle-refusals.test-a-cross-tree-cycle-on-the-mkType-arm-aborts`.
+- **A caller `mkType` whose result SHAPE reads what a parent IS** (the content of the desugared def's
+  `imports`, or an entry of the `inherits` collection) aborts uncatchably with `infinite recursion encountered` on every evaluator when the kind is on a value cycle. This is an ADR-0025 item 1
+  enumeration, argued by its mechanism: while the kind's key set is the caller's result key set, a
+  caller that forces a partner's WHNF at its own makes the two WHNFs mutually dependent before any
+  gen-schema code runs, so no guard here can catch it. The price has the shape ADR-0033 records for
+  the `nta` narrowing (expressible and undetected), and the analogous closure route is a named
+  re-entry guard (`den-hoag-tz1om`). On an acyclic tree such a caller is served. Pinned by
+  `cross-tree-cycle-refusals.test-a-caller-reading-the-parent-imports-at-its-result-shape-aborts`.
+
+  **The caller contract.** A caller `mkType` receives `defs` as the kind's raw defs (collection keys
+  stripped), followed by AT MOST ONE desugared def, present iff the kind's `inherits` is non-empty,
+  whose `value.imports` nest one module per composed parent under its own `_file`. That shape is a
+  function of the declaration alone. Its result shape may read `defs`' spine and length, each def's
+  `file`, each def's `value` to WHNF with its key set, and the `inherits` spine; every value cycle is
+  then refused by name, as on the default arm (`cross-tree-cycle-refusals`, the `mkType`-arm cells).
+  It may not read a parent's identity; the composition reads it, behind the guard.
+
 - **A cycle every member of which reaches through a witness twin first is missed.** The walk's visited
   set is keyed by witness, so of two twins (below) it reads the first and skips the second. A cycle
   reached only through the second is not seen by that walk. Where some member's own walk does reach
@@ -953,8 +963,8 @@ composition too: reading an entry of its `inherits`, or its `__kindImports`, is 
 the walk answers for classifies no parent.
 
 **An inheritance cycle is refused by name on every tree, in either spelling**, but for the two
-exceptions enumerated above (a value-entry cycle on the `mkType` arm, and a cycle every member reaches
-through a witness twin first). A kind that reaches
+exceptions enumerated above (a caller `mkType` whose result shape reads what a parent is, and a cycle
+every member reaches through a witness twin first). A kind that reaches
 itself through its parents, declared or spelled, would import itself into itself; it is refused,
 catchably, at every read that would compose it, in `evalSchema`'s wording: the members sorted, as
 `evalSchema` names them, so the bracket is the same whichever member is read, and then the path from
@@ -1511,7 +1521,7 @@ mkSchemaEntryType {
 
 The return value is merged with `computedFields` (computed wins for same-named keys — except a name in `kindResultKeys`, the kind-value contract `lib/entry-type.nix` reserves and refuses by name on both branches; `computed` may not use one of those at all), so topology and introspection fields remain authoritative.
 
-The kind value always carries the `inherits` and `parent` collections, written over the `mkType` result (a computed field still wins), because `evalSchema` and `_topology` read them off the kind value; a result that publishes no collections still composes its declared parents under `evalSchema`. On a plain tree a declared parent reaches the `mkType` result as one more of its `defs`, the import it desugars to. On a kind the entry refuses (an inheritance cycle, or a declared parent on an entry type built outside a tree; see [Kind Inheritance](#kind-inheritance)), every field the `mkType` result built and its applied `__functor` are read through the same refusal; `kind`, `strict`, `keySemantics`, `inherits` and `parent` stay readable.
+The kind value always carries the `inherits` and `parent` collections, written over the `mkType` result (a computed field still wins), because `evalSchema` and `_topology` read them off the kind value; a result that publishes no collections still composes its declared parents under `evalSchema`. On a plain tree the declared parents reach the `mkType` result as ONE more of its `defs`, present iff `inherits` is non-empty, whose `imports` nest the import each parent desugars to (the caller contract, [Kind Inheritance](#kind-inheritance)). On a kind the entry refuses (an inheritance cycle, or a declared parent on an entry type built outside a tree; see [Kind Inheritance](#kind-inheritance)), every field the `mkType` result built and its applied `__functor` are read through the same refusal; `kind`, `strict`, `keySemantics`, `inherits` and `parent` stay readable.
 
 #### `keySemantics` — opaque per-key category surface
 

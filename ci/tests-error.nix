@@ -565,45 +565,6 @@ in
           msg = "^gen-schema: kind 'baseO' inherits: the kind value 'baseO' is not the value its schema built: ";
         };
       };
-      # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): the name held by a DESCENDANT on the `mkType` arm,
-      # with a caller `mkType` whose result shape reads the defs. The reach walk passes through `sub`
-      # to the declaring kind, whose value is in flight, so it aborts uncatchably, as it did before the
-      # reach step. Host evaluator only; the other two are the guarantee's.
-      test-name-held-by-a-descendant-on-the-mkType-arm-aborts = {
-        expr =
-          let
-            mkType =
-              {
-                defs ? [ ],
-                kind,
-                ...
-              }:
-              {
-                __functor = _: _: {
-                  imports = map (d: d.value) (builtins.filter (d: builtins.isAttrs d.value) defs);
-                };
-                inherit kind;
-              }
-              // (if builtins.length defs > 0 then { hasDefs = true; } else { });
-          in
-          builtins.attrNames
-            (plainTreeWith (mkSchemaOption { inherit mkType; }) [
-              {
-                config.schema.baseO = {
-                  inherits = [ "sub" ];
-                  options.lb = genMerge.mkOption { type = genMerge.types.int; };
-                };
-                config.schema.sub = {
-                  inherits = [ foreignO ];
-                  options.extra = genMerge.mkOption { type = genMerge.types.int; };
-                };
-              }
-            ]).sub.options;
-        expectedError = {
-          type = "EvalError";
-          msg = "infinite recursion encountered";
-        };
-      };
       # A WITNESS COLLISION (den-hoag-4i0o5). Three self-named layers from one generator (one source
       # position, the same parent and option names) carry equal witnesses, so the cycle walk meets the
       # tip's witness on the middle layer. The refusal names both readings and the remedy, since no
@@ -3615,6 +3576,134 @@ in
           };
         }
       ];
+      mTree = plainTreeWith (mkSchemaOption {
+        inherit mkType;
+      });
+      mOn =
+        t: p:
+        t [
+          {
+            config.schema.k = {
+              inherits = [ p ];
+              options.ok = intOpt;
+            };
+          }
+        ];
+      mVal = mTree [
+        (
+          { config, ... }:
+          {
+            config.schema.a.inherits = [ config.schema.b ];
+            config.schema.b.inherits = [ "a" ];
+          }
+        )
+      ];
+      mSelf = mTree [
+        (
+          { config, ... }:
+          {
+            config.schema.a = {
+              inherits = [ config.schema.a ];
+              options.p = intOpt;
+            };
+          }
+        )
+      ];
+      mSA = mTree [
+        {
+          config.schema.s = {
+            inherits = [ mSB.s ];
+            options.p = intOpt;
+          };
+        }
+      ];
+      mSB = mTree [
+        {
+          config.schema.s = {
+            inherits = [ mSA.s ];
+            options.q = intOpt;
+          };
+        }
+      ];
+      # plain `a` and mkType `b` inherit each other
+      pxA = plainTree [
+        {
+          config.schema.a = {
+            inherits = [ pxB.b ];
+            options.p = intOpt;
+          };
+        }
+      ];
+      pxB = mTree [
+        {
+          config.schema.b = {
+            inherits = [ pxA.a ];
+            options.q = intOpt;
+          };
+        }
+      ];
+      # a caller whose result SHAPE reads the content of the desugared parents' imports
+      mkTypeImports =
+        {
+          defs ? [ ],
+          kind,
+          ...
+        }:
+        {
+          __functor = _: _: { imports = map (d: d.value) defs; };
+          inherit kind;
+        }
+        // (
+          if builtins.any (d: builtins.isAttrs d.value && (d.value.imports or [ ]) != [ ]) defs then
+            { hasImports = true; }
+          else
+            { }
+        );
+      # a SERVED caller whose result shape counts the defs past one: the old shape's per-parent count
+      lenTree = plainTreeWith (mkSchemaOption {
+        mkType =
+          {
+            defs ? [ ],
+            kind,
+            ...
+          }@args:
+          mkType args // (if builtins.length defs > 1 then { many = true; } else { });
+      });
+      lenA = lenTree [
+        {
+          config.schema.a = {
+            inherits = [ lenB.b ];
+            options.p = intOpt;
+          };
+        }
+      ];
+      lenB = lenTree [
+        {
+          config.schema.b = {
+            inherits = [ lenA.a ];
+            options.q = intOpt;
+          };
+        }
+      ];
+      iTree = plainTreeWith (mkSchemaOption {
+        mkType = mkTypeImports;
+      });
+      iA = iTree [
+        {
+          config.schema.a = {
+            inherits = [ iB.b ];
+            options.p = intOpt;
+          };
+        }
+      ];
+      iB = iTree [
+        {
+          config.schema.b = {
+            inherits = [ iA.a ];
+            options.q = intOpt;
+          };
+        }
+      ];
     in
     {
       test-a-member-refuses-by-its-own-name = {
@@ -3665,11 +3754,74 @@ in
             }).k.options;
         expectedError = refuses "a b" "a -> b -> a" "a";
       };
-      # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1; closed by den-hoag-24zdh): on the `mkType` arm a
-      # value-entry cycle aborts uncatchably on every evaluator. The kind's value is the caller's
-      # result, which reads the defs, whose spine forces the partner's result before any guard runs.
-      test-a-cross-tree-cycle-on-the-mkType-arm-aborts = {
+      # THE `mkType` ARM (den-hoag-24zdh): the desugared parents reach the caller as ONE def whenever
+      # `inherits` is non-empty, so the defs' spine reads no partner and the kind has a WHNF before
+      # any parent is classified; every value cycle then meets the walk.
+      test-a-cross-tree-cycle-on-the-mkType-arm-refuses = {
         expr = builtins.attrNames mA.a.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-a-same-tree-value-cycle-on-the-mkType-arm-refuses = {
+        expr = builtins.attrNames mVal.a.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-a-self-value-on-the-mkType-arm-refuses = {
+        expr = builtins.attrNames mSelf.a.options;
+        expectedError = refuses "a" "a -> a" "a";
+      };
+      test-a-same-named-cross-tree-cycle-on-the-mkType-arm-refuses = {
+        expr = builtins.attrNames mSA.s.options;
+        expectedError = refuses "s" "s -> s -> s" "s";
+      };
+      test-a-kind-inheriting-a-mkType-member-refuses-by-the-member-name = {
+        expr = builtins.attrNames (mOn mTree mA.a).k.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-a-plain-kind-inheriting-a-mkType-member-refuses-by-the-member-name = {
+        expr = builtins.attrNames (kOn [ mA.a ]).k.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-a-cycle-across-the-two-arms-refuses = {
+        expr = builtins.attrNames pxA.a.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-the-mkType-mark-refuses = {
+        expr = mA.a.__mint.minted;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-a-mkType-member-inherits-entry-refuses = {
+        expr = builtins.elemAt mA.a.inherits 0;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      test-a-mkType-member-under-evalSchema-refuses = {
+        expr =
+          builtins.attrNames
+            (evalSchema {
+              schemaOption = mkSchemaOption { inherit mkType; };
+              modules = [
+                {
+                  config.schema.k = {
+                    inherits = [ mA.a ];
+                    options.ok = intOpt;
+                  };
+                }
+              ];
+            }).k.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      # A caller whose result shape reads the defs' LENGTH past the raw defs is served: the desugared
+      # def is one, present iff `inherits` is non-empty, whatever the parents are.
+      test-a-caller-counting-the-defs-at-its-result-shape-refuses = {
+        expr = builtins.attrNames lenA.a.options;
+        expectedError = refuses "a b" "a -> b -> a" "a";
+      };
+      # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): a caller `mkType` whose result SHAPE reads what a
+      # parent IS (the content of the desugared def's `imports`, or an `inherits` entry). While the
+      # kind's key set is the caller's result key set, that reading forces each partner's WHNF at this
+      # kind's own, so the two are mutually dependent before any gen-schema code runs, and it aborts
+      # uncatchably on every evaluator.
+      test-a-caller-reading-the-parent-imports-at-its-result-shape-aborts = {
+        expr = builtins.attrNames iA.a.options;
         expectedError = {
           type = "EvalError";
           msg = "infinite recursion encountered";

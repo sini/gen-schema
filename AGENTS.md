@@ -76,7 +76,9 @@ them off it. On a plain `mkSchemaOption` tree a declared `inherits` DESUGARS ont
 `imports = [ config.schema.<p> ]` spelling makes (`den-hoag-8c8pr` Q-a, owner-ruled 2026-09-30): the
 tree hands its own `config` to `mkSchemaEntryTypeIn`, and the desugared def imports
 `inheritedModule`, the one module `evalSchema`'s `injectFor` imports too (`inheritsDesugaredFile`;
-cells `schema-inheritance.test-plain-inherits-*`). An entry type built outside a tree
+cells `schema-inheritance.test-plain-inherits-*`). The `mkType` caller receives those defs nested
+under ONE def, present iff `inherits` is non-empty, so its `defs`' shape reads no parent and a value
+cycle on that arm is refused by name (den-hoag-24zdh; cells `cross-tree-cycle-refusals`). An entry type built outside a tree
 (`mkSchemaEntryType`, tree `null`) refuses a declared parent by name. An inheritance cycle in either
 spelling is refused by ONE walk, `inheritanceCycle`, over the published `__kindCycleParents` compared by
 `__kindWitness`, in `evalSchema`'s wording (8c8pr Q-b arm (i), 2026-09-30; cells
