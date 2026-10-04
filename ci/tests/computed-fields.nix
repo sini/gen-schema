@@ -7,31 +7,29 @@
 let
   inherit (genSchema) mkSchemaOption;
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          collections.tags = {
-            default = [ ];
-          };
-          computed = collections: _defs: {
-            tagCount = builtins.length collections.tags;
-          };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        collections.tags = {
+          default = [ ];
         };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          tags = [
-            "server"
-            "linux"
-            "production"
-          ];
+        computed = collections: _defs: {
+          tagCount = builtins.length collections.tags;
         };
-        config.schema.app = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+      };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+        tags = [
+          "server"
+          "linux"
+          "production"
+        ];
+      };
+      config.schema.app = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 in
 {
   flake.tests.computed.test-tag-count-populated = {

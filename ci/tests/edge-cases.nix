@@ -15,33 +15,29 @@ let
   inherit (genSchema) declarationOf;
 
   # Empty schema — zero kinds
-  emptyEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-      }
-    ];
-  };
+  emptyEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+    }
+  ];
 
   # Docs default rendering
-  docsEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          options.port = genMerge.mkOption {
-            type = genMerge.types.int;
-            default = 80;
-          };
-          options.role = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "worker";
-          };
+  docsEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+        options.port = genMerge.mkOption {
+          type = genMerge.types.int;
+          default = 80;
         };
-      }
-    ];
-  };
+        options.role = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "worker";
+        };
+      };
+    }
+  ];
   docs = renderDocs docsEval.config.schema;
 
   refConflictSchema = evalSchema {
@@ -54,35 +50,33 @@ let
   };
 
   # ref with two modules setting same ref to different values
-  refConflictEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry refConflictSchema.host { };
-        options.services = mkInstanceRegistry refConflictSchema.service {
-          extraModules = [
-            (
-              { ... }:
-              {
-                options.host = genMerge.mkOption {
-                  type = declarationOf refConflictEval.config.hosts;
-                };
-              }
-            )
-          ];
-        };
-        config.hosts.igloo.addr = "10.0.1.1";
-        config.hosts.iceberg.addr = "10.0.1.2";
-      }
-      # Two modules set the same service's host to different values
-      {
-        config.services.nginx = {
-          host = "igloo";
-          port = 80;
-        };
-      }
-      { config.services.nginx.host = "iceberg"; }
-    ];
-  };
+  refConflictEval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry refConflictSchema.host { };
+      options.services = mkInstanceRegistry refConflictSchema.service {
+        extraModules = [
+          (
+            { ... }:
+            {
+              options.host = genMerge.mkOption {
+                type = declarationOf refConflictEval.config.hosts;
+              };
+            }
+          )
+        ];
+      };
+      config.hosts.igloo.addr = "10.0.1.1";
+      config.hosts.iceberg.addr = "10.0.1.2";
+    }
+    # Two modules set the same service's host to different values
+    {
+      config.services.nginx = {
+        host = "igloo";
+        port = 80;
+      };
+    }
+    { config.services.nginx.host = "iceberg"; }
+  ];
   refConflict = builtins.tryEval (
     builtins.deepSeq refConflictEval.config.services.nginx.host refConflictEval.config.services.nginx.host
   );

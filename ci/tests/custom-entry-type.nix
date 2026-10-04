@@ -34,41 +34,37 @@ let
 
   # --- Basic: custom mkType produces a result without __functor wrapping from merge ---
 
-  basicEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          mkType = customMkType;
-        };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  basicEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        mkType = customMkType;
+      };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   hostKind = basicEval.config.schema.host;
 
   # --- Collections still extracted with custom mkType ---
 
-  collectionEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          mkType = customMkType;
-          collections.tags = {
-            default = [ ];
-          };
+  collectionEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        mkType = customMkType;
+        collections.tags = {
+          default = [ ];
         };
-        config.schema.host = {
-          tags = [
-            "server"
-            "prod"
-          ];
-        };
-      }
-    ];
-  };
+      };
+      config.schema.host = {
+        tags = [
+          "server"
+          "prod"
+        ];
+      };
+    }
+  ];
 
   collectionHost = collectionEval.config.schema.host;
 
@@ -92,16 +88,14 @@ let
     ];
   };
 
-  collectionStripEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry stripSchema.host { };
-        config.hosts.igloo = {
-          name = "igloo";
-        };
-      }
-    ];
-  };
+  collectionStripEval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry stripSchema.host { };
+      config.hosts.igloo = {
+        name = "igloo";
+      };
+    }
+  ];
 
   stripResult = builtins.tryEval (
     builtins.deepSeq collectionStripEval.config.hosts.igloo collectionStripEval.config.hosts.igloo
@@ -112,131 +106,119 @@ let
   # Introspection uses genMerge.evalModuleTree { modules = [ config.${k} ]; } so the
   # __functor must import modules that declare the options we want to introspect.
 
-  introEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          mkType = customMkType;
-          baseModule =
-            kind:
-            {
-              host = {
-                options.name = genMerge.mkOption { type = genMerge.types.str; };
-              };
-              user = {
-                options.userName = genMerge.mkOption { type = genMerge.types.str; };
-              };
-            }
-            .${kind} or { };
-        };
-        config.schema.host = { };
-        config.schema.user = { };
-      }
-    ];
-  };
+  introEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        mkType = customMkType;
+        baseModule =
+          kind:
+          {
+            host = {
+              options.name = genMerge.mkOption { type = genMerge.types.str; };
+            };
+            user = {
+              options.userName = genMerge.mkOption { type = genMerge.types.str; };
+            };
+          }
+          .${kind} or { };
+      };
+      config.schema.host = { };
+      config.schema.user = { };
+    }
+  ];
 
   # --- Custom marker present (proves mkType controls the result) ---
 
   # --- baseModule passed as kindModule ---
 
-  baseModEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          mkType = customMkType;
-          baseModule = {
-            options.base-field = genMerge.mkOption {
-              type = genMerge.types.str;
-              default = "from-base";
-            };
+  baseModEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        mkType = customMkType;
+        baseModule = {
+          options.base-field = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "from-base";
           };
         };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+      };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   # Evaluate the custom type as a module to check baseModule options are accessible
-  baseModInnerEval = genMerge.evalModuleTree {
-    modules = [ baseModEval.config.schema.host ];
-  };
+  baseModInnerEval = genMerge.evalModuleTree { } [ baseModEval.config.schema.host ];
 
   # --- Mixin pipeline skipped with custom mkType ---
   # If mixins ran, they'd fail since our custom type doesn't go through applyMixin.
   # The fact that this evaluates proves mixins are skipped.
 
-  mixinSkipEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          mkType = customMkType;
-          mixins = [
-            (
-              { record, ... }:
-              record
-              // {
-                extraField = {
-                  type = genMerge.types.str;
-                  default = "mixin-value";
-                };
-              }
-            )
-          ];
-        };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  mixinSkipEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        mkType = customMkType;
+        mixins = [
+          (
+            { record, ... }:
+            record
+            // {
+              extraField = {
+                type = genMerge.types.str;
+                default = "mixin-value";
+              };
+            }
+          )
+        ];
+      };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   mixinSkipHost = mixinSkipEval.config.schema.host;
 
   # --- baseModule as function of kind name ---
 
-  baseModFnEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          mkType = customMkType;
-          baseModule = kind: {
-            options.kindName = genMerge.mkOption {
-              type = genMerge.types.str;
-              default = kind;
-            };
+  baseModFnEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        mkType = customMkType;
+        baseModule = kind: {
+          options.kindName = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = kind;
           };
         };
-        config.schema.host = { };
-      }
-    ];
-  };
+      };
+      config.schema.host = { };
+    }
+  ];
 
   # --- Topology and edges resolve correctly with custom mkType ---
   # parent is a built-in collection; extractedCollections.parent flows through
   # // collections into the custom result, so config.${k}.parent is readable by
   # the topology derivation in _topology / _edges.
 
-  topoEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          mkType = customMkType;
-          collections.tags = {
-            default = [ ];
-          };
+  topoEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        mkType = customMkType;
+        collections.tags = {
+          default = [ ];
         };
-        config.schema.host = {
-          tags = [ "server" ];
-        };
-        config.schema.user = {
-          parent = "host";
-          tags = [ "person" ];
-        };
-      }
-    ];
-  };
+      };
+      config.schema.host = {
+        tags = [ "server" ];
+      };
+      config.schema.user = {
+        parent = "host";
+        tags = [ "person" ];
+      };
+    }
+  ];
 
   topoSchema = topoEval.config.schema;
 

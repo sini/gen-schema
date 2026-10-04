@@ -149,12 +149,10 @@ let
   genSchema = gen-schema.lib;
   merge = gen-merge.lib;   # evalModuleTree + mkOption + types — the pure-gen module system
 in
-merge.evalModuleTree {
-  modules = [{
+merge.evalModuleTree { } [{
     options.schema = genSchema.mkSchemaOption {};
     config.schema.host.options.addr = merge.mkOption { type = merge.types.str; };
-  }];
-}
+  }]
 ```
 
 ### Without flakes

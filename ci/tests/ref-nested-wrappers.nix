@@ -28,51 +28,49 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.services = mkInstanceRegistry schema.service {
-          refs.hosts = eval.config.hosts;
-          refs.primary = eval.config.hosts;
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.services = mkInstanceRegistry schema.service {
+        refs.hosts = eval.config.hosts;
+        refs.primary = eval.config.hosts;
+      };
+      config.hosts = {
+        igloo = {
+          addr = "10.0.1.1";
         };
-        config.hosts = {
-          igloo = {
-            addr = "10.0.1.1";
-          };
-          iceberg = {
-            addr = "10.0.1.2";
-          };
+        iceberg = {
+          addr = "10.0.1.2";
         };
-        config.services.web = {
-          port = 80;
-          hosts = [
-            "igloo"
-            "iceberg"
-          ];
-          primary = [
-            "igloo"
-            null
-            "iceberg"
-          ];
-        };
-        config.services.empty = {
-          port = 443;
-        };
-        config.services.instance-vals = {
-          port = 8080;
-          hosts = [
-            eval.config.hosts.igloo
-            "iceberg"
-          ];
-          primary = [
-            eval.config.hosts.igloo
-            null
-          ];
-        };
-      }
-    ];
-  };
+      };
+      config.services.web = {
+        port = 80;
+        hosts = [
+          "igloo"
+          "iceberg"
+        ];
+        primary = [
+          "igloo"
+          null
+          "iceberg"
+        ];
+      };
+      config.services.empty = {
+        port = 443;
+      };
+      config.services.instance-vals = {
+        port = 8080;
+        hosts = [
+          eval.config.hosts.igloo
+          "iceberg"
+        ];
+        primary = [
+          eval.config.hosts.igloo
+          null
+        ];
+      };
+    }
+  ];
 
   inherit (eval.config.services) web empty;
   instance-vals = eval.config.services.instance-vals;

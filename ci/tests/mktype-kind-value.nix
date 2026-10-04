@@ -36,22 +36,18 @@ let
 
   kindOf =
     mkType: name:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = mkSchemaOption { inherit mkType; }; }
-        { config.schema.${name} = { }; }
-      ];
-    }).config.schema.${name};
+    (genMerge.evalModuleTree { } [
+      { options.schema = mkSchemaOption { inherit mkType; }; }
+      { config.schema.${name} = { }; }
+    ]).config.schema.${name};
 
   # The default arm's own control: it never had this defect (`prelude.last loc` is inherited
   # directly on that branch), so it must read exactly as it did before F1.
   defaultKind =
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = mkSchemaOption { }; }
-        { config.schema.host = { }; }
-      ];
-    }).config.schema.host;
+    (genMerge.evalModuleTree { } [
+      { options.schema = mkSchemaOption { }; }
+      { config.schema.host = { }; }
+    ]).config.schema.host;
 in
 {
   # F1, arm 1: a `mkType` result carrying no `kind` at all. Before the fix `.kind` aborted
@@ -79,14 +75,12 @@ in
       in
       (builtins.tryEval (
         builtins.deepSeq
-          (genMerge.evalModuleTree {
-            modules = [
-              {
-                options.h = genMerge.mkOption { type = ty; };
-                config.h.role = "r";
-              }
-            ];
-          }).config.h.role
+          (genMerge.evalModuleTree { } [
+            {
+              options.h = genMerge.mkOption { type = ty; };
+              config.h.role = "r";
+            }
+          ]).config.h.role
           true
       )).success;
     expected = true;

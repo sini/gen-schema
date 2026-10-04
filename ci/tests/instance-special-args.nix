@@ -82,77 +82,67 @@ let
     ];
   };
 
-  viaRegistry = evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host {
+  viaRegistry = evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host {
+        specialArgs = {
+          site = tagged;
+        };
+      };
+      config.hosts.igloo.addr = "10.0.1.1";
+    }
+  ];
+
+  viaType = evalModuleTree { } [
+    {
+      options.host = mkOption {
+        type = mkInstanceType schema.host {
           specialArgs = {
             site = tagged;
           };
         };
-        config.hosts.igloo.addr = "10.0.1.1";
-      }
-    ];
-  };
-
-  viaType = evalModuleTree {
-    modules = [
-      {
-        options.host = mkOption {
-          type = mkInstanceType schema.host {
-            specialArgs = {
-              site = tagged;
-            };
-          };
-          default = { };
-        };
-        config.host.addr = "10.0.1.2";
-      }
-    ];
-  };
+        default = { };
+      };
+      config.host.addr = "10.0.1.2";
+    }
+  ];
 
   # The identity arm's eval, on the kind whose module forces its arg at WHNF. Same thread, same
   # constructors — only the kind differs, so a cell here that moves attributes to the key-set
   # derivation and to nothing else.
-  viaGatedRegistry = evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.gated {
+  viaGatedRegistry = evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.gated {
+        specialArgs = {
+          site = tagged;
+        };
+      };
+      config.hosts.igloo.addr = "10.0.2.1";
+    }
+  ];
+
+  viaGatedType = evalModuleTree { } [
+    {
+      options.host = mkOption {
+        type = mkInstanceType schema.gated {
           specialArgs = {
             site = tagged;
           };
         };
-        config.hosts.igloo.addr = "10.0.2.1";
-      }
-    ];
-  };
-
-  viaGatedType = evalModuleTree {
-    modules = [
-      {
-        options.host = mkOption {
-          type = mkInstanceType schema.gated {
-            specialArgs = {
-              site = tagged;
-            };
-          };
-          default = { };
-        };
-        config.host.addr = "10.0.2.2";
-      }
-    ];
-  };
+        default = { };
+      };
+      config.host.addr = "10.0.2.2";
+    }
+  ];
 
   # LIVE CONTROL: the same kind, the same declaration, NO `specialArgs`. Without it the two cells
   # above are consistent with the arg arriving from somewhere other than the thread under test.
-  withoutArgs = evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        config.hosts.igloo.addr = "10.0.1.3";
-      }
-    ];
-  };
+  withoutArgs = evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      config.hosts.igloo.addr = "10.0.1.3";
+    }
+  ];
 in
 {
   flake.tests.instance-special-args = {

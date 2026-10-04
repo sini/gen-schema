@@ -7,17 +7,15 @@
 let
   inherit (genSchema) mkSchemaOption schemaFn;
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          methods.greet = schemaFn "Greet" genMerge.types.str ({ name, ... }: "hi ${name}");
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+        methods.greet = schemaFn "Greet" genMerge.types.str ({ name, ... }: "hi ${name}");
+      };
+    }
+  ];
 
   hostKind = eval.config.schema.host;
 in

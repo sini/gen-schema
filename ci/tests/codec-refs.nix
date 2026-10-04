@@ -47,49 +47,47 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.services = mkInstanceRegistry schema.service {
-          refs.host = eval.config.hosts;
-          refs.replicas = eval.config.hosts;
-          refs.primary = eval.config.hosts;
-          refs.backends = eval.config.hosts;
-          refs.byName = eval.config.hosts;
-          refs.byNameLazy = eval.config.hosts;
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.services = mkInstanceRegistry schema.service {
+        refs.host = eval.config.hosts;
+        refs.replicas = eval.config.hosts;
+        refs.primary = eval.config.hosts;
+        refs.backends = eval.config.hosts;
+        refs.byName = eval.config.hosts;
+        refs.byNameLazy = eval.config.hosts;
+      };
+      config.hosts = {
+        igloo = {
+          addr = "10.0.1.1";
         };
-        config.hosts = {
-          igloo = {
-            addr = "10.0.1.1";
-          };
-          iceberg = {
-            addr = "10.0.1.2";
-          };
+        iceberg = {
+          addr = "10.0.1.2";
         };
-        config.services.nginx = {
-          port = 80;
-          host = "igloo";
-          replicas = [
-            "igloo"
-            "iceberg"
-          ];
-          primary = "igloo";
-          backends = [
-            "igloo"
-            "iceberg"
-            "igloo"
-          ];
-          byName.front = "igloo";
-          byNameLazy.front = "igloo";
-        };
-        config.services.solo = {
-          port = 443;
-          host = "iceberg";
-        };
-      }
-    ];
-  };
+      };
+      config.services.nginx = {
+        port = 80;
+        host = "igloo";
+        replicas = [
+          "igloo"
+          "iceberg"
+        ];
+        primary = "igloo";
+        backends = [
+          "igloo"
+          "iceberg"
+          "igloo"
+        ];
+        byName.front = "igloo";
+        byNameLazy.front = "igloo";
+      };
+      config.services.solo = {
+        port = 443;
+        host = "iceberg";
+      };
+    }
+  ];
 
   codec = mkCodec schema.service { };
 

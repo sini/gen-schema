@@ -8,17 +8,15 @@
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
-  schemaEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  schemaEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   schema = schemaEval.config.schema;
 
@@ -44,29 +42,25 @@ let
     };
   };
 
-  validEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.services = validRegistry;
-        config.services.web = {
-          port = 8080;
-          name = "web";
-        };
-      }
-    ];
-  };
+  validEval = genMerge.evalModuleTree { } [
+    {
+      options.services = validRegistry;
+      config.services.web = {
+        port = 8080;
+        name = "web";
+      };
+    }
+  ];
 
-  invalidEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.services = invalidRegistry;
-        config.services.web = {
-          port = -1;
-          name = "web";
-        };
-      }
-    ];
-  };
+  invalidEval = genMerge.evalModuleTree { } [
+    {
+      options.services = invalidRegistry;
+      config.services.web = {
+        port = -1;
+        name = "web";
+      };
+    }
+  ];
 in
 {
   flake.tests.refined-pipeline.test-valid-instance-passes = {
@@ -86,17 +80,15 @@ in
     expr =
       let
         noRefRegistry = mkInstanceRegistry schema.service { };
-        eval = genMerge.evalModuleTree {
-          modules = [
-            {
-              options.services = noRefRegistry;
-              config.services.web = {
-                port = -1;
-                name = "web";
-              };
-            }
-          ];
-        };
+        eval = genMerge.evalModuleTree { } [
+          {
+            options.services = noRefRegistry;
+            config.services.web = {
+              port = -1;
+              name = "web";
+            };
+          }
+        ];
       in
       eval.config.services.web.port;
     expected = -1;
@@ -119,17 +111,15 @@ in
             ];
           };
         };
-        eval = genMerge.evalModuleTree {
-          modules = [
-            {
-              options.services = multiRegistry;
-              config.services.web = {
-                port = 8080;
-                name = "web";
-              };
-            }
-          ];
-        };
+        eval = genMerge.evalModuleTree { } [
+          {
+            options.services = multiRegistry;
+            config.services.web = {
+              port = 8080;
+              name = "web";
+            };
+          }
+        ];
       in
       eval.config.services.web.port;
     expected = 8080;
@@ -154,17 +144,15 @@ in
             ];
           };
         };
-        eval = genMerge.evalModuleTree {
-          modules = [
-            {
-              options.services = multiFieldRegistry;
-              config.services.web = {
-                port = 8080;
-                name = "web";
-              };
-            }
-          ];
-        };
+        eval = genMerge.evalModuleTree { } [
+          {
+            options.services = multiFieldRegistry;
+            config.services.web = {
+              port = 8080;
+              name = "web";
+            };
+          }
+        ];
       in
       eval.config.services.web.name;
     expected = "web";

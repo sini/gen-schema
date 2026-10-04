@@ -23,36 +23,34 @@ let
   };
 
   # Two separate modules: one defines hosts, another defines services with refs
-  eval = genMerge.evalModuleTree {
-    modules = [
-      # Module 1: hosts
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-        };
-      }
-      # Module 2: services with ref to hosts
-      {
-        options.services = mkInstanceRegistry schema.service {
-          extraModules = [
-            (
-              { ... }:
-              {
-                options.host = genMerge.mkOption {
-                  type = declarationOf eval.config.hosts;
-                };
-              }
-            )
-          ];
-        };
-        config.services.nginx = {
-          host = "igloo";
-          port = 80;
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    # Module 1: hosts
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+      };
+    }
+    # Module 2: services with ref to hosts
+    {
+      options.services = mkInstanceRegistry schema.service {
+        extraModules = [
+          (
+            { ... }:
+            {
+              options.host = genMerge.mkOption {
+                type = declarationOf eval.config.hosts;
+              };
+            }
+          )
+        ];
+      };
+      config.services.nginx = {
+        host = "igloo";
+        port = 80;
+      };
+    }
+  ];
 in
 {
   flake.tests.ref-compose = {

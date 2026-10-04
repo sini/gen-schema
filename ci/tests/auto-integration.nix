@@ -19,51 +19,45 @@ let
 
   # --- Test 1: Auto-extracted refinements from inline type declarations ---
 
-  schemaWithRefinedTypes = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.service = {
-          options.port = genMerge.mkOption {
-            type = refinedLib.types.refined genMerge.types.int {
-              check = v: v > 0 && v < 65536;
-              message = "must be valid TCP port";
-            };
+  schemaWithRefinedTypes = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.service = {
+        options.port = genMerge.mkOption {
+          type = refinedLib.types.refined genMerge.types.int {
+            check = v: v > 0 && v < 65536;
+            message = "must be valid TCP port";
           };
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
         };
-      }
-    ];
-  };
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   schemaR = schemaWithRefinedTypes.config.schema;
 
   # mkInstanceRegistry without explicit refinements — should auto-extract
   autoRegistry = mkInstanceRegistry schemaR.service { };
 
-  validEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.services = autoRegistry;
-        config.services.web = {
-          port = 8080;
-          name = "web";
-        };
-      }
-    ];
-  };
+  validEval = genMerge.evalModuleTree { } [
+    {
+      options.services = autoRegistry;
+      config.services.web = {
+        port = 8080;
+        name = "web";
+      };
+    }
+  ];
 
-  invalidEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.services = autoRegistry;
-        config.services.bad = {
-          port = -1;
-          name = "bad";
-        };
-      }
-    ];
-  };
+  invalidEval = genMerge.evalModuleTree { } [
+    {
+      options.services = autoRegistry;
+      config.services.bad = {
+        port = -1;
+        name = "bad";
+      };
+    }
+  ];
 
   # --- Test 2: Auto-applied mixins in mkSchemaEntryType ---
 
@@ -78,38 +72,34 @@ let
     };
   };
 
-  schemaWithMixins = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          mixins = [ monitorable ];
-          baseModule = {
-            port = genMerge.mkOption {
-              type = genMerge.types.int;
-              default = 8080;
-            };
-            hostname = genMerge.mkOption { type = genMerge.types.str; };
+  schemaWithMixins = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        mixins = [ monitorable ];
+        baseModule = {
+          port = genMerge.mkOption {
+            type = genMerge.types.int;
+            default = 8080;
           };
+          hostname = genMerge.mkOption { type = genMerge.types.str; };
         };
-        config.schema.service = { };
-      }
-    ];
-  };
+      };
+      config.schema.service = { };
+    }
+  ];
 
   schemaM = schemaWithMixins.config.schema;
   mixinRegistry = mkInstanceRegistry schemaM.service { };
 
-  mixinEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.services = mixinRegistry;
-        config.services.web = {
-          port = 3000;
-          hostname = "localhost";
-        };
-      }
-    ];
-  };
+  mixinEval = genMerge.evalModuleTree { } [
+    {
+      options.services = mixinRegistry;
+      config.services.web = {
+        port = 3000;
+        hostname = "localhost";
+      };
+    }
+  ];
 
   # --- den-hoag-zijk1: the refinement plane is a projection of the option plane ---
   # Wherever the engine collects a refined option — `imports`, `baseModule`, a function module, a
@@ -122,22 +112,18 @@ let
   tcpMsg = [ "must be a valid TCP port (1-65535)" ];
   hostKind =
     args: decl:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = mkSchemaOption args; }
-        { config.schema.host = decl; }
-      ];
-    }).config.schema.host;
+    (genMerge.evalModuleTree { } [
+      { options.schema = mkSchemaOption args; }
+      { config.schema.host = decl; }
+    ]).config.schema.host;
   messages = k: builtins.mapAttrs (_: map (r: r.message)) k.refinements;
   portAccepted =
     args: decl: port:
     builtins.tryEval
-      (genMerge.evalModuleTree {
-        modules = [
-          { options.hosts = mkInstanceRegistry (hostKind args decl) { }; }
-          { config.hosts.a.myPort = port; }
-        ];
-      }).config.hosts.a.myPort;
+      (genMerge.evalModuleTree { } [
+        { options.hosts = mkInstanceRegistry (hostKind args decl) { }; }
+        { config.hosts.a.myPort = port; }
+      ]).config.hosts.a.myPort;
   imported = {
     imports = [ { options.myPort = portOpt; } ];
   };

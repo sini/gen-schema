@@ -22,9 +22,8 @@ let
   strOpt = genMerge.mkOption { type = T.str; };
   tree =
     modules:
-    (genMerge.evalModuleTree {
-      modules = [ { options.schema = mkSchemaOption { }; } ] ++ modules;
-    }).config.schema;
+    (genMerge.evalModuleTree { } ([ { options.schema = mkSchemaOption { }; } ] ++ modules))
+    .config.schema;
   mark = k: k.__mint.minted;
   isA =
     k: v:
@@ -212,12 +211,10 @@ in
             }
             // (if builtins.length defs > 0 then { hasDefs = true; } else { });
           k =
-            (genMerge.evalModuleTree {
-              modules = [
-                { options.schema = mkSchemaOption { inherit mkType; }; }
-                { config.schema.base = entry "inherits" foreign; }
-              ];
-            }).config.schema.base;
+            (genMerge.evalModuleTree { } [
+              { options.schema = mkSchemaOption { inherit mkType; }; }
+              { config.schema.base = entry "inherits" foreign; }
+            ]).config.schema.base;
         in
         {
           inherits = map (e: mark e == mark foreign) k.inherits;
@@ -298,18 +295,16 @@ in
             }
             // (if builtins.length defs > 0 then { hasDefs = true; } else { });
           t =
-            (genMerge.evalModuleTree {
-              modules = [
-                { options.schema = mkSchemaOption { inherit mkType; }; }
-                {
-                  config.schema.base = {
-                    inherits = [ "sub" ];
-                    options.lb = intOpt;
-                  };
-                }
-                { config.schema.sub = entry "inherits" foreign; }
-              ];
-            }).config.schema;
+            (genMerge.evalModuleTree { } [
+              { options.schema = mkSchemaOption { inherit mkType; }; }
+              {
+                config.schema.base = {
+                  inherits = [ "sub" ];
+                  options.lb = intOpt;
+                };
+              }
+              { config.schema.sub = entry "inherits" foreign; }
+            ]).config.schema;
         in
         {
           sub = builtins.attrNames t.sub.options;
@@ -360,16 +355,14 @@ in
       expr =
         let
           sub =
-            (genMerge.evalModuleTree {
-              modules = [
-                {
-                  options.kinds = genMerge.mkOption {
-                    type = T.lazyAttrsOf (mkSchemaEntryType { });
-                  };
-                  config.kinds.sub = entry "inherits" foreign;
-                }
-              ];
-            }).config.kinds.sub;
+            (genMerge.evalModuleTree { } [
+              {
+                options.kinds = genMerge.mkOption {
+                  type = T.lazyAttrsOf (mkSchemaEntryType { });
+                };
+                config.kinds.sub = entry "inherits" foreign;
+              }
+            ]).config.kinds.sub;
         in
         {
           options = builtins.attrNames sub.options;

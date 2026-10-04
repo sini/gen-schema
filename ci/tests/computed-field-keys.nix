@@ -16,12 +16,10 @@ let
 
   evalWith =
     args:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = mkSchemaOption args; }
-        { config.schema.host = { }; }
-      ];
-    }).config.schema;
+    (genMerge.evalModuleTree { } [
+      { options.schema = mkSchemaOption args; }
+      { config.schema.host = { }; }
+    ]).config.schema;
 
   mkType =
     { ... }:

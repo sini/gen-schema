@@ -8,45 +8,39 @@ let
   inherit (genSchema) mkSchemaOption;
 
   # mkSchemaOption with a baseModule that adds a description option
-  schemaEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          baseModule = {
-            options.description = genMerge.mkOption {
-              type = genMerge.types.str;
-              default = "no description";
-            };
+  schemaEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        baseModule = {
+          options.description = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "no description";
           };
         };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.user = {
-          options.email = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+      };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.user = {
+        options.email = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
-  hostInstance = genMerge.evalModuleTree {
-    modules = [
-      schemaEval.config.schema.host
-      {
-        config.name = "igloo";
-        config.description = "a frosty host";
-      }
-    ];
-  };
+  hostInstance = genMerge.evalModuleTree { } [
+    schemaEval.config.schema.host
+    {
+      config.name = "igloo";
+      config.description = "a frosty host";
+    }
+  ];
 
-  userInstance = genMerge.evalModuleTree {
-    modules = [
-      schemaEval.config.schema.user
-      {
-        config.email = "yeti@snow.land";
-      }
-    ];
-  };
+  userInstance = genMerge.evalModuleTree { } [
+    schemaEval.config.schema.user
+    {
+      config.email = "yeti@snow.land";
+    }
+  ];
 in
 {
   flake.tests.base.test-host-has-base-option = {

@@ -6,31 +6,29 @@
   ...
 }:
 let
-  eval = genMerge.evalModuleTree {
-    modules = [
-      { options.schema = genSchema.mkSchemaOption { }; }
-      # Module A adds a validator
-      {
-        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        config.schema.host.validators = [
-          (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
-        ];
-      }
-      # Module B adds another validator
-      {
-        config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; };
-        config.schema.host.validators = [
-          (genSchema.mkValidator "valid-role" (
-            { role, ... }:
-            lib.elem role [
-              "web"
-              "db"
-            ]
-          ) "bad role")
-        ];
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    { options.schema = genSchema.mkSchemaOption { }; }
+    # Module A adds a validator
+    {
+      config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      config.schema.host.validators = [
+        (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
+      ];
+    }
+    # Module B adds another validator
+    {
+      config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; };
+      config.schema.host.validators = [
+        (genSchema.mkValidator "valid-role" (
+          { role, ... }:
+          lib.elem role [
+            "web"
+            "db"
+          ]
+        ) "bad role")
+      ];
+    }
+  ];
 in
 {
   flake.tests."validator-compose".test-validators-merged = {

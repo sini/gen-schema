@@ -7,24 +7,22 @@
 let
   inherit (genSchema) mkSchemaOption declarationOf;
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.user = {
-          parent = "host";
-          options.shell = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = declarationOf "host"; };
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.user = {
+        parent = "host";
+        options.shell = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.host = genMerge.mkOption { type = declarationOf "host"; };
+      };
+    }
+  ];
 
   edges = eval.config.schema._edges;
   parentEdges = builtins.filter (e: e.type == "parent") edges;

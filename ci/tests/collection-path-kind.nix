@@ -8,19 +8,17 @@
   ...
 }:
 let
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = genSchema.mkSchemaOption {
-          collections.includes = {
-            default = [ ];
-          };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = genSchema.mkSchemaOption {
+        collections.includes = {
+          default = [ ];
         };
-        # host defined via path — collection extraction is skipped
-        config.schema.host = ../test-fixtures/collection-path-kind-host.nix;
-      }
-    ];
-  };
+      };
+      # host defined via path — collection extraction is skipped
+      config.schema.host = ../test-fixtures/collection-path-kind-host.nix;
+    }
+  ];
 in
 {
   flake.tests."collection-path".test-path-kind-gets-default = {

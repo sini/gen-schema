@@ -18,14 +18,12 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        config.hosts.igloo.addr = "10.0.1.1";
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      config.hosts.igloo.addr = "10.0.1.1";
+    }
+  ];
 
   inherit (eval.config.hosts) igloo;
 in

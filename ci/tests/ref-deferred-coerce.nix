@@ -32,67 +32,63 @@ let
   # --- Self-referential registry with deferred coerce ---
   # A trait's `needs` field references other traits in the same registry.
   # Custom coerce adds a tag to prove it ran; deferred = true avoids infinite recursion.
-  evalSelfRef = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.traits = mkInstanceRegistry traitSchema.trait {
-          refs.needs = {
-            instances = evalSelfRef.config.traits;
-            coerce =
-              _registry: default: val:
-              if builtins.isList default then default else [ default ];
-            deferred = true;
-          };
+  evalSelfRef = genMerge.evalModuleTree { } [
+    {
+      options.traits = mkInstanceRegistry traitSchema.trait {
+        refs.needs = {
+          instances = evalSelfRef.config.traits;
+          coerce =
+            _registry: default: val:
+            if builtins.isList default then default else [ default ];
+          deferred = true;
         };
-        config.traits.base = {
-          priority = 0;
-        };
-        config.traits.network = {
-          priority = 10;
-          needs = [ "base" ];
-        };
-        config.traits.firewall = {
-          priority = 20;
-          needs = [ "network" ];
-        };
-      }
-    ];
-  };
+      };
+      config.traits.base = {
+        priority = 0;
+      };
+      config.traits.network = {
+        priority = 10;
+        needs = [ "base" ];
+      };
+      config.traits.firewall = {
+        priority = 20;
+        needs = [ "network" ];
+      };
+    }
+  ];
 
   # --- Self-referential with custom selector coerce ---
-  evalSelector = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.traits = mkInstanceRegistry traitSchema.trait {
-          refs.needs = {
-            instances = evalSelector.config.traits;
-            coerce =
-              registry: default: val:
-              if builtins.isAttrs val && val ? __selectByPriority then
-                let
-                  threshold = val.__selectByPriority;
-                in
-                builtins.filter (t: t.priority <= threshold) (builtins.attrValues registry)
-              else if builtins.isList default then
-                default
-              else
-                [ default ];
-            deferred = true;
-          };
+  evalSelector = genMerge.evalModuleTree { } [
+    {
+      options.traits = mkInstanceRegistry traitSchema.trait {
+        refs.needs = {
+          instances = evalSelector.config.traits;
+          coerce =
+            registry: default: val:
+            if builtins.isAttrs val && val ? __selectByPriority then
+              let
+                threshold = val.__selectByPriority;
+              in
+              builtins.filter (t: t.priority <= threshold) (builtins.attrValues registry)
+            else if builtins.isList default then
+              default
+            else
+              [ default ];
+          deferred = true;
         };
-        config.traits.base = {
-          priority = 0;
-        };
-        config.traits.network = {
-          priority = 10;
-        };
-        config.traits.firewall = {
-          priority = 20;
-          needs = [ { __selectByPriority = 10; } ];
-        };
-      }
-    ];
-  };
+      };
+      config.traits.base = {
+        priority = 0;
+      };
+      config.traits.network = {
+        priority = 10;
+      };
+      config.traits.firewall = {
+        priority = 20;
+        needs = [ { __selectByPriority = 10; } ];
+      };
+    }
+  ];
 
   depsSchema = evalSchema {
     modules = [
@@ -108,28 +104,26 @@ let
   };
 
   # --- Self-referential with setOf + deferred coerce (dedup) ---
-  evalSetOf = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.traits = mkInstanceRegistry depsSchema.trait {
-          refs.deps = {
-            instances = evalSetOf.config.traits;
-            coerce =
-              _registry: default: val:
-              if builtins.isList default then default else [ default ];
-            deferred = true;
-          };
+  evalSetOf = genMerge.evalModuleTree { } [
+    {
+      options.traits = mkInstanceRegistry depsSchema.trait {
+        refs.deps = {
+          instances = evalSetOf.config.traits;
+          coerce =
+            _registry: default: val:
+            if builtins.isList default then default else [ default ];
+          deferred = true;
         };
-        config.traits.a = { };
-        config.traits.b = {
-          deps = [
-            "a"
-            "a"
-          ];
-        };
-      }
-    ];
-  };
+      };
+      config.traits.a = { };
+      config.traits.b = {
+        deps = [
+          "a"
+          "a"
+        ];
+      };
+    }
+  ];
 
   serviceSchema = evalSchema {
     modules = [
@@ -144,28 +138,26 @@ let
   };
 
   # --- Non-deferred coerce still works (regression guard) ---
-  evalNonDeferred = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry serviceSchema.host { };
-        options.services = mkInstanceRegistry serviceSchema.service {
-          refs.host = {
-            instances = evalNonDeferred.config.hosts;
-            coerce =
-              default: val:
-              if builtins.isString val && val == "fallback" then evalNonDeferred.config.hosts.igloo else default;
-          };
+  evalNonDeferred = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry serviceSchema.host { };
+      options.services = mkInstanceRegistry serviceSchema.service {
+        refs.host = {
+          instances = evalNonDeferred.config.hosts;
+          coerce =
+            default: val:
+            if builtins.isString val && val == "fallback" then evalNonDeferred.config.hosts.igloo else default;
         };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-        };
-        config.services.web = {
-          port = 80;
-          host = "fallback";
-        };
-      }
-    ];
-  };
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+      };
+      config.services.web = {
+        port = 80;
+        host = "fallback";
+      };
+    }
+  ];
 
   mixedSchema = evalSchema {
     modules = [
@@ -184,35 +176,33 @@ let
   };
 
   # --- Mixed deferred + non-deferred refs on same kind ---
-  evalMixed = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry mixedSchema.host { };
-        options.services = mkInstanceRegistry mixedSchema.service {
-          refs.host = evalMixed.config.hosts;
-          refs.depends = {
-            instances = evalMixed.config.services;
-            coerce =
-              _registry: default: val:
-              if builtins.isList default then default else [ default ];
-            deferred = true;
-          };
+  evalMixed = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry mixedSchema.host { };
+      options.services = mkInstanceRegistry mixedSchema.service {
+        refs.host = evalMixed.config.hosts;
+        refs.depends = {
+          instances = evalMixed.config.services;
+          coerce =
+            _registry: default: val:
+            if builtins.isList default then default else [ default ];
+          deferred = true;
         };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-        };
-        config.services.db = {
-          port = 5432;
-          host = "igloo";
-        };
-        config.services.api = {
-          port = 8080;
-          host = "igloo";
-          depends = [ "db" ];
-        };
-      }
-    ];
-  };
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+      };
+      config.services.db = {
+        port = 5432;
+        host = "igloo";
+      };
+      config.services.api = {
+        port = 8080;
+        host = "igloo";
+        depends = [ "db" ];
+      };
+    }
+  ];
 in
 {
   flake.tests.ref-deferred-coerce = {

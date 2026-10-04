@@ -56,18 +56,16 @@ let
   };
   treeOf =
     i:
-    (merge.evalModuleTree {
-      modules = [
-        { options.schema = S.mkSchemaOption { }; }
-        {
-          config.schema.base.options.b = intOpt;
-          config.schema.sub = {
-            inherits = [ "base" ];
-            options."s${toString i}" = intOpt;
-          };
-        }
-      ];
-    }).config.schema;
+    (merge.evalModuleTree { } [
+      { options.schema = S.mkSchemaOption { }; }
+      {
+        config.schema.base.options.b = intOpt;
+        config.schema.sub = {
+          inherits = [ "base" ];
+          options."s${toString i}" = intOpt;
+        };
+      }
+    ]).config.schema;
   # `n` instances of one kind with a parent: each instance applies the kind's `__functor`, whose
   # module key reads the kind's mark.
   instances =
@@ -75,19 +73,17 @@ let
     let
       t = treeOf 0;
       reg =
-        (merge.evalModuleTree {
-          modules = [
-            { options.hosts = S.mkInstanceRegistry t.sub { }; }
-            {
-              config.hosts = builtins.listToAttrs (
-                builtins.genList (i: {
-                  name = "h${toString i}";
-                  value = { };
-                }) n
-              );
-            }
-          ];
-        }).config.hosts;
+        (merge.evalModuleTree { } [
+          { options.hosts = S.mkInstanceRegistry t.sub { }; }
+          {
+            config.hosts = builtins.listToAttrs (
+              builtins.genList (i: {
+                name = "h${toString i}";
+                value = { };
+              }) n
+            );
+          }
+        ]).config.hosts;
     in
     builtins.deepSeq (builtins.seq t.sub.__mint.minted (builtins.mapAttrs (_: h: h.b + h.s0) reg)) n;
   # A refined type's predicate applications (den-hoag-refined-outside-kind-silent-1jlsq): the spy
@@ -99,27 +95,23 @@ let
   };
   inKindRead =
     ty:
-    (merge.evalModuleTree {
-      modules = [
-        { options.schema = S.mkSchemaOption { }; }
-        (
-          { config, ... }:
-          {
-            config.schema.widget.options.n = merge.mkOption { type = ty; };
-            options.widgets = S.mkInstanceRegistry config.schema.widget { };
-          }
-        )
-        { config.widgets.w1.n = 5; }
-      ];
-    }).config.widgets.w1.n;
+    (merge.evalModuleTree { } [
+      { options.schema = S.mkSchemaOption { }; }
+      (
+        { config, ... }:
+        {
+          config.schema.widget.options.n = merge.mkOption { type = ty; };
+          options.widgets = S.mkInstanceRegistry config.schema.widget { };
+        }
+      )
+      { config.widgets.w1.n = 5; }
+    ]).config.widgets.w1.n;
   outsideRead =
     ty: v:
-    (merge.evalModuleTree {
-      modules = [
-        { options.o = merge.mkOption { type = ty; }; }
-        { config.o = v; }
-      ];
-    }).config.o;
+    (merge.evalModuleTree { } [
+      { options.o = merge.mkOption { type = ty; }; }
+      { config.o = v; }
+    ]).config.o;
 in
 {
   # ONE kind, one instance and eight: the kind marks minted must not move with the instance count.

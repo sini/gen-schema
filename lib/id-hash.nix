@@ -143,10 +143,7 @@ let
         [ "name" ]
         ++ prelude.attrNames (
           prelude.filterAttrs isPrimitiveOption
-            (merge.evalModuleTree {
-              modules = [ kindValue ];
-              inherit specialArgs;
-            }).options
+            (merge.evalModuleTree { specialArgs = specialArgs; } [ kindValue ]).options
         )
       )
     );

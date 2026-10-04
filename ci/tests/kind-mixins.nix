@@ -45,42 +45,36 @@ let
   emitted = emitModule [ ] withMixin;
 
   # Use the emitted module in a schema
-  schemaEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.service = emitted.module;
-      }
-    ];
-  };
+  schemaEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.service = emitted.module;
+    }
+  ];
 
   schema = schemaEval.config.schema;
 
   # Create instances
   registry = mkInstanceRegistry schema.service { };
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.services = registry;
-        config.services.web = {
-          port = 8080;
-          hostname = "localhost";
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.services = registry;
+      config.services.web = {
+        port = 8080;
+        hostname = "localhost";
+      };
+    }
+  ];
 
   # Test that mkSchemaEntryType stores mixins
-  entryWithMixins = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { mixins = [ monitorable ]; };
-        config.schema.svc = {
-          port = genMerge.mkOption { type = genMerge.types.int; };
-        };
-      }
-    ];
-  };
+  entryWithMixins = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { mixins = [ monitorable ]; };
+      config.schema.svc = {
+        port = genMerge.mkOption { type = genMerge.types.int; };
+      };
+    }
+  ];
 in
 {
   flake.tests.kind-mixins.test-mixin-adds-option = {
@@ -111,16 +105,14 @@ in
   flake.tests.kind-mixins.test-entry-type-empty-mixins-default = {
     expr =
       let
-        e = genMerge.evalModuleTree {
-          modules = [
-            {
-              options.schema = mkSchemaOption { };
-              config.schema.basic = {
-                name = genMerge.mkOption { type = genMerge.types.str; };
-              };
-            }
-          ];
-        };
+        e = genMerge.evalModuleTree { } [
+          {
+            options.schema = mkSchemaOption { };
+            config.schema.basic = {
+              name = genMerge.mkOption { type = genMerge.types.str; };
+            };
+          }
+        ];
       in
       e.config.schema.basic.mixins;
     expected = [ ];

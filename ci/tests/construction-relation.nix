@@ -26,7 +26,7 @@ let
       r = builtins.tryEval (builtins.deepSeq v true);
     in
     if r.success then "MERGED" else "REFUSED";
-  cfg = mods: (genMerge.evalModuleTree { modules = mods; }).config;
+  cfg = mods: (genMerge.evalModuleTree { } mods).config;
   fn = _: _: { };
   fn2 = _: _: { };
 
@@ -54,12 +54,10 @@ let
   xt =
     a: b:
     verdict
-      (genMerge.evalModuleTree {
-        modules = [
-          { options.x = genMerge.mkOption { type = a; }; }
-          { options.x = genMerge.mkOption { type = b; }; }
-        ];
-      }).options.x.type.name;
+      (genMerge.evalModuleTree { } [
+        { options.x = genMerge.mkOption { type = a; }; }
+        { options.x = genMerge.mkOption { type = b; }; }
+      ]).options.x.type.name;
   inst =
     mods: val:
     verdict

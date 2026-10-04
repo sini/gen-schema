@@ -15,14 +15,12 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = genSchema.mkInstanceRegistry schema.host { };
-        config.hosts.igloo.addr = "10.0.1.1";
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = genSchema.mkInstanceRegistry schema.host { };
+      config.hosts.igloo.addr = "10.0.1.1";
+    }
+  ];
 in
 {
   flake.tests."derive-none" = {

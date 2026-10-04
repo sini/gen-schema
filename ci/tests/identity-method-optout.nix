@@ -46,14 +46,12 @@ let
 
   mkArm =
     { withMethod, secretValue }:
-    (genMerge.evalModuleTree {
-      modules = [
-        {
-          options.hosts = mkInstanceRegistry (if withMethod then methodKind else plainKind) { };
-          config.hosts.igloo.secret = secretValue;
-        }
-      ];
-    }).config.hosts.igloo;
+    (genMerge.evalModuleTree { } [
+      {
+        options.hosts = mkInstanceRegistry (if withMethod then methodKind else plainKind) { };
+        config.hosts.igloo.secret = secretValue;
+      }
+    ]).config.hosts.igloo;
 
   plainA = mkArm {
     withMethod = false;

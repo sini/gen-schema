@@ -15,9 +15,7 @@ let
   read =
     decls: field:
     let
-      v =
-        (genMerge.evalModuleTree { modules = decls ++ [ { config.schema.k = { }; } ]; })
-        .config.schema.${field};
+      v = (genMerge.evalModuleTree { } (decls ++ [ { config.schema.k = { }; } ])).config.schema.${field};
       r = builtins.tryEval (builtins.deepSeq v v);
     in
     if r.success then r.value else "REFUSED";

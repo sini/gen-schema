@@ -24,23 +24,21 @@ let
     let
       result = builtins.tryEval (
         let
-          eval = genMerge.evalModuleTree {
-            modules = [
-              {
-                options.hosts = mkInstanceRegistry schema.host { };
-                options.services = mkInstanceRegistry schema.service {
-                  refs.host = eval.config.hosts;
-                  refs.network = eval.config.hosts; # no ref field named "network"
-                };
-                config.hosts.igloo = {
-                  addr = "10.0.1.1";
-                };
-                config.services.nginx = {
-                  host = "igloo";
-                };
-              }
-            ];
-          };
+          eval = genMerge.evalModuleTree { } [
+            {
+              options.hosts = mkInstanceRegistry schema.host { };
+              options.services = mkInstanceRegistry schema.service {
+                refs.host = eval.config.hosts;
+                refs.network = eval.config.hosts; # no ref field named "network"
+              };
+              config.hosts.igloo = {
+                addr = "10.0.1.1";
+              };
+              config.services.nginx = {
+                host = "igloo";
+              };
+            }
+          ];
         in
         builtins.attrNames eval.config.services
       );

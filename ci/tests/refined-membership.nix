@@ -48,12 +48,10 @@ let
 
   outside =
     ty: v:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.o = genMerge.mkOption { type = ty; }; }
-        { config.o = v; }
-      ];
-    }).config.o;
+    (genMerge.evalModuleTree { } [
+      { options.o = genMerge.mkOption { type = ty; }; }
+      { config.o = v; }
+    ]).config.o;
 
   labelOpt = genMerge.mkOption {
     type = t.str;
@@ -73,43 +71,41 @@ let
   # kind through `mkSchemaOption { mixins; baseModule; }` (the bridge path) instead of inline.
   inKindWith =
     mixin: ty: regRefs: v:
-    (genMerge.evalModuleTree {
-      modules = [
-        {
-          options.schema =
-            if mixin then
-              mkSchemaOption {
-                mixins = [ tagMixin ];
-                baseModule = {
-                  n = genMerge.mkOption { type = ty; };
-                  label = labelOpt;
-                };
-              }
-            else
-              mkSchemaOption { };
-        }
-        (
+    (genMerge.evalModuleTree { } [
+      {
+        options.schema =
           if mixin then
-            { config.schema.widget = { }; }
-          else
-            {
-              config.schema.widget = {
-                options.n = genMerge.mkOption { type = ty; };
-                options.label = labelOpt;
+            mkSchemaOption {
+              mixins = [ tagMixin ];
+              baseModule = {
+                n = genMerge.mkOption { type = ty; };
+                label = labelOpt;
               };
             }
-        )
-        (
-          { config, ... }:
+          else
+            mkSchemaOption { };
+      }
+      (
+        if mixin then
+          { config.schema.widget = { }; }
+        else
           {
-            options.widgets = mkInstanceRegistry config.schema.widget (
-              if regRefs == null then { } else { refinements = regRefs; }
-            );
+            config.schema.widget = {
+              options.n = genMerge.mkOption { type = ty; };
+              options.label = labelOpt;
+            };
           }
-        )
-        { config.widgets.w1.n = v; }
-      ];
-    }).config.widgets.w1;
+      )
+      (
+        { config, ... }:
+        {
+          options.widgets = mkInstanceRegistry config.schema.widget (
+            if regRefs == null then { } else { refinements = regRefs; }
+          );
+        }
+      )
+      { config.widgets.w1.n = v; }
+    ]).config.widgets.w1;
   inKind = inKindWith false;
 
   # A non-flat base: `b` is a throw that neither the program (it reads `.label`) nor a strict
@@ -309,13 +305,11 @@ in
     # the value it forbids.
     test-a-refinement-declared-twice-refuses-by-name = {
       expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            { options.probe = genMerge.mkOption { type = refined t.int [ refinements.tcpPort ]; }; }
-            { options.probe = genMerge.mkOption { type = refined t.int [ refinements.tcpPort ]; }; }
-            { config.probe = 70000; }
-          ];
-        }).config.probe;
+        (genMerge.evalModuleTree { } [
+          { options.probe = genMerge.mkOption { type = refined t.int [ refinements.tcpPort ]; }; }
+          { options.probe = genMerge.mkOption { type = refined t.int [ refinements.tcpPort ]; }; }
+          { config.probe = 70000; }
+        ]).config.probe;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-merge: a definition for option `probe' is not of the expected type: must be a valid TCP port";

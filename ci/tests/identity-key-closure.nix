@@ -15,12 +15,10 @@
 let
   # Eval 1 — the kind, sealed. `role` is contributed to the KIND, which is the inlet that legitimately
   # moves an identity and is not what this file is about.
-  kindTree = genMerge.evalModuleTree {
-    modules = [
-      { options.schema = genSchema.mkSchemaOption { }; }
-      { config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; }; }
-    ];
-  };
+  kindTree = genMerge.evalModuleTree { } [
+    { options.schema = genSchema.mkSchemaOption { }; }
+    { config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; }; }
+  ];
   hostKind = kindTree.config.schema.host;
 
   # Eval 2 — the instance, through the registry type. `extraModules` is `mkInstanceType`'s own
@@ -28,22 +26,20 @@ let
   # module through it), so this is the shape a caller reaches, not a synthetic one.
   instanceWith =
     extraModules: role:
-    (genMerge.evalModuleTree {
-      modules = [
-        {
-          options.hosts = genMerge.mkOption {
-            type = genMerge.types.attrsOf (
-              genSchema.mkInstanceType hostKind {
-                inherit extraModules;
-                strict = false;
-              }
-            );
-            default = { };
-          };
-        }
-        { config.hosts.igloo.role = role; }
-      ];
-    }).config.hosts.igloo;
+    (genMerge.evalModuleTree { } [
+      {
+        options.hosts = genMerge.mkOption {
+          type = genMerge.types.attrsOf (
+            genSchema.mkInstanceType hostKind {
+              inherit extraModules;
+              strict = false;
+            }
+          );
+          default = { };
+        };
+      }
+      { config.hosts.igloo.role = role; }
+    ]).config.hosts.igloo;
 
   tagModule = {
     options.tag = genMerge.mkOption {
@@ -69,67 +65,61 @@ let
   # the real door is strictly more faithful than simulating its output, and it pins the same
   # figures: measured byte-for-byte against the literal it replaces (same identity keys, same empty
   # `options`, same stamped `id_hash`), with the literal's refusal as the live control.
-  aspectShapedTree = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = genSchema.mkSchemaOption {
-          mkType =
-            {
-              defs,
-              kind,
-              ...
-            }:
-            {
-              __functor = _: _: {
-                imports = map (d: d.value) defs;
-              };
-              inherit kind;
+  aspectShapedTree = genMerge.evalModuleTree { } [
+    {
+      options.schema = genSchema.mkSchemaOption {
+        mkType =
+          {
+            defs,
+            kind,
+            ...
+          }:
+          {
+            __functor = _: _: {
+              imports = map (d: d.value) defs;
             };
-        };
-      }
-      {
-        config.schema.thimble.options.spool = genMerge.mkOption {
-          type = genMerge.types.str;
-          default = "";
-        };
-      }
-    ];
-  };
+            inherit kind;
+          };
+      };
+    }
+    {
+      config.schema.thimble.options.spool = genMerge.mkOption {
+        type = genMerge.types.str;
+        default = "";
+      };
+    }
+  ];
   aspectShapedKind = aspectShapedTree.config.schema.thimble;
 
   # The control arm: the SAME option set declared the way gen-schema declares one, where `options` is
   # populated. It agreed with the stamp before this change and must still — a cell that only watched
   # the aspect shape could not tell a repair from a uniform break.
-  schemaShapedTree = genMerge.evalModuleTree {
-    modules = [
-      { options.schema = genSchema.mkSchemaOption { }; }
-      {
-        config.schema.thimble.options.spool = genMerge.mkOption {
-          type = genMerge.types.str;
-          default = "";
-        };
-      }
-    ];
-  };
+  schemaShapedTree = genMerge.evalModuleTree { } [
+    { options.schema = genSchema.mkSchemaOption { }; }
+    {
+      config.schema.thimble.options.spool = genMerge.mkOption {
+        type = genMerge.types.str;
+        default = "";
+      };
+    }
+  ];
   schemaShapedKind = schemaShapedTree.config.schema.thimble;
 
   mintOne =
     kindValue:
-    (genMerge.evalModuleTree {
-      modules = [
-        {
-          options.things = genMerge.mkOption {
-            type = genMerge.types.attrsOf (
-              genSchema.mkInstanceType kindValue {
-                strict = false;
-              }
-            );
-            default = { };
-          };
-        }
-        { config.things.pewter.spool = "silk"; }
-      ];
-    }).config.things.pewter;
+    (genMerge.evalModuleTree { } [
+      {
+        options.things = genMerge.mkOption {
+          type = genMerge.types.attrsOf (
+            genSchema.mkInstanceType kindValue {
+              strict = false;
+            }
+          );
+          default = { };
+        };
+      }
+      { config.things.pewter.spool = "silk"; }
+    ]).config.things.pewter;
 
   aspectInstance = mintOne aspectShapedKind;
   schemaInstance = mintOne schemaShapedKind;
@@ -188,25 +178,23 @@ in
   flake.tests.identity-key-closure.test-explicit-key-naming-an-extramodules-option-is-refused = {
     expr =
       (builtins.tryEval
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.hosts = genMerge.mkOption {
-                type = genMerge.types.attrsOf (
-                  genSchema.mkInstanceType hostKind {
-                    extraModules = [ tagModule ];
-                    strict = false;
-                  }
-                );
-                default = { };
-              };
-            }
-            {
-              config.hosts.igloo.role = "web";
-              config.hosts.igloo._identity.keys = [ "tag" ];
-            }
-          ];
-        }).config.hosts.igloo.id_hash
+        (genMerge.evalModuleTree { } [
+          {
+            options.hosts = genMerge.mkOption {
+              type = genMerge.types.attrsOf (
+                genSchema.mkInstanceType hostKind {
+                  extraModules = [ tagModule ];
+                  strict = false;
+                }
+              );
+              default = { };
+            };
+          }
+          {
+            config.hosts.igloo.role = "web";
+            config.hosts.igloo._identity.keys = [ "tag" ];
+          }
+        ]).config.hosts.igloo.id_hash
       ).success;
     expected = false;
   };

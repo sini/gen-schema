@@ -7,25 +7,23 @@
 let
   inherit (genSchema) mkSchemaOption;
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          collections.includes = {
-            default = [ ];
-          };
-          collections.excludes = {
-            default = [ ];
-          };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        collections.includes = {
+          default = [ ];
         };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          includes = [ "networking" ];
-          excludes = [ "desktop" ];
+        collections.excludes = {
+          default = [ ];
         };
-      }
-    ];
-  };
+      };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+        includes = [ "networking" ];
+        excludes = [ "desktop" ];
+      };
+    }
+  ];
 
   hostKind = eval.config.schema.host;
 in

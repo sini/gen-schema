@@ -6,16 +6,14 @@
 }:
 let
   inherit (genSchema) mkStrictModule;
-  eval = genMerge.evalModuleTree {
-    modules = [
-      (mkStrictModule "host")
-      { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
-      {
-        config.name = "igloo";
-        config.badKey = "oops";
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    (mkStrictModule "host")
+    { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
+    {
+      config.name = "igloo";
+      config.badKey = "oops";
+    }
+  ];
   threw = builtins.tryEval (builtins.deepSeq eval.config eval.config);
 in
 {
@@ -25,13 +23,11 @@ in
   };
   flake.tests.strict-module.test-declared-key-works = {
     expr =
-      (genMerge.evalModuleTree {
-        modules = [
-          (mkStrictModule "host")
-          { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
-          { config.name = "igloo"; }
-        ];
-      }).config.name;
+      (genMerge.evalModuleTree { } [
+        (mkStrictModule "host")
+        { options.name = genMerge.mkOption { type = genMerge.types.str; }; }
+        { config.name = "igloo"; }
+      ]).config.name;
     expected = "igloo";
   };
 }

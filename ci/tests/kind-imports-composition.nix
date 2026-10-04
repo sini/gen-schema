@@ -38,23 +38,21 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        # Instantiate both — should not conflict
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.users = mkInstanceRegistry schema.user { };
+  eval = genMerge.evalModuleTree { } [
+    {
+      # Instantiate both — should not conflict
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.users = mkInstanceRegistry schema.user { };
 
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-          description = "main server";
-        };
-        config.users.tux = {
-          shell = "/bin/zsh";
-        };
-      }
-    ];
-  };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+        description = "main server";
+      };
+      config.users.tux = {
+        shell = "/bin/zsh";
+      };
+    }
+  ];
 in
 {
   flake.tests."kind-imports".test-host-gets-base-option = {

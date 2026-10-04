@@ -20,9 +20,9 @@ let
     let
       kindValue = mkKind kind (builtins.head modules);
     in
-    genMerge.evalModuleTree {
-      modules = [ (mkIdentityModule kindValue (identityKeysForKind { } kindValue)) ] ++ modules;
-    }
+    genMerge.evalModuleTree { } (
+      [ (mkIdentityModule kindValue (identityKeysForKind { } kindValue)) ] ++ modules
+    )
     // {
       inherit kindValue;
     };

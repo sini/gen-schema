@@ -46,20 +46,18 @@ let
       };
     in
     show
-      (genMerge.evalModuleTree {
-        modules = [
-          (
-            { config, ... }:
-            {
-              options.hosts = mkInstanceRegistry schema.host { };
-              options.svcs = mkInstanceRegistry schema.svc { refs.f = bind config.hosts; };
-              config.hosts.a = { };
-              config.hosts.b = { };
-              config.svcs.s.f = value;
-            }
-          )
-        ];
-      }).config.svcs.s.f;
+      (genMerge.evalModuleTree { } [
+        (
+          { config, ... }:
+          {
+            options.hosts = mkInstanceRegistry schema.host { };
+            options.svcs = mkInstanceRegistry schema.svc { refs.f = bind config.hosts; };
+            config.hosts.a = { };
+            config.hosts.b = { };
+            config.svcs.s.f = value;
+          }
+        )
+      ]).config.svcs.s.f;
   xy = {
     x = "a";
     y = "b";

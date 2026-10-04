@@ -28,45 +28,43 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.services = mkInstanceRegistry schema.service {
-          refs.hosts = eval.config.hosts;
-          refs.primary = eval.config.hosts;
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.services = mkInstanceRegistry schema.service {
+        refs.hosts = eval.config.hosts;
+        refs.primary = eval.config.hosts;
+      };
+      config.hosts = {
+        igloo = {
+          addr = "10.0.1.1";
         };
-        config.hosts = {
-          igloo = {
-            addr = "10.0.1.1";
-          };
-          iceberg = {
-            addr = "10.0.1.2";
-          };
+        iceberg = {
+          addr = "10.0.1.2";
         };
-        config.services.nginx = {
-          port = 80;
-          hosts = [
-            "igloo"
-            "iceberg"
-          ];
-          primary = "igloo";
-        };
-        config.services.solo = {
-          port = 443;
-          # defaults: hosts = [], primary = null
-        };
-        config.services.mixed = {
-          port = 8080;
-          hosts = [
-            "igloo"
-            eval.config.hosts.iceberg
-          ];
-          primary = eval.config.hosts.igloo;
-        };
-      }
-    ];
-  };
+      };
+      config.services.nginx = {
+        port = 80;
+        hosts = [
+          "igloo"
+          "iceberg"
+        ];
+        primary = "igloo";
+      };
+      config.services.solo = {
+        port = 443;
+        # defaults: hosts = [], primary = null
+      };
+      config.services.mixed = {
+        port = 8080;
+        hosts = [
+          "igloo"
+          eval.config.hosts.iceberg
+        ];
+        primary = eval.config.hosts.igloo;
+      };
+    }
+  ];
 
   inherit (eval.config.services) nginx solo mixed;
 in

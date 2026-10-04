@@ -18,12 +18,10 @@ let
   T = genMerge.types;
   kindIn =
     args: decl:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = mkSchemaOption args; }
-        { config.schema.host = decl; }
-      ];
-    }).config.schema.host;
+    (genMerge.evalModuleTree { } [
+      { options.schema = mkSchemaOption args; }
+      { config.schema.host = decl; }
+    ]).config.schema.host;
   kindOf = kindIn { };
   opt = type: genMerge.mkOption { inherit type; };
   decides = e: (builtins.tryEval e).success;
@@ -275,12 +273,10 @@ let
   # C4: one kind value carried through a consumer option of type `t`.
   via =
     t: k:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.k = genMerge.mkOption { type = t; }; }
-        { config.k = k; }
-      ];
-    }).config.k;
+    (genMerge.evalModuleTree { } [
+      { options.k = genMerge.mkOption { type = t; }; }
+      { config.k = k; }
+    ]).config.k;
   tr =
     e:
     let
@@ -289,12 +285,10 @@ let
     if r.success then r.value else "REFUSED";
   instanceP =
     kind:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.hosts = genSchema.mkInstanceRegistry kind { }; }
-        { config.hosts.a = { }; }
-      ];
-    }).config.hosts.a;
+    (genMerge.evalModuleTree { } [
+      { options.hosts = genSchema.mkInstanceRegistry kind { }; }
+      { config.hosts.a = { }; }
+    ]).config.hosts.a;
 
   # F3 · the `mkType` arm (gen-aspects' door), where the published `options` is `{ }`.
   aspectShaped =

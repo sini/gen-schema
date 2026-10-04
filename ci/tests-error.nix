@@ -51,9 +51,7 @@ let
   # A plain tree: the schema option declared in the caller's own module pass (den v1's shape).
   plainTreeWith =
     schemaOption: modules:
-    (genMerge.evalModuleTree {
-      modules = [ { options.schema = schemaOption; } ] ++ modules;
-    }).config.schema;
+    (genMerge.evalModuleTree { } ([ { options.schema = schemaOption; } ] ++ modules)).config.schema;
   plainTree = plainTreeWith (mkSchemaOption { });
   # A kind graph, name -> parents, each kind declaring its own option `o_<name>`: the parents
   # declared, or written in the deprecated spelling.
@@ -94,12 +92,10 @@ let
 
   # A kind value the way a caller actually gets one, for the kind-mark cells below.
   markedHostKind =
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = mkSchemaOption { }; }
-        { config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; }; }
-      ];
-    }).config.schema.host;
+    (genMerge.evalModuleTree { } [
+      { options.schema = mkSchemaOption { }; }
+      { config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; }; }
+    ]).config.schema.host;
 
   # A kind declaring one primitive identity key and one option that is DECLARED but not an identity
   # key. `tags` is the input P3 was measured on: it is declared, so "is not declared" was a lie.
@@ -130,9 +126,9 @@ let
     let
       kindValue = kindOfModules (builtins.head modules);
     in
-    genMerge.evalModuleTree {
-      modules = [ (mkIdentityModule kindValue (identityKeysForKind { } kindValue)) ] ++ modules ++ extra;
-    };
+    genMerge.evalModuleTree { } (
+      [ (mkIdentityModule kindValue (identityKeysForKind { } kindValue)) ] ++ modules ++ extra
+    );
 
   keysNaming = k: (identityEval hostModules [ { config._identity.keys = [ k ]; } ]).config.id_hash;
 
@@ -140,21 +136,17 @@ let
   # which never reaches the stamp — the shape on which a door refusing only at the stamp would
   # admit the name silently.
   byName =
-    (genMerge.evalModuleTree {
-      modules = [ (mkIdentityModule "host" [ "name" ]) ] ++ hostModules;
-    }).config;
+    (genMerge.evalModuleTree { } ([ (mkIdentityModule "host" [ "name" ]) ] ++ hostModules)).config;
 
   # A kind reached through `mkSchemaOption`'s own construction, for the declaration-key cells below.
   # Going through the published option is what makes those cells measure the guard's PLACEMENT
   # inside `mkSchemaEntryType`'s merge rather than a predicate a test wrapped from outside.
   kindOf =
     args: decl:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = mkSchemaOption args; }
-        { config.schema.host = decl; }
-      ];
-    }).config.schema.host;
+    (genMerge.evalModuleTree { } [
+      { options.schema = mkSchemaOption args; }
+      { config.schema.host = decl; }
+    ]).config.schema.host;
 
   strOpt = genMerge.mkOption {
     type = genMerge.types.str;
@@ -166,16 +158,14 @@ let
   # and only a minted instance shows that.
   instanceOf =
     args: decl:
-    (genMerge.evalModuleTree {
-      modules = [
-        {
-          options.hosts = mkInstanceRegistry (kindOf args decl) { };
-          config.hosts.h1 = {
-            name = "h1";
-          };
-        }
-      ];
-    }).config.hosts.h1;
+    (genMerge.evalModuleTree { } [
+      {
+        options.hosts = mkInstanceRegistry (kindOf args decl) { };
+        config.hosts.h1 = {
+          name = "h1";
+        };
+      }
+    ]).config.hosts.h1;
 
   # A control forced WHOLE inside its own `tryEval`. `tryEval` alone stops at WHNF, so a list whose
   # ELEMENT throws escapes the wrapper and the throw then lands outside the `assert` — where the
@@ -189,12 +179,10 @@ let
   };
   portOf =
     decl: port:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.hosts = mkInstanceRegistry (kindOf { } decl) { }; }
-        { config.hosts.a.myPort = port; }
-      ];
-    }).config.hosts.a.myPort;
+    (genMerge.evalModuleTree { } [
+      { options.hosts = mkInstanceRegistry (kindOf { } decl) { }; }
+      { config.hosts.a.myPort = port; }
+    ]).config.hosts.a.myPort;
 in
 {
   # evalSchema's two refusals, one of them reached through the deprecated spelling. They are here rather
@@ -265,17 +253,15 @@ in
     # parent is refused by name rather than dropped.
     test-treeless-entry-refuses-by-name = {
       expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.kinds = genMerge.mkOption {
-                type = genMerge.types.lazyAttrsOf (mkSchemaEntryType { });
-              };
-              config.kinds.base = { };
-              config.kinds.derived.inherits = [ "base" ];
-            }
-          ];
-        }).config.kinds.derived.options;
+        (genMerge.evalModuleTree { } [
+          {
+            options.kinds = genMerge.mkOption {
+              type = genMerge.types.lazyAttrsOf (mkSchemaEntryType { });
+            };
+            config.kinds.base = { };
+            config.kinds.derived.inherits = [ "base" ];
+          }
+        ]).config.kinds.derived.options;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kind 'derived' inherits 'base', but nothing resolved it: this entry type was built outside a kind tree, so there is no parent to read. Declare the kind through `mkSchemaOption` or `evalSchema`$";
@@ -286,14 +272,12 @@ in
     # `parent`, so an undeclared one is refused by the topology instead of reading as no parent.
     test-mktype-undeclared-parent-refuses-by-name = {
       expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.schema = mkSchemaOption { mkType = bareMkType; };
-              config.schema.user.parent = "nosuch";
-            }
-          ];
-        }).config.schema._topology.user;
+        (genMerge.evalModuleTree { } [
+          {
+            options.schema = mkSchemaOption { mkType = bareMkType; };
+            config.schema.user.parent = "nosuch";
+          }
+        ]).config.schema._topology.user;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kind 'user' declares parent 'nosuch' which is not a declared kind$";
@@ -442,7 +426,7 @@ in
             })).a;
         in
         {
-          expr = builtins.attrNames (genMerge.evalModuleTree { modules = [ (k.__functor k) ]; }).options;
+          expr = builtins.attrNames (genMerge.evalModuleTree { } [ (k.__functor k) ]).options;
           expectedError = refuses "a b" "a -> b -> a" "a";
         };
     };
@@ -634,20 +618,16 @@ in
       };
       viaAnything =
         v:
-        (genMerge.evalModuleTree {
-          modules = [
-            { options.v = genMerge.mkOption { type = T.anything; }; }
-            { config.v = v; }
-          ];
-        }).config.v;
+        (genMerge.evalModuleTree { } [
+          { options.v = genMerge.mkOption { type = T.anything; }; }
+          { config.v = v; }
+        ]).config.v;
       kindWith =
         computed:
-        (genMerge.evalModuleTree {
-          modules = [
-            { options.schema = mkSchemaOption { inherit computed; }; }
-            { config.schema.host.options.port = intOpt; }
-          ];
-        }).config.schema.host;
+        (genMerge.evalModuleTree { } [
+          { options.schema = mkSchemaOption { inherit computed; }; }
+          { config.schema.host.options.port = intOpt; }
+        ]).config.schema.host;
       boomy = kindWith (_: _: { boom = throw "boom"; });
       kMeta = kindWith (
         _: _: {
@@ -692,12 +672,10 @@ in
       opts = k: builtins.attrNames k.options;
       instanceOf =
         kind:
-        (genMerge.evalModuleTree {
-          modules = [
-            { options.h = genMerge.mkOption { type = mkInstanceType kind { }; }; }
-            { config.h.name = "a"; }
-          ];
-        }).config.h;
+        (genMerge.evalModuleTree { } [
+          { options.h = genMerge.mkOption { type = mkInstanceType kind { }; }; }
+          { config.h.name = "a"; }
+        ]).config.h;
       notBuilt = site: kind: {
         type = "ThrownError";
         msg = "^${site}: the kind value '${kind}' is not the value its schema built: a `//` over a kind value keeps its mark while changing what the mark stands for; declare the change in the kind entry, or pass the kind value the schema published$";
@@ -864,15 +842,15 @@ in
     # `mkInstanceType` use.
     test-unmarked-attrset-refused = {
       expr =
-        (genMerge.evalModuleTree {
-          modules = [
+        (genMerge.evalModuleTree { } (
+          [
             (mkIdentityModule {
               kind = "host";
               options = { };
             } [ "name" ])
           ]
-          ++ hostModules;
-        }).config.id_hash;
+          ++ hostModules
+        )).config.id_hash;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: mkIdentityModule: expected a kind value carrying a mint-backed mark \\(`__mint\\.minted`\\); got an attrset with no mark$";
@@ -969,18 +947,16 @@ in
     # refusals in the same derivation.
     test-mint-is-a-reserved-collection-key = {
       expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.schema = mkSchemaOption {
-                collections.__mint = {
-                  default = [ ];
-                };
+        (genMerge.evalModuleTree { } [
+          {
+            options.schema = mkSchemaOption {
+              collections.__mint = {
+                default = [ ];
               };
-            }
-            { config.schema.host = { }; }
-          ];
-        }).config.schema.host.kind;
+            };
+          }
+          { config.schema.host = { }; }
+        ]).config.schema.host.kind;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: collection '__mint' is reserved — cannot be used as a collection key$";
@@ -991,18 +967,16 @@ in
     # over collections, so a guard on collections alone leaves this half open.
     test-mint-is-a-reserved-computed-field = {
       expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.schema = mkSchemaOption {
-                computed = _: _: {
-                  __mint = "forged";
-                };
+        (genMerge.evalModuleTree { } [
+          {
+            options.schema = mkSchemaOption {
+              computed = _: _: {
+                __mint = "forged";
               };
-            }
-            { config.schema.host = { }; }
-          ];
-        }).config.schema.host.__mint;
+            };
+          }
+          { config.schema.host = { }; }
+        ]).config.schema.host.__mint;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType$";
@@ -1020,29 +994,25 @@ in
       let
         kindOf =
           decl:
-          (genMerge.evalModuleTree {
-            modules = [
-              { options.schema = mkSchemaOption { }; }
-              { config.schema.host = decl; }
-            ];
-          }).config.schema.host;
+          (genMerge.evalModuleTree { } [
+            { options.schema = mkSchemaOption { }; }
+            { config.schema.host = decl; }
+          ]).config.schema.host;
         typeOnly = _: kindOf { options.port = genMerge.mkOption { type = genMerge.types.int; }; };
         k1 = typeOnly 1;
         k2 = typeOnly 2;
         carried =
-          (genMerge.evalModuleTree {
-            modules = [
-              { options.k = genMerge.mkOption { type = genMerge.types.anything; }; }
-              {
-                _file = "A";
-                config.k = k1;
-              }
-              {
-                _file = "B";
-                config.k = k2;
-              }
-            ];
-          }).config.k;
+          (genMerge.evalModuleTree { } [
+            { options.k = genMerge.mkOption { type = genMerge.types.anything; }; }
+            {
+              _file = "A";
+              config.k = k1;
+            }
+            {
+              _file = "B";
+              config.k = k2;
+            }
+          ]).config.k;
       in
       {
         expr =
@@ -1127,15 +1097,13 @@ in
     let
       kindsOf =
         extra:
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.schema = genSchema.mkSchemaOption { };
-              config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-            }
-            extra
-          ];
-        }).config.schema._kindNames;
+        (genMerge.evalModuleTree { } [
+          {
+            options.schema = genSchema.mkSchemaOption { };
+            config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+          }
+          extra
+        ]).config.schema._kindNames;
       stray = {
         type = "ThrownError";
         msg = "^gen-schema: `_module' is the module engine's namespace and declares no kind; a schema module wrote something under it other than the engine's own `args', `check', `freeformType', `specialArgs' \\(a kind body there is read as a kind named `_module', and the `_' prefix is reserved\\)$";
@@ -1755,20 +1723,20 @@ in
       opt = genMerge.mkOption { type = genMerge.types.anything; };
       kindWith =
         decls:
-        (genMerge.evalModuleTree {
-          modules = [
+        (genMerge.evalModuleTree { } (
+          [
             { options.schema = mkSchemaOption { }; }
           ]
-          ++ map (d: { config.schema.KINDNAME = d; }) decls;
-        }).config.schema.KINDNAME;
+          ++ map (d: { config.schema.KINDNAME = d; }) decls
+        )).config.schema.KINDNAME;
       strictInstance =
         decls: insts:
-        (genMerge.evalModuleTree {
-          modules = [
+        (genMerge.evalModuleTree { } (
+          [
             { options.registry = mkInstanceRegistry (kindWith decls) { }; }
           ]
-          ++ map (i: { config.registry.INSTANCENAME = i; }) insts;
-        }).config.registry.INSTANCENAME;
+          ++ map (i: { config.registry.INSTANCENAME = i; }) insts
+        )).config.registry.INSTANCENAME;
       instanceOf = decls: inst: strictInstance decls [ inst ];
       flat = [ { options.DECLAREDOPTION = opt; } ];
       grouped = [ { options.GROUPNAME.DECLAREDINNER = opt; } ];
@@ -1855,16 +1823,14 @@ in
       test-strict-at-a-root-evaluation = {
         expr =
           builtins.deepSeq
-            (genMerge.evalModuleTree {
-              modules = [
-                (genSchema.mkStrictModule "KINDNAME")
-                { options.DECLAREDOPTION = opt; }
-                {
-                  config.DECLAREDOPTION = 1;
-                  config.OFFENDINGKEY = 2;
-                }
-              ];
-            }).config
+            (genMerge.evalModuleTree { } [
+              (genSchema.mkStrictModule "KINDNAME")
+              { options.DECLAREDOPTION = opt; }
+              {
+                config.DECLAREDOPTION = 1;
+                config.OFFENDINGKEY = 2;
+              }
+            ]).config
             null;
         expectedError = {
           type = "ThrownError";
@@ -1876,21 +1842,17 @@ in
       test-strict-names-the-path-modules-own-file = {
         expr =
           assert
-            (genMerge.evalModuleTree {
-              modules = [
-                (genSchema.mkStrictModule "KINDNAME")
-                { options.DECLAREDOPTION = opt; }
-                { config.DECLAREDOPTION = 1; }
-              ];
-            }).config.DECLAREDOPTION == 1;
+            (genMerge.evalModuleTree { } [
+              (genSchema.mkStrictModule "KINDNAME")
+              { options.DECLAREDOPTION = opt; }
+              { config.DECLAREDOPTION = 1; }
+            ]).config.DECLAREDOPTION == 1;
           builtins.deepSeq
-            (genMerge.evalModuleTree {
-              modules = [
-                (genSchema.mkStrictModule "KINDNAME")
-                { options.DECLAREDOPTION = opt; }
-                ./test-fixtures/strict-own-file.nix
-              ];
-            }).config
+            (genMerge.evalModuleTree { } [
+              (genSchema.mkStrictModule "KINDNAME")
+              { options.DECLAREDOPTION = opt; }
+              ./test-fixtures/strict-own-file.nix
+            ]).config
             null;
         expectedError = {
           type = "ThrownError";
@@ -2000,9 +1962,8 @@ in
     let
       schemaOf =
         modules:
-        (genMerge.evalModuleTree {
-          modules = [ { options.schema = mkSchemaOption { }; } ] ++ modules;
-        }).config.schema;
+        (genMerge.evalModuleTree { } ([ { options.schema = mkSchemaOption { }; } ] ++ modules))
+        .config.schema;
       cycleMsg = "^gen-schema: containment cycle among kinds \\[a b\\] — a kind may not be its own ancestor$";
       looped = schemaOf [
         {
@@ -2103,17 +2064,15 @@ in
         in
         {
           expr =
-            (genMerge.evalModuleTree {
-              modules = [
-                { options.schema = stubbed.mkSchemaOption { }; }
-                {
-                  config.schema = {
-                    a = { };
-                    b.parent = "a";
-                  };
-                }
-              ];
-            }).config.schema._roots;
+            (genMerge.evalModuleTree { } [
+              { options.schema = stubbed.mkSchemaOption { }; }
+              {
+                config.schema = {
+                  a = { };
+                  b.parent = "a";
+                };
+              }
+            ]).config.schema._roots;
           expectedError = {
             type = "ThrownError";
             msg = "^gen-schema: containment cycle among kinds \\[CYCLE-SENTINEL\\] — a kind may not be its own ancestor$";
@@ -2166,63 +2125,61 @@ in
     let
       at =
         extra:
-        (genMerge.evalModuleTree {
-          modules = [
-            (
-              { config, ... }:
-              let
-                kinds = genSchema.evalSchema {
-                  modules = [
-                    {
-                      config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-                      config.schema.link.options.label = genMerge.mkOption { type = genMerge.types.str; };
-                      config.schema.service.options.host = genMerge.mkOption {
-                        type = genSchema.declarationOf "host";
+        (genMerge.evalModuleTree { } [
+          (
+            { config, ... }:
+            let
+              kinds = genSchema.evalSchema {
+                modules = [
+                  {
+                    config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                    config.schema.link.options.label = genMerge.mkOption { type = genMerge.types.str; };
+                    config.schema.service.options.host = genMerge.mkOption {
+                      type = genSchema.declarationOf "host";
+                    };
+                    config.schema.node = {
+                      options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                      options.parent = genMerge.mkOption {
+                        type = genMerge.types.nullOr (genSchema.declarationOf "node");
+                        default = null;
                       };
-                      config.schema.node = {
-                        options.addr = genMerge.mkOption { type = genMerge.types.str; };
-                        options.parent = genMerge.mkOption {
-                          type = genMerge.types.nullOr (genSchema.declarationOf "node");
-                          default = null;
-                        };
-                      };
-                    }
-                  ];
+                    };
+                  }
+                ];
+              };
+            in
+            {
+              options.hosts = genSchema.mkInstanceRegistry kinds.host { };
+              options.spares = genSchema.mkInstanceRegistry kinds.host { };
+              options.links = genSchema.mkInstanceRegistry kinds.link {
+                extraModules = [
+                  { options.target = genMerge.mkOption { type = genSchema.declarationOf config.hosts; }; }
+                ];
+              };
+              options.handLinks = genSchema.mkInstanceRegistry kinds.link {
+                extraModules = [
+                  { options.target = genMerge.mkOption { type = genSchema.declarationOf hand; }; }
+                ];
+              };
+              options.services = genSchema.mkInstanceRegistry kinds.service { refs.host = config.hosts; };
+              # `derive` overwrites an identity key after the stamp is minted, so the post-derive
+              # record carries a stamp its own fields no longer produce.
+              options.drift = genSchema.mkInstanceRegistry kinds.node {
+                refs.parent = {
+                  deferred = true;
+                  instances = config.drift;
                 };
-              in
-              {
-                options.hosts = genSchema.mkInstanceRegistry kinds.host { };
-                options.spares = genSchema.mkInstanceRegistry kinds.host { };
-                options.links = genSchema.mkInstanceRegistry kinds.link {
-                  extraModules = [
-                    { options.target = genMerge.mkOption { type = genSchema.declarationOf config.hosts; }; }
-                  ];
-                };
-                options.handLinks = genSchema.mkInstanceRegistry kinds.link {
-                  extraModules = [
-                    { options.target = genMerge.mkOption { type = genSchema.declarationOf hand; }; }
-                  ];
-                };
-                options.services = genSchema.mkInstanceRegistry kinds.service { refs.host = config.hosts; };
-                # `derive` overwrites an identity key after the stamp is minted, so the post-derive
-                # record carries a stamp its own fields no longer produce.
-                options.drift = genSchema.mkInstanceRegistry kinds.node {
-                  refs.parent = {
-                    deferred = true;
-                    instances = config.drift;
-                  };
-                  derive = _: { n0.addr = "derived"; };
-                };
-                config.hosts.igloo.addr = "10.0.0.1";
-                config.spares.igloo.addr = "10.9.9.9";
-                config.links.main.label = "l";
-                config.handLinks.main.label = "l";
-                config.drift.n0.addr = "n0";
-              }
-            )
-            extra
-          ];
-        }).config;
+                derive = _: { n0.addr = "derived"; };
+              };
+              config.hosts.igloo.addr = "10.0.0.1";
+              config.spares.igloo.addr = "10.9.9.9";
+              config.links.main.label = "l";
+              config.handLinks.main.label = "l";
+              config.drift.n0.addr = "n0";
+            }
+          )
+          extra
+        ]).config;
       fixture = extra: (at extra).links.main.target;
       hand.a = {
         name = "a";
@@ -2554,20 +2511,18 @@ in
         }).host;
       identityOf =
         regOpts: v:
-        (genMerge.evalModuleTree {
-          modules = [
+        (genMerge.evalModuleTree { } [
 
-            {
-              options.hosts = mkInstanceRegistry leafHost regOpts;
-              config.hosts.h = {
-                addr = "10.0.0.1";
-                role = "web";
-              }
-              // v;
+          {
+            options.hosts = mkInstanceRegistry leafHost regOpts;
+            config.hosts.h = {
+              addr = "10.0.0.1";
+              role = "web";
             }
+            // v;
+          }
 
-          ];
-        }).config.hosts.h.id_hash;
+        ]).config.hosts.h.id_hash;
     in
 
     {
@@ -2735,17 +2690,15 @@ in
         let
           # every option defaulted, so the deep force reaches the type's own fields first
           kind =
-            (genMerge.evalModuleTree {
-              modules = [
-                { options.schema = mkSchemaOption { }; }
-                {
-                  config.schema.host.options.role = genMerge.mkOption {
-                    type = genMerge.types.str;
-                    default = "x";
-                  };
-                }
-              ];
-            }).config.schema.host;
+            (genMerge.evalModuleTree { } [
+              { options.schema = mkSchemaOption { }; }
+              {
+                config.schema.host.options.role = genMerge.mkOption {
+                  type = genMerge.types.str;
+                  default = "x";
+                };
+              }
+            ]).config.schema.host;
         in
         builtins.deepSeq (genSchema.mkInstanceType kind { }) null;
       expectedError = {
@@ -3166,7 +3119,7 @@ in
           }
         ]).a;
       oneGenerator = generatorOver (mkSchemaOption { }) { };
-      o_a = modules: (genMerge.evalModuleTree { inherit modules; }).config.o_a;
+      o_a = modules: (genMerge.evalModuleTree { } modules).config.o_a;
       controls = (forced (o_a [ (oneGenerator "two") ])).value == "two";
       collision = {
         type = "ThrownError";
@@ -3297,8 +3250,7 @@ in
           specialArgs = args // {
             inherit intOpt;
           };
-          modules = [ { options.schema = mkSchemaOption { }; } ] ++ [ file ];
-        }).config.schema;
+        } ([ { options.schema = mkSchemaOption { }; } ] ++ [ file ])).config.schema;
       sw1 = byPath {
         _file = "w1";
         imports = [ ./test-fixtures/shared-layer.nix ];
@@ -3836,12 +3788,10 @@ in
       inherit (genSchema) declarationOf setOf evalSchema;
       outside =
         type: v:
-        (genMerge.evalModuleTree {
-          modules = [
-            { options.o = genMerge.mkOption { inherit type; }; }
-            { o = v; }
-          ];
-        }).config.o;
+        (genMerge.evalModuleTree { } [
+          { options.o = genMerge.mkOption { inherit type; }; }
+          { o = v; }
+        ]).config.o;
       unbound = {
         type = "ThrownError";
         msg = "^gen-schema: o.*: `declarationOf \"host\"' is unbound here\\. A deferred declaration resolves only through a registry binding .*$";
@@ -3876,19 +3826,17 @@ in
       };
       test-bound-dangling-keeps-its-wording = {
         expr =
-          (genMerge.evalModuleTree {
-            modules = [
-              (
-                { config, ... }:
-                {
-                  options.hosts = mkInstanceRegistry schema.host { };
-                  options.svcs = mkInstanceRegistry schema.svc { refs.host = config.hosts; };
-                  config.hosts.a = { };
-                  config.svcs.s.host = "nope";
-                }
-              )
-            ];
-          }).config.svcs.s.host.name;
+          (genMerge.evalModuleTree { } [
+            (
+              { config, ... }:
+              {
+                options.hosts = mkInstanceRegistry schema.host { };
+                options.svcs = mkInstanceRegistry schema.svc { refs.host = config.hosts; };
+                config.hosts.a = { };
+                config.svcs.s.host = "nope";
+              }
+            )
+          ]).config.svcs.s.host.name;
         expectedError = {
           type = "ThrownError";
           msg = "^gen-schema: ref field 'host' on kind 'svc': reference 'nope' not found in instance registry \\(available: a\\)$";
@@ -3921,20 +3869,18 @@ in
           };
         in
         builtins.deepSeq
-          (genMerge.evalModuleTree {
-            modules = [
-              (
-                { config, ... }:
-                {
-                  options.hosts = mkInstanceRegistry schema.host { };
-                  options.svcs = mkInstanceRegistry schema.svc { refs.f = bind config.hosts; };
-                  config.hosts.a = { };
-                  config.hosts.b = { };
-                  config.svcs.s.f = value;
-                }
-              )
-            ];
-          }).config.svcs.s.f
+          (genMerge.evalModuleTree { } [
+            (
+              { config, ... }:
+              {
+                options.hosts = mkInstanceRegistry schema.host { };
+                options.svcs = mkInstanceRegistry schema.svc { refs.f = bind config.hosts; };
+                config.hosts.a = { };
+                config.hosts.b = { };
+                config.svcs.s.f = value;
+              }
+            )
+          ]).config.svcs.s.f
           null;
       thrown = msg: {
         type = "ThrownError";

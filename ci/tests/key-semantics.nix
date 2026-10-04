@@ -19,28 +19,24 @@ let
     };
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { keySemantics = semantics; };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { keySemantics = semantics; };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   # Default: no keySemantics passed → recorded as {}
-  evalDefault = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  evalDefault = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 in
 {
   flake.tests.key-semantics.test-keysemantics-recorded = {

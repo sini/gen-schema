@@ -14,45 +14,41 @@ let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
   # The STANDARD arm — `mkSchemaOption` with no `mkType`, where `options` is populated.
-  standardTree = genMerge.evalModuleTree {
-    modules = [
-      { options.schema = mkSchemaOption { }; }
-      {
-        config.schema.host = {
-          options.role = genMerge.mkOption { type = genMerge.types.str; };
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-        };
-      }
-    ];
-  };
+  standardTree = genMerge.evalModuleTree { } [
+    { options.schema = mkSchemaOption { }; }
+    {
+      config.schema.host = {
+        options.role = genMerge.mkOption { type = genMerge.types.str; };
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+      };
+    }
+  ];
   hostKind = standardTree.config.schema.host;
 
   # The mkTYPE arm — the door gen-aspects goes through (`gen-aspects/lib/schema.nix`, binding
   # `schemaOpt`), where the declarations live in the `__functor`'s imports. Both
   # shapes are covered because both reach ONE merge; the stamp is in that merge and nowhere else.
-  mkTypeTree = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          mkType =
-            {
-              defs,
-              kind,
-              ...
-            }:
-            {
-              __functor = _: _: {
-                imports = map (d: d.value) defs;
-              };
-              inherit kind;
+  mkTypeTree = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        mkType =
+          {
+            defs,
+            kind,
+            ...
+          }:
+          {
+            __functor = _: _: {
+              imports = map (d: d.value) defs;
             };
-        };
-      }
-      {
-        config.schema.widget.options.facet = genMerge.mkOption { type = genMerge.types.str; };
-      }
-    ];
-  };
+            inherit kind;
+          };
+      };
+    }
+    {
+      config.schema.widget.options.facet = genMerge.mkOption { type = genMerge.types.str; };
+    }
+  ];
   widgetKind = mkTypeTree.config.schema.widget;
 in
 {
@@ -90,35 +86,31 @@ in
   flake.tests.kind-mark.test-the-mark-follows-the-declared-surface = {
     expr =
       let
-        widened = genMerge.evalModuleTree {
-          modules = [
-            { options.schema = mkSchemaOption { }; }
-            {
-              config.schema.host = {
-                options.role = genMerge.mkOption { type = genMerge.types.str; };
-                options.port = genMerge.mkOption { type = genMerge.types.int; };
-                options.zone = genMerge.mkOption { type = genMerge.types.str; };
-              };
-            }
-          ];
-        };
+        widened = genMerge.evalModuleTree { } [
+          { options.schema = mkSchemaOption { }; }
+          {
+            config.schema.host = {
+              options.role = genMerge.mkOption { type = genMerge.types.str; };
+              options.port = genMerge.mkOption { type = genMerge.types.int; };
+              options.zone = genMerge.mkOption { type = genMerge.types.str; };
+            };
+          }
+        ];
       in
       {
         movedOnAnExtraOption = widened.config.schema.host.__mint.minted != hostKind.__mint.minted;
         # LIVE CONTROL — the same declaration re-evaluated mints the SAME mark, so the arm above is
         # reading the surface and not merely the evaluation.
         stableAcrossEvaluations =
-          (genMerge.evalModuleTree {
-            modules = [
-              { options.schema = mkSchemaOption { }; }
-              {
-                config.schema.host = {
-                  options.role = genMerge.mkOption { type = genMerge.types.str; };
-                  options.port = genMerge.mkOption { type = genMerge.types.int; };
-                };
-              }
-            ];
-          }).config.schema.host.__mint.minted == hostKind.__mint.minted;
+          (genMerge.evalModuleTree { } [
+            { options.schema = mkSchemaOption { }; }
+            {
+              config.schema.host = {
+                options.role = genMerge.mkOption { type = genMerge.types.str; };
+                options.port = genMerge.mkOption { type = genMerge.types.int; };
+              };
+            }
+          ]).config.schema.host.__mint.minted == hostKind.__mint.minted;
       };
     expected = {
       movedOnAnExtraOption = true;
@@ -180,19 +172,17 @@ in
   flake.tests.kind-mark.test-self-referential-registry-still-evaluates = {
     expr =
       let
-        selfReferential = genMerge.evalModuleTree {
-          modules = [
-            (
-              { config, ... }:
-              {
-                options.schema = mkSchemaOption { };
-                options.hosts = mkInstanceRegistry config.schema.host { };
-                config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; };
-                config.hosts.igloo.role = "web";
-              }
-            )
-          ];
-        };
+        selfReferential = genMerge.evalModuleTree { } [
+          (
+            { config, ... }:
+            {
+              options.schema = mkSchemaOption { };
+              options.hosts = mkInstanceRegistry config.schema.host { };
+              config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; };
+              config.hosts.igloo.role = "web";
+            }
+          )
+        ];
       in
       {
         instanceEvaluates = selfReferential.config.hosts.igloo.role;

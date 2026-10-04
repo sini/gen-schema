@@ -51,31 +51,29 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.peers = mkInstanceRegistry schema.peer { };
-        options.hosts = mkInstanceRegistry schema.host {
-          refs.peer = eval.config.peers;
-        };
-        config.peers = {
-          yurt = {
-            addr = "10.0.1.2";
-          };
-        };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-          role = "web";
-          peer = "yurt";
-          meta.region = "eu-west";
-        };
-        config.hosts.yurt = {
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.peers = mkInstanceRegistry schema.peer { };
+      options.hosts = mkInstanceRegistry schema.host {
+        refs.peer = eval.config.peers;
+      };
+      config.peers = {
+        yurt = {
           addr = "10.0.1.2";
-          role = "worker";
         };
-      }
-    ];
-  };
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+        role = "web";
+        peer = "yurt";
+        meta.region = "eu-west";
+      };
+      config.hosts.yurt = {
+        addr = "10.0.1.2";
+        role = "worker";
+      };
+    }
+  ];
 
   igloo = eval.config.hosts.igloo;
 

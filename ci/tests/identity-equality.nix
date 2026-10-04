@@ -24,21 +24,19 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-          role = "web";
-        };
-        config.hosts.iceberg = {
-          addr = "10.0.2.1";
-          role = "db";
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+        role = "web";
+      };
+      config.hosts.iceberg = {
+        addr = "10.0.2.1";
+        role = "db";
+      };
+    }
+  ];
 
   # Two separate accesses to the same instance
   ref1 = eval.config.hosts.igloo;

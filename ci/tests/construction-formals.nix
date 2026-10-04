@@ -16,12 +16,10 @@
 let
   kindOf =
     args: decl:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = genSchema.mkSchemaOption args; }
-        { config.schema.host = decl; }
-      ];
-    }).config.schema.host;
+    (genMerge.evalModuleTree { } [
+      { options.schema = genSchema.mkSchemaOption args; }
+      { config.schema.host = decl; }
+    ]).config.schema.host;
 
   mkTypeArgs = {
     mkType =
@@ -40,9 +38,7 @@ let
   # `_`-prefixed names back out leaves exactly the names the declaration-key door reserves — read
   # from the library's own bindings, so a formal added there is covered here with no second edit.
   schemaConfig =
-    (genMerge.evalModuleTree {
-      modules = [ { options.schema = genSchema.mkSchemaOption { }; } ];
-    }).config.schema;
+    (genMerge.evalModuleTree { } [ { options.schema = genSchema.mkSchemaOption { }; } ]).config.schema;
   population = builtins.filter (
     k:
     !(prelude.hasPrefix "_" k)
@@ -60,12 +56,10 @@ let
         modules = [ { config.schema.k = decl; } ];
       };
     in
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.ks = genSchema.mkInstanceRegistry schema.k { }; }
-        { config.ks.a = { }; }
-      ];
-    }).config.ks.a;
+    (genMerge.evalModuleTree { } [
+      { options.ks = genSchema.mkInstanceRegistry schema.k { }; }
+      { config.ks.a = { }; }
+    ]).config.ks.a;
 in
 {
   flake.tests.construction-formals = {
@@ -146,12 +140,12 @@ in
             {
               inherit kind;
               landed =
-                (genMerge.evalModuleTree {
-                  modules = [
+                (genMerge.evalModuleTree { } (
+                  [
                     { options.keySemantics = genMerge.mkOption { type = genMerge.types.str; }; }
                   ]
-                  ++ map (d: d.value) defs;
-                }).config.keySemantics;
+                  ++ map (d: d.value) defs
+                )).config.keySemantics;
             };
         } { imports = [ { keySemantics = "x"; } ]; }).landed;
       expected = "x";

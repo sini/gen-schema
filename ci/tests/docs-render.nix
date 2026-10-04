@@ -7,24 +7,22 @@
 let
   inherit (genSchema) mkSchemaOption renderDocs schemaFn;
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host = {
-          options.name = genMerge.mkOption {
-            type = genMerge.types.str;
-            description = "Hostname";
-          };
-          options.addr = genMerge.mkOption {
-            type = genMerge.types.str;
-            description = "IP address";
-          };
-          methods.greeting = schemaFn "Greeting message" genMerge.types.str ({ name, ... }: "hi ${name}");
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host = {
+        options.name = genMerge.mkOption {
+          type = genMerge.types.str;
+          description = "Hostname";
         };
-      }
-    ];
-  };
+        options.addr = genMerge.mkOption {
+          type = genMerge.types.str;
+          description = "IP address";
+        };
+        methods.greeting = schemaFn "Greeting message" genMerge.types.str ({ name, ... }: "hi ${name}");
+      };
+    }
+  ];
 
   rendered = renderDocs eval.config.schema;
 
@@ -32,33 +30,29 @@ let
   # regardless of whether it was actually marked `internal`. A user-declared field
   # that merely happens to start with `_` must render like any other field — only
   # the `internal` flag (and the always-excluded `id_hash`) may exclude it.
-  underscoreFieldEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.device = {
-          options._legacyId = genMerge.mkOption {
-            type = genMerge.types.str;
-            description = "Legacy id — not module-internal, just underscore-named";
-          };
+  underscoreFieldEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.device = {
+        options._legacyId = genMerge.mkOption {
+          type = genMerge.types.str;
+          description = "Legacy id — not module-internal, just underscore-named";
         };
-      }
-    ];
-  };
+      };
+    }
+  ];
   renderedUnderscoreField = renderDocs underscoreFieldEval.config.schema;
 
   # A reserved kind name must fail renderDocs the SAME way it fails plain schema
   # evaluation — no silently-partial doc, since renderDocs reads _kindNames itself.
-  reservedEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema._hidden = {
-          options.secret = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  reservedEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema._hidden = {
+        options.secret = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
   renderDocsReservedAttempt = builtins.tryEval (
     builtins.deepSeq (renderDocs reservedEval.config.schema) (renderDocs reservedEval.config.schema)
   );

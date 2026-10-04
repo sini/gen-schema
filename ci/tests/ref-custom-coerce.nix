@@ -36,103 +36,97 @@ let
   };
 
   # --- Simple binding (no coerce) — verifies normalizeBinding passthrough ---
-  evalSimple = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry serviceSchema.host { };
-        options.services = mkInstanceRegistry serviceSchema.service {
-          refs.host = evalSimple.config.hosts;
-        };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-        };
-        config.services.web = {
-          port = 80;
-          host = "igloo";
-        };
-      }
-    ];
-  };
+  evalSimple = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry serviceSchema.host { };
+      options.services = mkInstanceRegistry serviceSchema.service {
+        refs.host = evalSimple.config.hosts;
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+      };
+      config.services.web = {
+        port = 80;
+        host = "igloo";
+      };
+    }
+  ];
 
   # --- Scalar coerce test ---
-  evalScalar = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry serviceSchema.host { };
-        options.services = mkInstanceRegistry serviceSchema.service {
-          refs.host = {
-            instances = evalScalar.config.hosts;
-            coerce =
-              default: val:
-              if builtins.isString val && val == "fallback" then evalScalar.config.hosts.igloo else default;
-          };
+  evalScalar = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry serviceSchema.host { };
+      options.services = mkInstanceRegistry serviceSchema.service {
+        refs.host = {
+          instances = evalScalar.config.hosts;
+          coerce =
+            default: val:
+            if builtins.isString val && val == "fallback" then evalScalar.config.hosts.igloo else default;
         };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-        };
-        config.hosts.iceberg = {
-          addr = "10.0.1.2";
-        };
-        config.services.web = {
-          port = 80;
-          host = "fallback";
-        };
-        config.services.api = {
-          port = 8080;
-          host = "iceberg";
-        };
-        config.services.direct = {
-          port = 443;
-          host = evalScalar.config.hosts.iceberg;
-        };
-      }
-    ];
-  };
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+      };
+      config.hosts.iceberg = {
+        addr = "10.0.1.2";
+      };
+      config.services.web = {
+        port = 80;
+        host = "fallback";
+      };
+      config.services.api = {
+        port = 8080;
+        host = "iceberg";
+      };
+      config.services.direct = {
+        port = 443;
+        host = evalScalar.config.hosts.iceberg;
+      };
+    }
+  ];
 
   # --- listOf coerce test ---
-  evalList = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry groupSchema.host { };
-        options.groups = mkInstanceRegistry groupSchema.group {
-          refs.members = {
-            instances = evalList.config.hosts;
-            coerce =
-              default: val:
-              if builtins.isAttrs val && val ? __expandAll then
-                builtins.attrValues evalList.config.hosts
-              else if builtins.isList default then
-                default
-              else
-                [ default ];
-          };
+  evalList = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry groupSchema.host { };
+      options.groups = mkInstanceRegistry groupSchema.group {
+        refs.members = {
+          instances = evalList.config.hosts;
+          coerce =
+            default: val:
+            if builtins.isAttrs val && val ? __expandAll then
+              builtins.attrValues evalList.config.hosts
+            else if builtins.isList default then
+              default
+            else
+              [ default ];
         };
-        config.hosts = {
-          igloo = {
-            addr = "10.0.1.1";
-          };
-          iceberg = {
-            addr = "10.0.1.2";
-          };
+      };
+      config.hosts = {
+        igloo = {
+          addr = "10.0.1.1";
         };
-        config.groups.all = {
-          members = [ { __expandAll = true; } ];
+        iceberg = {
+          addr = "10.0.1.2";
         };
-        config.groups.explicit = {
-          members = [
-            "igloo"
-            "iceberg"
-          ];
-        };
-        config.groups.mixed = {
-          members = [
-            "igloo"
-            evalList.config.hosts.iceberg
-          ];
-        };
-      }
-    ];
-  };
+      };
+      config.groups.all = {
+        members = [ { __expandAll = true; } ];
+      };
+      config.groups.explicit = {
+        members = [
+          "igloo"
+          "iceberg"
+        ];
+      };
+      config.groups.mixed = {
+        members = [
+          "igloo"
+          evalList.config.hosts.iceberg
+        ];
+      };
+    }
+  ];
 in
 {
   flake.tests.ref-custom-coerce = {
@@ -181,28 +175,26 @@ in
               }
             ];
           };
-          evalBad = genMerge.evalModuleTree {
-            modules = [
-              {
-                options.hosts = mkInstanceRegistry thingSchema.host { };
-                options.things = mkInstanceRegistry thingSchema.thing {
-                  refs.host = {
-                    instances = evalBad.config.hosts;
-                    coerce = _default: _val: [
-                      evalBad.config.hosts.igloo
-                      evalBad.config.hosts.igloo
-                    ];
-                  };
+          evalBad = genMerge.evalModuleTree { } [
+            {
+              options.hosts = mkInstanceRegistry thingSchema.host { };
+              options.things = mkInstanceRegistry thingSchema.thing {
+                refs.host = {
+                  instances = evalBad.config.hosts;
+                  coerce = _default: _val: [
+                    evalBad.config.hosts.igloo
+                    evalBad.config.hosts.igloo
+                  ];
                 };
-                config.hosts.igloo = {
-                  addr = "10.0.1.1";
-                };
-                config.things.bad = {
-                  host = "igloo";
-                };
-              }
-            ];
-          };
+              };
+              config.hosts.igloo = {
+                addr = "10.0.1.1";
+              };
+              config.things.bad = {
+                host = "igloo";
+              };
+            }
+          ];
         in
         builtins.tryEval (builtins.seq evalBad.config.things.bad.host null);
       expected = {

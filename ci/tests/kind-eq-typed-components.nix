@@ -21,12 +21,10 @@ let
   T = genMerge.types;
   kindIn =
     args: decl:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = mkSchemaOption args; }
-        { config.schema.host = decl; }
-      ];
-    }).config.schema.host;
+    (genMerge.evalModuleTree { } [
+      { options.schema = mkSchemaOption args; }
+      { config.schema.host = decl; }
+    ]).config.schema.host;
   verdict =
     a: b:
     let

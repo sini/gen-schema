@@ -48,14 +48,12 @@ let
   # A registry over a kind value, evaluated far enough to read one instance.
   instanceOf =
     kindValue: opts:
-    (genMerge.evalModuleTree {
-      modules = [
-        {
-          options.spools = mkInstanceRegistry kindValue opts;
-          config.spools.one = { };
-        }
-      ];
-    }).config.spools.one;
+    (genMerge.evalModuleTree { } [
+      {
+        options.spools = mkInstanceRegistry kindValue opts;
+        config.spools.one = { };
+      }
+    ]).config.spools.one;
 
   optionSet = kindValue: builtins.attrNames (instanceOf kindValue { });
 
@@ -81,22 +79,20 @@ let
   # the consumer's option set is not in the tree at all, so the read has nothing to resolve.
   headKnob =
     knob:
-    (genMerge.evalModuleTree {
-      modules = [
-        (
-          { config, ... }:
-          {
-            options.schema = mkSchemaOption { };
-            options.knob = genMerge.mkOption {
-              type = genMerge.types.bool;
-              default = knob;
-            };
-            config.schema.base =
-              if config.knob then { options.hem = str "h"; } else { options.selvage = str "v"; };
-          }
-        )
-      ];
-    }).config.schema;
+    (genMerge.evalModuleTree { } [
+      (
+        { config, ... }:
+        {
+          options.schema = mkSchemaOption { };
+          options.knob = genMerge.mkOption {
+            type = genMerge.types.bool;
+            default = knob;
+          };
+          config.schema.base =
+            if config.knob then { options.hem = str "h"; } else { options.selvage = str "v"; };
+        }
+      )
+    ]).config.schema;
 
   # ── C14: the relation is queryable ───────────────────────────────────────────────────────────
   fmt = es: map (e: "${e.from}->${toString e.to}:${e.type}") es;
@@ -116,15 +112,15 @@ let
   # ── the deprecated spelling: `base` beside the given modules, on a tree built without `evalSchema` ──
   spelledTree =
     modules:
-    (genMerge.evalModuleTree {
-      modules = [
+    (genMerge.evalModuleTree { } (
+      [
         {
           options.schema = mkSchemaOption { };
           config.schema.base.options.description = str "";
         }
       ]
-      ++ modules;
-    }).config.schema;
+      ++ modules
+    )).config.schema;
   # An `mkType` result that publishes no collections (den-hoag-fwoa8's shape).
   bareMkTypeOpt = mkSchemaOption {
     mkType =
@@ -156,9 +152,8 @@ let
   # ── den-hoag-8c8pr: the plain tree's desugar ─────────────────────────────────────────────────
   plainTree =
     modules:
-    (genMerge.evalModuleTree {
-      modules = [ { options.schema = mkSchemaOption { }; } ] ++ modules;
-    }).config.schema;
+    (genMerge.evalModuleTree { } ([ { options.schema = mkSchemaOption { }; } ] ++ modules))
+    .config.schema;
   # `derived` beside `spelledTree`'s `base`: declaring its parents, or spelling `base`
   declaredDerived = inh: {
     config.schema.derived = {
@@ -231,31 +226,29 @@ let
     };
   # gen-aspects' `mkType` shape: the functor ignores `self`, and `__defsModule` is built from the defs
   aspectsShaped =
-    (genMerge.evalModuleTree {
-      modules = [
-        {
-          options.schema = mkSchemaOption {
-            mkType =
-              { defs, collections, ... }:
-              let
-                defsModules = map (d: d.value) (builtins.filter (d: builtins.isAttrs d.value) defs);
-              in
-              {
-                __functor =
-                  _:
-                  { ... }:
-                  {
-                    imports = defsModules;
-                  };
-                __defsModule.imports = defsModules;
-              }
-              // collections;
-          };
-          config.schema.base.options.description = str "";
-        }
-        (declaredDerived [ "base" ])
-      ];
-    }).config.schema.derived;
+    (genMerge.evalModuleTree { } [
+      {
+        options.schema = mkSchemaOption {
+          mkType =
+            { defs, collections, ... }:
+            let
+              defsModules = map (d: d.value) (builtins.filter (d: builtins.isAttrs d.value) defs);
+            in
+            {
+              __functor =
+                _:
+                { ... }:
+                {
+                  imports = defsModules;
+                };
+              __defsModule.imports = defsModules;
+            }
+            // collections;
+        };
+        config.schema.base.options.description = str "";
+      }
+      (declaredDerived [ "base" ])
+    ]).config.schema.derived;
   # two trees, each with a kind `a` that composes a parent of its own
   twoTreesA = {
     one =
@@ -677,15 +670,13 @@ in
     # read it before.
     test-mktype-without-collections-publishes-parent = {
       expr =
-        (genMerge.evalModuleTree {
-          modules = [
-            {
-              options.schema = bareMkTypeOpt;
-              config.schema.host = { };
-              config.schema.user.parent = "host";
-            }
-          ];
-        }).config.schema._topology.user.parent;
+        (genMerge.evalModuleTree { } [
+          {
+            options.schema = bareMkTypeOpt;
+            config.schema.host = { };
+            config.schema.user.parent = "host";
+          }
+        ]).config.schema._topology.user.parent;
       expected = "host";
     };
 
@@ -701,7 +692,7 @@ in
       in
       {
         expr = builtins.elem "description" (
-          builtins.attrNames (genMerge.evalModuleTree { modules = [ (k.__functor k) ]; }).options
+          builtins.attrNames (genMerge.evalModuleTree { } [ (k.__functor k) ]).options
         );
         expected = true;
       };
@@ -773,13 +764,11 @@ in
           (
             so:
             builtins.attrNames
-              (genMerge.evalModuleTree {
-                modules = [
-                  { options.schema = so; }
-                  { config.schema.base.options.description = str ""; }
-                  (declaredDerived [ "base" ])
-                ];
-              }).config.schema.derived.options
+              (genMerge.evalModuleTree { } [
+                { options.schema = so; }
+                { config.schema.base.options.description = str ""; }
+                (declaredDerived [ "base" ])
+              ]).config.schema.derived.options
           )
           [
             bareMkTypeOpt
@@ -802,20 +791,19 @@ in
     # the defs the caller's `mkType` receives.
     test-plain-inherits-composes-through-the-functor = {
       expr = builtins.elem "description" (
-        builtins.attrNames
-          (genMerge.evalModuleTree { modules = [ (aspectsShaped.__functor aspectsShaped) ]; }).options
+        builtins.attrNames (genMerge.evalModuleTree { } [ (aspectsShaped.__functor aspectsShaped) ]).options
       );
       expected = true;
     };
     test-plain-inherits-composes-imported-as-a-module = {
       expr = builtins.elem "description" (
-        builtins.attrNames (genMerge.evalModuleTree { modules = [ aspectsShaped ]; }).options
+        builtins.attrNames (genMerge.evalModuleTree { } [ aspectsShaped ]).options
       );
       expected = true;
     };
     test-plain-inherits-composes-through-a-caller-field = {
       expr = builtins.elem "description" (
-        builtins.attrNames (genMerge.evalModuleTree { modules = [ aspectsShaped.__defsModule ]; }).options
+        builtins.attrNames (genMerge.evalModuleTree { } [ aspectsShaped.__defsModule ]).options
       );
       expected = true;
     };
@@ -868,12 +856,10 @@ in
     test-same-named-kinds-of-two-trees-both-compose = {
       expr =
         builtins.attrNames
-          (genMerge.evalModuleTree {
-            modules = [
-              twoTreesA.one
-              twoTreesA.two
-            ];
-          }).options;
+          (genMerge.evalModuleTree { } [
+            twoTreesA.one
+            twoTreesA.two
+          ]).options;
       expected = [
         "o_a"
         "o_p"
@@ -894,7 +880,7 @@ in
           o_a =
             modules:
             let
-              r = builtins.tryEval (genMerge.evalModuleTree { inherit modules; }).config.o_a;
+              r = builtins.tryEval (genMerge.evalModuleTree { } modules).config.o_a;
             in
             if r.success then r.value else "REFUSED";
           one = oneGenerator "one";

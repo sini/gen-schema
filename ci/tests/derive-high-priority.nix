@@ -15,31 +15,29 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = genSchema.mkInstanceRegistry schema.host {
-          extraModules = [
-            {
-              options.computed = genMerge.mkOption {
-                type = genMerge.types.str;
-                internal = true;
-              };
-            }
-          ];
-          derive = _instances: {
-            igloo = {
-              computed = "from-derive";
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = genSchema.mkInstanceRegistry schema.host {
+        extraModules = [
+          {
+            options.computed = genMerge.mkOption {
+              type = genMerge.types.str;
+              internal = true;
             };
+          }
+        ];
+        derive = _instances: {
+          igloo = {
+            computed = "from-derive";
           };
         };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-          computed = "from-instance";
-        };
-      }
-    ];
-  };
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+        computed = "from-instance";
+      };
+    }
+  ];
 in
 {
   flake.tests."derive-priority" = {

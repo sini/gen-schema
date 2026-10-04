@@ -53,14 +53,12 @@ let
       }
     ];
   };
-  hostTree = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = genSchema.mkInstanceRegistry hostSchema.host { };
-        config.hosts.igloo.rack = 3;
-      }
-    ];
-  };
+  hostTree = genMerge.evalModuleTree { } [
+    {
+      options.hosts = genSchema.mkInstanceRegistry hostSchema.host { };
+      config.hosts.igloo.rack = 3;
+    }
+  ];
   hostKv = hostSchema.host;
   hostAltKv = hostSchema.hostAlt;
   spindleKv = hostSchema.spindle;
@@ -88,14 +86,12 @@ let
       }
     ];
   };
-  widgetTree = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.widgets = genSchema.mkInstanceRegistry widgetSchema.widget { };
-        config.widgets.cog = { };
-      }
-    ];
-  };
+  widgetTree = genMerge.evalModuleTree { } [
+    {
+      options.widgets = genSchema.mkInstanceRegistry widgetSchema.widget { };
+      config.widgets.cog = { };
+    }
+  ];
   widgetKv = widgetSchema.widget;
   widgetInst = widgetTree.config.widgets.cog;
 
@@ -110,12 +106,10 @@ let
       }
     ];
   };
-  schemaTree = genMerge.evalModuleTree {
-    modules = [
-      { options.rackFarm = genSchema.mkInstanceRegistry rackSchema.rack { }; }
-      { config.rackFarm.r1.slots = 12; }
-    ];
-  };
+  schemaTree = genMerge.evalModuleTree { } [
+    { options.rackFarm = genSchema.mkInstanceRegistry rackSchema.rack { }; }
+    { config.rackFarm.r1.slots = 12; }
+  ];
   rackKv = rackSchema.rack;
   rackInst = schemaTree.config.rackFarm.r1;
 
@@ -139,12 +133,10 @@ let
       }
     ];
   };
-  homeTree = genMerge.evalModuleTree {
-    modules = [
-      { options.homes = genSchema.mkInstanceRegistry homeSchema.home { }; }
-      { config.homes.ben.system = "x86_64-linux"; }
-    ];
-  };
+  homeTree = genMerge.evalModuleTree { } [
+    { options.homes = genSchema.mkInstanceRegistry homeSchema.home { }; }
+    { config.homes.ben.system = "x86_64-linux"; }
+  ];
   homeKv = homeSchema.home;
   homeInst = homeTree.config.homes.ben;
 in

@@ -6,47 +6,43 @@
   ...
 }:
 let
-  schemaEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = genSchema.mkSchemaOption { };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          options.role = genMerge.mkOption { type = genMerge.types.str; };
-          validators = [
-            (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
-            (genSchema.mkValidator "valid-role" (
-              { role, ... }:
-              lib.elem role [
-                "web"
-                "db"
-                "worker"
-              ]
-            ) "role must be web, db, or worker")
-          ];
-        };
-      }
-    ];
-  };
+  schemaEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = genSchema.mkSchemaOption { };
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        options.role = genMerge.mkOption { type = genMerge.types.str; };
+        validators = [
+          (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
+          (genSchema.mkValidator "valid-role" (
+            { role, ... }:
+            lib.elem role [
+              "web"
+              "db"
+              "worker"
+            ]
+          ) "role must be web, db, or worker")
+        ];
+      };
+    }
+  ];
   hostType = genSchema.mkInstanceType schemaEval.config.schema.host { };
-  instanceEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = genMerge.mkOption {
-          type = genMerge.types.attrsOf hostType;
-          default = { };
-        };
-        config.hosts.bad = {
-          addr = "";
-          role = "invalid";
-        };
-        config.hosts.good = {
-          addr = "10.0.1.1";
-          role = "web";
-        };
-      }
-    ];
-  };
+  instanceEval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = genMerge.mkOption {
+        type = genMerge.types.attrsOf hostType;
+        default = { };
+      };
+      config.hosts.bad = {
+        addr = "";
+        role = "invalid";
+      };
+      config.hosts.good = {
+        addr = "10.0.1.1";
+        role = "web";
+      };
+    }
+  ];
   result = genSchema.validateInstances schemaEval.config.schema.host instanceEval.config.hosts;
 in
 {

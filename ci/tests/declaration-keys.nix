@@ -19,12 +19,10 @@ let
   # wrapped from outside.
   kindOf =
     args: decl:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = genSchema.mkSchemaOption args; }
-        { config.schema.host = decl; }
-      ];
-    }).config.schema.host;
+    (genMerge.evalModuleTree { } [
+      { options.schema = genSchema.mkSchemaOption args; }
+      { config.schema.host = decl; }
+    ]).config.schema.host;
 
   strOpt = genMerge.mkOption {
     type = genMerge.types.str;
@@ -53,12 +51,10 @@ let
         modules = [ { config.schema.k = decl; } ];
       };
     in
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.ks = genSchema.mkInstanceRegistry schema.k { }; }
-        { config.ks.a = { }; }
-      ];
-    }).config.ks.a;
+    (genMerge.evalModuleTree { } [
+      { options.ks = genSchema.mkInstanceRegistry schema.k { }; }
+      { config.ks.a = { }; }
+    ]).config.ks.a;
 in
 {
   flake.tests.declaration-keys = {
@@ -113,9 +109,8 @@ in
     # against gen-merge's, not against a frozen guess of what gen-merge once enforced.
     test-declaration-keys-are-published = {
       expr =
-        (genMerge.evalModuleTree {
-          modules = [ { options.s = genSchema.mkSchemaOption { }; } ];
-        }).config.s._declarationKeys;
+        (genMerge.evalModuleTree { } [ { options.s = genSchema.mkSchemaOption { }; } ])
+        .config.s._declarationKeys;
       expected = builtins.sort (a: b: a < b) genMerge.moduleSyntax.structured;
     };
 

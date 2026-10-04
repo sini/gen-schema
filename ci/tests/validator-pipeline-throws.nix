@@ -21,14 +21,12 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = genSchema.mkInstanceRegistry schema.host { };
-        config.hosts.bad.addr = "";
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = genSchema.mkInstanceRegistry schema.host { };
+      config.hosts.bad.addr = "";
+    }
+  ];
   result = builtins.tryEval (builtins.deepSeq eval.config.hosts eval.config.hosts);
 in
 {

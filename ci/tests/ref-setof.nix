@@ -29,73 +29,69 @@ let
   };
 
   # --- Basic setOf test ---
-  evalBasic = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry basicSchema.host { };
-        options.groups = mkInstanceRegistry basicSchema.group {
-          refs.members = evalBasic.config.hosts;
+  evalBasic = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry basicSchema.host { };
+      options.groups = mkInstanceRegistry basicSchema.group {
+        refs.members = evalBasic.config.hosts;
+      };
+      config.hosts = {
+        igloo = {
+          addr = "10.0.1.1";
         };
-        config.hosts = {
-          igloo = {
-            addr = "10.0.1.1";
-          };
-          iceberg = {
-            addr = "10.0.1.2";
-          };
+        iceberg = {
+          addr = "10.0.1.2";
         };
-        config.groups.web = {
-          members = [
-            "igloo"
-            "iceberg"
-            "igloo"
-          ];
-        };
-        config.groups.empty = { };
-        config.groups.instances = {
-          members = [
-            evalBasic.config.hosts.igloo
-            evalBasic.config.hosts.iceberg
-            evalBasic.config.hosts.igloo
-          ];
-        };
-      }
-    ];
-  };
+      };
+      config.groups.web = {
+        members = [
+          "igloo"
+          "iceberg"
+          "igloo"
+        ];
+      };
+      config.groups.empty = { };
+      config.groups.instances = {
+        members = [
+          evalBasic.config.hosts.igloo
+          evalBasic.config.hosts.iceberg
+          evalBasic.config.hosts.igloo
+        ];
+      };
+    }
+  ];
 
   # --- setOf with custom coerce (expansion + dedup) ---
-  evalCoerce = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry basicSchema.host { };
-        options.groups = mkInstanceRegistry basicSchema.group {
-          refs.members = {
-            instances = evalCoerce.config.hosts;
-            coerce =
-              default: val:
-              if builtins.isAttrs val && val ? __expandAll then
-                builtins.attrValues evalCoerce.config.hosts
-              else
-                default;
-          };
+  evalCoerce = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry basicSchema.host { };
+      options.groups = mkInstanceRegistry basicSchema.group {
+        refs.members = {
+          instances = evalCoerce.config.hosts;
+          coerce =
+            default: val:
+            if builtins.isAttrs val && val ? __expandAll then
+              builtins.attrValues evalCoerce.config.hosts
+            else
+              default;
         };
-        config.hosts = {
-          igloo = {
-            addr = "10.0.1.1";
-          };
-          iceberg = {
-            addr = "10.0.1.2";
-          };
+      };
+      config.hosts = {
+        igloo = {
+          addr = "10.0.1.1";
         };
-        config.groups.expanded = {
-          members = [
-            "igloo"
-            { __expandAll = true; }
-          ];
+        iceberg = {
+          addr = "10.0.1.2";
         };
-      }
-    ];
-  };
+      };
+      config.groups.expanded = {
+        members = [
+          "igloo"
+          { __expandAll = true; }
+        ];
+      };
+    }
+  ];
 
   nullableSchema = evalSchema {
     modules = [
@@ -115,29 +111,27 @@ let
   };
 
   # --- nullOr (setOf (declarationOf "kind")) ---
-  evalNullable = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry nullableSchema.host { };
-        options.services = mkInstanceRegistry nullableSchema.service {
-          refs.hosts = evalNullable.config.hosts;
-        };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-        };
-        config.services.web = {
-          port = 80;
-          hosts = [
-            "igloo"
-            "igloo"
-          ];
-        };
-        config.services.none = {
-          port = 443;
-        };
-      }
-    ];
-  };
+  evalNullable = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry nullableSchema.host { };
+      options.services = mkInstanceRegistry nullableSchema.service {
+        refs.hosts = evalNullable.config.hosts;
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+      };
+      config.services.web = {
+        port = 80;
+        hosts = [
+          "igloo"
+          "igloo"
+        ];
+      };
+      config.services.none = {
+        port = 443;
+      };
+    }
+  ];
 in
 {
   flake.tests.ref-setof = {

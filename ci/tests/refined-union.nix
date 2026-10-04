@@ -44,13 +44,11 @@ let
       attempt = builtins.tryEval (
         let
           c =
-            (genMerge.evalModuleTree {
-              modules = [
-                { options.p = genMerge.mkOption { type = tA; }; }
-                { options.p = genMerge.mkOption { type = tB; }; }
-                { p = v; }
-              ];
-            }).config.p;
+            (genMerge.evalModuleTree { } [
+              { options.p = genMerge.mkOption { type = tA; }; }
+              { options.p = genMerge.mkOption { type = tB; }; }
+              { p = v; }
+            ]).config.p;
         in
         builtins.deepSeq c c
       );
@@ -59,12 +57,10 @@ let
 
   typeOf =
     tA: tB:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.p = genMerge.mkOption { type = tA; }; }
-        { options.p = genMerge.mkOption { type = tB; }; }
-      ];
-    }).options.p.type;
+    (genMerge.evalModuleTree { } [
+      { options.p = genMerge.mkOption { type = tA; }; }
+      { options.p = genMerge.mkOption { type = tB; }; }
+    ]).options.p.type;
 
   between = nt.ints.between 0 1;
 
@@ -153,14 +149,12 @@ in
           attempt = builtins.tryEval (
             let
               ty =
-                (genMerge.evalModuleTree {
-                  modules = [
-                    { options.p = genMerge.mkOption { type = R between; }; }
-                    { options.p = genMerge.mkOption { type = R between; }; }
-                    { options.p = genMerge.mkOption { type = R between; }; }
-                    { p = 1; }
-                  ];
-                }).options.p.type;
+                (genMerge.evalModuleTree { } [
+                  { options.p = genMerge.mkOption { type = R between; }; }
+                  { options.p = genMerge.mkOption { type = R between; }; }
+                  { options.p = genMerge.mkOption { type = R between; }; }
+                  { p = 1; }
+                ]).options.p.type;
               v = {
                 inherit (ty) name;
                 refinements = map (x: x.message) ty.__schema.refinements;

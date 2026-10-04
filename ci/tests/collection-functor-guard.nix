@@ -6,18 +6,16 @@
   ...
 }:
 let
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = genSchema.mkSchemaOption {
-          collections.__functor = {
-            default = { };
-          };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = genSchema.mkSchemaOption {
+        collections.__functor = {
+          default = { };
         };
-        config.schema.host.options.name = genMerge.mkOption { type = genMerge.types.str; };
-      }
-    ];
-  };
+      };
+      config.schema.host.options.name = genMerge.mkOption { type = genMerge.types.str; };
+    }
+  ];
   # Force the schema kind evaluation to trigger the guard
   result = builtins.tryEval (builtins.deepSeq eval.config.schema.host eval.config.schema.host);
 in

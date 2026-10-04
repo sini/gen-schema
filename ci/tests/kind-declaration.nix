@@ -8,30 +8,26 @@ let
   inherit (genSchema) mkSchemaOption;
 
   # Declare a schema with a "host" kind
-  schemaEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  schemaEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   hostKind = schemaEval.config.schema.host;
 
   # Import the kind into an instance evaluation
-  instance = genMerge.evalModuleTree {
-    modules = [
-      hostKind
-      {
-        config.name = "igloo";
-        config.addr = "192.168.1.1";
-      }
-    ];
-  };
+  instance = genMerge.evalModuleTree { } [
+    hostKind
+    {
+      config.name = "igloo";
+      config.addr = "192.168.1.1";
+    }
+  ];
 in
 {
   flake.tests.kind.test-kind-is-callable = {

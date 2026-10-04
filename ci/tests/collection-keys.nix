@@ -17,69 +17,59 @@ let
   str = mkOption { type = types.str; };
 
   # One declared collection, one kind that fills it.
-  plain = evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          collections.includes = {
-            default = [ ];
-          };
+  plain = evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        collections.includes = {
+          default = [ ];
         };
-        config.schema.host = {
-          options.addr = str;
-          includes = [ "policy-a" ];
-        };
-      }
-    ];
-  };
+      };
+      config.schema.host = {
+        options.addr = str;
+        includes = [ "policy-a" ];
+      };
+    }
+  ];
   plainKind = plain.config.schema.host;
 
   # No caller collections — the built-in base alone.
-  noCols = evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host.options.addr = str;
-      }
-    ];
-  };
+  noCols = evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host.options.addr = str;
+    }
+  ];
 
   # Two caller collections — the input the base-only arm never supplies.
-  twoCols = evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          collections.includes = {
-            default = [ ];
-          };
-          collections.excludes = {
-            default = [ ];
-          };
+  twoCols = evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        collections.includes = {
+          default = [ ];
         };
-        config.schema.host.options.addr = str;
-      }
-    ];
-  };
+        collections.excludes = {
+          default = [ ];
+        };
+      };
+      config.schema.host.options.addr = str;
+    }
+  ];
 
   # Two ordinary kinds — the seventh internal option must not disturb _kindNames.
-  ordinary = evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host.options.addr = str;
-        config.schema.user.options.userName = str;
-      }
-    ];
-  };
+  ordinary = evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host.options.addr = str;
+      config.schema.user.options.userName = str;
+    }
+  ];
 
   # A reserved COLLECTION key with ZERO kinds declared. The refusal lives inside the hoisted
   # body, so the published read reaches it — a respelling outside the guard would not.
   readKeys =
     collections:
     let
-      e = evalModuleTree {
-        modules = [ { options.schema = mkSchemaOption { inherit collections; }; } ];
-      };
+      e = evalModuleTree { } [ { options.schema = mkSchemaOption { inherit collections; }; } ];
     in
     builtins.tryEval (builtins.deepSeq e.config.schema._collectionKeys e.config.schema._collectionKeys);
   reservedColAttempt = readKeys {
@@ -101,46 +91,42 @@ let
   # `settings` and `tags` (via `mkAspectSchema`'s caller-supplied cnf) and gen's `includes`,
   # `excludes`, `isEntity`, `isolated`. They are declared TOGETHER, in one schema, because a
   # per-name arm cannot catch a door whose predicate goes wrong on the merged set.
-  liveConsumerNames = evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          collections =
-            prelude.genAttrs
-              [
-                "settings"
-                "tags"
-                "includes"
-                "excludes"
-                "isEntity"
-                "isolated"
-              ]
-              (_: {
-                default = [ ];
-              });
-        };
-      }
-    ];
-  };
+  liveConsumerNames = evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        collections =
+          prelude.genAttrs
+            [
+              "settings"
+              "tags"
+              "includes"
+              "excludes"
+              "isEntity"
+              "isolated"
+            ]
+            (_: {
+              default = [ ];
+            });
+      };
+    }
+  ];
 
   # den-hoag-25mae. A user kind NAMED AFTER a declared internal introspection option. Every
   # existing cell for this behaviour observes the internal names as OPTION DECLARATIONS, on a
   # schema where no user kind carries one -- this is the collision input, and nothing exercised
   # it. `host` is load-bearing: without it `_kindNames` reads `[ ]`, which is also what a fixture
   # declaring no kinds at all returns -- a value that cannot fail.
-  collidePlus = evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema._collectionKeys = {
-          options.x = str;
-        };
-        config.schema.host = {
-          options.addr = str;
-        };
-      }
-    ];
-  };
+  collidePlus = evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema._collectionKeys = {
+        options.x = str;
+      };
+      config.schema.host = {
+        options.addr = str;
+      };
+    }
+  ];
 in
 {
   # O1 — the surface exists where a consumer stands, holding config.schema and nothing else.

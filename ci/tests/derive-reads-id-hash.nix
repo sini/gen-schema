@@ -15,26 +15,24 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = genSchema.mkInstanceRegistry schema.host {
-          extraModules = [
-            {
-              options.hashPrefix = genMerge.mkOption {
-                type = genMerge.types.str;
-                readOnly = true;
-                internal = true;
-              };
-            }
-          ];
-          derive =
-            instances: lib.mapAttrs (_: inst: { hashPrefix = builtins.substring 0 8 inst.id_hash; }) instances;
-        };
-        config.hosts.igloo.addr = "10.0.1.1";
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = genSchema.mkInstanceRegistry schema.host {
+        extraModules = [
+          {
+            options.hashPrefix = genMerge.mkOption {
+              type = genMerge.types.str;
+              readOnly = true;
+              internal = true;
+            };
+          }
+        ];
+        derive =
+          instances: lib.mapAttrs (_: inst: { hashPrefix = builtins.substring 0 8 inst.id_hash; }) instances;
+      };
+      config.hosts.igloo.addr = "10.0.1.1";
+    }
+  ];
 in
 {
   flake.tests."derive-hash" = {

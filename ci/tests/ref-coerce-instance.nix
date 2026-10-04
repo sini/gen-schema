@@ -25,46 +25,44 @@ let
   };
 
   # Test both deferred and direct modes with instance-value coercion.
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
 
-        # Deferred mode with instance value
-        options.services = mkInstanceRegistry schema.service {
-          refs.host = eval.config.hosts;
-        };
+      # Deferred mode with instance value
+      options.services = mkInstanceRegistry schema.service {
+        refs.host = eval.config.hosts;
+      };
 
-        # Direct mode with instance value
-        options.links = mkInstanceRegistry schema.link {
-          extraModules = [
-            (
-              { ... }:
-              {
-                options.target = genMerge.mkOption {
-                  type = declarationOf eval.config.hosts;
-                };
-              }
-            )
-          ];
-        };
+      # Direct mode with instance value
+      options.links = mkInstanceRegistry schema.link {
+        extraModules = [
+          (
+            { ... }:
+            {
+              options.target = genMerge.mkOption {
+                type = declarationOf eval.config.hosts;
+              };
+            }
+          )
+        ];
+      };
 
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-        };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+      };
 
-        # Assign instance values instead of string keys
-        config.services.nginx = {
-          host = eval.config.hosts.igloo;
-          port = 80;
-        };
-        config.links.main = {
-          target = eval.config.hosts.igloo;
-          label = "primary";
-        };
-      }
-    ];
-  };
+      # Assign instance values instead of string keys
+      config.services.nginx = {
+        host = eval.config.hosts.igloo;
+        port = 80;
+      };
+      config.links.main = {
+        target = eval.config.hosts.igloo;
+        label = "primary";
+      };
+    }
+  ];
 in
 {
   flake.tests.ref-coerce-instance = {

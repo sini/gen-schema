@@ -34,8 +34,8 @@ let
     let
       kindValue = mkKind kind (builtins.head modules);
     in
-    genMerge.evalModuleTree {
-      modules = [
+    genMerge.evalModuleTree { } (
+      [
         (mkIdentityModule kindValue (identityKeysForKind { } kindValue))
         {
           options.name = genMerge.mkOption {
@@ -44,8 +44,8 @@ let
           };
         }
       ]
-      ++ modules;
-    }
+      ++ modules
+    )
     // {
       inherit kindValue;
     };

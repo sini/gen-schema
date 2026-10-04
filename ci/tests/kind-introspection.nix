@@ -9,21 +9,19 @@
 let
   inherit (genSchema) mkSchemaOption declarationOf;
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = declarationOf "host"; };
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.host = genMerge.mkOption { type = declarationOf "host"; };
+      };
+    }
+  ];
 
   host = eval.config.schema.host;
   service = eval.config.schema.service;

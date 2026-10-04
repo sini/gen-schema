@@ -29,30 +29,28 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.groups = mkInstanceRegistry schema.group {
-          refs.members = eval.config.hosts;
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.groups = mkInstanceRegistry schema.group {
+        refs.members = eval.config.hosts;
+      };
+      config.hosts = {
+        igloo = {
+          addr = "10.0.1.1";
         };
-        config.hosts = {
-          igloo = {
-            addr = "10.0.1.1";
-          };
-          iceberg = {
-            addr = "10.0.1.2";
-          };
+        iceberg = {
+          addr = "10.0.1.2";
         };
-        config.groups.web = {
-          members = [
-            "igloo"
-            "iceberg"
-          ];
-        };
-      }
-    ];
-  };
+      };
+      config.groups.web = {
+        members = [
+          "igloo"
+          "iceberg"
+        ];
+      };
+    }
+  ];
 
   members = eval.config.groups.web.members;
   set = toSet members;
@@ -68,16 +66,14 @@ in
     test-member-false = {
       expr =
         let
-          eval2 = genMerge.evalModuleTree {
-            modules = [
-              {
-                options.hosts = mkInstanceRegistry schema.host { };
-                config.hosts.other = {
-                  addr = "10.0.1.3";
-                };
-              }
-            ];
-          };
+          eval2 = genMerge.evalModuleTree { } [
+            {
+              options.hosts = mkInstanceRegistry schema.host { };
+              config.hosts.other = {
+                addr = "10.0.1.3";
+              };
+            }
+          ];
         in
         set.member eval2.config.hosts.other;
       expected = false;

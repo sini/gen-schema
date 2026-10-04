@@ -23,36 +23,32 @@ let
   };
 
   # #1: Non-instance attrset passed to a ref field should throw
-  evalBadAttrset = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.services = mkInstanceRegistry schema.service {
-          refs.host = evalBadAttrset.config.hosts;
-        };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-        };
-        config.services.bad = {
-          host = {
-            foo = "bar";
-          }; # not an instance
-        };
-      }
-    ];
-  };
+  evalBadAttrset = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.services = mkInstanceRegistry schema.service {
+        refs.host = evalBadAttrset.config.hosts;
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+      };
+      config.services.bad = {
+        host = {
+          foo = "bar";
+        }; # not an instance
+      };
+    }
+  ];
 
   # #3: toSet on non-instances should throw
-  evalGood = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-        };
-      }
-    ];
-  };
+  evalGood = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+      };
+    }
+  ];
 
   goodSet = toSet (builtins.attrValues evalGood.config.hosts);
 in

@@ -29,44 +29,40 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.services = mkInstanceRegistry schema.service {
-          refs = {
-            host = eval.config.hosts;
-            peers = eval.config.hosts;
-          };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.services = mkInstanceRegistry schema.service {
+        refs = {
+          host = eval.config.hosts;
+          peers = eval.config.hosts;
         };
-        config.hosts.igloo.addr = "10.0.1.1";
-        config.hosts.yurt.addr = "10.0.1.2";
-        config.services.byName = {
-          host = "igloo";
-          peers = [
-            "igloo"
-            "yurt"
-            "igloo"
-          ];
-        };
-        config.services.byValue = {
-          host = eval.config.hosts.yurt;
-          peers = [ eval.config.hosts.yurt ];
-        };
-      }
-    ];
-  };
+      };
+      config.hosts.igloo.addr = "10.0.1.1";
+      config.hosts.yurt.addr = "10.0.1.2";
+      config.services.byName = {
+        host = "igloo";
+        peers = [
+          "igloo"
+          "yurt"
+          "igloo"
+        ];
+      };
+      config.services.byValue = {
+        host = eval.config.hosts.yurt;
+        peers = [ eval.config.hosts.yurt ];
+      };
+    }
+  ];
 
-  direct = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.pick = genMerge.mkOption { type = declarationOf direct.config.hosts; };
-        config.hosts.igloo.addr = "10.0.1.1";
-        config.pick = "igloo";
-      }
-    ];
-  };
+  direct = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.pick = genMerge.mkOption { type = declarationOf direct.config.hosts; };
+      config.hosts.igloo.addr = "10.0.1.1";
+      config.pick = "igloo";
+    }
+  ];
 
   svc = eval.config.services;
   refused = v: (builtins.tryEval (builtins.seq v true)).success;

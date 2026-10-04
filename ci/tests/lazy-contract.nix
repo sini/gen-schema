@@ -8,17 +8,15 @@
 let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
-  schemaEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  schemaEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   schema = schemaEval.config.schema;
 
@@ -34,17 +32,15 @@ let
     };
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.services = lazyRegistry;
-        config.services.web = {
-          port = -1;
-          name = "web";
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.services = lazyRegistry;
+      config.services.web = {
+        port = -1;
+        name = "web";
+      };
+    }
+  ];
 in
 {
   # Lazy contract: non-refined fields remain accessible without triggering the contract
@@ -66,17 +62,15 @@ in
   flake.tests.lazy-contract.test-lazy-valid-passes = {
     expr =
       let
-        validEval = genMerge.evalModuleTree {
-          modules = [
-            {
-              options.services = lazyRegistry;
-              config.services.web = {
-                port = 8080;
-                name = "web";
-              };
-            }
-          ];
-        };
+        validEval = genMerge.evalModuleTree { } [
+          {
+            options.services = lazyRegistry;
+            config.services.web = {
+              port = 8080;
+              name = "web";
+            };
+          }
+        ];
       in
       validEval.config.services.web.port;
     expected = 8080;
@@ -103,17 +97,15 @@ in
             ];
           };
         };
-        mixedEval = genMerge.evalModuleTree {
-          modules = [
-            {
-              options.services = mixedRegistry;
-              config.services.web = {
-                port = 8080;
-                name = "web";
-              };
-            }
-          ];
-        };
+        mixedEval = genMerge.evalModuleTree { } [
+          {
+            options.services = mixedRegistry;
+            config.services.web = {
+              port = 8080;
+              name = "web";
+            };
+          }
+        ];
       in
       mixedEval.config.services.web.port;
     expected = 8080;

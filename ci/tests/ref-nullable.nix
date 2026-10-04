@@ -21,44 +21,42 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.services = mkInstanceRegistry schema.service {
-          extraModules = [
-            (
-              { ... }:
-              {
-                options.upstream = genMerge.mkOption {
-                  type = genMerge.types.nullOr (declarationOf eval.config.services);
-                  default = null;
-                };
-              }
-            )
-          ];
-          refs.host = eval.config.hosts;
-        };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-        };
-        config.services.api = {
-          host = "igloo";
-          port = 8080;
-        };
-        config.services.gateway = {
-          host = "igloo";
-          port = 443;
-          upstream = "api";
-        };
-        config.services.standalone = {
-          host = "igloo";
-          port = 9090;
-          # upstream defaults to null
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.services = mkInstanceRegistry schema.service {
+        extraModules = [
+          (
+            { ... }:
+            {
+              options.upstream = genMerge.mkOption {
+                type = genMerge.types.nullOr (declarationOf eval.config.services);
+                default = null;
+              };
+            }
+          )
+        ];
+        refs.host = eval.config.hosts;
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+      };
+      config.services.api = {
+        host = "igloo";
+        port = 8080;
+      };
+      config.services.gateway = {
+        host = "igloo";
+        port = 443;
+        upstream = "api";
+      };
+      config.services.standalone = {
+        host = "igloo";
+        port = 9090;
+        # upstream defaults to null
+      };
+    }
+  ];
 in
 {
   flake.tests.ref-nullable = {

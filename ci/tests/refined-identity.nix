@@ -50,12 +50,10 @@ let
       attempt = builtins.tryEval (
         let
           opt =
-            (genMerge.evalModuleTree {
-              modules = [
-                { options.probe = genMerge.mkOption { type = tA; }; }
-                { options.probe = genMerge.mkOption { type = tB; }; }
-              ];
-            }).options.probe;
+            (genMerge.evalModuleTree { } [
+              { options.probe = genMerge.mkOption { type = tA; }; }
+              { options.probe = genMerge.mkOption { type = tB; }; }
+            ]).options.probe;
           msgs = map (r: r.message) (opt.type.__schema.refinements or [ ]);
         in
         builtins.deepSeq msgs msgs
@@ -237,9 +235,8 @@ in
             attempt = builtins.tryEval (
               let
                 opt =
-                  (genMerge.evalModuleTree {
-                    modules = map (ty: { options.probe = genMerge.mkOption { type = ty; }; }) ts;
-                  }).options.probe;
+                  (genMerge.evalModuleTree { } (map (ty: { options.probe = genMerge.mkOption { type = ty; }; }) ts))
+                  .options.probe;
                 msgs = map (r: r.message) (opt.type.__schema.refinements or [ ]);
               in
               builtins.deepSeq msgs msgs
@@ -406,13 +403,11 @@ in
           declare =
             tA: tB:
             let
-              tree = genMerge.evalModuleTree {
-                modules = [
-                  { options.probe = genMerge.mkOption { type = tA; }; }
-                  { options.probe = genMerge.mkOption { type = tB; }; }
-                  { config.probe = 70000; }
-                ];
-              };
+              tree = genMerge.evalModuleTree { } [
+                { options.probe = genMerge.mkOption { type = tA; }; }
+                { options.probe = genMerge.mkOption { type = tB; }; }
+                { config.probe = 70000; }
+              ];
               attempt = builtins.tryEval (
                 let
                   violations = map (x: x.message) (checkRefinements "probe" tree.options.probe.type 70000);

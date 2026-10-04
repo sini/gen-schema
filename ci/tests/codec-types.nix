@@ -41,39 +41,37 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.services = mkInstanceRegistry schema.service {
-          refs.host = eval.config.hosts;
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.services = mkInstanceRegistry schema.service {
+        refs.host = eval.config.hosts;
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+        port = 8080;
+        optPort = 443;
+        ports = [
+          80
+          443
+          8080
+        ];
+        labels = {
+          env = "prod";
+          region = "us-east";
         };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-          port = 8080;
-          optPort = 443;
-          ports = [
-            80
-            443
-            8080
-          ];
-          labels = {
-            env = "prod";
-            region = "us-east";
-          };
-          role = "web";
-        };
-        config.hosts.yurt = {
-          addr = "10.0.1.2";
-          port = 9090;
-          role = "worker";
-        };
-        config.services.nginx = {
-          host = "igloo";
-        };
-      }
-    ];
-  };
+        role = "web";
+      };
+      config.hosts.yurt = {
+        addr = "10.0.1.2";
+        port = 9090;
+        role = "worker";
+      };
+      config.services.nginx = {
+        host = "igloo";
+      };
+    }
+  ];
 
   # Codec with type-registered encoder for the (int-typed) port fields.
   # gen-merge/gen-types name the leaf "int" (nixpkgs' port alias "unsignedInt16" is gone);

@@ -47,14 +47,12 @@ let
 
   inst =
     kindValue: addr:
-    (genMerge.evalModuleTree {
-      modules = [
-        {
-          options.reg = mkInstanceRegistry kindValue { };
-          config.reg.pewter.addr = addr;
-        }
-      ];
-    }).config.reg.pewter;
+    (genMerge.evalModuleTree { } [
+      {
+        options.reg = mkInstanceRegistry kindValue { };
+        config.reg.pewter.addr = addr;
+      }
+    ]).config.reg.pewter;
 
   a = inst kindA "10.0.0.1";
   b = inst kindB "10.0.0.1";

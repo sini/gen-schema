@@ -21,9 +21,7 @@ let
     };
   treeWith =
     schemaOption: modules:
-    (genMerge.evalModuleTree {
-      modules = [ { options.schema = schemaOption; } ] ++ modules;
-    }).config.schema;
+    (genMerge.evalModuleTree { } ([ { options.schema = schemaOption; } ] ++ modules)).config.schema;
   tree = treeWith (mkSchemaOption { });
   mark = k: k.__mint.minted;
   ancestorCount = k: builtins.length (builtins.attrNames k.__kindAncestors);

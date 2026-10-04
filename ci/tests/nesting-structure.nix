@@ -23,28 +23,26 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host {
-          extraModules = [
-            (
-              { ... }:
-              {
-                options.users = mkInstanceRegistry schema.user { };
-              }
-            )
-          ];
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host {
+        extraModules = [
+          (
+            { ... }:
+            {
+              options.users = mkInstanceRegistry schema.user { };
+            }
+          )
+        ];
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+        users.tux = {
+          shell = "/bin/zsh";
         };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-          users.tux = {
-            shell = "/bin/zsh";
-          };
-        };
-      }
-    ];
-  };
+      };
+    }
+  ];
 in
 {
   flake.tests.nesting = {

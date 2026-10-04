@@ -15,17 +15,15 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        config.hosts.igloo = {
-          name = "igloo";
-          undeclaredKey = "should work";
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      config.hosts.igloo = {
+        name = "igloo";
+        undeclaredKey = "should work";
+      };
+    }
+  ];
 
   result = builtins.tryEval (builtins.deepSeq eval.config.hosts.igloo eval.config.hosts.igloo);
 in

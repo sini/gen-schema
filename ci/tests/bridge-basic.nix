@@ -73,15 +73,13 @@ in
     expr =
       let
         result = emitModule [ ] optionRecord;
-        eval = genMerge.evalModuleTree {
-          modules = [
-            result.module
-            {
-              config.port = 9090;
-              config.hostname = "test";
-            }
-          ];
-        };
+        eval = genMerge.evalModuleTree { } [
+          result.module
+          {
+            config.port = 9090;
+            config.hostname = "test";
+          }
+        ];
       in
       eval.config.port;
     expected = 9090;
@@ -91,12 +89,10 @@ in
     expr =
       let
         result = emitModule [ ] optionRecord;
-        eval = genMerge.evalModuleTree {
-          modules = [
-            result.module
-            { config.hostname = "test"; }
-          ];
-        };
+        eval = genMerge.evalModuleTree { } [
+          result.module
+          { config.hostname = "test"; }
+        ];
       in
       eval.config.port;
     expected = 8080;
@@ -115,15 +111,13 @@ in
     expr =
       let
         result = emitModule [ ] refinedRecord;
-        eval = genMerge.evalModuleTree {
-          modules = [
-            result.module
-            {
-              config.port = 8080;
-              config.name = "test";
-            }
-          ];
-        };
+        eval = genMerge.evalModuleTree { } [
+          result.module
+          {
+            config.port = 8080;
+            config.name = "test";
+          }
+        ];
       in
       eval.config.port;
     expected = 8080;
@@ -154,12 +148,10 @@ in
     expr =
       let
         result = emitModule [ "validators" ] collectionRecord;
-        eval = genMerge.evalModuleTree {
-          modules = [
-            result.module
-            { config.port = 8080; }
-          ];
-        };
+        eval = genMerge.evalModuleTree { } [
+          result.module
+          { config.port = 8080; }
+        ];
       in
       eval.config ? validators;
     expected = false;

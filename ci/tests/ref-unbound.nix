@@ -24,12 +24,10 @@ let
   outside =
     type: v:
     verdict
-      (genMerge.evalModuleTree {
-        modules = [
-          { options.o = genMerge.mkOption { inherit type; }; }
-          { o = v; }
-        ];
-      }).config.o;
+      (genMerge.evalModuleTree { } [
+        { options.o = genMerge.mkOption { inherit type; }; }
+        { o = v; }
+      ]).config.o;
   schema = evalSchema {
     modules = [
       {
@@ -47,22 +45,20 @@ let
   };
   inKind =
     host: members:
-    (genMerge.evalModuleTree {
-      modules = [
-        (
-          { config, ... }:
-          {
-            options.hosts = mkInstanceRegistry schema.host { };
-            options.svcs = mkInstanceRegistry schema.svc { refs.host = config.hosts; };
-            options.grps = mkInstanceRegistry schema.grp { refs.members = config.hosts; };
-            config.hosts.a = { };
-            config.hosts.b = { };
-            config.svcs.s.host = host;
-            config.grps.g.members = members;
-          }
-        )
-      ];
-    }).config;
+    (genMerge.evalModuleTree { } [
+      (
+        { config, ... }:
+        {
+          options.hosts = mkInstanceRegistry schema.host { };
+          options.svcs = mkInstanceRegistry schema.svc { refs.host = config.hosts; };
+          options.grps = mkInstanceRegistry schema.grp { refs.members = config.hosts; };
+          config.hosts.a = { };
+          config.hosts.b = { };
+          config.svcs.s.host = host;
+          config.grps.g.members = members;
+        }
+      )
+    ]).config;
 in
 {
   flake.tests.ref-unbound = {
@@ -92,14 +88,12 @@ in
     test-kind-without-registry-refused = {
       expr =
         verdict
-          (genMerge.evalModuleTree {
-            modules = [
-              {
-                options.one = genMerge.mkOption { type = mkInstanceType schema.svc { }; };
-                config.one.host = "a";
-              }
-            ];
-          }).config.one.host;
+          (genMerge.evalModuleTree { } [
+            {
+              options.one = genMerge.mkOption { type = mkInstanceType schema.svc { }; };
+              config.one.host = "a";
+            }
+          ]).config.one.host;
       expected = "REFUSED";
     };
     test-bound-in-a-kind-resolves = {
@@ -156,24 +150,22 @@ in
         };
         run =
           r:
-          (genMerge.evalModuleTree {
-            modules = [
-              (
-                { config, ... }:
-                {
-                  options.hosts = mkInstanceRegistry rschema.host { };
-                  options.rs = mkInstanceRegistry rschema.r {
-                    refs.h = config.hosts;
-                    refs.n = config.hosts;
-                    refs.l = config.hosts;
-                  };
-                  config.hosts.a = { };
-                  config.hosts.b = { };
-                  config.rs.y = r;
-                }
-              )
-            ];
-          }).config.rs.y;
+          (genMerge.evalModuleTree { } [
+            (
+              { config, ... }:
+              {
+                options.hosts = mkInstanceRegistry rschema.host { };
+                options.rs = mkInstanceRegistry rschema.r {
+                  refs.h = config.hosts;
+                  refs.n = config.hosts;
+                  refs.l = config.hosts;
+                };
+                config.hosts.a = { };
+                config.hosts.b = { };
+                config.rs.y = r;
+              }
+            )
+          ]).config.rs.y;
       in
       {
         expr = {

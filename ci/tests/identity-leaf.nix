@@ -30,8 +30,8 @@ let
   kindValue = (evalSchema { modules = [ { config.schema.host = hostDecl; } ]; }).host;
   direct =
     extra:
-    genMerge.evalModuleTree {
-      modules = [
+    genMerge.evalModuleTree { } (
+      [
         (mkIdentityModule kindValue (identityKeysForKind { } kindValue))
         hostDecl
 
@@ -41,8 +41,8 @@ let
         }
 
       ]
-      ++ extra;
-    };
+      ++ extra
+    );
   identityType = (direct [ ]).options._identity.type;
 
   # The published path: an instance of a registry, on a strict kind (the default) and a lax one.
@@ -59,20 +59,18 @@ let
     }).host;
   one =
     regOpts: v:
-    (genMerge.evalModuleTree {
-      modules = [
+    (genMerge.evalModuleTree { } [
 
-        {
-          options.hosts = mkInstanceRegistry frozenHost regOpts;
-          config.hosts.h = {
-            addr = "10.0.0.1";
-            role = "web";
-          }
-          // v;
+      {
+        options.hosts = mkInstanceRegistry frozenHost regOpts;
+        config.hosts.h = {
+          addr = "10.0.0.1";
+          role = "web";
         }
+        // v;
+      }
 
-      ];
-    }).config.hosts.h;
+    ]).config.hosts.h;
   read = h: {
     inherit (h) id_hash _identity _identityKeys;
   };

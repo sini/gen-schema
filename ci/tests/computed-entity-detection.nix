@@ -7,42 +7,40 @@
 let
   inherit (genSchema) mkSchemaOption;
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          collections.includes = {
-            default = [ ];
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        collections.includes = {
+          default = [ ];
+        };
+        collections.excludes = {
+          default = [ ];
+        };
+        computed =
+          collections: defs:
+          let
+            hasStructural = lib.any (
+              d: builtins.isAttrs d.value && (d.value ? options || d.value ? config)
+            ) defs;
+            hasCollections = collections.includes != [ ] || collections.excludes != [ ];
+          in
+          {
+            isEntity = hasStructural || hasCollections;
           };
-          collections.excludes = {
-            default = [ ];
-          };
-          computed =
-            collections: defs:
-            let
-              hasStructural = lib.any (
-                d: builtins.isAttrs d.value && (d.value ? options || d.value ? config)
-              ) defs;
-              hasCollections = collections.includes != [ ] || collections.excludes != [ ];
-            in
-            {
-              isEntity = hasStructural || hasCollections;
-            };
-        };
-        # Kind with includes (entity)
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          includes = [ "networking" ];
-        };
-        # Empty kind (not entity)
-        config.schema.tag = { };
-        # Kind with structural content only (entity)
-        config.schema.app = {
-          options.version = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+      };
+      # Kind with includes (entity)
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+        includes = [ "networking" ];
+      };
+      # Empty kind (not entity)
+      config.schema.tag = { };
+      # Kind with structural content only (entity)
+      config.schema.app = {
+        options.version = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 in
 {
   flake.tests.entity-detect.test-host-is-entity = {

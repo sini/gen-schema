@@ -41,33 +41,31 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.items = mkInstanceRegistry schema.item { };
-        config.items.strItem = {
-          value = "hello";
-          flexible = "text";
-          mixed = "plain";
-        };
-        config.items.intItem = {
-          value = 42;
-          flexible = 99;
-          mixed = [
-            1
-            2
-            3
-          ];
-        };
-        config.items.boolItem = {
-          value = "yes";
-          optValue = 10;
-          flexible = true;
-          mixed = "fallback";
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.items = mkInstanceRegistry schema.item { };
+      config.items.strItem = {
+        value = "hello";
+        flexible = "text";
+        mixed = "plain";
+      };
+      config.items.intItem = {
+        value = 42;
+        flexible = 99;
+        mixed = [
+          1
+          2
+          3
+        ];
+      };
+      config.items.boolItem = {
+        value = "yes";
+        optValue = 10;
+        flexible = true;
+        mixed = "fallback";
+      };
+    }
+  ];
 
   # Register a codec for int type
   codec = mkCodec schema.item {

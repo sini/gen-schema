@@ -17,9 +17,8 @@ let
   intOpt = genMerge.mkOption { type = genMerge.types.int; };
   tree =
     modules:
-    (genMerge.evalModuleTree {
-      modules = [ { options.schema = mkSchemaOption { }; } ] ++ modules;
-    }).config.schema;
+    (genMerge.evalModuleTree { } ([ { options.schema = mkSchemaOption { }; } ] ++ modules))
+    .config.schema;
   # ONE source position for every application.
   layer = name: parent: o: {
     config.schema.${name} = {
@@ -66,23 +65,17 @@ let
   sv2 = tree [ (asValue "2" sv1.base) ];
   byPath =
     file: parent:
-    (genMerge.evalModuleTree {
-      specialArgs = { inherit parent intOpt; };
-      modules = [
-        { options.schema = mkSchemaOption { }; }
-        file
-      ];
-    }).config.schema;
+    (genMerge.evalModuleTree { specialArgs = { inherit parent intOpt; }; } [
+      { options.schema = mkSchemaOption { }; }
+      file
+    ]).config.schema;
   # one layer FILE that sets its own `_file` per application, imported by path (tag via specialArgs)
   byPathTagged =
     file: tag: parent:
-    (genMerge.evalModuleTree {
-      specialArgs = { inherit parent intOpt tag; };
-      modules = [
-        { options.schema = mkSchemaOption { }; }
-        file
-      ];
-    }).config.schema;
+    (genMerge.evalModuleTree { specialArgs = { inherit parent intOpt tag; }; } [
+      { options.schema = mkSchemaOption { }; }
+      file
+    ]).config.schema;
   pt1 = byPathTagged ../test-fixtures/shared-layer-tagged.nix "1" t0.base;
   pt2 = byPathTagged ../test-fixtures/shared-layer-tagged.nix "2" pt1.base;
   # the same applications from two DISTINCT path modules that set ONE `_file`

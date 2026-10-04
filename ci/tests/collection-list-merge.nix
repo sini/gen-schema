@@ -7,26 +7,24 @@
 let
   inherit (genSchema) mkSchemaOption;
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption {
-          collections.includes = {
-            default = [ ];
-          };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption {
+        collections.includes = {
+          default = [ ];
         };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          includes = [ "networking" ];
-        };
-      }
-      {
-        config.schema.host = {
-          includes = [ "monitoring" ];
-        };
-      }
-    ];
-  };
+      };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+        includes = [ "networking" ];
+      };
+    }
+    {
+      config.schema.host = {
+        includes = [ "monitoring" ];
+      };
+    }
+  ];
 in
 {
   flake.tests.collection-list.test-merged-includes = {

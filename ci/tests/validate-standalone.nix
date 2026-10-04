@@ -17,34 +17,30 @@ let
 
   # Build schema with validators, but create instances manually (not via registry)
   # to avoid the registry's apply pipeline throwing on validation failure.
-  schemaEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = genSchema.mkSchemaOption { };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          validators = [
-            (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
-          ];
-        };
-      }
-    ];
-  };
+  schemaEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = genSchema.mkSchemaOption { };
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        validators = [
+          (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
+        ];
+      };
+    }
+  ];
 
   # Create instances directly via mkInstanceType (no apply pipeline)
   hostType = genSchema.mkInstanceType schemaEval.config.schema.host { };
-  instanceEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = genMerge.mkOption {
-          type = genMerge.types.attrsOf hostType;
-          default = { };
-        };
-        config.hosts.good.addr = "10.0.1.1";
-        config.hosts.bad.addr = "";
-      }
-    ];
-  };
+  instanceEval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = genMerge.mkOption {
+        type = genMerge.types.attrsOf hostType;
+        default = { };
+      };
+      config.hosts.good.addr = "10.0.1.1";
+      config.hosts.bad.addr = "";
+    }
+  ];
 
   result = genSchema.validateInstances schemaEval.config.schema.host instanceEval.config.hosts;
 in

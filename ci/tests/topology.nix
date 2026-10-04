@@ -7,23 +7,21 @@
 let
   inherit (genSchema) mkSchemaOption;
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.user = {
-          parent = "host";
-          options.shell = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.network = {
-          options.cidr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.user = {
+        parent = "host";
+        options.shell = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.network = {
+        options.cidr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   schema = eval.config.schema;
   topo = schema._topology;

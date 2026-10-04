@@ -17,32 +17,30 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.services = mkInstanceRegistry schema.service {
-          extraModules = [
-            (
-              { ... }:
-              {
-                options.upstream = genMerge.mkOption {
-                  type = genMerge.types.nullOr (declarationOf eval.config.services);
-                  default = null;
-                };
-              }
-            )
-          ];
-        };
-        config.services.api = {
-          port = 8080;
-        };
-        config.services.gateway = {
-          port = 443;
-          upstream = "api";
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.services = mkInstanceRegistry schema.service {
+        extraModules = [
+          (
+            { ... }:
+            {
+              options.upstream = genMerge.mkOption {
+                type = genMerge.types.nullOr (declarationOf eval.config.services);
+                default = null;
+              };
+            }
+          )
+        ];
+      };
+      config.services.api = {
+        port = 8080;
+      };
+      config.services.gateway = {
+        port = 443;
+        upstream = "api";
+      };
+    }
+  ];
 in
 {
   flake.tests.ref-self-reference = {

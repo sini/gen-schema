@@ -19,18 +19,16 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        config.hosts.igloo.addr = "10.0.1.1";
-        config.hosts.yurt = {
-          addr = "10.0.1.2";
-          system = "aarch64-linux";
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      config.hosts.igloo.addr = "10.0.1.1";
+      config.hosts.yurt = {
+        addr = "10.0.1.2";
+        system = "aarch64-linux";
+      };
+    }
+  ];
 in
 {
   flake.tests.defaults = {

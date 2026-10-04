@@ -63,9 +63,8 @@ let
       # at pass 0.
       evalAt =
         injected:
-        (merge.evalModuleTree {
-          modules = [ { options.schema = resolvedSchemaOption; } ] ++ modules ++ injected;
-        }).config.schema;
+        (merge.evalModuleTree { } ([ { options.schema = resolvedSchemaOption; } ] ++ modules ++ injected))
+        .config.schema;
 
       # Pass 0 freezes every kind that inherits nothing. Reading `.inherits` off it is safe on a
       # kind whose parents have not been injected yet: collections are extracted by the entry

@@ -56,46 +56,44 @@ let
 
   mk =
     extra:
-    (genMerge.evalModuleTree {
-      modules = [
-        (
-          { config, ... }:
-          {
-            options.hosts = mkInstanceRegistry schema.host { };
-            options.spares = mkInstanceRegistry schema.host { };
-            options.services = mkInstanceRegistry schema.service {
-              refs = {
-                host = config.hosts;
-                peers = config.hosts;
-              };
+    (genMerge.evalModuleTree { } [
+      (
+        { config, ... }:
+        {
+          options.hosts = mkInstanceRegistry schema.host { };
+          options.spares = mkInstanceRegistry schema.host { };
+          options.services = mkInstanceRegistry schema.service {
+            refs = {
+              host = config.hosts;
+              peers = config.hosts;
             };
-            options.nodes = mkInstanceRegistry schema.node {
-              refs.parent = {
-                deferred = true;
-                instances = config.nodes;
-              };
+          };
+          options.nodes = mkInstanceRegistry schema.node {
+            refs.parent = {
+              deferred = true;
+              instances = config.nodes;
             };
-            options.links = mkInstanceRegistry schema.link {
-              extraModules = [ { options.target = opt { type = declarationOf config.hosts; }; } ];
-            };
-            options.handLinks = mkInstanceRegistry schema.link {
-              extraModules = [ { options.target = opt { type = declarationOf hand; }; } ];
-            };
-            config.hosts.igloo.addr = "10.0.0.1";
-            config.hosts.yurt = {
-              addr = "10.0.0.2";
-              name = "renamed";
-            };
-            config.spares.igloo.addr = "10.9.9.9";
-            config.nodes.n0.addr = "n0";
-            config.links.main.label = "l";
-            config.links.back.label = "b";
-            config.handLinks.main.label = "l";
-          }
-        )
-        extra
-      ];
-    }).config;
+          };
+          options.links = mkInstanceRegistry schema.link {
+            extraModules = [ { options.target = opt { type = declarationOf config.hosts; }; } ];
+          };
+          options.handLinks = mkInstanceRegistry schema.link {
+            extraModules = [ { options.target = opt { type = declarationOf hand; }; } ];
+          };
+          config.hosts.igloo.addr = "10.0.0.1";
+          config.hosts.yurt = {
+            addr = "10.0.0.2";
+            name = "renamed";
+          };
+          config.spares.igloo.addr = "10.9.9.9";
+          config.nodes.n0.addr = "n0";
+          config.links.main.label = "l";
+          config.links.back.label = "b";
+          config.handLinks.main.label = "l";
+        }
+      )
+      extra
+    ]).config;
 
   # A stamp-bearing record that is not a gen-schema instance: no `_identityKeys` datum.
   hand.a = {

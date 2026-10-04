@@ -34,20 +34,18 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-          role = "web";
-        };
-        config.hosts.yurt = {
-          addr = "10.0.1.2";
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+        role = "web";
+      };
+      config.hosts.yurt = {
+        addr = "10.0.1.2";
+      };
+    }
+  ];
 
   codec = mkCodec schema.host {
     excludeFields = [ "tags" ];

@@ -26,21 +26,19 @@ let
     let
       result = builtins.tryEval (
         let
-          eval = genMerge.evalModuleTree {
-            modules = [
-              {
-                options.hosts = mkInstanceRegistry schema.host { };
-                # No refs.host — should throw when service instances are evaluated
-                options.services = mkInstanceRegistry schema.service { };
-                config.hosts.igloo = {
-                  addr = "10.0.1.1";
-                };
-                config.services.nginx = {
-                  host = "igloo";
-                };
-              }
-            ];
-          };
+          eval = genMerge.evalModuleTree { } [
+            {
+              options.hosts = mkInstanceRegistry schema.host { };
+              # No refs.host — should throw when service instances are evaluated
+              options.services = mkInstanceRegistry schema.service { };
+              config.hosts.igloo = {
+                addr = "10.0.1.1";
+              };
+              config.services.nginx = {
+                host = "igloo";
+              };
+            }
+          ];
         in
         # Force evaluation of the service registry to trigger ref scanning
         builtins.attrNames eval.config.services

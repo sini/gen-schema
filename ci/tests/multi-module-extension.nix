@@ -8,41 +8,37 @@ let
   inherit (genSchema) mkSchemaOption;
 
   # Three separate modules each extending schema.host with different options
-  schemaEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
+  schemaEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+    {
+      config.schema.host = {
+        options.port = genMerge.mkOption {
+          type = genMerge.types.int;
+          default = 22;
         };
-      }
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-      {
-        config.schema.host = {
-          options.port = genMerge.mkOption {
-            type = genMerge.types.int;
-            default = 22;
-          };
-        };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   hostKind = schemaEval.config.schema.host;
 
-  instance = genMerge.evalModuleTree {
-    modules = [
-      hostKind
-      {
-        config.name = "igloo";
-        config.addr = "10.0.0.1";
-      }
-    ];
-  };
+  instance = genMerge.evalModuleTree { } [
+    hostKind
+    {
+      config.name = "igloo";
+      config.addr = "10.0.0.1";
+    }
+  ];
 in
 {
   flake.tests.kind-extend.test-name-from-first-module = {

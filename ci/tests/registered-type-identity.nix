@@ -18,18 +18,15 @@ let
   refused = e: !(builtins.tryEval (builtins.deepSeq e e)).success;
   tree =
     modules:
-    (genMerge.evalModuleTree {
-      modules = [ { options.schema = mkSchemaOption { }; } ] ++ modules;
-    }).config.schema;
+    (genMerge.evalModuleTree { } ([ { options.schema = mkSchemaOption { }; } ] ++ modules))
+    .config.schema;
   kindOf = t: (tree [ { config.schema.bobbin.options.n = genMerge.mkOption { type = t; }; } ]).bobbin;
   evalOpt =
     t: v:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.o = genMerge.mkOption { type = t; }; }
-        { config.o = v; }
-      ];
-    }).config.o;
+    (genMerge.evalModuleTree { } [
+      { options.o = genMerge.mkOption { type = t; }; }
+      { config.o = v; }
+    ]).config.o;
   tryOpt =
     t: v:
     let

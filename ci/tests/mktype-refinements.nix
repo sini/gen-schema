@@ -21,21 +21,17 @@ let
 
   kindOf =
     args: decl:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = mkSchemaOption args; }
-        { config.schema.host = decl; }
-      ];
-    }).config.schema.host;
+    (genMerge.evalModuleTree { } [
+      { options.schema = mkSchemaOption args; }
+      { config.schema.host = decl; }
+    ]).config.schema.host;
 
   hostsWith =
     k: v:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.hosts = mkInstanceRegistry k { }; }
-        { config.hosts.a.myPort = v; }
-      ];
-    }).config.hosts.a.myPort;
+    (genMerge.evalModuleTree { } [
+      { options.hosts = mkInstanceRegistry k { }; }
+      { config.hosts.a.myPort = v; }
+    ]).config.hosts.a.myPort;
 
   refinedDecl = {
     options.myPort = genMerge.mkOption { type = rp; };
@@ -87,7 +83,7 @@ in
           std = kindOf { } decl;
           names = kv: builtins.attrNames kv.options;
           imported = builtins.filter (n: builtins.substring 0 7 n != "_module") (
-            builtins.attrNames (genMerge.evalModuleTree { modules = [ k ]; }).options
+            builtins.attrNames (genMerge.evalModuleTree { } [ k ]).options
           );
         in
         {
@@ -147,7 +143,7 @@ in
         {
           inherit published;
           imported = builtins.filter (n: builtins.substring 0 7 n != "_module") (
-            builtins.attrNames (genMerge.evalModuleTree { modules = [ k ]; }).options
+            builtins.attrNames (genMerge.evalModuleTree { } [ k ]).options
           );
           identityKeysArePublished = genSchema.identityKeysForKind { } k == [ "name" ] ++ published;
         };

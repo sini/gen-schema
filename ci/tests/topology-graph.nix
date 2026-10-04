@@ -21,9 +21,8 @@
 let
   schemaOf =
     gs: modules:
-    (genMerge.evalModuleTree {
-      modules = [ { options.schema = gs.mkSchemaOption { }; } ] ++ modules;
-    }).config.schema;
+    (genMerge.evalModuleTree { } ([ { options.schema = gs.mkSchemaOption { }; } ] ++ modules))
+    .config.schema;
   kinds = attrs: [ { config.schema = attrs; } ];
 
   stubbed = import ../../lib {

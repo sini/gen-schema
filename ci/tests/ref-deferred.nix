@@ -22,24 +22,22 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = mkInstanceRegistry schema.host { };
-        options.services = mkInstanceRegistry schema.service {
-          refs.host = eval.config.hosts;
-        };
-        config.hosts.igloo = {
-          addr = "10.0.1.1";
-          role = "web";
-        };
-        config.services.nginx = {
-          host = "igloo";
-          port = 80;
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry schema.host { };
+      options.services = mkInstanceRegistry schema.service {
+        refs.host = eval.config.hosts;
+      };
+      config.hosts.igloo = {
+        addr = "10.0.1.1";
+        role = "web";
+      };
+      config.services.nginx = {
+        host = "igloo";
+        port = 80;
+      };
+    }
+  ];
 
   inherit (eval.config.services) nginx;
 in

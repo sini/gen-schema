@@ -15,9 +15,8 @@ let
   intOpt = genMerge.mkOption { type = T.int; };
   tree =
     modules:
-    (genMerge.evalModuleTree {
-      modules = [ { options.schema = mkSchemaOption { }; } ] ++ modules;
-    }).config.schema;
+    (genMerge.evalModuleTree { } ([ { options.schema = mkSchemaOption { }; } ] ++ modules))
+    .config.schema;
   k80 =
     (tree [
       {
@@ -30,22 +29,18 @@ let
   typeOnly = _: (tree [ { config.schema.host.options.port = intOpt; } ]).host;
   via =
     type: v:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.v = genMerge.mkOption { inherit type; }; }
-        { config.v.x = v; }
-      ];
-    }).config.v.x;
+    (genMerge.evalModuleTree { } [
+      { options.v = genMerge.mkOption { inherit type; }; }
+      { config.v.x = v; }
+    ]).config.v.x;
   # an honest kind whose computed field has no WHNF value, at the top level, inside an attrset and
   # inside a list: nix and Determinate force a shared throwing slot under `==`, Lix does not
   kindWith =
     computed:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.schema = mkSchemaOption { inherit computed; }; }
-        { config.schema.host.options.port = intOpt; }
-      ];
-    }).config.schema.host;
+    (genMerge.evalModuleTree { } [
+      { options.schema = mkSchemaOption { inherit computed; }; }
+      { config.schema.host.options.port = intOpt; }
+    ]).config.schema.host;
   boomy = kindWith (_: _: { boom = throw "boom"; });
   kMeta = kindWith (
     _: _: {
@@ -110,12 +105,10 @@ let
   opts = k: builtins.attrNames k.options;
   instanceOf =
     kind:
-    (genMerge.evalModuleTree {
-      modules = [
-        { options.h = genMerge.mkOption { type = mkInstanceType kind { }; }; }
-        { config.h.name = "a"; }
-      ];
-    }).config.h;
+    (genMerge.evalModuleTree { } [
+      { options.h = genMerge.mkOption { type = mkInstanceType kind { }; }; }
+      { config.h.name = "a"; }
+    ]).config.h;
   # a walker of gen-demo `c94`'s `pathsNamed` shape: it descends attrsets and lists and stops at
   # anything else, so it terminates over a kind value only while the witness is a function
   leaves =
@@ -228,12 +221,10 @@ in
     };
     test-swapped-kind-under-types-submodule-composes-unread = {
       expr = builtins.attrNames (
-        (genMerge.evalModuleTree {
-          modules = [
-            { options.h = genMerge.mkOption { type = T.submodule (foreign // { options = { }; }); }; }
-            { config.h.b = 1; }
-          ];
-        }).config.h
+        (genMerge.evalModuleTree { } [
+          { options.h = genMerge.mkOption { type = T.submodule (foreign // { options = { }; }); }; }
+          { config.h.b = 1; }
+        ]).config.h
       );
       expected = [ "b" ];
     };

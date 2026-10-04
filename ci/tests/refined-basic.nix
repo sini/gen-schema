@@ -132,14 +132,12 @@ in
   flake.tests.refined-basic.test-evalmodules-with-refined-type = {
     expr =
       let
-        eval = genMerge.evalModuleTree {
-          modules = [
-            {
-              options.port = genMerge.mkOption { type = refinedPort; };
-              config.port = 8080;
-            }
-          ];
-        };
+        eval = genMerge.evalModuleTree { } [
+          {
+            options.port = genMerge.mkOption { type = refinedPort; };
+            config.port = 8080;
+          }
+        ];
       in
       eval.config.port;
     expected = 8080;

@@ -15,18 +15,16 @@ let
     ];
   };
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = genSchema.mkInstanceRegistry schema.host {
-          deriveEither = {
-            derive = _instances: { left = "something went wrong"; };
-          };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = genSchema.mkInstanceRegistry schema.host {
+        deriveEither = {
+          derive = _instances: { left = "something went wrong"; };
         };
-        config.hosts.igloo.addr = "10.0.1.1";
-      }
-    ];
-  };
+      };
+      config.hosts.igloo.addr = "10.0.1.1";
+    }
+  ];
 in
 {
   flake.tests."derive-either-left" = {

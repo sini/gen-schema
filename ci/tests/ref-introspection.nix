@@ -7,24 +7,22 @@
 let
   inherit (genSchema) mkSchemaOption declarationOf;
 
-  eval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = mkSchemaOption { };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = declarationOf "host"; };
-        };
-        # Kind with no refs
-        config.schema.network = {
-          options.cidr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  eval = genMerge.evalModuleTree { } [
+    {
+      options.schema = mkSchemaOption { };
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.host = genMerge.mkOption { type = declarationOf "host"; };
+      };
+      # Kind with no refs
+      config.schema.network = {
+        options.cidr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   serviceKind = eval.config.schema.service;
   hostKind = eval.config.schema.host;

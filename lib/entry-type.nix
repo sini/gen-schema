@@ -1068,10 +1068,7 @@ let
         introspectOf =
           module:
           let
-            tree = merge.evalModuleTree {
-              modules = [ module ];
-              inherit specialArgs;
-            };
+            tree = merge.evalModuleTree { specialArgs = specialArgs; } [ module ];
             options = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) tree.options;
           in
           {

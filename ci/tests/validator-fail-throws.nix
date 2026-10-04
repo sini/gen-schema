@@ -6,33 +6,29 @@
   ...
 }:
 let
-  schemaEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.schema = genSchema.mkSchemaOption { };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          validators = [
-            (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
-          ];
-        };
-      }
-    ];
-  };
+  schemaEval = genMerge.evalModuleTree { } [
+    {
+      options.schema = genSchema.mkSchemaOption { };
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        validators = [
+          (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
+        ];
+      };
+    }
+  ];
   hostType = genSchema.mkInstanceType schemaEval.config.schema.host { };
-  instanceEval = genMerge.evalModuleTree {
-    modules = [
-      {
-        options.hosts = genMerge.mkOption {
-          type = genMerge.types.attrsOf hostType;
-          default = { };
-        };
-        config.hosts.bad = {
-          addr = "";
-        };
-      }
-    ];
-  };
+  instanceEval = genMerge.evalModuleTree { } [
+    {
+      options.hosts = genMerge.mkOption {
+        type = genMerge.types.attrsOf hostType;
+        default = { };
+      };
+      config.hosts.bad = {
+        addr = "";
+      };
+    }
+  ];
   result = genSchema.validateInstances schemaEval.config.schema.host instanceEval.config.hosts;
 in
 {
