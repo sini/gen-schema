@@ -1825,26 +1825,31 @@ let
                     # reading that spine made each kind on a value cycle consume its partner's WHNF before
                     # any guard ran. Scoped to this arm: the default arm's key set reads no parent, so it
                     # keeps `strippedDefs` and pays nothing, and the plane below keeps it on both arms,
-                    # so no mark moves. The stripping is re-mapped here rather than bound beside
-                    # `strippedDefs`, which would cost the default arm a thunk per kind.
+                    # so no mark moves. A kind that inherits nothing has no desugared def, so it hands
+                    # the caller `strippedDefs` itself.
                     custom = mkType {
                       kindModule = resolvedBase;
                       collections = extractedCollections;
                       defs =
-                        map (
-                          d:
-                          if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
-                            d // { value = builtins.removeAttrs d.value collectionKeys; }
-                          else
-                            d
-                        ) defs
-                        ++ prelude.optional (declaredRaw != [ ]) {
-                          file = "<gen-schema: kind '${kind}' inherits>";
-                          value.imports = map (d: {
-                            _file = d.file;
-                            inherit (d.value) imports;
-                          }) desugaredDefs;
-                        };
+                        if declaredRaw == [ ] then
+                          strippedDefs
+                        else
+                          map (
+                            d:
+                            if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
+                              d // { value = builtins.removeAttrs d.value collectionKeys; }
+                            else
+                              d
+                          ) defs
+                          ++ [
+                            {
+                              file = "<gen-schema: kind '${kind}' inherits>";
+                              value.imports = map (d: {
+                                _file = d.file;
+                                inherit (d.value) imports;
+                              }) desugaredDefs;
+                            }
+                          ];
                       inherit kind;
                     };
                     # The keys the arm applies over the `mkType` result. `options = { }` and `refs = { }`
