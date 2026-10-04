@@ -913,12 +913,12 @@ exceptions to "a value or a named refusal", enumerated and pinned (`ci/tests-err
 closed:
 
 - **A caller `mkType` whose result SHAPE reads what a parent IS** (the content of the desugared def's
-  `imports`, or an entry of the `inherits` collection) aborts uncatchably with `infinite recursion encountered` on every evaluator when the kind is on a value cycle. This is an ADR-0025 item 1
-  enumeration, argued by its mechanism: while the kind's key set is the caller's result key set, a
-  caller that forces a partner's WHNF at its own makes the two WHNFs mutually dependent before any
-  gen-schema code runs, so no guard here can catch it. The price has the shape ADR-0033 records for
-  the `nta` narrowing (expressible and undetected), and the analogous closure route is a named
-  re-entry guard (`den-hoag-tz1om`). On an acyclic tree such a caller is served. Pinned by
+  `imports`, or an entry of the `inherits` collection) aborts uncatchably with `infinite recursion encountered` on every evaluator when the kind is on a value cycle. It is enumerated and argued by its
+  mechanism: while the kind's key set is the caller's result key set, a caller that forces a partner's
+  WHNF at its own makes the two WHNFs mutually dependent before any gen-schema code runs, so no guard
+  here can catch it. The cycle is expressible and undetected, the price evaluation pays for a re-entry
+  into a value under construction; the route that would close it is a named re-entry guard on that
+  value, not a check gen-schema can run first. On an acyclic tree such a caller is served. Pinned by
   `cross-tree-cycle-refusals.test-a-caller-reading-the-parent-imports-at-its-result-shape-aborts`.
 
   **The caller contract.** A caller `mkType` receives `defs` as the kind's raw defs (collection keys
