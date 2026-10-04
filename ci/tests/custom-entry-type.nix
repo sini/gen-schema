@@ -103,7 +103,7 @@ let
 
   # --- Introspection works with custom mkType ---
   # mkType receives kindModule (baseModule) and must produce a callable result.
-  # Introspection uses genMerge.evalModuleTree { modules = [ config.${k} ]; } so the
+  # Introspection uses genMerge.evalModuleTree { } [ config.${k} ] so the
   # __functor must import modules that declare the options we want to introspect.
 
   introEval = genMerge.evalModuleTree { } [
