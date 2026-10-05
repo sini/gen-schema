@@ -1496,10 +1496,9 @@ let
               # composition on every evaluator (`formOf` classifies nothing on a cycle), pinned by
               # `witness-collision-refusals.test-a-cycle-behind-an-untagged-twin-refuses-by-a-member`. Where EVERY
               # member's walk is shadowed by a twin listed first, no walk finds it and composition
-              # recurses uncatchably on all three evaluators: a PERMANENT ARGUED PRICE (owner-ruled
-              # 2026-10-05, den-hoag-95cv0 Arm A via den-hoag-yqz1j), pinned by
-              # `witness-collision-refusals.test-a-fully-shadowed-cycle-aborts`. Giving each twin its own
-              # provenance (`_file`) dissolves it. No key closes it: the walk reads values, not
+              # recurses uncatchably on all three evaluators, a PERMANENT ARGUED PRICE (den-hoag-95cv0 Arm A
+              # via den-hoag-yqz1j), pinned by `witness-collision-refusals.test-a-fully-shadowed-cycle-aborts`.
+              # Giving each twin its own provenance (`_file`) dissolves it. No key closes it: the walk reads values, not
               # addresses, so a key that tells twins apart (a name path) never repeats on a cycle not
               # through this kind and the walk diverges there, and a walk with no visited set pays every
               # path through a diamond lattice.
