@@ -3996,7 +3996,8 @@ in
       };
       # A nixpkgs attrsOf over the declaration is not refused: the binding's redeclaration over gen-merge's
       # attrsOf of the bound leaf merges with it as two nixpkgs attrsOf declarations merge (gen-merge
-      # publishes attrsOf under attrsWith, as nixpkgs), and the field serves nixpkgs' own value for them.
+      # publishes attrsOf under attrsWith, as nixpkgs). The two declarations serve nixpkgs' own value for
+      # them, and the registry field serves that value resolved: `x` is host `a`'s instance.
       test-foreign-attrsof-serves-nixpkgs-value =
         let
           B = D.functor.type { bound = true; };
@@ -4005,13 +4006,35 @@ in
             { options.f = mkOption { type = boundAttrsOf B; }; }
             { config.f.x = "a"; }
           ];
+          schema = evalSchema { } [
+            {
+              config.schema.host = { };
+              config.schema.svc.options.f = genMerge.mkOption { type = FT.attrsOf D; };
+            }
+          ];
+          served =
+            (genMerge.evalModuleTree { } [
+              (
+                { config, ... }:
+                {
+                  options.hosts = mkInstanceRegistry { } schema.host;
+                  options.svcs = mkInstanceRegistry { refs.f = config.hosts; } schema.svc;
+                  config.hosts.a = { };
+                  config.hosts.b = { };
+                  config.svcs.s.f.x = "a";
+                }
+              )
+            ]).config;
         in
         {
-          expr = builtins.seq (read {
-            type = FT.attrsOf D;
-            value.x = "a";
-          }) (genMerge.evalModuleTree { } (decls FT.attrsOf T.attrsOf genMerge.mkOption)).config.f;
-          expected = (lib.evalModules { modules = decls FT.attrsOf FT.attrsOf lib.mkOption; }).config.f;
+          expr = {
+            merged = (genMerge.evalModuleTree { } (decls FT.attrsOf T.attrsOf genMerge.mkOption)).config.f;
+            resolved = builtins.mapAttrs (_: v: v.id_hash) served.svcs.s.f;
+          };
+          expected = {
+            merged = (lib.evalModules { modules = decls FT.attrsOf FT.attrsOf lib.mkOption; }).config.f;
+            resolved.x = served.hosts.a.id_hash;
+          };
         };
     };
 }
