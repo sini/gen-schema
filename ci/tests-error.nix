@@ -3994,12 +3994,24 @@ in
         };
         expectedError = unwalked "unique";
       };
-      test-foreign-attrsof-refused-at-the-type-merge = {
-        expr = read {
-          type = FT.attrsOf D;
-          value.x = "a";
+      # A nixpkgs attrsOf over the declaration is not refused: the binding's redeclaration over gen-merge's
+      # attrsOf of the bound leaf merges with it as two nixpkgs attrsOf declarations merge (gen-merge
+      # publishes attrsOf under attrsWith, as nixpkgs), and the field serves nixpkgs' own value for them.
+      test-foreign-attrsof-serves-nixpkgs-value =
+        let
+          B = D.functor.type { bound = true; };
+          decls = kindAttrsOf: boundAttrsOf: mkOption: [
+            { options.f = mkOption { type = kindAttrsOf D; }; }
+            { options.f = mkOption { type = boundAttrsOf B; }; }
+            { config.f.x = "a"; }
+          ];
+        in
+        {
+          expr = builtins.seq (read {
+            type = FT.attrsOf D;
+            value.x = "a";
+          }) (genMerge.evalModuleTree { } (decls FT.attrsOf T.attrsOf genMerge.mkOption)).config.f;
+          expected = (lib.evalModules { modules = decls FT.attrsOf FT.attrsOf lib.mkOption; }).config.f;
         };
-        expectedError = thrown "types that do not merge";
-      };
     };
 }
