@@ -931,8 +931,7 @@ closed:
   `b`'s cycle (`b -> x -> p -> k -> b`). Where EVERY member lists a twin with no cycle behind it before
   its cycle branch (`a` inherits `x1` then `x2`, `x2` inherits `b`; `b` inherits `y1` then `y2`, `y2`
   inherits `a`), no walk finds the cycle and composition recurses uncatchably on all three evaluators.
-  This abort is a **permanent argued price** under ADR-0025 item 1 (owner-ruled 2026-10-05,
-  `den-hoag-95cv0` Arm A via `den-hoag-yqz1j`): telling the twins apart needs node identity or a
+  This abort is a **permanent argued price**: telling the twins apart needs node identity or a
   content comparison, the same question as gen-bind's released one-site-two-bodies exception. It is
   pinned by `witness-collision-refusals.test-a-fully-shadowed-cycle-aborts`; the same shape with the
   cycle branch listed first is refused by name. **The remedy is provenance:** give each application its
