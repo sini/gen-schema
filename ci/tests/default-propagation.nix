@@ -7,21 +7,19 @@
 let
   inherit (genSchema) evalSchema mkInstanceRegistry;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.system = genMerge.mkOption { type = genMerge.types.str; };
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          config.system = genMerge.mkDefault "x86_64-linux";
-        };
-      }
-    ];
-  };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.system = genMerge.mkOption { type = genMerge.types.str; };
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        config.system = genMerge.mkDefault "x86_64-linux";
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
+      options.hosts = mkInstanceRegistry { } schema.host;
       config.hosts.igloo.addr = "10.0.1.1";
       config.hosts.yurt = {
         addr = "10.0.1.2";

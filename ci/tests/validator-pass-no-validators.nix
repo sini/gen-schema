@@ -13,7 +13,7 @@ let
       };
     }
   ];
-  hostType = genSchema.mkInstanceType schemaEval.config.schema.host { };
+  hostType = genSchema.mkInstanceType { } schemaEval.config.schema.host;
   instanceEval = genMerge.evalModuleTree { } [
     {
       options.hosts = genMerge.mkOption {

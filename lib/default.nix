@@ -53,7 +53,26 @@ let
   # position: a module in a `records = [ ]` component (`mixins`, `baseModule`, `specialArgs`), or a
   # facet's `module`, declaring an option typed by a per-call `mkOptionType` aborts in the order
   # that interns `functor` first, and in every order when that type has a `description` back-edge.
+  #
+  # OPTIONS FIRST, then the name, then the type (den-hoag-7gp66 P2, rules 2 and 4):
+  # `constructionRelation { minted?; compared?; } name self`. The two component maps are optional,
+  # so they leave for one closed options set, a `prelude.door` refused by name and catchably at
+  # `constructionRelation opts`'s own WHNF. The name is configuration; the type the relation is
+  # stated for is the subject, last. This library's own constructors call the unchecked core.
   constructionRelation =
+    prelude.door
+      {
+        name = "gen-schema.constructionRelation";
+        optional = [
+          "minted"
+          "compared"
+        ];
+      }
+      (
+        o: name: self:
+        constructionRelationCore name o self
+      );
+  constructionRelationCore =
     name:
     {
       minted ? { },
@@ -145,11 +164,11 @@ let
     inherit (refinedLib) isRefined getRefinements;
   };
   strictLib = import ./strict.nix {
-    inherit prelude merge constructionRelation;
+    inherit prelude merge constructionRelationCore;
     inherit (bridgeLib) isOptionDecl;
   };
   refLib = import ./ref.nix {
-    inherit prelude merge constructionRelation;
+    inherit prelude merge constructionRelationCore;
     inherit (refinedLib) mkRefinedType;
   };
   # The VALUE-level declaration vocabulary, kin to refLib's type-level one — see field-declaration.nix's
@@ -166,7 +185,7 @@ let
       graph
       record
       identity
-      constructionRelation
+      constructionRelationCore
       keySemanticsRecords
       ;
     inherit (methods) mkMethodsModule;

@@ -27,7 +27,7 @@ let
     options.name = genMerge.mkOption { type = t.str; };
     options.addr = genMerge.mkOption { type = t.str; };
   };
-  kindValue = (evalSchema { modules = [ { config.schema.host = hostDecl; } ]; }).host;
+  kindValue = (evalSchema { } [ { config.schema.host = hostDecl; } ]).host;
   direct =
     extra:
     genMerge.evalModuleTree { } (
@@ -47,22 +47,20 @@ let
 
   # The published path: an instance of a registry, on a strict kind (the default) and a lax one.
   frozenHost =
-    (evalSchema {
-      modules = [
+    (evalSchema { } [
 
-        {
-          config.schema.host.options.addr = genMerge.mkOption { type = t.str; };
-          config.schema.host.options.role = genMerge.mkOption { type = t.str; };
-        }
+      {
+        config.schema.host.options.addr = genMerge.mkOption { type = t.str; };
+        config.schema.host.options.role = genMerge.mkOption { type = t.str; };
+      }
 
-      ];
-    }).host;
+    ]).host;
   one =
     regOpts: v:
     (genMerge.evalModuleTree { } [
 
       {
-        options.hosts = mkInstanceRegistry frozenHost regOpts;
+        options.hosts = mkInstanceRegistry regOpts frozenHost;
         config.hosts.h = {
           addr = "10.0.0.1";
           role = "web";

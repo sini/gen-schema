@@ -21,21 +21,19 @@ let
   # walked by the outer `gen.tree` unchanged, now ALSO composed as a self-contained pass so
   # admin-user's `inherits = [ "user" ]` resolves through real staged injection rather than a bare
   # read of this tree's own in-flight `config`.
-  schema = evalSchema {
-    modules = [
-      (import ../schema/host.nix { inherit lib; })
-      (import ../schema/user.nix { inherit lib; })
-      (import ../schema/group.nix { inherit lib genSchema; })
-      (import ../schema/network.nix { inherit lib genSchema; })
-      (import ../schema/service.nix { inherit lib genSchema; })
-      (import ../schema/admin-user.nix { inherit lib; })
-      (import ../schema/field-validators.nix { inherit genSchema; })
-      (import ../schema/monitoring-plugin.nix { inherit lib; })
-      (import ./derived.nix { inherit lib; })
-      (import ./methods.nix { inherit lib config genSchema; })
-      (import ./validation.nix { inherit lib genSchema; })
-    ];
-  };
+  schema = evalSchema { } [
+    (import ../schema/host.nix { inherit lib; })
+    (import ../schema/user.nix { inherit lib; })
+    (import ../schema/group.nix { inherit lib genSchema; })
+    (import ../schema/network.nix { inherit lib genSchema; })
+    (import ../schema/service.nix { inherit lib genSchema; })
+    (import ../schema/admin-user.nix { inherit lib; })
+    (import ../schema/field-validators.nix { inherit genSchema; })
+    (import ../schema/monitoring-plugin.nix { inherit lib; })
+    (import ./derived.nix { inherit lib; })
+    (import ./methods.nix { inherit lib config genSchema; })
+    (import ./validation.nix { inherit lib genSchema; })
+  ];
 
   # --- UID assignment helpers ---
 
@@ -191,27 +189,27 @@ in
     description = "The evalSchema-staged, inheritance-aware schema tree that fleet's registries above are built from -- what introspection and doc/codec generation should read instead of the outer-merge `options.schema`.";
   };
 
-  options.fleet.hosts = mkInstanceRegistry schema.host {
+  options.fleet.hosts = mkInstanceRegistry {
     description = "Fleet host instances.";
-  };
+  } schema.host;
 
-  options.fleet.users = mkInstanceRegistry schema.user {
+  options.fleet.users = mkInstanceRegistry {
     description = "Fleet user instances.";
     derive = deriveUids {
       min = 1000;
       max = 60000;
     };
-  };
+  } schema.user;
 
-  options.fleet.admins = mkInstanceRegistry schema.admin-user {
+  options.fleet.admins = mkInstanceRegistry {
     description = "Fleet admin user instances (inherits user kind).";
     derive = deriveUids {
       min = 60001;
       max = 65000;
     };
-  };
+  } schema.admin-user;
 
-  options.fleet.services = mkInstanceRegistry schema.service {
+  options.fleet.services = mkInstanceRegistry {
     description = "Fleet service instances.";
     # Deferred ref: bind "host" kind-ref to the hosts registry
     refs.host = config.fleet.hosts;
@@ -247,14 +245,14 @@ in
         }
       )
     ];
-  };
+  } schema.service;
 
-  options.fleet.groups = mkInstanceRegistry schema.group {
+  options.fleet.groups = mkInstanceRegistry {
     description = "Fleet host group instances.";
     refs.members = config.fleet.hosts;
-  };
+  } schema.group;
 
-  options.fleet.networks = mkInstanceRegistry schema.network {
+  options.fleet.networks = mkInstanceRegistry {
     description = "Fleet network instances.";
-  };
+  } schema.network;
 }

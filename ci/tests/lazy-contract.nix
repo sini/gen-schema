@@ -20,7 +20,7 @@ let
 
   schema = schemaEval.config.schema;
 
-  lazyRegistry = mkInstanceRegistry schema.service {
+  lazyRegistry = mkInstanceRegistry {
     refinements = {
       port = [
         {
@@ -30,7 +30,7 @@ let
         }
       ];
     };
-  };
+  } schema.service;
 
   eval = genMerge.evalModuleTree { } [
     {
@@ -80,7 +80,7 @@ in
   flake.tests.lazy-contract.test-mixed-strict-and-lazy = {
     expr =
       let
-        mixedRegistry = mkInstanceRegistry schema.service {
+        mixedRegistry = mkInstanceRegistry {
           refinements = {
             port = [
               {
@@ -96,7 +96,7 @@ in
               }
             ];
           };
-        };
+        } schema.service;
         mixedEval = genMerge.evalModuleTree { } [
           {
             options.services = mixedRegistry;

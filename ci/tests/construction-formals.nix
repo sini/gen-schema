@@ -52,12 +52,10 @@ let
   instanceOf =
     decl:
     let
-      schema = genSchema.evalSchema {
-        modules = [ { config.schema.k = decl; } ];
-      };
+      schema = genSchema.evalSchema { } [ { config.schema.k = decl; } ];
     in
     (genMerge.evalModuleTree { } [
-      { options.ks = genSchema.mkInstanceRegistry schema.k { }; }
+      { options.ks = genSchema.mkInstanceRegistry { } schema.k; }
       { config.ks.a = { }; }
     ]).config.ks.a;
 in

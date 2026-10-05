@@ -13,9 +13,11 @@ let
       config.schema.host = {
         options.name = genMerge.mkOption { type = genMerge.types.str; };
         options.role = genMerge.mkOption { type = genMerge.types.str; };
-        methods.describe = schemaFn "Describe this host" genMerge.types.str (
-          { name, role, ... }: "${name} is a ${role}"
-        );
+        methods.describe = schemaFn {
+          description = "Describe this host";
+          type = genMerge.types.str;
+          fn = { name, role, ... }: "${name} is a ${role}";
+        };
       };
     }
   ];

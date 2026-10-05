@@ -70,27 +70,29 @@ let
 
   # --- Collections stripped before custom type sees defs ---
 
-  stripSchema = evalSchema {
-    schemaOption = mkSchemaOption {
-      mkType = customMkType;
-      collections.tags = {
-        default = [ ];
-      };
-      strict = true;
-    };
-    modules = [
+  stripSchema =
+    evalSchema
       {
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          tags = [ "server" ];
+        schemaOption = mkSchemaOption {
+          mkType = customMkType;
+          collections.tags = {
+            default = [ ];
+          };
+          strict = true;
         };
       }
-    ];
-  };
+      [
+        {
+          config.schema.host = {
+            options.name = genMerge.mkOption { type = genMerge.types.str; };
+            tags = [ "server" ];
+          };
+        }
+      ];
 
   collectionStripEval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry stripSchema.host { };
+      options.hosts = mkInstanceRegistry { } stripSchema.host;
       config.hosts.igloo = {
         name = "igloo";
       };

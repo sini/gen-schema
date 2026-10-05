@@ -12,29 +12,27 @@ let
     setOf
     ;
 
-  basicSchema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+  basicSchema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.group = {
+        options.members = genMerge.mkOption {
+          type = setOf (declarationOf "host");
+          default = [ ];
         };
-        config.schema.group = {
-          options.members = genMerge.mkOption {
-            type = setOf (declarationOf "host");
-            default = [ ];
-          };
-        };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   # --- Basic setOf test ---
   evalBasic = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry basicSchema.host { };
-      options.groups = mkInstanceRegistry basicSchema.group {
+      options.hosts = mkInstanceRegistry { } basicSchema.host;
+      options.groups = mkInstanceRegistry {
         refs.members = evalBasic.config.hosts;
-      };
+      } basicSchema.group;
       config.hosts = {
         igloo = {
           addr = "10.0.1.1";
@@ -64,8 +62,8 @@ let
   # --- setOf with custom coerce (expansion + dedup) ---
   evalCoerce = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry basicSchema.host { };
-      options.groups = mkInstanceRegistry basicSchema.group {
+      options.hosts = mkInstanceRegistry { } basicSchema.host;
+      options.groups = mkInstanceRegistry {
         refs.members = {
           instances = evalCoerce.config.hosts;
           coerce =
@@ -75,7 +73,7 @@ let
             else
               default;
         };
-      };
+      } basicSchema.group;
       config.hosts = {
         igloo = {
           addr = "10.0.1.1";
@@ -93,30 +91,28 @@ let
     }
   ];
 
-  nullableSchema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+  nullableSchema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.hosts = genMerge.mkOption {
+          type = genMerge.types.nullOr (setOf (declarationOf "host"));
+          default = null;
         };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.hosts = genMerge.mkOption {
-            type = genMerge.types.nullOr (setOf (declarationOf "host"));
-            default = null;
-          };
-        };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   # --- nullOr (setOf (declarationOf "kind")) ---
   evalNullable = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry nullableSchema.host { };
-      options.services = mkInstanceRegistry nullableSchema.service {
+      options.hosts = mkInstanceRegistry { } nullableSchema.host;
+      options.services = mkInstanceRegistry {
         refs.hosts = evalNullable.config.hosts;
-      };
+      } nullableSchema.service;
       config.hosts.igloo = {
         addr = "10.0.1.1";
       };

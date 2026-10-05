@@ -13,30 +13,36 @@ let
     schemaFn
     ;
 
-  schema = evalSchema {
-    schemaOption = mkSchemaOption {
-      collections.tags = {
-        default = [ ];
-      };
-    };
-    modules = [
+  schema =
+    evalSchema
       {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          options.role = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "worker";
+        schemaOption = mkSchemaOption {
+          collections.tags = {
+            default = [ ];
           };
-          tags = [ "server" ];
-          methods.label = schemaFn "Label" genMerge.types.str ({ name, addr, ... }: "${name}:${addr}");
         };
       }
-    ];
-  };
+      [
+        {
+          config.schema.host = {
+            options.addr = genMerge.mkOption { type = genMerge.types.str; };
+            options.role = genMerge.mkOption {
+              type = genMerge.types.str;
+              default = "worker";
+            };
+            tags = [ "server" ];
+            methods.label = schemaFn {
+              description = "Label";
+              type = genMerge.types.str;
+              fn = { name, addr, ... }: "${name}:${addr}";
+            };
+          };
+        }
+      ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
+      options.hosts = mkInstanceRegistry { } schema.host;
       config.hosts.igloo = {
         addr = "10.0.1.1";
         role = "web";
@@ -47,9 +53,9 @@ let
     }
   ];
 
-  codec = mkCodec schema.host {
+  codec = mkCodec {
     excludeFields = [ "tags" ];
-  };
+  } schema.host;
 
   encoded = codec.encode eval.config.hosts.igloo;
   encodedYurt = codec.encode eval.config.hosts.yurt;

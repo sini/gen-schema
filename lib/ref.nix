@@ -17,7 +17,7 @@
 {
   prelude,
   merge,
-  constructionRelation,
+  constructionRelationCore,
   mkRefinedType,
 }:
 let
@@ -114,7 +114,7 @@ let
   mkRef =
     bound: kindName:
     let
-      relation = constructionRelation "declarationOf(${kindName})" { minted.kind = kindName; } self;
+      relation = constructionRelationCore "declarationOf(${kindName})" { minted.kind = kindName; } self;
       self = merge.mkOptionType {
         name = "declarationOf(${kindName})";
         description = "reference to a ${kindName} instance";

@@ -8,42 +8,40 @@
 let
   inherit (genSchema) evalSchema mkInstanceRegistry mkCodec;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.item = {
-          # either str int — distinguishable by isString / isInt
-          options.value = genMerge.mkOption {
-            type = genMerge.types.either genMerge.types.str genMerge.types.int;
-          };
-          # nullOr (either str int)
-          options.optValue = genMerge.mkOption {
-            type = genMerge.types.nullOr (genMerge.types.either genMerge.types.str genMerge.types.int);
-            default = null;
-          };
-          # oneOf [ str int bool ] — desugars to nested either
-          options.flexible = genMerge.mkOption {
-            type = genMerge.types.oneOf [
-              genMerge.types.str
-              genMerge.types.int
-              genMerge.types.bool
-            ];
-          };
-          # either str (listOf int) — wrappers inside branches.
-          # NB: gen-merge's `either` dispatches on the FIRST branch whose check is
-          # definitive; a bare `listOf` has no discriminating check, so the total-check
-          # branch (str) must come first. This preserves the same expected values.
-          options.mixed = genMerge.mkOption {
-            type = genMerge.types.either genMerge.types.str (genMerge.types.listOf genMerge.types.int);
-          };
+  schema = evalSchema { } [
+    {
+      config.schema.item = {
+        # either str int — distinguishable by isString / isInt
+        options.value = genMerge.mkOption {
+          type = genMerge.types.either genMerge.types.str genMerge.types.int;
         };
-      }
-    ];
-  };
+        # nullOr (either str int)
+        options.optValue = genMerge.mkOption {
+          type = genMerge.types.nullOr (genMerge.types.either genMerge.types.str genMerge.types.int);
+          default = null;
+        };
+        # oneOf [ str int bool ] — desugars to nested either
+        options.flexible = genMerge.mkOption {
+          type = genMerge.types.oneOf [
+            genMerge.types.str
+            genMerge.types.int
+            genMerge.types.bool
+          ];
+        };
+        # either str (listOf int) — wrappers inside branches.
+        # NB: gen-merge's `either` dispatches on the FIRST branch whose check is
+        # definitive; a bare `listOf` has no discriminating check, so the total-check
+        # branch (str) must come first. This preserves the same expected values.
+        options.mixed = genMerge.mkOption {
+          type = genMerge.types.either genMerge.types.str (genMerge.types.listOf genMerge.types.int);
+        };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.items = mkInstanceRegistry schema.item { };
+      options.items = mkInstanceRegistry { } schema.item;
       config.items.strItem = {
         value = "hello";
         flexible = "text";
@@ -68,17 +66,17 @@ let
   ];
 
   # Register a codec for int type
-  codec = mkCodec schema.item {
+  codec = mkCodec {
     types = {
       int = {
         encode = v: "n:${toString v}";
         decode = v: lib.toInt (lib.removePrefix "n:" v);
       };
     };
-  };
+  } schema.item;
 
   # No type registrations — identity for all branches
-  identityCodec = mkCodec schema.item { };
+  identityCodec = mkCodec { } schema.item;
 in
 {
   flake.tests.codec-either = {

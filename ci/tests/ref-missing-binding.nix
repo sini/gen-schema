@@ -7,18 +7,16 @@
 let
   inherit (genSchema) evalSchema mkInstanceRegistry declarationOf;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.service = {
-          options.host = genMerge.mkOption { type = declarationOf "host"; };
-        };
-      }
-    ];
-  };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.service = {
+        options.host = genMerge.mkOption { type = declarationOf "host"; };
+      };
+    }
+  ];
 
   # Missing refs binding should throw during evaluation.
   # We force evaluation of an instance to trigger the ref scan.
@@ -28,9 +26,9 @@ let
         let
           eval = genMerge.evalModuleTree { } [
             {
-              options.hosts = mkInstanceRegistry schema.host { };
+              options.hosts = mkInstanceRegistry { } schema.host;
               # No refs.host — should throw when service instances are evaluated
-              options.services = mkInstanceRegistry schema.service { };
+              options.services = mkInstanceRegistry { } schema.service;
               config.hosts.igloo = {
                 addr = "10.0.1.1";
               };

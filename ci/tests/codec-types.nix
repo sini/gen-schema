@@ -13,40 +13,38 @@ let
     declarationOf
     ;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.optPort = genMerge.mkOption {
-            type = genMerge.types.nullOr genMerge.types.int;
-            default = null;
-          };
-          options.ports = genMerge.mkOption {
-            type = genMerge.types.listOf genMerge.types.int;
-            default = [ ];
-          };
-          options.labels = genMerge.mkOption {
-            type = genMerge.types.attrsOf genMerge.types.str;
-            default = { };
-          };
-          options.role = genMerge.mkOption { type = genMerge.types.str; };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.optPort = genMerge.mkOption {
+          type = genMerge.types.nullOr genMerge.types.int;
+          default = null;
         };
-        config.schema.service = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          options.host = genMerge.mkOption { type = declarationOf "host"; };
+        options.ports = genMerge.mkOption {
+          type = genMerge.types.listOf genMerge.types.int;
+          default = [ ];
         };
-      }
-    ];
-  };
+        options.labels = genMerge.mkOption {
+          type = genMerge.types.attrsOf genMerge.types.str;
+          default = { };
+        };
+        options.role = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.service = {
+        options.name = genMerge.mkOption { type = genMerge.types.str; };
+        options.host = genMerge.mkOption { type = declarationOf "host"; };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
-      options.services = mkInstanceRegistry schema.service {
+      options.hosts = mkInstanceRegistry { } schema.host;
+      options.services = mkInstanceRegistry {
         refs.host = eval.config.hosts;
-      };
+      } schema.service;
       config.hosts.igloo = {
         addr = "10.0.1.1";
         port = 8080;
@@ -76,26 +74,26 @@ let
   # Codec with type-registered encoder for the (int-typed) port fields.
   # gen-merge/gen-types name the leaf "int" (nixpkgs' port alias "unsignedInt16" is gone);
   # the codec dispatches on `type.name`, so registrations key on "int".
-  portCodec = mkCodec schema.host {
+  portCodec = mkCodec {
     types = {
       int = {
         encode = v: "port:${toString v}";
         decode = v: lib.toInt (lib.removePrefix "port:" v);
       };
     };
-  };
+  } schema.host;
 
   # Codec with unused type (no fields of this type exist on host)
-  unusedCodec = mkCodec schema.host {
+  unusedCodec = mkCodec {
     types = {
       nonexistentType = {
         encode = v: v;
       };
     };
-  };
+  } schema.host;
 
   # Codec with per-field override suppressing type codec
-  overrideCodec = mkCodec schema.host {
+  overrideCodec = mkCodec {
     types = {
       int = {
         encode = v: "port:${toString v}";
@@ -106,17 +104,17 @@ let
         encode = v: "custom:${toString v}";
       };
     };
-  };
+  } schema.host;
 
   # Codec for service to test ref priority over types
-  serviceCodec = mkCodec schema.service {
+  serviceCodec = mkCodec {
     types = {
       # This should NOT apply to the host ref field ("string" is gen-types' str name)
       string = {
         encode = v: "str:${v}";
       };
     };
-  };
+  } schema.service;
 
   igloo = eval.config.hosts.igloo;
   yurt = eval.config.hosts.yurt;

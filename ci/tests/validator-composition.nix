@@ -12,20 +12,27 @@ let
     {
       config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
       config.schema.host.validators = [
-        (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
+        (genSchema.mkValidator {
+          name = "has-addr";
+          pred = { addr, ... }: addr != "";
+          message = "need addr";
+        })
       ];
     }
     # Module B adds another validator
     {
       config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; };
       config.schema.host.validators = [
-        (genSchema.mkValidator "valid-role" (
-          { role, ... }:
-          lib.elem role [
-            "web"
-            "db"
-          ]
-        ) "bad role")
+        (genSchema.mkValidator {
+          name = "valid-role";
+          pred =
+            { role, ... }:
+            lib.elem role [
+              "web"
+              "db"
+            ];
+          message = "bad role";
+        })
       ];
     }
   ];

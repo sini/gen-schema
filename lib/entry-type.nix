@@ -23,7 +23,7 @@
   sealedCollisionEq,
   identityOf,
   comparisonSubject,
-  constructionRelation,
+  constructionRelationCore,
   keySemanticsRecords,
 }:
 let
@@ -1004,30 +1004,33 @@ let
     "specialArgs"
   ];
 
-  # OPTIONS door (P1): every formal is optional, so `checkOptions` alone closes it. The `assert`
-  # forces `checked` where the record is applied — the door's own return is built through
-  # `merge.mkOptionType`, an external call whose own strictness this door does not want to depend
-  # on for its catchability.
+  # OPTIONS door (P1, then P2): every formal is optional, so the one step is a closed `prelude.door`,
+  # refused by name and catchably at the application's own WHNF, with its contract published as data.
+  # The door is bound once; each kind tree supplies only its body (`mkSchemaEntryTypeIn`).
+  entryTypeDoor = prelude.door {
+    name = "gen-schema.mkSchemaEntryType";
+    optional = schemaEntryFormals;
+  };
   mkSchemaEntryType = mkSchemaEntryTypeIn null;
 
   # THE ENTRY TYPE OF ONE KIND TREE (den-hoag-8c8pr, owner-ruled 2026-09-30: `inherits` on a tree
   # `evalSchema` did not build means what `imports = [ config.schema.<p> ]` means there). `tree` is
   # the tree's own `config` — the kind values the deprecated spelling reads — or `null` for an entry
   # type built outside a tree, where a declared parent has nothing to be read from.
-  mkSchemaEntryTypeIn =
-    tree: args:
-    let
-      checked = prelude.checkOptions "gen-schema.mkSchemaEntryType" schemaEntryFormals args;
-    in
-    # `checked` is applied to a NATIVE attrset-pattern lambda rather than destructured field-by-field
-    # above: each field below becomes a `compared` component (see `components`, below) whose value
+  mkSchemaEntryTypeIn = tree: entryTypeDoor (mkSchemaEntryTypeCore tree);
+  # The unchecked core, which `mkSchemaOption` below calls with the set its own door already checked
+  # against the same list.
+  mkSchemaEntryTypeCore =
+    tree:
+    # The record is applied to a NATIVE attrset-pattern lambda rather than destructured field-by-field:
+    # each field below becomes a `compared` component (see `components`, below) whose value
     # `constructionRelation` must keep the SLOT this constructor was HANDED, not a fresh selection off
     # it — upstream Nix `==` keeps a function's identity only for the one slot it was bound to, and a
     # `let`-bound selection (`checked.computed or null`) allocates a fresh one per construction, so two
-    # calls sharing one `computed` would be refused (den-hoag-jzatq). A native formal, applied to
-    # `checked` (== `args`, unchanged by a successful `checkOptions`), binds the identical slot the
-    # pre-P1 door bound directly, so the door catches an unknown option (R6, above) without giving up
-    # the identity `constructionRelation` depends on.
+    # calls sharing one `computed` would be refused (den-hoag-jzatq). The door hands its body the
+    # caller's own record, unchanged by a successful check, so a native formal binds the identical
+    # slot the pre-P1 door bound directly: the door catches an unknown option (R6, above) without
+    # giving up the identity `constructionRelation` depends on.
     (
       {
         baseModule ? null,
@@ -1154,7 +1157,7 @@ let
         self = merge.mkOptionType {
           name = "schemaKindEntry";
           description = "schema kind entry — options, config, collections and computed fields";
-          functor = constructionRelation "schemaKindEntry" components self;
+          functor = constructionRelationCore "schemaKindEntry" components self;
           # deferredModule accepts any def value and lets the merge decide; so does this.
           inherit (base) check;
           merge =
@@ -2123,17 +2126,16 @@ let
         };
       in
       self
-    )
-      checked;
+    );
 
   # OPTIONS door (P1): every formal is optional, closed over `schemaEntryFormals` — the SAME list
   # `mkSchemaEntryType` closes over, so "the option's type is its entry type's construction" holds
   # by construction (see that list's own header comment, above).
-  mkSchemaOption =
-    args:
-    let
-      checked = prelude.checkOptions "gen-schema.mkSchemaOption" schemaEntryFormals args;
-    in
+  mkSchemaOption = prelude.door {
+    name = "gen-schema.mkSchemaOption";
+    optional = schemaEntryFormals;
+  } mkSchemaOptionCore;
+  mkSchemaOptionCore =
     # Applied to a native formal, not destructured field-by-field, for the same reason
     # `mkSchemaEntryType` is (den-hoag-jzatq, see its own header comment): every field here is
     # forwarded VERBATIM into `mkSchemaEntryType`'s own `compared` components below, and a
@@ -2168,13 +2170,13 @@ let
             specialArgs
             ;
         };
-        entry = mkSchemaEntryType entryArgs;
+        entry = mkSchemaEntryTypeCore null entryArgs;
         inner = merge.types.submodule (
           { config, options, ... }:
           {
             # The kinds are typed by this tree's own entry type, which reads a declared parent off
             # `config` — the same kind values `imports = [ config.schema.<p> ]` reads (den-hoag-8c8pr).
-            freeformType = merge.types.lazyAttrsOf (mkSchemaEntryTypeIn config entryArgs);
+            freeformType = merge.types.lazyAttrsOf (mkSchemaEntryTypeCore config entryArgs);
 
             # READ-ONLY, on two measured bases (den-hoag-px98p): a well-typed write to a derived output
             # (`config.schema._collectionKeys = [ "fake" ]`) would otherwise be published silently, and
@@ -2465,8 +2467,7 @@ let
         default = { };
         type = self;
       }
-    )
-      checked;
+    );
 in
 {
   inherit

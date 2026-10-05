@@ -35,60 +35,62 @@ let
   # evaluation with no instance anywhere, served by THIS formal. A kind whose module forces its arg
   # at WHNF is refused there before the identity question is ever reached, so without this the cells
   # below would red for the wrong reason.
-  schema = evalSchema {
-    specialArgs = {
-      site = tagged;
-    };
-    modules = [
+  schema =
+    evalSchema
       {
-        config.schema.host = {
-          imports = [
-            (
-              { site, ... }:
-              {
-                options.tag = mkOption {
-                  type = genMerge.types.str;
-                  default = site.inletTag;
-                };
-              }
-            )
-          ];
-          options.addr = mkOption { type = genMerge.types.str; };
-        };
-        # ★ A SECOND KIND, IN A SECOND ARGUMENT POSITION, AND THE IDENTITY CELLS BELOW NEED IT.
-        # `host`'s module forces its arg inside an option DEFAULT, so a reader that wants only
-        # option NAMES never forces it — which is why a key-set derivation reading names was read as
-        # safe and was not. This module forces the arg to produce its OWN WHNF, the
-        # `{ lib, ... }: lib.mkIf …` shape a real consumer writes, so APPLYING it forces the arg and
-        # every reader of the kind's option set is on that path.
-        config.schema.gated = {
-          imports = [
-            (
-              { site, ... }:
-              if site.gated then
-                {
-                  options.gate = mkOption {
-                    type = genMerge.types.str;
-                    default = "open";
-                  };
-                }
-              else
-                { }
-            )
-          ];
-          options.addr = mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
-
-  viaRegistry = evalModuleTree { } [
-    {
-      options.hosts = mkInstanceRegistry schema.host {
         specialArgs = {
           site = tagged;
         };
-      };
+      }
+      [
+        {
+          config.schema.host = {
+            imports = [
+              (
+                { site, ... }:
+                {
+                  options.tag = mkOption {
+                    type = genMerge.types.str;
+                    default = site.inletTag;
+                  };
+                }
+              )
+            ];
+            options.addr = mkOption { type = genMerge.types.str; };
+          };
+          # ★ A SECOND KIND, IN A SECOND ARGUMENT POSITION, AND THE IDENTITY CELLS BELOW NEED IT.
+          # `host`'s module forces its arg inside an option DEFAULT, so a reader that wants only
+          # option NAMES never forces it — which is why a key-set derivation reading names was read as
+          # safe and was not. This module forces the arg to produce its OWN WHNF, the
+          # `{ lib, ... }: lib.mkIf …` shape a real consumer writes, so APPLYING it forces the arg and
+          # every reader of the kind's option set is on that path.
+          config.schema.gated = {
+            imports = [
+              (
+                { site, ... }:
+                if site.gated then
+                  {
+                    options.gate = mkOption {
+                      type = genMerge.types.str;
+                      default = "open";
+                    };
+                  }
+                else
+                  { }
+              )
+            ];
+            options.addr = mkOption { type = genMerge.types.str; };
+          };
+        }
+      ];
+
+  viaRegistry = evalModuleTree { } [
+    {
+      options.hosts = mkInstanceRegistry {
+        specialArgs = {
+          site = tagged;
+        };
+      } schema.host;
       config.hosts.igloo.addr = "10.0.1.1";
     }
   ];
@@ -96,11 +98,11 @@ let
   viaType = evalModuleTree { } [
     {
       options.host = mkOption {
-        type = mkInstanceType schema.host {
+        type = mkInstanceType {
           specialArgs = {
             site = tagged;
           };
-        };
+        } schema.host;
         default = { };
       };
       config.host.addr = "10.0.1.2";
@@ -112,11 +114,11 @@ let
   # derivation and to nothing else.
   viaGatedRegistry = evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.gated {
+      options.hosts = mkInstanceRegistry {
         specialArgs = {
           site = tagged;
         };
-      };
+      } schema.gated;
       config.hosts.igloo.addr = "10.0.2.1";
     }
   ];
@@ -124,11 +126,11 @@ let
   viaGatedType = evalModuleTree { } [
     {
       options.host = mkOption {
-        type = mkInstanceType schema.gated {
+        type = mkInstanceType {
           specialArgs = {
             site = tagged;
           };
-        };
+        } schema.gated;
         default = { };
       };
       config.host.addr = "10.0.2.2";
@@ -139,7 +141,7 @@ let
   # above are consistent with the arg arriving from somewhere other than the thread under test.
   withoutArgs = evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
+      options.hosts = mkInstanceRegistry { } schema.host;
       config.hosts.igloo.addr = "10.0.1.3";
     }
   ];

@@ -11,38 +11,36 @@
 let
   inherit (genSchema) evalSchema mkInstanceRegistry;
 
-  schema = evalSchema {
-    modules = [
-      {
-        # Shared base kind
-        config.schema.conf = {
-          options.description = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "";
-          };
+  schema = evalSchema { } [
+    {
+      # Shared base kind
+      config.schema.conf = {
+        options.description = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "";
         };
+      };
 
-        # Host and user both inherit conf
-        config.schema.host = {
-          inherits = [ "conf" ];
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      # Host and user both inherit conf
+      config.schema.host = {
+        inherits = [ "conf" ];
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.user = {
+        inherits = [ "conf" ];
+        options.shell = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "/bin/bash";
         };
-        config.schema.user = {
-          inherits = [ "conf" ];
-          options.shell = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "/bin/bash";
-          };
-        };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
       # Instantiate both — should not conflict
-      options.hosts = mkInstanceRegistry schema.host { };
-      options.users = mkInstanceRegistry schema.user { };
+      options.hosts = mkInstanceRegistry { } schema.host;
+      options.users = mkInstanceRegistry { } schema.user;
 
       config.hosts.igloo = {
         addr = "10.0.1.1";

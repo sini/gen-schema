@@ -20,7 +20,7 @@
 {
   prelude,
   merge,
-  constructionRelation,
+  constructionRelationCore,
   isOptionDecl,
 }:
 let
@@ -80,7 +80,7 @@ in
         let
           self = merge.mkOptionType {
             name = "strict";
-            functor = constructionRelation "strict" { minted.kind = kind; } self;
+            functor = constructionRelationCore "strict" { minted.kind = kind; } self;
             merge =
               path: decls:
               let

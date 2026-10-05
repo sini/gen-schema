@@ -13,51 +13,49 @@ let
     setOf
     ;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.host = genMerge.mkOption { type = declarationOf "host"; };
+        options.replicas = genMerge.mkOption {
+          type = genMerge.types.listOf (declarationOf "host");
+          default = [ ];
         };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = declarationOf "host"; };
-          options.replicas = genMerge.mkOption {
-            type = genMerge.types.listOf (declarationOf "host");
-            default = [ ];
-          };
-          options.primary = genMerge.mkOption {
-            type = genMerge.types.nullOr (declarationOf "host");
-            default = null;
-          };
-          options.backends = genMerge.mkOption {
-            type = setOf (declarationOf "host");
-            default = [ ];
-          };
-          options.byName = genMerge.mkOption {
-            type = genMerge.types.attrsOf (declarationOf "host");
-            default = { };
-          };
-          options.byNameLazy = genMerge.mkOption {
-            type = genMerge.types.lazyAttrsOf (declarationOf "host");
-            default = { };
-          };
+        options.primary = genMerge.mkOption {
+          type = genMerge.types.nullOr (declarationOf "host");
+          default = null;
         };
-      }
-    ];
-  };
+        options.backends = genMerge.mkOption {
+          type = setOf (declarationOf "host");
+          default = [ ];
+        };
+        options.byName = genMerge.mkOption {
+          type = genMerge.types.attrsOf (declarationOf "host");
+          default = { };
+        };
+        options.byNameLazy = genMerge.mkOption {
+          type = genMerge.types.lazyAttrsOf (declarationOf "host");
+          default = { };
+        };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
-      options.services = mkInstanceRegistry schema.service {
+      options.hosts = mkInstanceRegistry { } schema.host;
+      options.services = mkInstanceRegistry {
         refs.host = eval.config.hosts;
         refs.replicas = eval.config.hosts;
         refs.primary = eval.config.hosts;
         refs.backends = eval.config.hosts;
         refs.byName = eval.config.hosts;
         refs.byNameLazy = eval.config.hosts;
-      };
+      } schema.service;
       config.hosts = {
         igloo = {
           addr = "10.0.1.1";
@@ -89,7 +87,7 @@ let
     }
   ];
 
-  codec = mkCodec schema.service { };
+  codec = mkCodec { } schema.service;
 
   encoded = codec.encode eval.config.services.nginx;
   encodedSolo = codec.encode eval.config.services.solo;

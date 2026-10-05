@@ -19,40 +19,38 @@ let
   inherit (genMerge.types) str nullOr;
   opt = genMerge.mkOption;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = opt { type = str; };
-          options.note = opt {
-            type = str;
-            default = "n";
-            identity = false;
-          };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = opt { type = str; };
+        options.note = opt {
+          type = str;
+          default = "n";
+          identity = false;
         };
-        config.schema.service = {
-          options.host = opt { type = declarationOf "host"; };
-          options.peers = opt {
-            type = setOf (declarationOf "host");
-            default = [ ];
-          };
+      };
+      config.schema.service = {
+        options.host = opt { type = declarationOf "host"; };
+        options.peers = opt {
+          type = setOf (declarationOf "host");
+          default = [ ];
         };
-        config.schema.node = {
-          options.addr = opt { type = str; };
-          options.note = opt {
-            type = str;
-            default = "n";
-            identity = false;
-          };
-          options.parent = opt {
-            type = nullOr (declarationOf "node");
-            default = null;
-          };
+      };
+      config.schema.node = {
+        options.addr = opt { type = str; };
+        options.note = opt {
+          type = str;
+          default = "n";
+          identity = false;
         };
-        config.schema.link.options.label = opt { type = str; };
-      }
-    ];
-  };
+        options.parent = opt {
+          type = nullOr (declarationOf "node");
+          default = null;
+        };
+      };
+      config.schema.link.options.label = opt { type = str; };
+    }
+  ];
 
   mk =
     extra:
@@ -60,26 +58,26 @@ let
       (
         { config, ... }:
         {
-          options.hosts = mkInstanceRegistry schema.host { };
-          options.spares = mkInstanceRegistry schema.host { };
-          options.services = mkInstanceRegistry schema.service {
+          options.hosts = mkInstanceRegistry { } schema.host;
+          options.spares = mkInstanceRegistry { } schema.host;
+          options.services = mkInstanceRegistry {
             refs = {
               host = config.hosts;
               peers = config.hosts;
             };
-          };
-          options.nodes = mkInstanceRegistry schema.node {
+          } schema.service;
+          options.nodes = mkInstanceRegistry {
             refs.parent = {
               deferred = true;
               instances = config.nodes;
             };
-          };
-          options.links = mkInstanceRegistry schema.link {
+          } schema.node;
+          options.links = mkInstanceRegistry {
             extraModules = [ { options.target = opt { type = declarationOf config.hosts; }; } ];
-          };
-          options.handLinks = mkInstanceRegistry schema.link {
+          } schema.link;
+          options.handLinks = mkInstanceRegistry {
             extraModules = [ { options.target = opt { type = declarationOf hand; }; } ];
-          };
+          } schema.link;
           config.hosts.igloo.addr = "10.0.0.1";
           config.hosts.yurt = {
             addr = "10.0.0.2";

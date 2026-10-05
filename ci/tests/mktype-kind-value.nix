@@ -71,7 +71,7 @@ in
   flake.tests.mktype-kind-value.test-mktype-arm-with-no-kind-echo-is-admitted-by-mkInstanceType = {
     expr =
       let
-        ty = mkInstanceType (kindOf mkTypeNoKind "host") { };
+        ty = mkInstanceType { } (kindOf mkTypeNoKind "host");
       in
       (builtins.tryEval (
         builtins.deepSeq

@@ -57,16 +57,18 @@ let
     type = t.str;
     default = "w";
   };
-  tagMixin = mkMixin {
-    requires = [ ];
-    provides = [ "tag" ];
-    define = _: {
-      tag = genMerge.mkOption {
-        type = t.str;
-        default = "t";
-      };
-    };
-  };
+  tagMixin =
+    mkMixin
+      {
+        requires = [ ];
+        provides = [ "tag" ];
+      }
+      (_: {
+        tag = genMerge.mkOption {
+          type = t.str;
+          default = "t";
+        };
+      });
   # One instance `w1` of kind `widget` with fields `n` (typed `ty`) and `label`. `mixin` declares the
   # kind through `mkSchemaOption { mixins; baseModule; }` (the bridge path) instead of inline.
   inKindWith =
@@ -99,9 +101,9 @@ let
       (
         { config, ... }:
         {
-          options.widgets = mkInstanceRegistry config.schema.widget (
+          options.widgets = mkInstanceRegistry (
             if regRefs == null then { } else { refinements = regRefs; }
-          );
+          ) config.schema.widget;
         }
       )
       { config.widgets.w1.n = v; }

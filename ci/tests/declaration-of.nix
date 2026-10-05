@@ -19,25 +19,23 @@ let
     setOf
     ;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        config.schema.service.options.host = genMerge.mkOption { type = declarationOf "host"; };
-        config.schema.service.options.peers = genMerge.mkOption { type = setOf (declarationOf "host"); };
-      }
-    ];
-  };
+  schema = evalSchema { } [
+    {
+      config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      config.schema.service.options.host = genMerge.mkOption { type = declarationOf "host"; };
+      config.schema.service.options.peers = genMerge.mkOption { type = setOf (declarationOf "host"); };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
-      options.services = mkInstanceRegistry schema.service {
+      options.hosts = mkInstanceRegistry { } schema.host;
+      options.services = mkInstanceRegistry {
         refs = {
           host = eval.config.hosts;
           peers = eval.config.hosts;
         };
-      };
+      } schema.service;
       config.hosts.igloo.addr = "10.0.1.1";
       config.hosts.yurt.addr = "10.0.1.2";
       config.services.byName = {
@@ -57,7 +55,7 @@ let
 
   direct = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
+      options.hosts = mkInstanceRegistry { } schema.host;
       options.pick = genMerge.mkOption { type = declarationOf direct.config.hosts; };
       config.hosts.igloo.addr = "10.0.1.1";
       config.pick = "igloo";

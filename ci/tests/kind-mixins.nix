@@ -23,17 +23,19 @@ let
   inherit (genSchema) mkSchemaOption mkInstanceRegistry;
 
   # A mixin that adds a metrics_port option
-  monitorable = mkMixin {
-    requires = [ "port" ];
-    provides = [ "metrics_port" ];
-    define = _parent: {
-      metrics_port = genMerge.mkOption {
-        type = genMerge.types.int;
-        default = 9090;
-        description = "Port for metrics endpoint";
-      };
-    };
-  };
+  monitorable =
+    mkMixin
+      {
+        requires = [ "port" ];
+        provides = [ "metrics_port" ];
+      }
+      (_parent: {
+        metrics_port = genMerge.mkOption {
+          type = genMerge.types.int;
+          default = 9090;
+          description = "Port for metrics endpoint";
+        };
+      });
 
   # Build a schema kind manually using the mixin workflow
   baseRecord = R.fromAttrs {
@@ -55,7 +57,7 @@ let
   schema = schemaEval.config.schema;
 
   # Create instances
-  registry = mkInstanceRegistry schema.service { };
+  registry = mkInstanceRegistry { } schema.service;
   eval = genMerge.evalModuleTree { } [
     {
       options.services = registry;

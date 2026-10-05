@@ -19,49 +19,53 @@ in
 rec {
   # Monitorable: any kind with "port" gets a metrics endpoint.
   # Smalltalk direction (default): mixin fields override parent.
-  monitorable = mkMixin {
-    name = "monitorable";
-    requires = [ "port" ];
-    provides = [
-      "metricsPort"
-      "metricsPath"
-    ];
-    define = parent: {
-      metricsPort = lib.mkOption {
-        type = lib.types.int;
-        default = (record.select "port" parent) + 1000;
-        description = "Prometheus metrics port.";
-      };
-      metricsPath = lib.mkOption {
-        type = lib.types.str;
-        default = "/metrics";
-        description = "Metrics scrape path.";
-      };
-    };
-  };
+  monitorable =
+    mkMixin
+      {
+        requires = [ "port" ];
+        provides = [
+          "metricsPort"
+          "metricsPath"
+        ];
+        name = "monitorable";
+      }
+      (parent: {
+        metricsPort = lib.mkOption {
+          type = lib.types.int;
+          default = (record.select "port" parent) + 1000;
+          description = "Prometheus metrics port.";
+        };
+        metricsPath = lib.mkOption {
+          type = lib.types.str;
+          default = "/metrics";
+          description = "Metrics scrape path.";
+        };
+      });
 
   # TLS base: provides tls options.
   # Beta direction means existing fields take precedence over mixin's.
-  tlsBase = mkMixin {
-    name = "tlsBase";
-    requires = [ ];
-    provides = [
-      "tlsEnabled"
-      "tlsCertPath"
-    ];
-    define = _parent: {
-      tlsEnabled = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = "Whether TLS is enabled.";
-      };
-      tlsCertPath = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "Path to TLS certificate.";
-      };
-    };
-  };
+  tlsBase =
+    mkMixin
+      {
+        requires = [ ];
+        provides = [
+          "tlsEnabled"
+          "tlsCertPath"
+        ];
+        name = "tlsBase";
+      }
+      (_parent: {
+        tlsEnabled = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether TLS is enabled.";
+        };
+        tlsCertPath = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Path to TLS certificate.";
+        };
+      });
 
   # Composed: monitorable + beta(tlsBase).
   # monitorable requires "port", tlsBase has no requirements.

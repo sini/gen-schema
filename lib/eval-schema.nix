@@ -16,20 +16,21 @@
   inheritedModule,
 }:
 let
-  # MIXED door (P1, den-hoag-7gp66): `modules` is required, `schemaOption`/`specialArgs` optional —
-  # closed over the whole set, transitional until P2. The `assert` forces `checked` where the
-  # record is applied: without it, the `if …` chain below happens to force `undeclared` (hence
-  # `modules`) only because gen-merge's own `evalModuleTree` is strict enough to need it — an
-  # incidental forcing this door does not want to depend on for its own catchability.
-  evalSchema =
-    args:
+  # OPTIONS FIRST, `modules` LAST (den-hoag-7gp66 P2, R7, as gen-merge's `evalModuleTree`):
+  # `evalSchema { schemaOption?; specialArgs?; } modules`. The options are one closed set, a
+  # `prelude.door` refused by name and catchably at `evalSchema opts`'s own WHNF, so `evalSchema
+  # { specialArgs = …; }` is a value a caller can map over module lists. The module list is the
+  # subject, a positional operand with no field contract.
+  evalSchema = prelude.door {
+    name = "gen-schema.evalSchema";
+    optional = [
+      "schemaOption"
+      "specialArgs"
+    ];
+  } evalSchemaCore;
+  evalSchemaCore =
+    checked: modules:
     let
-      checked = prelude.checkOptions "gen-schema.evalSchema" [
-        "modules"
-        "schemaOption"
-        "specialArgs"
-      ] (prelude.checkRequired "gen-schema.evalSchema" [ "modules" ] args);
-      inherit (checked) modules;
       # `null` rather than `mkSchemaOption { }` so "the caller supplied one" is a QUESTION THIS
       # FUNCTION CAN ASK. The resolved value is identical when nobody supplies one; what the sentinel
       # buys is the refusal below, which a defaulted record could not state.
@@ -39,7 +40,6 @@ let
       # `mkSchemaOption`/`mkSchemaEntryType` — one formal forwarded, never a second mechanism.
       specialArgs = checked.specialArgs or { };
     in
-    assert builtins.isAttrs checked;
     let
       # ★ THE TWO TOGETHER ARE REFUSED BY NAME, because they are a SILENT LOSS. A caller-supplied
       # `schemaOption` is already built and its entry type has already closed over whatever args it

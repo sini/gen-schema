@@ -64,7 +64,18 @@ let
     decode = builtins.fromJSON;
   };
 
-  mkCodec =
+  # OPTIONS FIRST, then the kind (den-hoag-7gp66 P2, rules 2 and 4): `mkCodec { fields?; types?;
+  # excludeFields?; } kind`. The options are one closed set, a `prelude.door` refused by name and
+  # catchably at `mkCodec opts`'s own WHNF; the kind value is the subject, last.
+  mkCodec = prelude.door {
+    name = "gen-schema.mkCodec";
+    optional = [
+      "fields"
+      "types"
+      "excludeFields"
+    ];
+  } (o: kindValue: mkCodecCore kindValue o);
+  mkCodecCore =
     kindValue:
     {
       fields ? { },

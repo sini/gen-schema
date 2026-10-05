@@ -5,23 +5,21 @@
   ...
 }:
 let
-  schema = genSchema.evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  schema = genSchema.evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = genSchema.mkInstanceRegistry schema.host {
+      options.hosts = genSchema.mkInstanceRegistry {
         deriveEither = {
           derive = _instances: { left = "something went wrong"; };
         };
-      };
+      } schema.host;
       config.hosts.igloo.addr = "10.0.1.1";
     }
   ];

@@ -20,7 +20,7 @@ let
 
   schema = schemaEval.config.schema;
 
-  validRegistry = mkInstanceRegistry schema.service {
+  validRegistry = mkInstanceRegistry {
     refinements = {
       port = [
         {
@@ -29,9 +29,9 @@ let
         }
       ];
     };
-  };
+  } schema.service;
 
-  invalidRegistry = mkInstanceRegistry schema.service {
+  invalidRegistry = mkInstanceRegistry {
     refinements = {
       port = [
         {
@@ -40,7 +40,7 @@ let
         }
       ];
     };
-  };
+  } schema.service;
 
   validEval = genMerge.evalModuleTree { } [
     {
@@ -79,7 +79,7 @@ in
   flake.tests.refined-pipeline.test-no-refinements-passthrough = {
     expr =
       let
-        noRefRegistry = mkInstanceRegistry schema.service { };
+        noRefRegistry = mkInstanceRegistry { } schema.service;
         eval = genMerge.evalModuleTree { } [
           {
             options.services = noRefRegistry;
@@ -97,7 +97,7 @@ in
   flake.tests.refined-pipeline.test-multiple-refinements-on-field = {
     expr =
       let
-        multiRegistry = mkInstanceRegistry schema.service {
+        multiRegistry = mkInstanceRegistry {
           refinements = {
             port = [
               {
@@ -110,7 +110,7 @@ in
               }
             ];
           };
-        };
+        } schema.service;
         eval = genMerge.evalModuleTree { } [
           {
             options.services = multiRegistry;
@@ -128,7 +128,7 @@ in
   flake.tests.refined-pipeline.test-multiple-fields-refined = {
     expr =
       let
-        multiFieldRegistry = mkInstanceRegistry schema.service {
+        multiFieldRegistry = mkInstanceRegistry {
           refinements = {
             port = [
               {
@@ -143,7 +143,7 @@ in
               }
             ];
           };
-        };
+        } schema.service;
         eval = genMerge.evalModuleTree { } [
           {
             options.services = multiFieldRegistry;

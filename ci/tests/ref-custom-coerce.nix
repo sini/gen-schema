@@ -7,41 +7,37 @@
 let
   inherit (genSchema) evalSchema mkInstanceRegistry declarationOf;
 
-  serviceSchema = evalSchema {
-    modules = [
-      {
-        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = declarationOf "host"; };
-        };
-      }
-    ];
-  };
+  serviceSchema = evalSchema { } [
+    {
+      config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.host = genMerge.mkOption { type = declarationOf "host"; };
+      };
+    }
+  ];
 
-  groupSchema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+  groupSchema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.group = {
+        options.members = genMerge.mkOption {
+          type = genMerge.types.listOf (declarationOf "host");
+          default = [ ];
         };
-        config.schema.group = {
-          options.members = genMerge.mkOption {
-            type = genMerge.types.listOf (declarationOf "host");
-            default = [ ];
-          };
-        };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   # --- Simple binding (no coerce) — verifies normalizeBinding passthrough ---
   evalSimple = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry serviceSchema.host { };
-      options.services = mkInstanceRegistry serviceSchema.service {
+      options.hosts = mkInstanceRegistry { } serviceSchema.host;
+      options.services = mkInstanceRegistry {
         refs.host = evalSimple.config.hosts;
-      };
+      } serviceSchema.service;
       config.hosts.igloo = {
         addr = "10.0.1.1";
       };
@@ -55,15 +51,15 @@ let
   # --- Scalar coerce test ---
   evalScalar = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry serviceSchema.host { };
-      options.services = mkInstanceRegistry serviceSchema.service {
+      options.hosts = mkInstanceRegistry { } serviceSchema.host;
+      options.services = mkInstanceRegistry {
         refs.host = {
           instances = evalScalar.config.hosts;
           coerce =
             default: val:
             if builtins.isString val && val == "fallback" then evalScalar.config.hosts.igloo else default;
         };
-      };
+      } serviceSchema.service;
       config.hosts.igloo = {
         addr = "10.0.1.1";
       };
@@ -88,8 +84,8 @@ let
   # --- listOf coerce test ---
   evalList = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry groupSchema.host { };
-      options.groups = mkInstanceRegistry groupSchema.group {
+      options.hosts = mkInstanceRegistry { } groupSchema.host;
+      options.groups = mkInstanceRegistry {
         refs.members = {
           instances = evalList.config.hosts;
           coerce =
@@ -101,7 +97,7 @@ let
             else
               [ default ];
         };
-      };
+      } groupSchema.group;
       config.hosts = {
         igloo = {
           addr = "10.0.1.1";
@@ -167,18 +163,16 @@ in
     test-scalar-coerce-expansion-error = {
       expr =
         let
-          thingSchema = evalSchema {
-            modules = [
-              {
-                config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-                config.schema.thing.options.host = genMerge.mkOption { type = declarationOf "host"; };
-              }
-            ];
-          };
+          thingSchema = evalSchema { } [
+            {
+              config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+              config.schema.thing.options.host = genMerge.mkOption { type = declarationOf "host"; };
+            }
+          ];
           evalBad = genMerge.evalModuleTree { } [
             {
-              options.hosts = mkInstanceRegistry thingSchema.host { };
-              options.things = mkInstanceRegistry thingSchema.thing {
+              options.hosts = mkInstanceRegistry { } thingSchema.host;
+              options.things = mkInstanceRegistry {
                 refs.host = {
                   instances = evalBad.config.hosts;
                   coerce = _default: _val: [
@@ -186,7 +180,7 @@ in
                     evalBad.config.hosts.igloo
                   ];
                 };
-              };
+              } thingSchema.thing;
               config.hosts.igloo = {
                 addr = "10.0.1.1";
               };

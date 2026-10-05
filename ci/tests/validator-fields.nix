@@ -13,7 +13,11 @@ let
   inherit (genSchema) mkFieldValidator filterValidators mkValidator;
 
   # A plain validator (no fields) — always runs
-  plainValidator = mkValidator "always-run" (inst: inst ? name) "must have name";
+  plainValidator = mkValidator {
+    name = "always-run";
+    pred = inst: inst ? name;
+    message = "must have name";
+  };
 
   # Requires both "port" and "protocol"
   portProtocolValidator = mkFieldValidator {

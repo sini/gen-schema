@@ -12,7 +12,11 @@ let
       options.schema = mkSchemaOption { };
       config.schema.host = {
         options.name = genMerge.mkOption { type = genMerge.types.str; };
-        methods.greet = schemaFn "Greet" genMerge.types.str ({ name, ... }: "hi ${name}");
+        methods.greet = schemaFn {
+          description = "Greet";
+          type = genMerge.types.str;
+          fn = { name, ... }: "hi ${name}";
+        };
       };
     }
   ];

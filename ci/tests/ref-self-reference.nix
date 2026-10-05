@@ -7,19 +7,17 @@
 let
   inherit (genSchema) evalSchema mkInstanceRegistry declarationOf;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-        };
-      }
-    ];
-  };
+  schema = evalSchema { } [
+    {
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.services = mkInstanceRegistry schema.service {
+      options.services = mkInstanceRegistry {
         extraModules = [
           (
             { ... }:
@@ -31,7 +29,7 @@ let
             }
           )
         ];
-      };
+      } schema.service;
       config.services.api = {
         port = 8080;
       };

@@ -46,13 +46,12 @@ let
   instanceOf =
     args: decl:
     let
-      schema = genSchema.evalSchema {
-        schemaOption = genSchema.mkSchemaOption args;
-        modules = [ { config.schema.k = decl; } ];
-      };
+      schema = genSchema.evalSchema { schemaOption = genSchema.mkSchemaOption args; } [
+        { config.schema.k = decl; }
+      ];
     in
     (genMerge.evalModuleTree { } [
-      { options.ks = genSchema.mkInstanceRegistry schema.k { }; }
+      { options.ks = genSchema.mkInstanceRegistry { } schema.k; }
       { config.ks.a = { }; }
     ]).config.ks.a;
 in

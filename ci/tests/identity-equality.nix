@@ -10,23 +10,21 @@
 let
   inherit (genSchema) evalSchema mkInstanceRegistry;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          options.role = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "worker";
-          };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        options.role = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "worker";
         };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
+      options.hosts = mkInstanceRegistry { } schema.host;
       config.hosts.igloo = {
         addr = "10.0.1.1";
         role = "web";

@@ -213,7 +213,7 @@ in
       # --- Codec (serialization) ---
       codecDemo =
         let
-          hostCodec = genSchema.mkCodec frozenSchema.host {
+          hostCodec = genSchema.mkCodec {
             fields = {
               # Exclude metricsPort from serialization
               metricsPort = {
@@ -223,8 +223,8 @@ in
                 exclude = true;
               };
             };
-          };
-          serviceCodec = genSchema.mkCodec frozenSchema.service { };
+          } frozenSchema.host;
+          serviceCodec = genSchema.mkCodec { } frozenSchema.service;
 
           # Encode a single instance
           encodedIgloo = hostCodec.encode fleet.hosts.igloo;
@@ -242,13 +242,13 @@ in
           # Type-registered codec: register an encoder keyed by type name.
           # The int encoder fires on every field whose type is `int` — here
           # the host's metricsPort (contributed by the monitoring plugin).
-          typeCodec = genSchema.mkCodec frozenSchema.host {
+          typeCodec = genSchema.mkCodec {
             types = {
               int = {
                 encode = v: "port:${toString v}";
               };
             };
-          };
+          } frozenSchema.host;
           typeEncodedPort = (typeCodec.encode fleet.hosts.igloo).metricsPort;
         in
         {

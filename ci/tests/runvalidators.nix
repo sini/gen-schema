@@ -4,7 +4,11 @@
 let
   inherit (genSchema) mkValidator runValidators formatErrors;
   validators = [
-    (mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
+    (mkValidator {
+      name = "has-addr";
+      pred = { addr, ... }: addr != "";
+      message = "addr must not be empty";
+    })
   ];
   passResult = runValidators "host" validators {
     igloo = {

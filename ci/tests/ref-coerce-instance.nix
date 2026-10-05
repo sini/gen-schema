@@ -7,35 +7,33 @@
 let
   inherit (genSchema) evalSchema mkInstanceRegistry declarationOf;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = declarationOf "host"; };
-        };
-        config.schema.link = {
-          options.label = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.host = genMerge.mkOption { type = declarationOf "host"; };
+      };
+      config.schema.link = {
+        options.label = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   # Test both deferred and direct modes with instance-value coercion.
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
+      options.hosts = mkInstanceRegistry { } schema.host;
 
       # Deferred mode with instance value
-      options.services = mkInstanceRegistry schema.service {
+      options.services = mkInstanceRegistry {
         refs.host = eval.config.hosts;
-      };
+      } schema.service;
 
       # Direct mode with instance value
-      options.links = mkInstanceRegistry schema.link {
+      options.links = mkInstanceRegistry {
         extraModules = [
           (
             { ... }:
@@ -46,7 +44,7 @@ let
             }
           )
         ];
-      };
+      } schema.link;
 
       config.hosts.igloo = {
         addr = "10.0.1.1";

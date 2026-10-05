@@ -7,34 +7,32 @@
 let
   inherit (genSchema) evalSchema mkInstanceRegistry;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.user = {
+        options.shell = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "/bin/bash";
         };
-        config.schema.user = {
-          options.shell = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "/bin/bash";
-          };
-        };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host {
+      options.hosts = mkInstanceRegistry {
         extraModules = [
           (
             { ... }:
             {
-              options.users = mkInstanceRegistry schema.user { };
+              options.users = mkInstanceRegistry { } schema.user;
             }
           )
         ];
-      };
+      } schema.host;
       config.hosts.igloo = {
         addr = "10.0.1.1";
         users.tux = {

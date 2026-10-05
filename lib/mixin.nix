@@ -5,27 +5,27 @@
   record,
 }:
 let
-  # MIXED door (P1, den-hoag-7gp66): `define` is required, the rest optional — closed over the
-  # whole set (`checkOptions door (req++opt) (checkRequired door req args)`), transitional until
-  # P2 splits options off the record. The `assert` forces `checked` at the point of application:
-  # the return is an attrset literal, so its own WHNF would otherwise leave the check unforced.
-  mkMixin =
-    args:
+  # OPTIONS FIRST, then `define` (den-hoag-7gp66 P2, rules 2 and 4): `mkMixin { requires?; provides?;
+  # kinds?; name?; } define`. The optional fields leave for one closed options set, a `prelude.door`
+  # refused by name and catchably at `mkMixin opts`'s own WHNF; `define`, the one required field, is
+  # the subject and positional, last.
+  mkMixin = prelude.door {
+    name = "gen-schema.mkMixin";
+    optional = [
+      "requires"
+      "provides"
+      "kinds"
+      "name"
+    ];
+  } (o: define: mkMixinCore o define);
+  mkMixinCore =
+    o: define:
     let
-      checked = prelude.checkOptions "gen-schema.mkMixin" [
-        "define"
-        "requires"
-        "provides"
-        "kinds"
-        "name"
-      ] (prelude.checkRequired "gen-schema.mkMixin" [ "define" ] args);
-      inherit (checked) define;
-      requires = checked.requires or [ ];
-      provides = checked.provides or [ ];
-      kinds = checked.kinds or null;
-      name = checked.name or "anonymous";
+      requires = o.requires or [ ];
+      provides = o.provides or [ ];
+      kinds = o.kinds or null;
+      name = o.name or "anonymous";
     in
-    assert builtins.isAttrs checked;
     {
       __isMixin = true;
       __direction = "smalltalk";

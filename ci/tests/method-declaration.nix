@@ -13,9 +13,11 @@ let
       config.schema.host = {
         options.name = genMerge.mkOption { type = genMerge.types.str; };
         options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        methods.greeting = schemaFn "Greeting message" genMerge.types.str (
-          { name, addr, ... }: "Hello from ${name} at ${addr}"
-        );
+        methods.greeting = schemaFn {
+          description = "Greeting message";
+          type = genMerge.types.str;
+          fn = { name, addr, ... }: "Hello from ${name} at ${addr}";
+        };
       };
     }
   ];

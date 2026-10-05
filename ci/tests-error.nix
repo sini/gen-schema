@@ -116,11 +116,7 @@ let
 
   # The door takes the KIND DECLARATION: the head of `hostModules` is declared as the kind `host`
   # through `evalSchema`, and the tail is the instance's definitions (ci/tests/identity-hash.nix).
-  kindOfModules =
-    decl:
-    (evalSchema {
-      modules = [ { config.schema.host = decl; } ];
-    }).host;
+  kindOfModules = decl: (evalSchema { } [ { config.schema.host = decl; } ]).host;
   identityEval =
     modules: extra:
     let
@@ -160,7 +156,7 @@ let
     args: decl:
     (genMerge.evalModuleTree { } [
       {
-        options.hosts = mkInstanceRegistry (kindOf args decl) { };
+        options.hosts = mkInstanceRegistry { } (kindOf args decl);
         config.hosts.h1 = {
           name = "h1";
         };
@@ -180,7 +176,7 @@ let
   portOf =
     decl: port:
     (genMerge.evalModuleTree { } [
-      { options.hosts = mkInstanceRegistry (kindOf { } decl) { }; }
+      { options.hosts = mkInstanceRegistry { } (kindOf { } decl); }
       { config.hosts.a.myPort = port; }
     ]).config.hosts.a.myPort;
 in
@@ -193,14 +189,12 @@ in
     # uncatchable `stack overflow; max-call-depth exceeded`. ADR-0016 ruling 7: a kind may inherit
     # only kinds resolved in a strictly earlier pass, and the substrate refuses by name.
     test-cycle-refuses-by-name = {
-      expr = evalSchema {
-        modules = [
-          {
-            config.schema.a.inherits = [ "b" ];
-            config.schema.b.inherits = [ "a" ];
-          }
-        ];
-      };
+      expr = evalSchema { } [
+        {
+          config.schema.a.inherits = [ "b" ];
+          config.schema.b.inherits = [ "a" ];
+        }
+      ];
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: inheritance cycle among kinds \\[a b\\] — a kind may inherit only kinds resolved in a strictly earlier pass$";
@@ -214,17 +208,15 @@ in
     # type's wording with the path, before `evalSchema`'s name graph is reached. The members are the
     # same `[a b]`.
     test-deprecated-spelling-cycle-refuses-by-name = {
-      expr = evalSchema {
-        modules = [
-          (
-            { config, ... }:
-            {
-              config.schema.a.imports = [ config.schema.b ];
-              config.schema.b.imports = [ config.schema.a ];
-            }
-          )
-        ];
-      };
+      expr = evalSchema { } [
+        (
+          { config, ... }:
+          {
+            config.schema.a.imports = [ config.schema.b ];
+            config.schema.b.imports = [ config.schema.a ];
+          }
+        )
+      ];
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kind 'a' reaches a kind with its own content witness through its parents \\(a -> b -> a\\), among kinds \\[a b\\]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named 'a' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module its own `_file` separates them \\(a module imported by path is named by the `_file` its own content sets, else by its path; an importing module's `_file` does not reach it\\)$";
@@ -286,9 +278,7 @@ in
 
     # A parent name nothing declares refuses by name too, and names both ends of the edge.
     test-unknown-parent-refuses-by-name = {
-      expr = evalSchema {
-        modules = [ { config.schema.derived.inherits = [ "nosuch" ]; } ];
-      };
+      expr = evalSchema { } [ { config.schema.derived.inherits = [ "nosuch" ]; } ];
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: kind 'derived' inherits 'nosuch' which is not a declared kind$";
@@ -301,20 +291,18 @@ in
     # nothing to resolve — the knob is not refused, it is INEXPRESSIBLE.
     test-consumer-config-cannot-decide-a-kind = {
       expr =
-        (evalSchema {
-          modules = [
-            (
-              { config, ... }:
-              {
-                config.schema.base =
-                  if config.knob then
-                    { options.hem = genMerge.mkOption { type = genMerge.types.str; }; }
-                  else
-                    { options.selvage = genMerge.mkOption { type = genMerge.types.str; }; };
-              }
-            )
-          ];
-        }).base;
+        (evalSchema { } [
+          (
+            { config, ... }:
+            {
+              config.schema.base =
+                if config.knob then
+                  { options.hem = genMerge.mkOption { type = genMerge.types.str; }; }
+                else
+                  { options.selvage = genMerge.mkOption { type = genMerge.types.str; }; };
+            }
+          )
+        ]).base;
       expectedError = {
         type = "EvalError";
         msg = "attribute 'knob' missing";
@@ -459,7 +447,7 @@ in
         b.imports = [ s.a ];
       };
       plain = f: builtins.attrNames (plainTree (written f)).a.options;
-      staged = f: evalSchema { modules = written f; };
+      staged = f: evalSchema { } (written f);
     in
     {
       test-plain-value-2-cycle = {
@@ -673,7 +661,7 @@ in
       instanceOf =
         kind:
         (genMerge.evalModuleTree { } [
-          { options.h = genMerge.mkOption { type = mkInstanceType kind { }; }; }
+          { options.h = genMerge.mkOption { type = mkInstanceType { } kind; }; }
           { config.h.name = "a"; }
         ]).config.h;
       notBuilt = site: kind: {
@@ -929,13 +917,13 @@ in
         # `assertion failed`, which matches neither the type nor the message below.
         assert
           let
-            control = builtins.tryEval (mkInstanceRegistry markedHostKind { }).description;
+            control = builtins.tryEval (mkInstanceRegistry { } markedHostKind).description;
           in
           control.success && control.value == "host instances";
-        (mkInstanceRegistry {
+        (mkInstanceRegistry { } {
           kind = "host";
           options = { };
-        } { }).description;
+        }).description;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: mkInstanceRegistry: expected a kind value carrying a mint-backed mark \\(`__mint.minted`\\); got an attrset with no mark$";
@@ -1567,17 +1555,19 @@ in
   # cell could only say that something threw.
   flake.testsError.schema-special-args = {
     test-evalSchema-refuses-schemaOption-and-specialArgs-together = {
-      expr = evalSchema {
-        modules = [
-          { config.schema.fleet.options.hostName = genMerge.mkOption { type = genMerge.types.str; }; }
-        ];
-        schemaOption = mkSchemaOption { };
-        specialArgs = {
-          argand = {
-            inletTag = "CALLER";
-          };
-        };
-      };
+      expr =
+        evalSchema
+          {
+            schemaOption = mkSchemaOption { };
+            specialArgs = {
+              argand = {
+                inletTag = "CALLER";
+              };
+            };
+          }
+          [
+            { config.schema.fleet.options.hostName = genMerge.mkOption { type = genMerge.types.str; }; }
+          ];
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema: `evalSchema' was given both `schemaOption' and `specialArgs'\\. The schema option supplied here is already built, so those args would reach no kind tree; state them where it is constructed instead — `mkSchemaOption \\{ specialArgs = …; \\}'$";
@@ -1589,8 +1579,15 @@ in
       expr =
         let
           viaArgs =
-            (evalSchema {
-              modules = [
+            (evalSchema
+              {
+                specialArgs = {
+                  argand = {
+                    inletTag = "CALLER";
+                  };
+                };
+              }
+              [
                 {
                   config.schema.fleet.imports = [
                     (
@@ -1604,25 +1601,17 @@ in
                     )
                   ];
                 }
-              ];
-              specialArgs = {
-                argand = {
-                  inletTag = "CALLER";
-                };
-              };
-            }).fleet.options.hostName.default;
+              ]
+            ).fleet.options.hostName.default;
           viaOption =
-            (evalSchema {
-              modules = [
-                {
-                  config.schema.fleet.options.hostName = genMerge.mkOption {
-                    type = genMerge.types.str;
-                    default = "plain";
-                  };
-                }
-              ];
-              schemaOption = mkSchemaOption { };
-            }).fleet.options.hostName.default;
+            (evalSchema { schemaOption = mkSchemaOption { }; } [
+              {
+                config.schema.fleet.options.hostName = genMerge.mkOption {
+                  type = genMerge.types.str;
+                  default = "plain";
+                };
+              }
+            ]).fleet.options.hostName.default;
         in
         "${viaArgs}/${viaOption}";
       expected = "CALLER/plain";
@@ -1733,7 +1722,7 @@ in
         decls: insts:
         (genMerge.evalModuleTree { } (
           [
-            { options.registry = mkInstanceRegistry (kindWith decls) { }; }
+            { options.registry = mkInstanceRegistry { } (kindWith decls); }
           ]
           ++ map (i: { config.registry.INSTANCENAME = i; }) insts
         )).config.registry.INSTANCENAME;
@@ -2129,48 +2118,46 @@ in
           (
             { config, ... }:
             let
-              kinds = genSchema.evalSchema {
-                modules = [
-                  {
-                    config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-                    config.schema.link.options.label = genMerge.mkOption { type = genMerge.types.str; };
-                    config.schema.service.options.host = genMerge.mkOption {
-                      type = genSchema.declarationOf "host";
+              kinds = genSchema.evalSchema { } [
+                {
+                  config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                  config.schema.link.options.label = genMerge.mkOption { type = genMerge.types.str; };
+                  config.schema.service.options.host = genMerge.mkOption {
+                    type = genSchema.declarationOf "host";
+                  };
+                  config.schema.node = {
+                    options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                    options.parent = genMerge.mkOption {
+                      type = genMerge.types.nullOr (genSchema.declarationOf "node");
+                      default = null;
                     };
-                    config.schema.node = {
-                      options.addr = genMerge.mkOption { type = genMerge.types.str; };
-                      options.parent = genMerge.mkOption {
-                        type = genMerge.types.nullOr (genSchema.declarationOf "node");
-                        default = null;
-                      };
-                    };
-                  }
-                ];
-              };
+                  };
+                }
+              ];
             in
             {
-              options.hosts = genSchema.mkInstanceRegistry kinds.host { };
-              options.spares = genSchema.mkInstanceRegistry kinds.host { };
-              options.links = genSchema.mkInstanceRegistry kinds.link {
+              options.hosts = genSchema.mkInstanceRegistry { } kinds.host;
+              options.spares = genSchema.mkInstanceRegistry { } kinds.host;
+              options.links = genSchema.mkInstanceRegistry {
                 extraModules = [
                   { options.target = genMerge.mkOption { type = genSchema.declarationOf config.hosts; }; }
                 ];
-              };
-              options.handLinks = genSchema.mkInstanceRegistry kinds.link {
+              } kinds.link;
+              options.handLinks = genSchema.mkInstanceRegistry {
                 extraModules = [
                   { options.target = genMerge.mkOption { type = genSchema.declarationOf hand; }; }
                 ];
-              };
-              options.services = genSchema.mkInstanceRegistry kinds.service { refs.host = config.hosts; };
+              } kinds.link;
+              options.services = genSchema.mkInstanceRegistry { refs.host = config.hosts; } kinds.service;
               # `derive` overwrites an identity key after the stamp is minted, so the post-derive
               # record carries a stamp its own fields no longer produce.
-              options.drift = genSchema.mkInstanceRegistry kinds.node {
+              options.drift = genSchema.mkInstanceRegistry {
                 refs.parent = {
                   deferred = true;
                   instances = config.drift;
                 };
                 derive = _: { n0.addr = "derived"; };
-              };
+              } kinds.node;
               config.hosts.igloo.addr = "10.0.0.1";
               config.spares.igloo.addr = "10.9.9.9";
               config.links.main.label = "l";
@@ -2363,16 +2350,13 @@ in
         };
       viaEvalSchema =
         mod: sa:
-        (evalSchema {
-          specialArgs = sa;
-          modules = [ { config.schema.fleet.imports = [ mod ]; } ];
-        }).fleet.options.tag.default;
+        (evalSchema { specialArgs = sa; } [ { config.schema.fleet.imports = [ mod ]; } ])
+        .fleet.options.tag.default;
       viaMkSchemaOption =
         mod: sa:
-        (evalSchema {
-          schemaOption = mkSchemaOption { specialArgs = sa; };
-          modules = [ { config.schema.fleet.imports = [ mod ]; } ];
-        }).fleet.options.tag.default;
+        (evalSchema { schemaOption = mkSchemaOption { specialArgs = sa; }; } [
+          { config.schema.fleet.imports = [ mod ]; }
+        ]).fleet.options.tag.default;
       viaIdentityKeysForKind = sa: identityKeysForKind { specialArgs = sa; } (kindOfModules plainKind);
       msg =
         keys:
@@ -2499,22 +2483,20 @@ in
   flake.testsError.identity-leaf-refusals =
     let
       leafHost =
-        (evalSchema {
-          modules = [
+        (evalSchema { } [
 
-            {
-              config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-              config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; };
-            }
+          {
+            config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+            config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; };
+          }
 
-          ];
-        }).host;
+        ]).host;
       identityOf =
         regOpts: v:
         (genMerge.evalModuleTree { } [
 
           {
-            options.hosts = mkInstanceRegistry leafHost regOpts;
+            options.hosts = mkInstanceRegistry regOpts leafHost;
             config.hosts.h = {
               addr = "10.0.0.1";
               role = "web";
@@ -2568,11 +2550,12 @@ in
       };
     };
 
-  # THE CLOSED-DOOR REFUSALS (den-hoag-7gp66 P1) — `ci/tests/door-checks.nix` pins that every door
-  # refuses catchably; these pin WHICH refusal fired and that it names the door (R6). One cell per
-  # violation gen-prelude's `checkOptions`/`checkRequired` can raise for a row in `../doors.nix`, in
-  # the row's own order; a RECORD door (`options == [ ]`) has no unknown-option cell because R5 admits
-  # an extra field rather than refusing it (that admission is `door-checks.nix`'s own cell).
+  # THE DOOR REFUSALS (den-hoag-7gp66 P1, then P2) — `ci/tests/door-checks.nix` pins that every
+  # step refuses catchably; these pin WHICH refusal fired and that it names the door (R6). One cell
+  # per violation gen-prelude's checks can raise for a row in `../doors.nix`, in the row's own order;
+  # a RECORD step (`options == [ ]`) has no unknown-option cell because R5 admits an extra field
+  # rather than refusing it (that admission is `door-checks.nix`'s own cell), and an OPTIONS step
+  # (`required == [ ]`) has no missing-field cell.
   flake.testsError.door-checks = {
     test-mkfieldvalidator-missing-required-names-the-door = {
       expr = doors.mkFieldValidator.call (builtins.removeAttrs doors.mkFieldValidator.valid [ "fields" ]);
@@ -2589,47 +2572,63 @@ in
       };
     };
 
-    test-mkmixin-missing-required-names-the-door = {
-      expr = doors.mkMixin.call (builtins.removeAttrs doors.mkMixin.valid [ "define" ]);
+    test-mkvalidator-missing-required-names-the-door = {
+      expr = doors.mkValidator.call (builtins.removeAttrs doors.mkValidator.valid [ "name" ]);
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkMixin: required field 'define' is missing \\(required: 'define'\\) \\(in prelude\\.checkRequired\\)$";
+        msg = "^gen-schema\\.mkValidator: required field 'name' is missing \\(required: 'name', 'pred', 'message'\\) \\(in prelude\\.checkRequired\\)$";
       };
     };
+    test-mkvalidator-non-attrset-argument-names-the-door = {
+      expr = doors.mkValidator.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkValidator: the argument must be an attrset, not a int \\(required: 'name', 'pred', 'message'\\) \\(in prelude\\.checkRequired\\)$";
+      };
+    };
+
+    test-schemafn-missing-required-names-the-door = {
+      expr = doors.schemaFn.call (builtins.removeAttrs doors.schemaFn.valid [ "description" ]);
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.schemaFn: required field 'description' is missing \\(required: 'description', 'type', 'fn'\\) \\(in prelude\\.checkRequired\\)$";
+      };
+    };
+    test-schemafn-non-attrset-argument-names-the-door = {
+      expr = doors.schemaFn.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.schemaFn: the argument must be an attrset, not a int \\(required: 'description', 'type', 'fn'\\) \\(in prelude\\.checkRequired\\)$";
+      };
+    };
+
     test-mkmixin-non-attrset-argument-names-the-door = {
       expr = doors.mkMixin.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkMixin: the argument must be an attrset, not a int \\(required: 'define'\\) \\(in prelude\\.checkRequired\\)$";
+        msg = "^gen-schema\\.mkMixin: the options must be an attrset, not a int \\(accepted: 'requires', 'provides', 'kinds', 'name'\\) \\(in prelude\\.checkOptions\\)$";
       };
     };
     test-mkmixin-unknown-option-names-the-door = {
       expr = doors.mkMixin.call (doors.mkMixin.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkMixin: 'bogus' is not an option of this door; the options are closed \\(accepted: 'define', 'requires', 'provides', 'kinds', 'name'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = "^gen-schema\\.mkMixin: 'bogus' is not an option of this door; the options are closed \\(accepted: 'requires', 'provides', 'kinds', 'name'\\) \\(in prelude\\.checkOptions\\)$";
       };
     };
 
-    test-evalschema-missing-required-names-the-door = {
-      expr = doors.evalSchema.call (builtins.removeAttrs doors.evalSchema.valid [ "modules" ]);
-      expectedError = {
-        type = "ThrownError";
-        msg = "^gen-schema\\.evalSchema: required field 'modules' is missing \\(required: 'modules'\\) \\(in prelude\\.checkRequired\\)$";
-      };
-    };
     test-evalschema-non-attrset-argument-names-the-door = {
       expr = doors.evalSchema.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.evalSchema: the argument must be an attrset, not a int \\(required: 'modules'\\) \\(in prelude\\.checkRequired\\)$";
+        msg = "^gen-schema\\.evalSchema: the options must be an attrset, not a int \\(accepted: 'schemaOption', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
       };
     };
     test-evalschema-unknown-option-names-the-door = {
       expr = doors.evalSchema.call (doors.evalSchema.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.evalSchema: 'bogus' is not an option of this door; the options are closed \\(accepted: 'modules', 'schemaOption', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = "^gen-schema\\.evalSchema: 'bogus' is not an option of this door; the options are closed \\(accepted: 'schemaOption', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
       };
     };
 
@@ -2641,7 +2640,7 @@ in
       };
     };
     test-identitykeysforkind-unknown-option-names-the-door = {
-      expr = doors.identityKeysForKind.call { bogus = 1; };
+      expr = doors.identityKeysForKind.call (doors.identityKeysForKind.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema\\.identityKeysForKind: 'bogus' is not an option of this door; the options are closed \\(accepted: 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
@@ -2656,7 +2655,7 @@ in
       };
     };
     test-mkschemaentrytype-unknown-option-names-the-door = {
-      expr = doors.mkSchemaEntryType.call { bogus = 1; };
+      expr = doors.mkSchemaEntryType.call (doors.mkSchemaEntryType.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema\\.mkSchemaEntryType: 'bogus' is not an option of this door; the options are closed \\(accepted: 'baseModule', 'collections', 'computed', 'mixins', 'mkType', 'strict', 'keySemantics', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
@@ -2671,10 +2670,70 @@ in
       };
     };
     test-mkschemaoption-unknown-option-names-the-door = {
-      expr = doors.mkSchemaOption.call { bogus = 1; };
+      expr = doors.mkSchemaOption.call (doors.mkSchemaOption.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
         msg = "^gen-schema\\.mkSchemaOption: 'bogus' is not an option of this door; the options are closed \\(accepted: 'baseModule', 'collections', 'computed', 'mixins', 'mkType', 'strict', 'keySemantics', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+
+    test-mkinstancetype-non-attrset-argument-names-the-door = {
+      expr = doors.mkInstanceType.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkInstanceType: the options must be an attrset, not a int \\(accepted: 'extraModules', 'strict', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+    test-mkinstancetype-unknown-option-names-the-door = {
+      expr = doors.mkInstanceType.call (doors.mkInstanceType.valid // { bogus = 1; });
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkInstanceType: 'bogus' is not an option of this door; the options are closed \\(accepted: 'extraModules', 'strict', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+
+    test-mkinstanceregistry-non-attrset-argument-names-the-door = {
+      expr = doors.mkInstanceRegistry.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkInstanceRegistry: the options must be an attrset, not a int \\(accepted: 'extraModules', 'refs', 'refinements', 'strict', 'description', 'derive', 'deriveEither', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+    test-mkinstanceregistry-unknown-option-names-the-door = {
+      expr = doors.mkInstanceRegistry.call (doors.mkInstanceRegistry.valid // { bogus = 1; });
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkInstanceRegistry: 'bogus' is not an option of this door; the options are closed \\(accepted: 'extraModules', 'refs', 'refinements', 'strict', 'description', 'derive', 'deriveEither', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+
+    test-mkcodec-non-attrset-argument-names-the-door = {
+      expr = doors.mkCodec.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkCodec: the options must be an attrset, not a int \\(accepted: 'fields', 'types', 'excludeFields'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+    test-mkcodec-unknown-option-names-the-door = {
+      expr = doors.mkCodec.call (doors.mkCodec.valid // { bogus = 1; });
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.mkCodec: 'bogus' is not an option of this door; the options are closed \\(accepted: 'fields', 'types', 'excludeFields'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+
+    test-constructionrelation-non-attrset-argument-names-the-door = {
+      expr = doors.constructionRelation.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.constructionRelation: the options must be an attrset, not a int \\(accepted: 'minted', 'compared'\\) \\(in prelude\\.checkOptions\\)$";
+      };
+    };
+    test-constructionrelation-unknown-option-names-the-door = {
+      expr = doors.constructionRelation.call (doors.constructionRelation.valid // { bogus = 1; });
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema\\.constructionRelation: 'bogus' is not an option of this door; the options are closed \\(accepted: 'minted', 'compared'\\) \\(in prelude\\.checkOptions\\)$";
       };
     };
   };
@@ -2700,7 +2759,7 @@ in
               }
             ]).config.schema.host;
         in
-        builtins.deepSeq (genSchema.mkInstanceType kind { }) null;
+        builtins.deepSeq (genSchema.mkInstanceType { } kind) null;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-merge: `submodule': its called `whenEmpty' does not evaluate the nested tree: a nested tree is a child of the one evaluation that holds it [(]`evalModuleTree'[)], read through its fold's threaded sibling, and no second evaluation is made for it$";
@@ -3694,16 +3753,14 @@ in
       test-under-evalSchema = {
         expr =
           builtins.attrNames
-            (evalSchema {
-              modules = [
-                {
-                  config.schema.k = {
-                    inherits = [ xA.a ];
-                    options.ok = intOpt;
-                  };
-                }
-              ];
-            }).k.options;
+            (evalSchema { } [
+              {
+                config.schema.k = {
+                  inherits = [ xA.a ];
+                  options.ok = intOpt;
+                };
+              }
+            ]).k.options;
         expectedError = refuses "a b" "a -> b -> a" "a";
       };
       # THE `mkType` ARM (den-hoag-24zdh): the desugared parents reach the caller as ONE def whenever
@@ -3748,17 +3805,14 @@ in
       test-a-mkType-member-under-evalSchema-refuses = {
         expr =
           builtins.attrNames
-            (evalSchema {
-              schemaOption = mkSchemaOption { inherit mkType; };
-              modules = [
-                {
-                  config.schema.k = {
-                    inherits = [ mA.a ];
-                    options.ok = intOpt;
-                  };
-                }
-              ];
-            }).k.options;
+            (evalSchema { schemaOption = mkSchemaOption { inherit mkType; }; } [
+              {
+                config.schema.k = {
+                  inherits = [ mA.a ];
+                  options.ok = intOpt;
+                };
+              }
+            ]).k.options;
         expectedError = refuses "a b" "a -> b -> a" "a";
       };
       # A caller whose result shape reads the defs' LENGTH past the raw defs is served: the desugared
@@ -3796,14 +3850,12 @@ in
         type = "ThrownError";
         msg = "^gen-schema: o.*: `declarationOf \"host\"' is unbound here\\. A deferred declaration resolves only through a registry binding .*$";
       };
-      schema = evalSchema {
-        modules = [
-          {
-            config.schema.host = { };
-            config.schema.svc.options.host = genMerge.mkOption { type = declarationOf "host"; };
-          }
-        ];
-      };
+      schema = evalSchema { } [
+        {
+          config.schema.host = { };
+          config.schema.svc.options.host = genMerge.mkOption { type = declarationOf "host"; };
+        }
+      ];
     in
     {
       test-unbound-scalar-refused-by-name = {
@@ -3830,8 +3882,8 @@ in
             (
               { config, ... }:
               {
-                options.hosts = mkInstanceRegistry schema.host { };
-                options.svcs = mkInstanceRegistry schema.svc { refs.host = config.hosts; };
+                options.hosts = mkInstanceRegistry { } schema.host;
+                options.svcs = mkInstanceRegistry { refs.host = config.hosts; } schema.svc;
                 config.hosts.a = { };
                 config.svcs.s.host = "nope";
               }
@@ -3859,22 +3911,20 @@ in
           bind ? (hosts: hosts),
         }:
         let
-          schema = evalSchema {
-            modules = [
-              {
-                config.schema.host = { };
-                config.schema.svc.options.f = genMerge.mkOption { inherit type; };
-              }
-            ];
-          };
+          schema = evalSchema { } [
+            {
+              config.schema.host = { };
+              config.schema.svc.options.f = genMerge.mkOption { inherit type; };
+            }
+          ];
         in
         builtins.deepSeq
           (genMerge.evalModuleTree { } [
             (
               { config, ... }:
               {
-                options.hosts = mkInstanceRegistry schema.host { };
-                options.svcs = mkInstanceRegistry schema.svc { refs.f = bind config.hosts; };
+                options.hosts = mkInstanceRegistry { } schema.host;
+                options.svcs = mkInstanceRegistry { refs.f = bind config.hosts; } schema.svc;
                 config.hosts.a = { };
                 config.hosts.b = { };
                 config.svcs.s.f = value;

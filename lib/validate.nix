@@ -15,9 +15,25 @@
 let
   # --- Base constructors (gen-schema-owned) ---
 
-  mkValidator = name: pred: message: {
-    inherit name pred message;
-  };
+  # ONE REQUIRED RECORD (den-hoag-7gp66 P2, R7(a), the shape of gen-types' own `mkValidator`): the
+  # name and the message are both strings, and nothing orders a label, a predicate and its failure
+  # text, so they stay one required-argument record, `mkValidator { name; pred; message; }`. The
+  # record is a `prelude.door` (open, as a record operand is): a missing field is refused by name
+  # and catchably at the application.
+  mkValidator =
+    prelude.door
+      {
+        name = "gen-schema.mkValidator";
+        required = [
+          "name"
+          "pred"
+          "message"
+        ];
+        open = true;
+      }
+      (v: {
+        inherit (v) name pred message;
+      });
 
   runValidators =
     kind: validators: instances:
@@ -89,29 +105,28 @@ in
   # Wrap mkValidator with field requirements.
   # Validators with __fields are skipped when any required field is absent from the kind.
   #
-  # RECORD door (P1, den-hoag-7gp66): all four fields are required, so R5 leaves it open — an
-  # extra field is admitted, the stated price of the open-record policy. The `assert` forces
-  # `checked` at the point the record is applied: the return below is an attrset LITERAL, whose
-  # own WHNF does not read `checked.fields` etc. merely to exist, so a lazy check left unforced
-  # would pass a bad call silently until some later reader happened to force one field.
+  # ONE REQUIRED RECORD (den-hoag-7gp66 P2, R7(a), as `mkValidator` above, with the fields the
+  # validator requires): all four fields are required, so R5 leaves it open — an extra field is
+  # admitted, the stated price of the open-record policy. The record is a `prelude.door`, whose check
+  # is forced at the application itself, so a bad record is refused at the door's own WHNF even
+  # though the return is an attrset literal.
   mkFieldValidator =
-    args:
-    let
-      checked = prelude.checkRequired "gen-schema.mkFieldValidator" [
-        "fields"
-        "name"
-        "check"
-        "message"
-      ] args;
-      inherit (checked)
-        fields
-        name
-        check
-        message
-        ;
-    in
-    assert builtins.isAttrs checked;
-    (mkValidator name check message) // { __fields = fields; };
+    prelude.door
+      {
+        name = "gen-schema.mkFieldValidator";
+        required = [
+          "fields"
+          "name"
+          "check"
+          "message"
+        ];
+        open = true;
+      }
+      (v: {
+        inherit (v) name message;
+        pred = v.check;
+        __fields = v.fields;
+      });
 
   # Filter validators by kind's option names.
   # Validators with __fields: skip if any required field is missing from optionNames.

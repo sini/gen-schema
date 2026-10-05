@@ -29,7 +29,7 @@ let
   hostsWith =
     k: v:
     (genMerge.evalModuleTree { } [
-      { options.hosts = mkInstanceRegistry k { }; }
+      { options.hosts = mkInstanceRegistry { } k; }
       { config.hosts.a.myPort = v; }
     ]).config.hosts.a.myPort;
 

@@ -24,11 +24,7 @@ let
   # prepends it unconditionally — a kind whose instances differ only in `name` must not collapse to
   # one identity. A fixture below that mints without declaring `name` is not a kind this library can
   # be handed through its own constructor, so the stand-in supplies what the constructor would.
-  mkKind =
-    kind: decl:
-    (genSchema.evalSchema {
-      modules = [ { config.schema.${kind} = decl; } ];
-    }).${kind};
+  mkKind = kind: decl: (genSchema.evalSchema { } [ { config.schema.${kind} = decl; } ]).${kind};
   mkEval =
     kind: modules:
     let

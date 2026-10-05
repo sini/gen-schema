@@ -13,12 +13,16 @@ let
         options.addr = genMerge.mkOption { type = genMerge.types.str; };
         options.role = genMerge.mkOption { type = genMerge.types.str; };
         validators = [
-          (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
+          (genSchema.mkValidator {
+            name = "has-addr";
+            pred = { addr, ... }: addr != "";
+            message = "addr must not be empty";
+          })
         ];
       };
     }
   ];
-  hostType = genSchema.mkInstanceType schemaEval.config.schema.host { };
+  hostType = genSchema.mkInstanceType { } schemaEval.config.schema.host;
   instanceEval = genMerge.evalModuleTree { } [
     {
       options.hosts = genMerge.mkOption {

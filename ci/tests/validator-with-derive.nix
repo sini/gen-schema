@@ -6,22 +6,24 @@
   ...
 }:
 let
-  schema = genSchema.evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          validators = [
-            (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "addr must not be empty")
-          ];
-        };
-      }
-    ];
-  };
+  schema = genSchema.evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        validators = [
+          (genSchema.mkValidator {
+            name = "has-addr";
+            pred = { addr, ... }: addr != "";
+            message = "addr must not be empty";
+          })
+        ];
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = genSchema.mkInstanceRegistry schema.host {
+      options.hosts = genSchema.mkInstanceRegistry {
         extraModules = [
           {
             options.tag = genMerge.mkOption {
@@ -32,7 +34,7 @@ let
           }
         ];
         derive = instances: lib.mapAttrs (name: _: { tag = "valid-${name}"; }) instances;
-      };
+      } schema.host;
       config.hosts.igloo.addr = "10.0.1.1";
     }
   ];

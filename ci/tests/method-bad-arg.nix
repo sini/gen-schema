@@ -12,7 +12,11 @@ let
       options.schema = mkSchemaOption { };
       config.schema.host = {
         options.name = genMerge.mkOption { type = genMerge.types.str; };
-        methods.broken = schemaFn "Broken method" genMerge.types.str ({ nonexistent, ... }: "should fail");
+        methods.broken = schemaFn {
+          description = "Broken method";
+          type = genMerge.types.str;
+          fn = { nonexistent, ... }: "should fail";
+        };
       };
     }
   ];

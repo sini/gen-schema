@@ -40,20 +40,18 @@ let
   ];
   docs = renderDocs docsEval.config.schema;
 
-  refConflictSchema = evalSchema {
-    modules = [
-      {
-        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        config.schema.service.options.port = genMerge.mkOption { type = genMerge.types.int; };
-      }
-    ];
-  };
+  refConflictSchema = evalSchema { } [
+    {
+      config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      config.schema.service.options.port = genMerge.mkOption { type = genMerge.types.int; };
+    }
+  ];
 
   # ref with two modules setting same ref to different values
   refConflictEval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry refConflictSchema.host { };
-      options.services = mkInstanceRegistry refConflictSchema.service {
+      options.hosts = mkInstanceRegistry { } refConflictSchema.host;
+      options.services = mkInstanceRegistry {
         extraModules = [
           (
             { ... }:
@@ -64,7 +62,7 @@ let
             }
           )
         ];
-      };
+      } refConflictSchema.service;
       config.hosts.igloo.addr = "10.0.1.1";
       config.hosts.iceberg.addr = "10.0.1.2";
     }

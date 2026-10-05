@@ -10,11 +10,7 @@ let
   # is the kind's declarations, evaluated through `evalSchema` as the kind `kind`; the TAIL is the
   # instance's definitions. See ci/tests/identity-hash.nix for the full note, including why a cell
   # comparing two DECLARATIONS recomputes under one kind rather than comparing two stamps.
-  mkKind =
-    kind: decl:
-    (genSchema.evalSchema {
-      modules = [ { config.schema.${kind} = decl; } ];
-    }).${kind};
+  mkKind = kind: decl: (genSchema.evalSchema { } [ { config.schema.${kind} = decl; } ]).${kind};
   mkEval =
     kind: modules:
     let

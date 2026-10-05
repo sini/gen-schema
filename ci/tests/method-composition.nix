@@ -13,12 +13,20 @@ let
       config.schema.host = {
         options.name = genMerge.mkOption { type = genMerge.types.str; };
         options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        methods.ping = schemaFn "Ping command" genMerge.types.str ({ addr, ... }: "ping ${addr}");
+        methods.ping = schemaFn {
+          description = "Ping command";
+          type = genMerge.types.str;
+          fn = { addr, ... }: "ping ${addr}";
+        };
       };
     }
     {
       config.schema.host = {
-        methods.ssh = schemaFn "SSH command" genMerge.types.str ({ name, ... }: "ssh ${name}");
+        methods.ssh = schemaFn {
+          description = "SSH command";
+          type = genMerge.types.str;
+          fn = { name, ... }: "ssh ${name}";
+        };
       };
     }
   ];

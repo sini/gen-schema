@@ -133,20 +133,20 @@ in
   flake.tests.kind-mark.test-admission-reads-the-record-and-not-the-digest = {
     expr = {
       thrownDigestIsAdmitted =
-        (mkInstanceRegistry (
+        (mkInstanceRegistry { } (
           hostKind
           // {
             __mint = {
               minted = throw "FORCED";
             };
           }
-        ) { }).description;
+        )).description;
       thrownMarkDetonates =
         !(builtins.tryEval
-          (mkInstanceRegistry (hostKind // { __mint = throw "FORCED-MARK"; }) { }).description
+          (mkInstanceRegistry { } (hostKind // { __mint = throw "FORCED-MARK"; })).description
         ).success;
       # LIVE CONTROL: the real kind value takes the same path and answers.
-      realKindIsAdmitted = (mkInstanceRegistry hostKind { }).description;
+      realKindIsAdmitted = (mkInstanceRegistry { } hostKind).description;
     };
     expected = {
       thrownDigestIsAdmitted = "host instances";
@@ -177,7 +177,7 @@ in
             { config, ... }:
             {
               options.schema = mkSchemaOption { };
-              options.hosts = mkInstanceRegistry config.schema.host { };
+              options.hosts = mkInstanceRegistry { } config.schema.host;
               config.schema.host.options.role = genMerge.mkOption { type = genMerge.types.str; };
               config.hosts.igloo.role = "web";
             }

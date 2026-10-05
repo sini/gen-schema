@@ -74,7 +74,7 @@ let
       t = treeOf 0;
       reg =
         (merge.evalModuleTree { } [
-          { options.hosts = S.mkInstanceRegistry t.sub { }; }
+          { options.hosts = S.mkInstanceRegistry { } t.sub; }
           {
             config.hosts = builtins.listToAttrs (
               builtins.genList (i: {
@@ -101,7 +101,7 @@ let
         { config, ... }:
         {
           config.schema.widget.options.n = merge.mkOption { type = ty; };
-          options.widgets = S.mkInstanceRegistry config.schema.widget { };
+          options.widgets = S.mkInstanceRegistry { } config.schema.widget;
         }
       )
       { config.widgets.w1.n = 5; }

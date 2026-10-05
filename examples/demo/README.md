@@ -140,9 +140,9 @@ config.schema.admin-user = {
 Admin-user instances get `userName` and `shell` from the user kind, plus `sudoPrivileges` and `sshKeys` from their own definition. The registries file resolves inheritance through a frozen `evalSchema` pass, then each kind gets its own registry with independent instances:
 
 ```nix
-schema = genSchema.evalSchema { modules = [ (import ../schema/user.nix {...}) (import ../schema/admin-user.nix {...}) ]; };
-options.fleet.users = mkInstanceRegistry schema.user {};
-options.fleet.admins = mkInstanceRegistry schema.admin-user {};
+schema = genSchema.evalSchema { } [ (import ../schema/user.nix {...}) (import ../schema/admin-user.nix {...}) ];
+options.fleet.users = mkInstanceRegistry {} schema.user;
+options.fleet.admins = mkInstanceRegistry {} schema.admin-user;
 ```
 
 Instances in each registry are independent — admins don't appear in the user registry. Identity hashes include the kind prefix, so a user "root" and an admin "root" hash differently.
@@ -166,9 +166,7 @@ All inherited options merge through deferred module merge. Conflicts (two parent
 ```nix
 # Describe: all args (name, role, addr) come from the host instance's config
 schema.host.methods.describe = schemaFn
-  "Human-readable summary of this host."
-  lib.types.str
-  ({ name, role, addr, ... }: "${name} (${role}) at ${addr}");
+  { description = "Human-readable summary of this host."; type = lib.types.str; fn = { name, role, addr, ... }: "${name} (${role}) at ${addr}"; };
 
 fleet.hosts.igloo.describe → "igloo (web) at 10.0.1.1"
 ```
@@ -178,12 +176,10 @@ Methods can also close over values from their declaration scope. `hasService` ca
 ```nix
 # hasService: name from instance, services from module scope
 schema.host.methods.hasService = schemaFn
-  "Check whether a named service targets this host."
-  (lib.types.functionTo lib.types.bool)
-  ({ name, ... }:
+  { description = "Check whether a named service targets this host."; type = lib.types.functionTo lib.types.bool; fn = { name, ... }:
     serviceName:
     let services = config.fleet.services;
-    in services ? ${serviceName} && services.${serviceName}.host.name == name);
+    in services ? ${serviceName} && services.${serviceName}.host.name == name; };
 
 fleet.hosts.igloo.hasService "nginx"    → true
 fleet.hosts.igloo.hasService "postgres" → false
@@ -223,18 +219,12 @@ Validators are cross-field constraints declared on schema kinds. They travel wit
 ```nix
 # gen-modules/fleet/validation.nix
 config.schema.host.validators = [
-  (genSchema.mkValidator "has-addr"
-    ({ addr, ... }: addr != "")
-    "host must have a non-empty addr")
-  (genSchema.mkValidator "valid-role"
-    ({ role, ... }: lib.elem role [ "web" "db" "worker" "lb" ])
-    "role must be one of: web, db, worker, lb")
+  (genSchema.mkValidator { name = "has-addr"; pred = { addr, ... }: addr != ""; message = "host must have a non-empty addr"; })
+  (genSchema.mkValidator { name = "valid-role"; pred = { role, ... }: lib.elem role [ "web" "db" "worker" "lb" ]; message = "role must be one of: web, db, worker, lb"; })
 ];
 
 config.schema.service.validators = [
-  (genSchema.mkValidator "valid-port"
-    ({ port, ... }: port > 0 && port < 65536)
-    "port must be between 1 and 65535")
+  (genSchema.mkValidator { name = "valid-port"; pred = { port, ... }: port > 0 && port < 65536; message = "port must be between 1 and 65535"; })
 ];
 ```
 
@@ -248,11 +238,11 @@ Derive hooks compute values from the full evaluated registry and merge them back
 
 ```nix
 # gen-modules/fleet/registries.nix
-options.fleet.users = mkInstanceRegistry config.schema.user {
+options.fleet.users = mkInstanceRegistry {
   derive = users:
     let uids = assignIds { min = 1000; max = 60000; } users;
     in lib.mapAttrs (name: _: { uid = uids.${name}; }) users;
-};
+} config.schema.user;
 
 fleet.users.tux.uid   → 4866  (deterministic from id_hash)
 fleet.users.yeti.uid  → 5388  (different hash → different UID)
@@ -274,7 +264,7 @@ mkEndpoint = service:
     ({ addr, port, protocol }: gen.either.right "${protocol}://${addr}:${toString port}")
   ] service;
 
-options.fleet.services = mkInstanceRegistry config.schema.service {
+options.fleet.services = mkInstanceRegistry {
   deriveEither = {
     derive = services:
       let
@@ -286,7 +276,7 @@ options.fleet.services = mkInstanceRegistry config.schema.service {
       else
         { left = lib.mapAttrsToList (name: r: "${name}: ${r.left}") errors; };
   };
-};
+} config.schema.service;
 
 fleet.services.nginx.endpoint     → "tcp://10.0.1.1:80"
 fleet.services.postgres.endpoint  → "tcp://10.0.2.1:5432"
@@ -382,7 +372,7 @@ Add a new kind by creating a file in `gen-modules/schema/`:
 Add a registry in `gen-modules/fleet/registries.nix`:
 
 ```nix
-options.fleet.routers = mkInstanceRegistry config.schema.router {};
+options.fleet.routers = mkInstanceRegistry {} config.schema.router;
 ```
 
 Add instances in a new file `gen-modules/fleet/routers.nix`:

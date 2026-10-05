@@ -12,51 +12,49 @@ let
     declarationOf
     ;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.peer = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+  schema = evalSchema { } [
+    {
+      config.schema.peer = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        options.role = genMerge.mkOption { type = genMerge.types.str; };
+        options.secret = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "s3cret";
         };
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          options.role = genMerge.mkOption { type = genMerge.types.str; };
-          options.secret = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "s3cret";
-          };
-          options.peer = genMerge.mkOption {
-            type = genMerge.types.nullOr (declarationOf "peer");
-            default = null;
-          };
-          options.meta = genMerge.mkOption {
-            type = genMerge.types.submodule {
-              options.region = genMerge.mkOption {
-                type = genMerge.types.str;
-                default = "us-east";
-              };
-              options.zone = genMerge.mkOption {
-                type = genMerge.types.str;
-                default = "a";
-              };
-              options.internal = genMerge.mkOption {
-                type = genMerge.types.str;
-                default = "x";
-              };
+        options.peer = genMerge.mkOption {
+          type = genMerge.types.nullOr (declarationOf "peer");
+          default = null;
+        };
+        options.meta = genMerge.mkOption {
+          type = genMerge.types.submodule {
+            options.region = genMerge.mkOption {
+              type = genMerge.types.str;
+              default = "us-east";
             };
-            default = { };
+            options.zone = genMerge.mkOption {
+              type = genMerge.types.str;
+              default = "a";
+            };
+            options.internal = genMerge.mkOption {
+              type = genMerge.types.str;
+              default = "x";
+            };
           };
+          default = { };
         };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.peers = mkInstanceRegistry schema.peer { };
-      options.hosts = mkInstanceRegistry schema.host {
+      options.peers = mkInstanceRegistry { } schema.peer;
+      options.hosts = mkInstanceRegistry {
         refs.peer = eval.config.peers;
-      };
+      } schema.host;
       config.peers = {
         yurt = {
           addr = "10.0.1.2";
@@ -78,16 +76,16 @@ let
   igloo = eval.config.hosts.igloo;
 
   # Codec with exclusion
-  codecExclude = mkCodec schema.host {
+  codecExclude = mkCodec {
     fields = {
       secret = {
         exclude = true;
       };
     };
-  };
+  } schema.host;
 
   # Codec with custom encode/decode
-  codecCustom = mkCodec schema.host {
+  codecCustom = mkCodec {
     fields = {
       secret = {
         exclude = true;
@@ -97,10 +95,10 @@ let
         decode = v: lib.removePrefix "ip:" v;
       };
     };
-  };
+  } schema.host;
 
   # Codec with recursive fields
-  codecNested = mkCodec schema.host {
+  codecNested = mkCodec {
     fields = {
       secret = {
         exclude = true;
@@ -115,10 +113,10 @@ let
         };
       };
     };
-  };
+  } schema.host;
 
   # Codec with custom encoder suppressing ref auto-encode
-  codecCustomRef = mkCodec schema.host {
+  codecCustomRef = mkCodec {
     fields = {
       secret = {
         exclude = true;
@@ -128,7 +126,7 @@ let
         decode = v: if v == "none" then null else lib.removePrefix "peer:" v;
       };
     };
-  };
+  } schema.host;
 in
 {
   flake.tests.codec-fields = {
@@ -194,26 +192,26 @@ in
     test-exclude-nonexistent-silent = {
       expr =
         let
-          c = mkCodec schema.host {
+          c = mkCodec {
             fields = {
               nonexistent = {
                 exclude = true;
               };
             };
-          };
+          } schema.host;
         in
         (c.encode igloo).addr;
       expected = "10.0.1.1";
     };
     test-encode-nonexistent-throws = {
       expr = builtins.tryEval (
-        mkCodec schema.host {
+        mkCodec {
           fields = {
             nonexistent = {
               encode = v: v;
             };
           };
-        }
+        } schema.host
       );
       expected = {
         success = false;

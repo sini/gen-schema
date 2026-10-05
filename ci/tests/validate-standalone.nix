@@ -23,14 +23,18 @@ let
       config.schema.host = {
         options.addr = genMerge.mkOption { type = genMerge.types.str; };
         validators = [
-          (genSchema.mkValidator "has-addr" ({ addr, ... }: addr != "") "need addr")
+          (genSchema.mkValidator {
+            name = "has-addr";
+            pred = { addr, ... }: addr != "";
+            message = "need addr";
+          })
         ];
       };
     }
   ];
 
   # Create instances directly via mkInstanceType (no apply pipeline)
-  hostType = genSchema.mkInstanceType schemaEval.config.schema.host { };
+  hostType = genSchema.mkInstanceType { } schemaEval.config.schema.host;
   instanceEval = genMerge.evalModuleTree { } [
     {
       options.hosts = genMerge.mkOption {
@@ -82,7 +86,15 @@ in
   flake.tests."validate-standalone".test-bogus-with-failing-validator-still-throws = {
     expr =
       (builtins.tryEval (
-        genSchema.validateInstances { validators = [ (mkValidator "v" (_: false) "m") ]; } { a = { }; }
+        genSchema.validateInstances {
+          validators = [
+            (mkValidator {
+              name = "v";
+              pred = _: false;
+              message = "m";
+            })
+          ];
+        } { a = { }; }
       )).success;
     expected = false;
   };

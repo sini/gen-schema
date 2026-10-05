@@ -120,7 +120,7 @@ Everything above the instance layer is pure schema — no validation or hashing 
     };
 
     # Create a registry and instances
-    options.hosts = genSchema.mkInstanceRegistry config.schema.host {};
+    options.hosts = genSchema.mkInstanceRegistry {} config.schema.host;
     hosts.igloo = { addr = "10.0.1.1"; role = "web"; };
     hosts.iceberg = { addr = "10.0.2.1"; };  # role defaults to "worker"
 
@@ -208,7 +208,7 @@ config.schema.service = {
 };
 
 # Services can reference each other (direct ref — registry in scope)
-options.services = genSchema.mkInstanceRegistry config.schema.service {
+options.services = genSchema.mkInstanceRegistry {
   extraModules = [({ ... }: {
     options.upstream = lib.mkOption {
       type = lib.types.nullOr (genSchema.declarationOf config.services);
@@ -216,7 +216,7 @@ options.services = genSchema.mkInstanceRegistry config.schema.service {
       description = "Upstream service this proxies to";
     };
   })];
-};
+} config.schema.service;
 
 config.services.api = { port = 8080; };
 config.services.gateway = { port = 443; upstream = "api"; };
@@ -247,9 +247,9 @@ config.schema.service = {
 config.schema.deployment.options.namespace = lib.mkOption {
   type = genSchema.declarationOf "namespace";
 };
-options.deployments = genSchema.mkInstanceRegistry config.schema.deployment {
+options.deployments = genSchema.mkInstanceRegistry {
   refs.namespace = config.namespaces;
-};
+} config.schema.deployment;
 
 config.namespaces.production = { labels.env = "prod"; };
 config.deployments.api = {
@@ -277,9 +277,7 @@ config.schema.host = {
   options.ip = lib.mkOption { type = lib.types.str; };
   options.os = lib.mkOption { type = lib.types.str; default = "nixos"; };
   methods.sshCmd = genSchema.schemaFn
-    "SSH command for this host"
-    lib.types.str
-    ({ name, ip, ... }: "ssh root@${ip} # ${name}");
+    { description = "SSH command for this host"; type = lib.types.str; fn = { name, ip, ... }: "ssh root@${ip} # ${name}"; };
 };
 
 config.schema.network = {
@@ -291,10 +289,10 @@ config.schema.network = {
 config.schema.host.options.network = lib.mkOption {
   type = genSchema.declarationOf "network";
 };
-options.hosts = genSchema.mkInstanceRegistry config.schema.host {
+options.hosts = genSchema.mkInstanceRegistry {
   refs.network = config.networks;
-};
-options.networks = genSchema.mkInstanceRegistry config.schema.network {};
+} config.schema.host;
+options.networks = genSchema.mkInstanceRegistry {} config.schema.network;
 
 config.networks.lan = { cidr = "10.0.1.0/24"; gateway = "10.0.1.1"; };
 config.hosts.nas = {
@@ -407,7 +405,7 @@ options.schema = genSchema.mkSchemaOption { strict = false; };
 **Instances** are concrete values of a kind. Create them with `mkInstanceRegistry`:
 
 ```nix
-options.fleet.hosts = genSchema.mkInstanceRegistry config.schema.host {};
+options.fleet.hosts = genSchema.mkInstanceRegistry {} config.schema.host;
 
 config.fleet.hosts.igloo = {
   addr = "10.0.1.1";
@@ -436,19 +434,19 @@ Registries can nest inside instances via `extraModules`. This establishes parent
 # Capture the top-level schema before entering extraModules closures
 let schema = config.schema;
 in {
-  options.fleet.hosts = genSchema.mkInstanceRegistry schema.host {
+  options.fleet.hosts = genSchema.mkInstanceRegistry {
     extraModules = [({ config, ... }:
       let hostConfig = config;  # capture the host instance's config
       in {
-        options.users = genSchema.mkInstanceRegistry schema.user {
+        options.users = genSchema.mkInstanceRegistry {
           extraModules = [
             # Inject parent host into child user's module args
             ({ ... }: { config._module.args.host = hostConfig; })
           ];
-        };
+        } schema.user;
       }
     )];
-  };
+  } schema.host;
 }
 
 config.fleet.hosts.igloo = {
@@ -474,9 +472,9 @@ Individual registries can override the schema-level strict setting:
 options.schema = genSchema.mkSchemaOption { strict = true; };
 
 # But this specific registry allows freeform
-options.fleet.configs = genSchema.mkInstanceRegistry config.schema.config {
+options.fleet.configs = genSchema.mkInstanceRegistry {
   strict = false;
-};
+} config.schema.config;
 ```
 
 ### Identity Hashing
@@ -567,9 +565,9 @@ config.schema.service.options.host = lib.mkOption {
 };
 
 # Registry binds the ref to a concrete registry
-options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
+options.fleet.services = genSchema.mkInstanceRegistry {
   refs.host = config.fleet.hosts;
-};
+} config.schema.service;
 ```
 
 The binding is what makes the deferred form a reference: `refs.<field>` swaps the kind's leaf for a
@@ -587,14 +585,14 @@ under `nullOr`, or an empty list, still evaluates: no element reaches the leaf.
 **Direct ref** — resolve immediately when the registry is in scope:
 
 ```nix
-options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
+options.fleet.services = genSchema.mkInstanceRegistry {
   extraModules = [({ ... }: {
     options.upstream = lib.mkOption {
       type = lib.types.nullOr (genSchema.declarationOf config.fleet.services);
       default = null;
     };
   })];
-};
+} config.schema.service;
 ```
 
 Both modes accept string keys or instance values:
@@ -656,14 +654,14 @@ type = lib.types.nullOr (lib.types.listOf (genSchema.declarationOf "host"));
 For domain-specific resolution, pass an extended binding with a `coerce` function:
 
 ```nix
-options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
+options.fleet.services = genSchema.mkInstanceRegistry {
   refs.host = {
     instances = config.fleet.hosts;
     coerce = default: val:
       if val == "primary" then config.fleet.hosts.igloo
       else default;
   };
-};
+} config.schema.service;
 ```
 
 `default` is a lazy thunk of the standard coercion result — only forced if you select it. In `listOf` context, `default` is a single-element list and the hook can return multiple instances (1->many expansion).
@@ -675,7 +673,7 @@ When a registry's ref field points back to itself (e.g., a trait's `needs` refer
 Set `deferred = true` to defer coercion to the `applyPipeline` (after all instances are evaluated). The coerce hook receives the raw materialized instances as its first argument, breaking the cycle:
 
 ```nix
-options.traits = genSchema.mkInstanceRegistry config.schema.trait {
+options.traits = genSchema.mkInstanceRegistry {
   refs.needs = {
     instances = config.traits;
     deferred = true;
@@ -684,7 +682,7 @@ options.traits = genSchema.mkInstanceRegistry config.schema.trait {
       if isSelector val then resolveAgainst registry val
       else default;
   };
-};
+} config.schema.trait;
 ```
 
 **Signature difference:** Non-deferred hooks take 2 args (`default: val:`). Deferred hooks take 3 args (`registry: default: val:`), where `registry` is the pre-apply instance attrset. gen-schema pre-applies the registry, so `mkCoerceChain` sees a standard 2-arg function internally.
@@ -848,8 +846,7 @@ schema with `evalSchema`, which resolves each parent in a strictly earlier pass 
 module into the child:
 
 ```nix
-schema = genSchema.evalSchema {
-  modules = [
+schema = genSchema.evalSchema { } [
     {
       config.schema.user = {
         options.userName = lib.mkOption { type = str; };
@@ -862,7 +859,6 @@ schema = genSchema.evalSchema {
       };
     }
   ];
-};
 ```
 
 Each gets its own registry. Identity hashes include the kind prefix — a user "root" and an admin "root" hash differently.
@@ -1069,9 +1065,7 @@ cycle would force each kind's WHNF from the other's and recurse before any name 
 
 ```nix
 config.schema.host.methods.describe = genSchema.schemaFn
-  "Human-readable summary"
-  lib.types.str
-  ({ name, role, addr, ... }: "${name} (${role}) at ${addr}");
+  { description = "Human-readable summary"; type = lib.types.str; fn = { name, role, addr, ... }: "${name} (${role}) at ${addr}"; };
 
 # On instances:
 config.fleet.hosts.igloo.describe  # → "igloo (web) at 10.0.1.1"
@@ -1083,13 +1077,11 @@ Methods can close over values from the declaring module's scope:
 # hasService captures config.fleet.services from the module;
 # name comes from the host instance's config
 config.schema.host.methods.hasService = genSchema.schemaFn
-  "Check if a service targets this host"
-  (lib.types.functionTo lib.types.bool)
-  ({ name, ... }:
+  { description = "Check if a service targets this host"; type = lib.types.functionTo lib.types.bool; fn = { name, ... }:
     serviceName:
     let services = config.fleet.services;
     in services ? ${serviceName}
-       && services.${serviceName}.host.name == name);
+       && services.${serviceName}.host.name == name; };
 
 config.fleet.hosts.igloo.hasService "nginx"     # → true
 config.fleet.hosts.igloo.hasService "postgres"   # → false
@@ -1100,13 +1092,11 @@ Methods compose across modules — multiple modules can each add methods to the 
 ```nix
 # Module A
 config.schema.host.methods.ping = genSchema.schemaFn
-  "Ping command" lib.types.str
-  ({ addr, ... }: "ping ${addr}");
+  { description = "Ping command"; type = lib.types.str; fn = { addr, ... }: "ping ${addr}"; };
 
 # Module B (separate file, separate flake input — doesn't matter)
 config.schema.host.methods.ssh = genSchema.schemaFn
-  "SSH command" lib.types.str
-  ({ name, ... }: "ssh ${name}");
+  { description = "SSH command"; type = lib.types.str; fn = { name, ... }: "ssh ${name}"; };
 
 # Both methods available on every host instance:
 config.fleet.hosts.igloo.ping  # → "ping 10.0.1.1"
@@ -1327,12 +1317,16 @@ Declare cross-field validation constraints on kinds. Validators are a built-in c
 
 ```nix
 config.schema.host.validators = [
-  (gen.mkValidator "has-addr"
-    ({ addr, ... }: addr != "")
-    "host must have a non-empty addr")
-  (gen.mkValidator "valid-role"
-    ({ role, ... }: lib.elem role [ "web" "db" "worker" ])
-    "role must be one of: web, db, worker")
+  (gen.mkValidator {
+    name = "has-addr";
+    pred = { addr, ... }: addr != "";
+    message = "host must have a non-empty addr";
+  })
+  (gen.mkValidator {
+    name = "valid-role";
+    pred = { role, ... }: lib.elem role [ "web" "db" "worker" ];
+    message = "role must be one of: web, db, worker";
+  })
 ];
 ```
 
@@ -1340,9 +1334,9 @@ Validators compose across modules — multiple modules can contribute validators
 
 ```nix
 # Module A
-config.schema.host.validators = [ (gen.mkValidator "a" ...) ];
+config.schema.host.validators = [ (gen.mkValidator { name = "a"; … }) ];
 # Module B
-config.schema.host.validators = [ (gen.mkValidator "b" ...) ];
+config.schema.host.validators = [ (gen.mkValidator { name = "b"; … }) ];
 # Both fire on every host registry
 ```
 
@@ -1368,14 +1362,14 @@ result = genSchema.validateInstances config.schema.host config.fleet.hosts;
 **Plain derive** — attrset in, attrset out:
 
 ```nix
-options.fleet.users = genSchema.mkInstanceRegistry config.schema.user {
+options.fleet.users = genSchema.mkInstanceRegistry {
   derive = users:
     let uids = assignIds { min = 1000; max = 60000; } users;
     in lib.mapAttrs (name: _: { uid = uids.${name}; }) users;
   extraModules = [({ ... }: {
     options.uid = lib.mkOption { type = lib.types.int; readOnly = true; internal = true; };
   })];
-};
+} config.schema.user;
 
 config.fleet.users.tux.uid  # → 34213 (deterministic from id_hash)
 ```
@@ -1385,12 +1379,12 @@ Derive can read `id_hash` and all instance config — it runs after full module 
 **`deriveEither`** — returns Either with configurable error handling:
 
 ```nix
-options.fleet.services = genSchema.mkInstanceRegistry config.schema.service {
+options.fleet.services = genSchema.mkInstanceRegistry {
   deriveEither = {
     derive = services: someEitherPipeline services;
     onError = left: lib.warn "enrichment failed" {};  # optional, default throws
   };
-};
+} config.schema.service;
 ```
 
 `derive` and `deriveEither` are mutually exclusive. `onError` receives the `left` value — throw, warn, or return a fallback attrset. The default `onError` throws with a formatted message.
@@ -1412,7 +1406,7 @@ Outputs a table per kind with option name, type, default, and description — in
 `mkCodec` creates a standalone codec for serializing/deserializing kind instances. The codec is format-agnostic at its core, with a pluggable format layer and built-in JSON convenience.
 
 ```nix
-codec = genSchema.mkCodec config.schema.host {
+codec = genSchema.mkCodec {
   # Optional: per-field overrides
   fields = {
     secret = { exclude = true; };
@@ -1426,7 +1420,7 @@ codec = genSchema.mkCodec config.schema.host {
   };
   # Optional: additional fields to exclude by name
   excludeFields = [ "tags" ];
-};
+} config.schema.host;
 ```
 
 The codec returns:
@@ -1553,10 +1547,9 @@ mkSchemaOption {
 
 ```nix
 evalSchema {
-  modules,              # the kind tree's modules
   schemaOption ? null,  # a caller-built `mkSchemaOption` result; default `mkSchemaOption { inherit specialArgs; }`
   specialArgs ? { },    # base module args for the kind tree
-}
+} modules               # the kind tree's modules, last (options first, closed)
 ```
 
 Returns the evaluated schema (`config.schema`) with kind inheritance resolved. A
@@ -1602,10 +1595,10 @@ because `anything`'s leaf fold compares values, not identities.
 ### `mkInstanceType`
 
 ```nix
-mkInstanceType kindValue {
+mkInstanceType {
   extraModules ? [],     # additional modules (cross-entity bindings, den-specific options)
   strict ? kindValue.strict,
-}
+} kindValue
 ```
 
 Returns `lib.types.submodule` — the type for a single instance of a kind.
@@ -1613,14 +1606,14 @@ Returns `lib.types.submodule` — the type for a single instance of a kind.
 ### `mkInstanceRegistry`
 
 ```nix
-mkInstanceRegistry kindValue {
+mkInstanceRegistry {
   extraModules ? [],
   refs ? {},             # bindings for deferred refs (see below)
   strict ? kindValue.strict,
   description ? "${kind} instances",
   derive ? null,         # { name → instance } → { name → attrset } — plain enrichment
   deriveEither ? null,   # { derive; onError? } — Either-based enrichment
-}
+} kindValue
 ```
 
 Returns `lib.mkOption` with `type = attrsOf (mkInstanceType ...)` and an `apply` pipeline that runs validators then derive.
@@ -1711,7 +1704,7 @@ marker key is exported as `fieldDeclarationMarker` for consumers writing their o
 ### `schemaFn`
 
 ```nix
-schemaFn description type fn
+schemaFn { description = description; type = type; fn = fn; }
 ```
 
 Declares a method on a kind. `fn` receives an attrset of config values matching its named arguments. Declare via `schema.<kind>.methods.<name> = schemaFn ...`.
@@ -1719,7 +1712,7 @@ Declares a method on a kind. `fn` receives an attrset of config values matching 
 ### `mkValidator` / `runValidators` / `formatErrors` / `defaultOnError`
 
 ```nix
-genSchema.mkValidator name pred message              # → { name; pred; message; }
+genSchema.mkValidator { name = name; pred = pred; message = message; }              # → { name; pred; message; }
 genSchema.runValidators kind validators instances    # → { right = instances; } | { left = [failure]; }
 genSchema.formatErrors failures                      # → human-readable string
 genSchema.defaultOnError left                        # throws with formatted errors
@@ -1776,11 +1769,11 @@ Returns a markdown string with a table per kind.
 ### `mkCodec`
 
 ```nix
-mkCodec kindValue {
+mkCodec {
   fields ? {},           # per-field overrides: { name = { encode?; decode?; exclude?; fields?; }; }
   types ? {},            # codecs by NixOS type name — auto-wrapped through nullOr/listOf/attrsOf/lazyAttrsOf/setOf
   excludeFields ? [],    # additional field names to exclude from serialization
-}
+} kindValue
 ```
 
 Returns a codec record with `encode`/`decode` (attrset ↔ attrset), format-parameterized `serialize`/`deserialize`, and curried `json.*` convenience. See [Codec (Serialization)](#codec-serialization) for full usage.
@@ -1837,17 +1830,16 @@ genSchema.blame "fieldName" "error message"
 
 ### `mkMixin`
 
-First-class reusable schema fragments with structural compatibility (§ Bracha 1990). `define` receives a record-algebra record and returns a plain attrset.
+First-class reusable schema fragments with structural compatibility (§ Bracha 1990). The options come first, as one closed set; `define`, the one required operand, comes last. It receives a record-algebra record and returns a plain attrset.
 
 ```nix
 monitorable = genSchema.mkMixin {
   requires = [ "port" "hostname" ];
   provides = [ "metrics_port" ];
   # kinds = [ "service" ];  # optional kind constraint
-  define = parent: {
-    metrics_port = (record.select "port" parent) + 1000;
-  };
-};
+} (parent: {
+  metrics_port = (record.select "port" parent) + 1000;
+});
 ```
 
 ### `composeMixins`

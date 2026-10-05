@@ -66,7 +66,11 @@ let
     word:
     kindOf {
       options.name = opt T.str;
-      methods.greeting = genSchema.schemaFn "g" T.str ({ name }: "${word} ${name}");
+      methods.greeting = genSchema.schemaFn {
+        description = "g";
+        type = T.str;
+        fn = { name }: "${word} ${name}";
+      };
     };
   hello = greeter "Hello";
   bye = greeter "Bye";
@@ -286,7 +290,7 @@ let
   instanceP =
     kind:
     (genMerge.evalModuleTree { } [
-      { options.hosts = genSchema.mkInstanceRegistry kind { }; }
+      { options.hosts = genSchema.mkInstanceRegistry { } kind; }
       { config.hosts.a = { }; }
     ]).config.hosts.a;
 

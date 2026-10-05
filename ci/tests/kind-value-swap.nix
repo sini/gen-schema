@@ -106,7 +106,7 @@ let
   instanceOf =
     kind:
     (genMerge.evalModuleTree { } [
-      { options.h = genMerge.mkOption { type = mkInstanceType kind { }; }; }
+      { options.h = genMerge.mkOption { type = mkInstanceType { } kind; }; }
       { config.h.name = "a"; }
     ]).config.h;
   # a walker of gen-demo `c94`'s `pathsNamed` shape: it descends attrsets and lists and stops at

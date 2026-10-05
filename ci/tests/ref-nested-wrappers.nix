@@ -7,34 +7,32 @@
 let
   inherit (genSchema) evalSchema mkInstanceRegistry declarationOf;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.hosts = genMerge.mkOption {
+          type = genMerge.types.nullOr (genMerge.types.listOf (declarationOf "host"));
+          default = null;
         };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.hosts = genMerge.mkOption {
-            type = genMerge.types.nullOr (genMerge.types.listOf (declarationOf "host"));
-            default = null;
-          };
-          options.primary = genMerge.mkOption {
-            type = genMerge.types.listOf (genMerge.types.nullOr (declarationOf "host"));
-            default = [ ];
-          };
+        options.primary = genMerge.mkOption {
+          type = genMerge.types.listOf (genMerge.types.nullOr (declarationOf "host"));
+          default = [ ];
         };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
-      options.services = mkInstanceRegistry schema.service {
+      options.hosts = mkInstanceRegistry { } schema.host;
+      options.services = mkInstanceRegistry {
         refs.hosts = eval.config.hosts;
         refs.primary = eval.config.hosts;
-      };
+      } schema.service;
       config.hosts = {
         igloo = {
           addr = "10.0.1.1";

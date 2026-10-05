@@ -37,7 +37,7 @@ let
   schemaR = schemaWithRefinedTypes.config.schema;
 
   # mkInstanceRegistry without explicit refinements — should auto-extract
-  autoRegistry = mkInstanceRegistry schemaR.service { };
+  autoRegistry = mkInstanceRegistry { } schemaR.service;
 
   validEval = genMerge.evalModuleTree { } [
     {
@@ -61,16 +61,18 @@ let
 
   # --- Test 2: Auto-applied mixins in mkSchemaEntryType ---
 
-  monitorable = genSchema.mkMixin {
-    requires = [ "port" ];
-    provides = [ "metrics_port" ];
-    define = parent: {
-      metrics_port = genMerge.mkOption {
-        type = genMerge.types.int;
-        default = (R.select "port" parent).default or 9090;
-      };
-    };
-  };
+  monitorable =
+    genSchema.mkMixin
+      {
+        requires = [ "port" ];
+        provides = [ "metrics_port" ];
+      }
+      (parent: {
+        metrics_port = genMerge.mkOption {
+          type = genMerge.types.int;
+          default = (R.select "port" parent).default or 9090;
+        };
+      });
 
   schemaWithMixins = genMerge.evalModuleTree { } [
     {
@@ -89,7 +91,7 @@ let
   ];
 
   schemaM = schemaWithMixins.config.schema;
-  mixinRegistry = mkInstanceRegistry schemaM.service { };
+  mixinRegistry = mkInstanceRegistry { } schemaM.service;
 
   mixinEval = genMerge.evalModuleTree { } [
     {
@@ -121,7 +123,7 @@ let
     args: decl: port:
     builtins.tryEval
       (genMerge.evalModuleTree { } [
-        { options.hosts = mkInstanceRegistry (hostKind args decl) { }; }
+        { options.hosts = mkInstanceRegistry { } (hostKind args decl); }
         { config.hosts.a.myPort = port; }
       ]).config.hosts.a.myPort;
   imported = {

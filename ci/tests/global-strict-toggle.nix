@@ -8,16 +8,13 @@
 let
   inherit (genSchema) evalSchema mkSchemaOption mkInstanceRegistry;
 
-  schema = evalSchema {
-    schemaOption = mkSchemaOption { strict = false; };
-    modules = [
-      { config.schema.host.options.name = genMerge.mkOption { type = genMerge.types.str; }; }
-    ];
-  };
+  schema = evalSchema { schemaOption = mkSchemaOption { strict = false; }; } [
+    { config.schema.host.options.name = genMerge.mkOption { type = genMerge.types.str; }; }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
+      options.hosts = mkInstanceRegistry { } schema.host;
       config.hosts.igloo = {
         name = "igloo";
         undeclaredKey = "should work";

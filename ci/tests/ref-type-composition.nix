@@ -9,31 +9,29 @@ let
   inherit (genSchema) evalSchema mkInstanceRegistry;
   inherit (genSchema) declarationOf;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-        };
-      }
-    ];
-  };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+      };
+    }
+  ];
 
   # Two separate modules: one defines hosts, another defines services with refs
   eval = genMerge.evalModuleTree { } [
     # Module 1: hosts
     {
-      options.hosts = mkInstanceRegistry schema.host { };
+      options.hosts = mkInstanceRegistry { } schema.host;
       config.hosts.igloo = {
         addr = "10.0.1.1";
       };
     }
     # Module 2: services with ref to hosts
     {
-      options.services = mkInstanceRegistry schema.service {
+      options.services = mkInstanceRegistry {
         extraModules = [
           (
             { ... }:
@@ -44,7 +42,7 @@ let
             }
           )
         ];
-      };
+      } schema.service;
       config.services.nginx = {
         host = "igloo";
         port = 80;

@@ -27,20 +27,22 @@ let
   # primitive-typed method reading it. Each arm instantiates one of them with the given secret value.
   kindOf =
     withMethod:
-    (evalSchema {
-      modules = [
-        {
-          config.schema.host = {
-            options.secret = genMerge.mkOption { type = genMerge.types.str; } // {
-              identity = false;
-            };
-          }
-          // lib.optionalAttrs withMethod {
-            methods.leak = schemaFn "reads the opted-out field" genMerge.types.str ({ secret, ... }: secret);
+    (evalSchema { } [
+      {
+        config.schema.host = {
+          options.secret = genMerge.mkOption { type = genMerge.types.str; } // {
+            identity = false;
           };
         }
-      ];
-    }).host;
+        // lib.optionalAttrs withMethod {
+          methods.leak = schemaFn {
+            description = "reads the opted-out field";
+            type = genMerge.types.str;
+            fn = { secret, ... }: secret;
+          };
+        };
+      }
+    ]).host;
   plainKind = kindOf false;
   methodKind = kindOf true;
 
@@ -48,7 +50,7 @@ let
     { withMethod, secretValue }:
     (genMerge.evalModuleTree { } [
       {
-        options.hosts = mkInstanceRegistry (if withMethod then methodKind else plainKind) { };
+        options.hosts = mkInstanceRegistry { } (if withMethod then methodKind else plainKind);
         config.hosts.igloo.secret = secretValue;
       }
     ]).config.hosts.igloo;

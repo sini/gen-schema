@@ -9,22 +9,20 @@ let
 
   # A bogus kind value -- no `kind`/`options` -- with an explicit description so the lazy `kind`
   # binding inside mkInstanceRegistry is never forced; only the applyPipeline guard should catch it.
-  bogusRegistry = mkInstanceRegistry { no = "kind"; } { description = "d"; };
+  bogusRegistry = mkInstanceRegistry { description = "d"; } { no = "kind"; };
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
-          options.role = genMerge.mkOption { type = genMerge.types.str; };
-        };
-      }
-    ];
-  };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        options.role = genMerge.mkOption { type = genMerge.types.str; };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
+      options.hosts = mkInstanceRegistry { } schema.host;
       config.hosts.igloo = {
         addr = "10.0.1.1";
         role = "server";

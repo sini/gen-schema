@@ -6,32 +6,34 @@
   ...
 }:
 let
-  schema = genSchema.evalSchema {
-    schemaOption = genSchema.mkSchemaOption {
-      baseModule.options.description = genMerge.mkOption {
-        type = genMerge.types.str;
-        default = "";
-      };
-      collections.tags = {
-        default = [ ];
-      };
-    };
-    modules = [
+  schema =
+    genSchema.evalSchema
       {
-        config.schema.host = {
-          tags = [
-            "web"
-            "prod"
-          ];
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+        schemaOption = genSchema.mkSchemaOption {
+          baseModule.options.description = genMerge.mkOption {
+            type = genMerge.types.str;
+            default = "";
+          };
+          collections.tags = {
+            default = [ ];
+          };
         };
       }
-    ];
-  };
+      [
+        {
+          config.schema.host = {
+            tags = [
+              "web"
+              "prod"
+            ];
+            options.addr = genMerge.mkOption { type = genMerge.types.str; };
+          };
+        }
+      ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = genSchema.mkInstanceRegistry schema.host { };
+      options.hosts = genSchema.mkInstanceRegistry { } schema.host;
       config.hosts.igloo.addr = "10.0.1.1";
     }
   ];

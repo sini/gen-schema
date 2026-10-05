@@ -12,29 +12,27 @@ let
     setOf
     ;
 
-  traitSchema = evalSchema {
-    modules = [
-      {
-        config.schema.trait = {
-          options.priority = genMerge.mkOption {
-            type = genMerge.types.int;
-            default = 100;
-          };
-          options.needs = genMerge.mkOption {
-            type = genMerge.types.listOf (declarationOf "trait");
-            default = [ ];
-          };
+  traitSchema = evalSchema { } [
+    {
+      config.schema.trait = {
+        options.priority = genMerge.mkOption {
+          type = genMerge.types.int;
+          default = 100;
         };
-      }
-    ];
-  };
+        options.needs = genMerge.mkOption {
+          type = genMerge.types.listOf (declarationOf "trait");
+          default = [ ];
+        };
+      };
+    }
+  ];
 
   # --- Self-referential registry with deferred coerce ---
   # A trait's `needs` field references other traits in the same registry.
   # Custom coerce adds a tag to prove it ran; deferred = true avoids infinite recursion.
   evalSelfRef = genMerge.evalModuleTree { } [
     {
-      options.traits = mkInstanceRegistry traitSchema.trait {
+      options.traits = mkInstanceRegistry {
         refs.needs = {
           instances = evalSelfRef.config.traits;
           coerce =
@@ -42,7 +40,7 @@ let
             if builtins.isList default then default else [ default ];
           deferred = true;
         };
-      };
+      } traitSchema.trait;
       config.traits.base = {
         priority = 0;
       };
@@ -60,7 +58,7 @@ let
   # --- Self-referential with custom selector coerce ---
   evalSelector = genMerge.evalModuleTree { } [
     {
-      options.traits = mkInstanceRegistry traitSchema.trait {
+      options.traits = mkInstanceRegistry {
         refs.needs = {
           instances = evalSelector.config.traits;
           coerce =
@@ -76,7 +74,7 @@ let
               [ default ];
           deferred = true;
         };
-      };
+      } traitSchema.trait;
       config.traits.base = {
         priority = 0;
       };
@@ -90,23 +88,21 @@ let
     }
   ];
 
-  depsSchema = evalSchema {
-    modules = [
-      {
-        config.schema.trait = {
-          options.deps = genMerge.mkOption {
-            type = setOf (declarationOf "trait");
-            default = [ ];
-          };
+  depsSchema = evalSchema { } [
+    {
+      config.schema.trait = {
+        options.deps = genMerge.mkOption {
+          type = setOf (declarationOf "trait");
+          default = [ ];
         };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   # --- Self-referential with setOf + deferred coerce (dedup) ---
   evalSetOf = genMerge.evalModuleTree { } [
     {
-      options.traits = mkInstanceRegistry depsSchema.trait {
+      options.traits = mkInstanceRegistry {
         refs.deps = {
           instances = evalSetOf.config.traits;
           coerce =
@@ -114,7 +110,7 @@ let
             if builtins.isList default then default else [ default ];
           deferred = true;
         };
-      };
+      } depsSchema.trait;
       config.traits.a = { };
       config.traits.b = {
         deps = [
@@ -125,30 +121,28 @@ let
     }
   ];
 
-  serviceSchema = evalSchema {
-    modules = [
-      {
-        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = declarationOf "host"; };
-        };
-      }
-    ];
-  };
+  serviceSchema = evalSchema { } [
+    {
+      config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.host = genMerge.mkOption { type = declarationOf "host"; };
+      };
+    }
+  ];
 
   # --- Non-deferred coerce still works (regression guard) ---
   evalNonDeferred = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry serviceSchema.host { };
-      options.services = mkInstanceRegistry serviceSchema.service {
+      options.hosts = mkInstanceRegistry { } serviceSchema.host;
+      options.services = mkInstanceRegistry {
         refs.host = {
           instances = evalNonDeferred.config.hosts;
           coerce =
             default: val:
             if builtins.isString val && val == "fallback" then evalNonDeferred.config.hosts.igloo else default;
         };
-      };
+      } serviceSchema.service;
       config.hosts.igloo = {
         addr = "10.0.1.1";
       };
@@ -159,27 +153,25 @@ let
     }
   ];
 
-  mixedSchema = evalSchema {
-    modules = [
-      {
-        config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
-        config.schema.service = {
-          options.port = genMerge.mkOption { type = genMerge.types.int; };
-          options.host = genMerge.mkOption { type = declarationOf "host"; };
-          options.depends = genMerge.mkOption {
-            type = genMerge.types.listOf (declarationOf "service");
-            default = [ ];
-          };
+  mixedSchema = evalSchema { } [
+    {
+      config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      config.schema.service = {
+        options.port = genMerge.mkOption { type = genMerge.types.int; };
+        options.host = genMerge.mkOption { type = declarationOf "host"; };
+        options.depends = genMerge.mkOption {
+          type = genMerge.types.listOf (declarationOf "service");
+          default = [ ];
         };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   # --- Mixed deferred + non-deferred refs on same kind ---
   evalMixed = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry mixedSchema.host { };
-      options.services = mkInstanceRegistry mixedSchema.service {
+      options.hosts = mkInstanceRegistry { } mixedSchema.host;
+      options.services = mkInstanceRegistry {
         refs.host = evalMixed.config.hosts;
         refs.depends = {
           instances = evalMixed.config.services;
@@ -188,7 +180,7 @@ let
             if builtins.isList default then default else [ default ];
           deferred = true;
         };
-      };
+      } mixedSchema.service;
       config.hosts.igloo = {
         addr = "10.0.1.1";
       };

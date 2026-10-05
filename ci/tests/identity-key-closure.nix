@@ -30,10 +30,10 @@ let
       {
         options.hosts = genMerge.mkOption {
           type = genMerge.types.attrsOf (
-            genSchema.mkInstanceType hostKind {
+            genSchema.mkInstanceType {
               inherit extraModules;
               strict = false;
-            }
+            } hostKind
           );
           default = { };
         };
@@ -111,9 +111,9 @@ let
       {
         options.things = genMerge.mkOption {
           type = genMerge.types.attrsOf (
-            genSchema.mkInstanceType kindValue {
+            genSchema.mkInstanceType {
               strict = false;
-            }
+            } kindValue
           );
           default = { };
         };
@@ -182,10 +182,10 @@ in
           {
             options.hosts = genMerge.mkOption {
               type = genMerge.types.attrsOf (
-                genSchema.mkInstanceType hostKind {
+                genSchema.mkInstanceType {
                   extraModules = [ tagModule ];
                   strict = false;
-                }
+                } hostKind
               );
               default = { };
             };

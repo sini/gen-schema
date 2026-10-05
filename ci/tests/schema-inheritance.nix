@@ -42,15 +42,15 @@ let
     }
   ];
 
-  rel = evalSchema { modules = relModules true; };
-  relNoInherit = evalSchema { modules = relModules false; };
+  rel = evalSchema { } (relModules true);
+  relNoInherit = evalSchema { } (relModules false);
 
   # A registry over a kind value, evaluated far enough to read one instance.
   instanceOf =
     kindValue: opts:
     (genMerge.evalModuleTree { } [
       {
-        options.spools = mkInstanceRegistry kindValue opts;
+        options.spools = mkInstanceRegistry opts kindValue;
         config.spools.one = { };
       }
     ]).config.spools.one;
@@ -58,21 +58,19 @@ let
   optionSet = kindValue: builtins.attrNames (instanceOf kindValue { });
 
   # ── C8: a depth-2 chain — ruling 7's "two levels deep takes two passes" ──────────────────────
-  depth2 = evalSchema {
-    modules = [
-      {
-        config.schema.base.options.description = str "";
-        config.schema.mid = {
-          inherits = [ "base" ];
-          options.selvage = str "v";
-        };
-        config.schema.leaf = {
-          inherits = [ "mid" ];
-          options.hem = str "h";
-        };
-      }
-    ];
-  };
+  depth2 = evalSchema { } [
+    {
+      config.schema.base.options.description = str "";
+      config.schema.mid = {
+        inherits = [ "base" ];
+        options.selvage = str "v";
+      };
+      config.schema.leaf = {
+        inherits = [ "mid" ];
+        options.hem = str "h";
+      };
+    }
+  ];
 
   # ── C10: the consumer's config can no longer decide a kind ───────────────────────────────────
   # At HEAD a knob on the consumer's own tree selects which options a kind declares. In the pass
@@ -97,17 +95,15 @@ let
   # ── C14: the relation is queryable ───────────────────────────────────────────────────────────
   fmt = es: map (e: "${e.from}->${toString e.to}:${e.type}") es;
 
-  containment = evalSchema {
-    modules = [
-      {
-        config.schema.base.options.description = str "";
-        config.schema.derived = {
-          parent = "base";
-          options.spool = str "s";
-        };
-      }
-    ];
-  };
+  containment = evalSchema { } [
+    {
+      config.schema.base.options.description = str "";
+      config.schema.derived = {
+        parent = "base";
+        options.spool = str "s";
+      };
+    }
+  ];
 
   # ── the deprecated spelling: `base` beside the given modules, on a tree built without `evalSchema` ──
   spelledTree =
@@ -324,16 +320,14 @@ in
     test-path-module-member-composes = {
       expr =
         builtins.attrNames
-          (evalSchema {
-            modules = [
-              {
-                config.schema.derived.imports = [
-                  (builtins.toFile "cxlc0-module-path.nix" "{ options.bolt = { }; }")
-                ];
-                config.schema.derived.options.spool = str "s";
-              }
-            ];
-          }).derived.options;
+          (evalSchema { } [
+            {
+              config.schema.derived.imports = [
+                (builtins.toFile "cxlc0-module-path.nix" "{ options.bolt = { }; }")
+              ];
+              config.schema.derived.options.spool = str "s";
+            }
+          ]).derived.options;
       expected = [
         "bolt"
         "spool"
@@ -344,9 +338,8 @@ in
     test-path-cycle-composes = {
       expr =
         builtins.attrNames
-          (evalSchema {
-            modules = [ { config.schema.derived.imports = [ ../test-fixtures/cxlc0/cycle-a.nix ]; } ];
-          }).derived.options;
+          (evalSchema { } [ { config.schema.derived.imports = [ ../test-fixtures/cxlc0/cycle-a.nix ]; } ])
+          .derived.options;
       expected = [
         "warp"
         "weft"
@@ -355,9 +348,8 @@ in
     test-path-tree-composes = {
       expr =
         builtins.attrNames
-          (evalSchema {
-            modules = [ { config.schema.derived.imports = [ ../test-fixtures/cxlc0/tree-mid.nix ]; } ];
-          }).derived.options;
+          (evalSchema { } [ { config.schema.derived.imports = [ ../test-fixtures/cxlc0/tree-mid.nix ]; } ])
+          .derived.options;
       expected = [
         "hem"
         "selvedge"
@@ -392,14 +384,12 @@ in
     test-c3-parent-value-flows = {
       expr =
         (instanceOf
-          (evalSchema {
-            modules = [
-              {
-                config.schema.base.options.description = str "cambric";
-                config.schema.derived.inherits = [ "base" ];
-              }
-            ];
-          }).derived
+          (evalSchema { } [
+            {
+              config.schema.base.options.description = str "cambric";
+              config.schema.derived.inherits = [ "base" ];
+            }
+          ]).derived
           { }
         ).description;
       expected = "cambric";
@@ -409,14 +399,14 @@ in
     # is pinned in ci/tests-error.nix, which is the output that can see it.
     test-c5-cycle-refusal-is-catchable = {
       expr =
-        (builtins.tryEval (evalSchema {
-          modules = [
+        (builtins.tryEval (
+          evalSchema { } [
             {
               config.schema.a.inherits = [ "b" ];
               config.schema.b.inherits = [ "a" ];
             }
-          ];
-        })).success;
+          ]
+        )).success;
       expected = false;
     };
 
@@ -443,7 +433,7 @@ in
     # guard was added to it and none can be (§2.4); the cell exists to show it still refuses.
     test-c7-existing-guard-still-refuses = {
       expr =
-        (builtins.tryEval ((mkInstanceRegistry { no = "kind"; } { description = "d"; }).apply { a = { }; }))
+        (builtins.tryEval ((mkInstanceRegistry { description = "d"; } { no = "kind"; }).apply { a = { }; }))
         .success;
       expected = false;
     };
@@ -465,9 +455,7 @@ in
     # C9 — an unknown parent refuses, and it refuses by NAME. Message pinned in tests-error.nix.
     test-c9-unknown-parent-refuses-catchably = {
       expr =
-        (builtins.tryEval (evalSchema {
-          modules = [ { config.schema.derived.inherits = [ "nosuch" ]; } ];
-        })).success;
+        (builtins.tryEval (evalSchema { } [ { config.schema.derived.inherits = [ "nosuch" ]; } ])).success;
       expected = false;
     };
 
@@ -528,17 +516,15 @@ in
     test-order-invariance = {
       expr =
         builtins.attrNames
-          (evalSchema {
-            modules = [
-              {
-                config.schema.derived = {
-                  inherits = [ "base" ];
-                  options.spool = str "s";
-                };
-                config.schema.base.options.description = str "";
-              }
-            ];
-          }).derived.options;
+          (evalSchema { } [
+            {
+              config.schema.derived = {
+                inherits = [ "base" ];
+                options.spool = str "s";
+              };
+              config.schema.base.options.description = str "";
+            }
+          ]).derived.options;
       expected = [
         "description"
         "spool"
@@ -645,12 +631,7 @@ in
     # The discriminator is the same tree with `inherits` dropped.
     test-mktype-without-collections-composes =
       let
-        s =
-          withInherit:
-          evalSchema {
-            schemaOption = bareMkTypeOpt;
-            modules = relModules withInherit;
-          };
+        s = withInherit: evalSchema { schemaOption = bareMkTypeOpt; } (relModules withInherit);
       in
       {
         expr = {
@@ -684,11 +665,7 @@ in
     # (tests-error): its functor applied by hand and evaluated as a module.
     test-mktype-without-collections-composes-through-the-functor =
       let
-        k =
-          (evalSchema {
-            schemaOption = bareMkTypeOpt;
-            modules = relModules true;
-          }).derived;
+        k = (evalSchema { schemaOption = bareMkTypeOpt; } (relModules true)).derived;
       in
       {
         expr = builtins.elem "description" (
@@ -745,10 +722,7 @@ in
     test-plain-inherits-is-the-staged-kind = {
       expr = {
         pair = observe (spelledTree [ (declaredDerived [ "base" ]) ]) == observe rel;
-        chain =
-          chainObs (plainTree [ chainDecl ]) == chainObs (evalSchema {
-            modules = [ chainDecl ];
-          });
+        chain = chainObs (plainTree [ chainDecl ]) == chainObs (evalSchema { } [ chainDecl ]);
       };
       expected = {
         pair = true;
@@ -817,7 +791,7 @@ in
         in
         {
           inherit plain;
-          staged = plain == optionSet (evalSchema { modules = [ (diamondDecl false) ]; }).d;
+          staged = plain == optionSet (evalSchema { } [ (diamondDecl false) ]).d;
           spelled = plain == optionSet (plainTree [ (diamondDecl true) ]).d;
         };
       expected = {

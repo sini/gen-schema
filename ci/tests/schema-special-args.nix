@@ -59,18 +59,13 @@ let
 
   schemaOf =
     args: mod:
-    evalSchema (
+    evalSchema args [
       {
-        modules = [
-          {
-            config.schema.fleet = {
-              imports = [ mod ];
-            };
-          }
-        ];
+        config.schema.fleet = {
+          imports = [ mod ];
+        };
       }
-      // args
-    );
+    ];
 
   # NOT `attrNames`, NOT `_kindNames` — see the header. This reads the option's default, which is
   # what actually forces the kind module's body.

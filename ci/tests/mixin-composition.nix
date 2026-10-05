@@ -16,23 +16,27 @@ let
     applyMixin
     ;
 
-  a = mkMixin {
-    requires = [ "port" ];
-    provides = [ "metrics_port" ];
-    name = "a";
-    define = parent: {
-      metrics_port = (R.select "port" parent) + 1000;
-    };
-  };
+  a =
+    mkMixin
+      {
+        requires = [ "port" ];
+        provides = [ "metrics_port" ];
+        name = "a";
+      }
+      (parent: {
+        metrics_port = (R.select "port" parent) + 1000;
+      });
 
-  b = mkMixin {
-    requires = [ "metrics_port" ];
-    provides = [ "metrics_url" ];
-    name = "b";
-    define = parent: {
-      metrics_url = "http://localhost:${toString (R.select "metrics_port" parent)}";
-    };
-  };
+  b =
+    mkMixin
+      {
+        requires = [ "metrics_port" ];
+        provides = [ "metrics_url" ];
+        name = "b";
+      }
+      (parent: {
+        metrics_url = "http://localhost:${toString (R.select "metrics_port" parent)}";
+      });
 in
 {
   flake.tests.mixin-composition.test-compose-effective-requires = {
@@ -110,16 +114,24 @@ in
   flake.tests.mixin-composition.test-compose-shadowing-order = {
     expr =
       let
-        first = mkMixin {
-          provides = [ "status" ];
-          name = "first";
-          define = _: { status = "from-first"; };
-        };
-        second = mkMixin {
-          provides = [ "status" ];
-          name = "second";
-          define = _: { status = "from-second"; };
-        };
+        first =
+          mkMixin
+            {
+              provides = [ "status" ];
+              name = "first";
+            }
+            (_: {
+              status = "from-first";
+            });
+        second =
+          mkMixin
+            {
+              provides = [ "status" ];
+              name = "second";
+            }
+            (_: {
+              status = "from-second";
+            });
         composed = composeMixins [
           first
           second
@@ -134,17 +146,26 @@ in
   flake.tests.mixin-composition.test-compose-mixed-direction = {
     expr =
       let
-        provider = mkMixin {
-          provides = [ "status" ];
-          name = "provider";
-          define = _: { status = "from-provider"; };
-        };
+        provider =
+          mkMixin
+            {
+              provides = [ "status" ];
+              name = "provider";
+            }
+            (_: {
+              status = "from-provider";
+            });
         # Beta: this mixin's "status" should be overridden by provider's
-        betaMixin = beta (mkMixin {
-          provides = [ "status" ];
-          name = "beta-mixin";
-          define = _: { status = "from-beta"; };
-        });
+        betaMixin = beta (
+          mkMixin
+            {
+              provides = [ "status" ];
+              name = "beta-mixin";
+            }
+            (_: {
+              status = "from-beta";
+            })
+        );
         composed = composeMixins [
           provider
           betaMixin
@@ -160,16 +181,24 @@ in
   flake.tests.mixin-composition.test-compose-without-beta-later-wins = {
     expr =
       let
-        provider = mkMixin {
-          provides = [ "status" ];
-          name = "provider";
-          define = _: { status = "from-provider"; };
-        };
-        overrider = mkMixin {
-          provides = [ "status" ];
-          name = "overrider";
-          define = _: { status = "from-overrider"; };
-        };
+        provider =
+          mkMixin
+            {
+              provides = [ "status" ];
+              name = "provider";
+            }
+            (_: {
+              status = "from-provider";
+            });
+        overrider =
+          mkMixin
+            {
+              provides = [ "status" ];
+              name = "overrider";
+            }
+            (_: {
+              status = "from-overrider";
+            });
         composed = composeMixins [
           provider
           overrider

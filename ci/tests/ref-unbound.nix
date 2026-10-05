@@ -28,30 +28,28 @@ let
         { options.o = genMerge.mkOption { inherit type; }; }
         { o = v; }
       ]).config.o;
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host.options.addr = genMerge.mkOption {
-          type = t.str;
-          default = "x";
-        };
-        config.schema.svc.options.host = genMerge.mkOption { type = declarationOf "host"; };
-        config.schema.grp.options.members = genMerge.mkOption {
-          type = setOf (declarationOf "host");
-          default = [ ];
-        };
-      }
-    ];
-  };
+  schema = evalSchema { } [
+    {
+      config.schema.host.options.addr = genMerge.mkOption {
+        type = t.str;
+        default = "x";
+      };
+      config.schema.svc.options.host = genMerge.mkOption { type = declarationOf "host"; };
+      config.schema.grp.options.members = genMerge.mkOption {
+        type = setOf (declarationOf "host");
+        default = [ ];
+      };
+    }
+  ];
   inKind =
     host: members:
     (genMerge.evalModuleTree { } [
       (
         { config, ... }:
         {
-          options.hosts = mkInstanceRegistry schema.host { };
-          options.svcs = mkInstanceRegistry schema.svc { refs.host = config.hosts; };
-          options.grps = mkInstanceRegistry schema.grp { refs.members = config.hosts; };
+          options.hosts = mkInstanceRegistry { } schema.host;
+          options.svcs = mkInstanceRegistry { refs.host = config.hosts; } schema.svc;
+          options.grps = mkInstanceRegistry { refs.members = config.hosts; } schema.grp;
           config.hosts.a = { };
           config.hosts.b = { };
           config.svcs.s.host = host;
@@ -90,7 +88,7 @@ in
         verdict
           (genMerge.evalModuleTree { } [
             {
-              options.one = genMerge.mkOption { type = mkInstanceType schema.svc { }; };
+              options.one = genMerge.mkOption { type = mkInstanceType { } schema.svc; };
               config.one.host = "a";
             }
           ]).config.one.host;
@@ -130,36 +128,34 @@ in
           check = v: builtins.length v < 3;
           message = "fewer than 3";
         };
-        rschema = evalSchema {
-          modules = [
-            {
-              config.schema.host = { };
-              config.schema.r.options = {
-                h = genMerge.mkOption { type = genSchema.refined (declarationOf "host") notB; };
-                n = genMerge.mkOption {
-                  type = t.nullOr (genSchema.refined (declarationOf "host") notB);
-                  default = null;
-                };
-                l = genMerge.mkOption {
-                  type = genSchema.refined (t.listOf (declarationOf "host")) small;
-                  default = [ ];
-                };
+        rschema = evalSchema { } [
+          {
+            config.schema.host = { };
+            config.schema.r.options = {
+              h = genMerge.mkOption { type = genSchema.refined (declarationOf "host") notB; };
+              n = genMerge.mkOption {
+                type = t.nullOr (genSchema.refined (declarationOf "host") notB);
+                default = null;
               };
-            }
-          ];
-        };
+              l = genMerge.mkOption {
+                type = genSchema.refined (t.listOf (declarationOf "host")) small;
+                default = [ ];
+              };
+            };
+          }
+        ];
         run =
           r:
           (genMerge.evalModuleTree { } [
             (
               { config, ... }:
               {
-                options.hosts = mkInstanceRegistry rschema.host { };
-                options.rs = mkInstanceRegistry rschema.r {
+                options.hosts = mkInstanceRegistry { } rschema.host;
+                options.rs = mkInstanceRegistry {
                   refs.h = config.hosts;
                   refs.n = config.hosts;
                   refs.l = config.hosts;
-                };
+                } rschema.r;
                 config.hosts.a = { };
                 config.hosts.b = { };
                 config.rs.y = r;

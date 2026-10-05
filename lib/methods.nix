@@ -1,8 +1,24 @@
 { prelude, merge }:
 let
-  schemaFn = description: type: fn: {
-    inherit description type fn;
-  };
+  # ONE KEYED RECORD, OPEN (den-hoag-7gp66 P2, rule 5 and the keyed-record ruling): `fn` is the
+  # subject, but `description` and `type` are two configuration operands with no natural order, so
+  # the three stay one record whose fields are named at the call site: `schemaFn { description;
+  # type; fn; }`. The record is a `prelude.door`: a missing field is refused by name and catchably at
+  # the application; an extra field is admitted (R5).
+  schemaFn =
+    prelude.door
+      {
+        name = "gen-schema.schemaFn";
+        required = [
+          "description"
+          "type"
+          "fn"
+        ];
+        open = true;
+      }
+      (m: {
+        inherit (m) description type fn;
+      });
 
   mkMethodsModule =
     kind: allMethods:

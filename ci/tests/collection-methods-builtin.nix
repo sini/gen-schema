@@ -17,7 +17,11 @@ let
       config.schema.host = {
         options.name = genMerge.mkOption { type = genMerge.types.str; };
         tags = [ "server" ];
-        methods.label = schemaFn "Label" genMerge.types.str ({ name, ... }: "host:${name}");
+        methods.label = schemaFn {
+          description = "Label";
+          type = genMerge.types.str;
+          fn = { name, ... }: "host:${name}";
+        };
       };
     }
   ];

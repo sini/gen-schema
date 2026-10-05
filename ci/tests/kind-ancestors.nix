@@ -110,37 +110,33 @@ let
   ];
 
   # ── K3 · the `evalSchema` arm publishes the parent the caller reads ──────────────────────────────
-  esOpen = evalSchema {
-    modules = [
-      { config.schema.base.options.b = openInt 0; }
-      {
-        config.schema.sub = {
-          inherits = [ "base" ];
-          options.extra = intOpt;
-        };
-      }
-    ];
-  };
-  esDiamond = evalSchema {
-    modules = [
-      { config.schema.base.options.b = openInt 0; }
-      {
-        config.schema.x = {
-          inherits = [ "base" ];
-          options.xx = intOpt;
-        };
-      }
-      {
-        config.schema.d = {
-          inherits = [
-            "base"
-            "x"
-          ];
-          options.dd = intOpt;
-        };
-      }
-    ];
-  };
+  esOpen = evalSchema { } [
+    { config.schema.base.options.b = openInt 0; }
+    {
+      config.schema.sub = {
+        inherits = [ "base" ];
+        options.extra = intOpt;
+      };
+    }
+  ];
+  esDiamond = evalSchema { } [
+    { config.schema.base.options.b = openInt 0; }
+    {
+      config.schema.x = {
+        inherits = [ "base" ];
+        options.xx = intOpt;
+      };
+    }
+    {
+      config.schema.d = {
+        inherits = [
+          "base"
+          "x"
+        ];
+        options.dd = intOpt;
+      };
+    }
+  ];
 in
 {
   flake.tests.kind-ancestors = {

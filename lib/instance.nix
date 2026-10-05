@@ -27,7 +27,20 @@
   getRefinements,
 }:
 let
-  mkInstanceType =
+  # OPTIONS FIRST, then the kind (den-hoag-7gp66 P2, rules 2 and 4): `mkInstanceType { extraModules?;
+  # strict?; specialArgs?; } kind`. The options are one closed set, a `prelude.door` refused by name
+  # and catchably at `mkInstanceType opts`'s own WHNF; the kind value is the subject, last. The core
+  # below keeps its native defaulted formals (`strict` defaults from the kind), now reached only
+  # through the checked door or from this file.
+  mkInstanceType = prelude.door {
+    name = "gen-schema.mkInstanceType";
+    optional = [
+      "extraModules"
+      "strict"
+      "specialArgs"
+    ];
+  } (o: kindValue: mkInstanceTypeCore kindValue o);
+  mkInstanceTypeCore =
     kindValue:
     {
       extraModules ? [ ],
@@ -56,7 +69,7 @@ let
       # refinement adds — is seen AFTER the set is a value, so none of them can enter it. Lazy on
       # purpose: forcing it here would force `kindValue` at option-DECLARATION time, which is the
       # recursion `mkInstanceRegistry`'s deferred guard exists to avoid on the self-referential
-      # `mkInstanceRegistry config.schema.host { }` idiom. It is forced at config-demand time, by
+      # `mkInstanceRegistry { } config.schema.host` idiom. It is forced at config-demand time, by
       # `id_hash` or by a read of `_identityKeys`, which is late enough.
       #
       # ★ IT TAKES THE SAME `specialArgs` THE INLET BELOW DOES, and that is not a duplicate of the
@@ -362,7 +375,24 @@ let
       deferredCoerce = deferredBindings;
     };
 
-  mkInstanceRegistry =
+  # OPTIONS FIRST, then the kind (den-hoag-7gp66 P2, rules 2 and 4): `mkInstanceRegistry { … } kind`,
+  # the self-referential idiom reading `mkInstanceRegistry { } config.schema.host`. The options are one
+  # closed set, a `prelude.door` refused by name and catchably at `mkInstanceRegistry opts`'s own WHNF,
+  # which never reads the kind, so the deferred guard below keeps its timing.
+  mkInstanceRegistry = prelude.door {
+    name = "gen-schema.mkInstanceRegistry";
+    optional = [
+      "extraModules"
+      "refs"
+      "refinements"
+      "strict"
+      "description"
+      "derive"
+      "deriveEither"
+      "specialArgs"
+    ];
+  } (o: kindValue: mkInstanceRegistryCore kindValue o);
+  mkInstanceRegistryCore =
     kindValue:
     let
       _guardMsg = "gen-schema: mkInstanceRegistry: expected a kind value carrying a mint-backed mark (`__mint.minted`); got an attrset with no mark";
@@ -594,7 +624,7 @@ let
       # apply it) sees no kind-shape check at all, bogus kindValue included. Argued impossibility
       # (ADR-0013 form): making this eager would mean forcing kindValue's shape as soon as this
       # attrset is built, which is exactly the WHNF forcing that recurses infinitely against the
-      # self-referential idiom `options.hosts = mkInstanceRegistry eval.config.schema.host {}`
+      # self-referential idiom `options.hosts = mkInstanceRegistry {} eval.config.schema.host`
       # (den-hoag-fvxh measured this directly: constructing the option record needs `kindValue`,
       # a config value, before `eval`'s options phase -- needed to compute that same config -- has
       # run). What would have to change for `.default` to become checkable: either the registry
@@ -604,7 +634,7 @@ let
       # through `apply` (below), which does carry the unconditional guard.
       default = { };
       type = merge.types.attrsOf (
-        mkInstanceType kindValue {
+        mkInstanceTypeCore kindValue {
           extraModules = allExtraModules;
           inherit strict specialArgs;
         }

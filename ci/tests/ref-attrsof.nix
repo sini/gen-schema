@@ -36,22 +36,20 @@ let
       kindOf ? "host",
     }:
     let
-      schema = evalSchema {
-        modules = [
-          {
-            config.schema.host = { };
-            config.schema.svc.options.f = genMerge.mkOption { inherit type; };
-          }
-        ];
-      };
+      schema = evalSchema { } [
+        {
+          config.schema.host = { };
+          config.schema.svc.options.f = genMerge.mkOption { inherit type; };
+        }
+      ];
     in
     show
       (genMerge.evalModuleTree { } [
         (
           { config, ... }:
           {
-            options.hosts = mkInstanceRegistry schema.host { };
-            options.svcs = mkInstanceRegistry schema.svc { refs.f = bind config.hosts; };
+            options.hosts = mkInstanceRegistry { } schema.host;
+            options.svcs = mkInstanceRegistry { refs.f = bind config.hosts; } schema.svc;
             config.hosts.a = { };
             config.hosts.b = { };
             config.svcs.s.f = value;

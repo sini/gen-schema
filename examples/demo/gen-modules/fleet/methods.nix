@@ -17,27 +17,31 @@ in
   config.schema.host.methods = {
     # Check if a named service targets this host.
     # Closes over fleet.services; receives `name` from the host instance.
-    hasService =
-      schemaFn "Check whether a named service targets this host." (lib.types.functionTo lib.types.bool)
-        (
-          { name, ... }:
-          serviceName:
-          let
-            inherit (config.fleet) services;
-          in
-          services ? ${serviceName} && services.${serviceName}.host.name == name
-        );
+    hasService = schemaFn {
+      description = "Check whether a named service targets this host.";
+      type = lib.types.functionTo lib.types.bool;
+      fn =
+        { name, ... }:
+        serviceName:
+        let
+          inherit (config.fleet) services;
+        in
+        services ? ${serviceName} && services.${serviceName}.host.name == name;
+    };
 
     # Return a description string for this host.
     # All named args (name, role, addr) resolved from instance config.
-    describe = schemaFn "Human-readable summary of this host." lib.types.str (
-      {
-        name,
-        role,
-        addr,
-        ...
-      }:
-      "${name} (${role}) at ${addr}"
-    );
+    describe = schemaFn {
+      description = "Human-readable summary of this host.";
+      type = lib.types.str;
+      fn =
+        {
+          name,
+          role,
+          addr,
+          ...
+        }:
+        "${name} (${role}) at ${addr}";
+    };
   };
 }

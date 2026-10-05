@@ -109,12 +109,10 @@ let
   # the `evalSchema` arm (OQ7): a value entry stages nothing, and composes as itself
   esOf =
     spelling:
-    evalSchema {
-      modules = [
-        { config.schema.base.options.b = strOpt; }
-        { config.schema.sub = entry spelling foreign; }
-      ];
-    };
+    evalSchema { } [
+      { config.schema.base.options.b = strOpt; }
+      { config.schema.sub = entry spelling foreign; }
+    ];
   esRecordOf = t: {
     inherits = map (render t) t.sub.inherits;
     bType = t.sub.options.b.type.name;
@@ -169,9 +167,7 @@ in
         {
           inherits = rec' (tree [ (decl "inherits") ]);
           alias = rec' (tree [ (decl "alias") ]);
-          evalSchema = rec' (evalSchema {
-            modules = [ (decl "inherits") ];
-          });
+          evalSchema = rec' (evalSchema { } [ (decl "inherits") ]);
         };
       expected =
         let

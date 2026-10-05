@@ -18,29 +18,25 @@ in
 {
   flake.tests.mixin-basic.test-mkMixin-creates-mixin = {
     expr =
-      (mkMixin {
-        requires = [ "port" ];
-        provides = [ "metrics_port" ];
-        define = parent: {
+      (mkMixin
+        {
+          requires = [ "port" ];
+          provides = [ "metrics_port" ];
+        }
+        (parent: {
           metrics_port = (R.select "port" parent) + 1000;
-        };
-      }).__isMixin;
+        })
+      ).__isMixin;
     expected = true;
   };
 
   flake.tests.mixin-basic.test-mkMixin-default-direction = {
-    expr =
-      (mkMixin {
-        define = _: { };
-      }).__direction;
+    expr = (mkMixin { } (_: { })).__direction;
     expected = "smalltalk";
   };
 
   flake.tests.mixin-basic.test-beta-changes-direction = {
-    expr =
-      (beta (mkMixin {
-        define = _: { };
-      })).__direction;
+    expr = (beta (mkMixin { } (_: { }))).__direction;
     expected = "beta";
   };
 
@@ -51,13 +47,15 @@ in
           port = 8080;
           hostname = "localhost";
         };
-        m = mkMixin {
-          requires = [ "port" ];
-          provides = [ "metrics_port" ];
-          define = parent: {
-            metrics_port = (R.select "port" parent) + 1000;
-          };
-        };
+        m =
+          mkMixin
+            {
+              requires = [ "port" ];
+              provides = [ "metrics_port" ];
+            }
+            (parent: {
+              metrics_port = (R.select "port" parent) + 1000;
+            });
       in
       R.select "metrics_port" (applyMixin m base "service");
     expected = 9080;
@@ -70,13 +68,15 @@ in
           port = 8080;
           hostname = "localhost";
         };
-        m = mkMixin {
-          requires = [ "port" ];
-          provides = [ "metrics_port" ];
-          define = parent: {
-            metrics_port = (R.select "port" parent) + 1000;
-          };
-        };
+        m =
+          mkMixin
+            {
+              requires = [ "port" ];
+              provides = [ "metrics_port" ];
+            }
+            (parent: {
+              metrics_port = (R.select "port" parent) + 1000;
+            });
       in
       R.select "hostname" (applyMixin m base "service");
     expected = "localhost";
@@ -86,10 +86,7 @@ in
     expr = builtins.tryEval (
       let
         base = R.fromAttrs { hostname = "localhost"; };
-        m = mkMixin {
-          requires = [ "port" ];
-          define = _: { };
-        };
+        m = mkMixin { requires = [ "port" ]; } (_: { });
       in
       applyMixin m base "service"
     );
@@ -109,8 +106,7 @@ in
             "service"
             "gateway"
           ];
-          define = _: { };
-        };
+        } (_: { });
       in
       applyMixin m base "database"
     );
@@ -124,17 +120,19 @@ in
     expr =
       let
         base = R.fromAttrs { port = 8080; };
-        m = mkMixin {
-          requires = [ "port" ];
-          kinds = [
-            "service"
-            "gateway"
-          ];
-          provides = [ "status" ];
-          define = _: {
-            status = "ok";
-          };
-        };
+        m =
+          mkMixin
+            {
+              requires = [ "port" ];
+              provides = [ "status" ];
+              kinds = [
+                "service"
+                "gateway"
+              ];
+            }
+            (_: {
+              status = "ok";
+            });
       in
       R.has "status" (applyMixin m base "service");
     expected = true;
@@ -148,11 +146,16 @@ in
           port = 8080;
           display = "base-display";
         };
-        m = beta (mkMixin {
-          requires = [ "port" ];
-          provides = [ "display" ];
-          define = _: { display = "mixin-display"; };
-        });
+        m = beta (
+          mkMixin
+            {
+              requires = [ "port" ];
+              provides = [ "display" ];
+            }
+            (_: {
+              display = "mixin-display";
+            })
+        );
       in
       R.select "display" (applyMixin m base "service");
     expected = "base-display"; # Beta: kind (parent) wins
@@ -166,11 +169,15 @@ in
           port = 8080;
           display = "base-display";
         };
-        m = mkMixin {
-          requires = [ "port" ];
-          provides = [ "display" ];
-          define = _: { display = "mixin-display"; };
-        };
+        m =
+          mkMixin
+            {
+              requires = [ "port" ];
+              provides = [ "display" ];
+            }
+            (_: {
+              display = "mixin-display";
+            });
       in
       R.select "display" (applyMixin m base "service");
     expected = "mixin-display"; # Smalltalk: mixin (child) wins

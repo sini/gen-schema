@@ -19,7 +19,11 @@ let
           type = genMerge.types.str;
           description = "IP address";
         };
-        methods.greeting = schemaFn "Greeting message" genMerge.types.str ({ name, ... }: "hi ${name}");
+        methods.greeting = schemaFn {
+          description = "Greeting message";
+          type = genMerge.types.str;
+          fn = { name, ... }: "hi ${name}";
+        };
       };
     }
   ];

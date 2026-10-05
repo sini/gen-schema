@@ -17,39 +17,31 @@ let
   # A: `host { addr }`. B: `host { addr; tags }`: `tags` is not primitive, so the KEY SETS are equal
   # and only the declaration separates the two kinds.
   kindA =
-    (evalSchema {
-      modules = [ { config.schema.host.options.addr = genMerge.mkOption { type = str; }; } ];
-    }).host;
+    (evalSchema { } [ { config.schema.host.options.addr = genMerge.mkOption { type = str; }; } ]).host;
   kindB =
-    (evalSchema {
-      modules = [
-        {
-          config.schema.host.options = {
-            addr = genMerge.mkOption { type = str; };
-            tags = genMerge.mkOption {
-              type = genMerge.types.listOf str;
-              default = [ ];
-            };
+    (evalSchema { } [
+      {
+        config.schema.host.options = {
+          addr = genMerge.mkOption { type = str; };
+          tags = genMerge.mkOption {
+            type = genMerge.types.listOf str;
+            default = [ ];
           };
-        }
-      ];
-    }).host;
+        };
+      }
+    ]).host;
   # An independently evaluated twin of A: one declaration, one mark.
   kindTwin =
-    (evalSchema {
-      modules = [ { config.schema.host.options.addr = genMerge.mkOption { type = str; }; } ];
-    }).host;
+    (evalSchema { } [ { config.schema.host.options.addr = genMerge.mkOption { type = str; }; } ]).host;
   # A's declaration under another name.
   kindOther =
-    (evalSchema {
-      modules = [ { config.schema.box.options.addr = genMerge.mkOption { type = str; }; } ];
-    }).box;
+    (evalSchema { } [ { config.schema.box.options.addr = genMerge.mkOption { type = str; }; } ]).box;
 
   inst =
     kindValue: addr:
     (genMerge.evalModuleTree { } [
       {
-        options.reg = mkInstanceRegistry kindValue { };
+        options.reg = mkInstanceRegistry { } kindValue;
         config.reg.pewter.addr = addr;
       }
     ]).config.reg.pewter;

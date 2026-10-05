@@ -13,28 +13,26 @@ let
     toSet
     ;
 
-  schema = evalSchema {
-    modules = [
-      {
-        config.schema.host = {
-          options.addr = genMerge.mkOption { type = genMerge.types.str; };
+  schema = evalSchema { } [
+    {
+      config.schema.host = {
+        options.addr = genMerge.mkOption { type = genMerge.types.str; };
+      };
+      config.schema.group = {
+        options.members = genMerge.mkOption {
+          type = setOf (declarationOf "host");
+          default = [ ];
         };
-        config.schema.group = {
-          options.members = genMerge.mkOption {
-            type = setOf (declarationOf "host");
-            default = [ ];
-          };
-        };
-      }
-    ];
-  };
+      };
+    }
+  ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
-      options.groups = mkInstanceRegistry schema.group {
+      options.hosts = mkInstanceRegistry { } schema.host;
+      options.groups = mkInstanceRegistry {
         refs.members = eval.config.hosts;
-      };
+      } schema.group;
       config.hosts = {
         igloo = {
           addr = "10.0.1.1";
@@ -68,7 +66,7 @@ in
         let
           eval2 = genMerge.evalModuleTree { } [
             {
-              options.hosts = mkInstanceRegistry schema.host { };
+              options.hosts = mkInstanceRegistry { } schema.host;
               config.hosts.other = {
                 addr = "10.0.1.3";
               };

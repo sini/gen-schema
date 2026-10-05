@@ -7,26 +7,28 @@
 let
   inherit (genSchema) evalSchema mkSchemaOption mkInstanceRegistry;
 
-  schema = evalSchema {
-    schemaOption = mkSchemaOption {
-      strict = true;
-      collections.tags = {
-        default = [ ];
-      };
-    };
-    modules = [
+  schema =
+    evalSchema
       {
-        config.schema.host = {
-          options.name = genMerge.mkOption { type = genMerge.types.str; };
-          tags = [ "server" ];
+        schemaOption = mkSchemaOption {
+          strict = true;
+          collections.tags = {
+            default = [ ];
+          };
         };
       }
-    ];
-  };
+      [
+        {
+          config.schema.host = {
+            options.name = genMerge.mkOption { type = genMerge.types.str; };
+            tags = [ "server" ];
+          };
+        }
+      ];
 
   eval = genMerge.evalModuleTree { } [
     {
-      options.hosts = mkInstanceRegistry schema.host { };
+      options.hosts = mkInstanceRegistry { } schema.host;
       config.hosts.igloo = {
         name = "igloo";
       };
