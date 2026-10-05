@@ -3313,7 +3313,7 @@ in
         k.k;
       # THE FULLY-SHADOWED CYCLE: `a -> x2 -> b -> y2 -> a`, each member listing its twin first
       # (`x1`, `y1`, inheriting harmless same-named kinds of other trees); `sA'` lists the cycle
-      # branch first
+      # branch first, and `sAf` gives the listed-first twins their own `_file`
       hx = parent: {
         config.schema.x = {
           inherits = [ parent ];
@@ -3326,11 +3326,11 @@ in
           options.o = intOpt;
         };
       };
-      sx1 = (plainTree [ (hx (plainTree [ { config.schema.b.options.q = intOpt; } ]).b) ]).x;
-      sy1 = (plainTree [ (hy (plainTree [ { config.schema.a.options.p = intOpt; } ]).a) ]).y;
       shadowed =
-        first:
+        tag: first:
         let
+          sx1 = (plainTree [ (hx (plainTree [ { config.schema.b.options.q = intOpt; } ]).b // tag) ]).x;
+          sy1 = (plainTree [ (hy (plainTree [ { config.schema.a.options.p = intOpt; } ]).a // tag) ]).y;
           ta = plainTree [
             {
               config.schema.a = {
@@ -3351,16 +3351,22 @@ in
           y2 = (plainTree [ (hy ta.a) ]).y;
         in
         ta;
-      sA = shadowed (
+      sA = shadowed { } (
         twin: cyc: [
           twin
           cyc
         ]
       );
-      sA' = shadowed (
+      sA' = shadowed { } (
         twin: cyc: [
           cyc
           twin
+        ]
+      );
+      sAf = shadowed { _file = "twin:1"; } (
+        twin: cyc: [
+          twin
+          cyc
         ]
       );
       refuses = members: path: kind: {
@@ -3401,11 +3407,14 @@ in
         expr = builtins.attrNames (vK { }).options;
         expectedError = refuses "b k p x" "b -> x -> p -> k -> b" "b";
       };
-      # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1, den-hoag-95cv0): a cycle EVERY member of which lists
-      # a witness twin first (`a` inherits `x1` then `x2`, `x2` inherits `b`; `b` inherits `y1` then
-      # `y2`, `y2` inherits `a`; each twin pair from one helper) is missed by every member's walk, so
-      # composition recurses uncatchably on all three evaluators. The control is the same shape with
-      # the cycle branch listed first: the walk sees it, and it is refused by name.
+      # ★ PERMANENT ARGUED PRICE (ADR-0025 item 1; owner-ruled 2026-10-05, den-hoag-95cv0 Arm A via
+      # den-hoag-yqz1j): a cycle EVERY member of which lists a witness twin first (`a` inherits `x1`
+      # then `x2`, `x2` inherits `b`; `b` inherits `y1` then `y2`, `y2` inherits `a`; each twin pair
+      # from one helper) is missed by every member's walk, so composition recurses uncatchably on all
+      # three evaluators. Telling the twins apart needs node identity or a content comparison, which
+      # is den-hoag-yqz1j's released R1 applied to kinds. The control is the same shape with the cycle
+      # branch listed first: the walk sees it, and it is refused by name. The remedy is provenance:
+      # with each listed-first twin under its own `_file`, the walk sees the cycle and refuses it.
       test-a-fully-shadowed-cycle-aborts = {
         expr = builtins.attrNames sA.a.options;
         expectedError = {
@@ -3415,6 +3424,10 @@ in
       };
       test-a-shadowed-cycle-with-the-cycle-branch-first-refuses = {
         expr = builtins.attrNames sA'.a.options;
+        expectedError = refuses "a b x y" "a -> x -> b -> y -> a" "a";
+      };
+      test-a-fully-shadowed-cycle-with-tagged-twins-refuses = {
+        expr = builtins.attrNames sAf.a.options;
         expectedError = refuses "a b x y" "a -> x -> b -> y -> a" "a";
       };
     };
