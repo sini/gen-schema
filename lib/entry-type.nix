@@ -1262,11 +1262,21 @@ let
                   [ ]
                 else
                   let
-                    files = map (d: d.file or null) defs;
+                    # `_file` is writable by any module (den-hoag-5n8ey), so the provenance counts only
+                    # on a def with the resolver's value, which `injectFor` writes as exactly
+                    # `{ imports = [ <one module> ]; }`. A def carrying the string with any other
+                    # value is an ordinary def: its parent still composes, and nothing is skipped.
+                    resolverShaped =
+                      v:
+                      builtins.isAttrs v
+                      && builtins.attrNames v == [ "imports" ]
+                      && builtins.isList v.imports
+                      && builtins.length v.imports == 1;
+                    resolvedBy = p: d: (d.file or null) == inheritsResolvedFile kind p && resolverShaped d.value;
                     spelled = spelledNames;
                   in
                   builtins.filter (
-                    p: !(builtins.elem (inheritsResolvedFile kind p) files) && !(builtins.elem p spelled)
+                    p: !(builtins.any (resolvedBy p) defs) && !(builtins.elem p spelled)
                   ) declaredInherits;
               # Sited on the COMPOSED value (`merged`, `treeModule`), never the kind's WHNF: `evalSchema`
               # reads `inherits` off pass 0, where no parent is resolved yet, and the collections, `kind`

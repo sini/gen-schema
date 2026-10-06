@@ -1117,5 +1117,181 @@ in
           ];
         };
       };
+    # The resolver's provenance counts on the resolver's def alone (den-hoag-5n8ey). A def that carries
+    # the string for a DECLARED parent with a value the resolver never writes does not make the desugar
+    # skip that parent: the parent composes beside the def's own keys, on the default arm, an `mkType`
+    # arm and the staged path. The control is a module with a `_file` of its own choosing.
+    test-a-forged-resolver-file-on-a-declared-parent-skips-nothing =
+      let
+        callerOpt = mkSchemaOption {
+          mkType =
+            { defs, kind, ... }:
+            {
+              __functor = _: _: { imports = map (d: d.value) defs; };
+              inherit kind;
+            };
+        };
+        decl = file: [
+          {
+            config.schema = {
+              site.options.site = str "s0";
+              host = {
+                inherits = [ "site" ];
+                options.addr = str "a";
+              };
+            };
+          }
+          {
+            _file = file;
+            config.schema.host.options.spoofOpt = str "x";
+          }
+        ];
+        forged = decl "<gen-schema evalSchema: kind 'host' inherits 'site'>";
+        own = decl "<my own module>";
+        bare =
+          opt: mods: (genMerge.evalModuleTree { } ([ { options.schema = opt; } ] ++ mods)).config.schema;
+      in
+      {
+        expr = {
+          defaultArm = optionSet ((bare (mkSchemaOption { }) forged).host);
+          mkTypeArm = optionSet ((bare callerOpt forged).host);
+          staged = optionSet ((evalSchema { schemaOption = callerOpt; } forged).host);
+          control = optionSet ((bare (mkSchemaOption { }) own).host);
+        };
+        expected =
+          let
+            all = [
+              "_identity"
+              "_identityKeys"
+              "addr"
+              "id_hash"
+              "name"
+              "site"
+              "spoofOpt"
+            ];
+          in
+          {
+            defaultArm = all;
+            mkTypeArm = all;
+            staged = all;
+            control = all;
+          };
+      };
+    # The three conjuncts of the resolver's shape and its file are each pinned by a cell that a
+    # build dropping that conjunct fails (den-hoag-5n8ey). Every def below keeps its declared parent
+    # `site` and gains the def's own imported option, so a skipped parent or a lost import shows.
+    test-a-def-under-its-own-file-with-the-resolver-shape-keeps-the-parent =
+      let
+        mod = {
+          options.fromImport = str "i";
+        };
+        mods = [
+          { options.schema = mkSchemaOption { }; }
+          {
+            config.schema = {
+              site.options.site = str "s0";
+              host = {
+                inherits = [ "site" ];
+                options.addr = str "a";
+              };
+            };
+          }
+          {
+            _file = "<my own module>";
+            config.schema.host.imports = [ mod ];
+          }
+        ];
+      in
+      {
+        expr = optionSet (genMerge.evalModuleTree { } mods).config.schema.host;
+        expected = [
+          "_identity"
+          "_identityKeys"
+          "addr"
+          "fromImport"
+          "id_hash"
+          "name"
+          "site"
+        ];
+      };
+    test-the-resolver-file-with-an-imports-def-carrying-a-key-keeps-the-parent =
+      let
+        mod = {
+          options.fromImport = str "i";
+        };
+        mods = [
+          { options.schema = mkSchemaOption { }; }
+          {
+            config.schema = {
+              site.options.site = str "s0";
+              host = {
+                inherits = [ "site" ];
+                options.addr = str "a";
+              };
+            };
+          }
+          {
+            _file = "<gen-schema evalSchema: kind 'host' inherits 'site'>";
+            config.schema.host = {
+              imports = [ mod ];
+              options.spoofOpt = str "x";
+            };
+          }
+        ];
+      in
+      {
+        expr = optionSet (genMerge.evalModuleTree { } mods).config.schema.host;
+        expected = [
+          "_identity"
+          "_identityKeys"
+          "addr"
+          "fromImport"
+          "id_hash"
+          "name"
+          "site"
+          "spoofOpt"
+        ];
+      };
+    test-the-resolver-file-with-a-two-import-def-keeps-the-parent =
+      let
+        mod1 = {
+          options.fromImport1 = str "i";
+        };
+        mod2 = {
+          options.fromImport2 = str "i";
+        };
+        mods = [
+          { options.schema = mkSchemaOption { }; }
+          {
+            config.schema = {
+              site.options.site = str "s0";
+              host = {
+                inherits = [ "site" ];
+                options.addr = str "a";
+              };
+            };
+          }
+          {
+            _file = "<gen-schema evalSchema: kind 'host' inherits 'site'>";
+            config.schema.host.imports = [
+              mod1
+              mod2
+            ];
+          }
+        ];
+      in
+      {
+        expr = optionSet (genMerge.evalModuleTree { } mods).config.schema.host;
+        expected = [
+          "_identity"
+          "_identityKeys"
+          "addr"
+          "fromImport1"
+          "fromImport2"
+          "id_hash"
+          "name"
+          "site"
+        ];
+      };
   };
 }
