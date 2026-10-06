@@ -4107,5 +4107,14 @@ in
           msg = "^gen-schema\\.mkInstanceRegistry: '__functor' is not an option of this door; the options are closed ";
         };
       };
+      # den-hoag-cxlc0: the raw `.default` read bypasses `apply`; the lazy default refuses a non-kind
+      # by name where it once returned `{ }` (den-hoag-fvxh's declared exception, now closed).
+      test-a-raw-default-read-on-a-non-kind-refuses = {
+        expr = (mkInstanceRegistry { description = "d"; } { no = "kind"; }).default;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: mkInstanceRegistry: expected a kind value carrying a mint-backed mark \\(`__mint.minted`\\); got an attrset with no mark$";
+        };
+      };
     };
 }

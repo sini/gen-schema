@@ -631,20 +631,16 @@ let
     in
     merge.mkOption {
       inherit description;
-      # `default` is a raw value on this record, never routed through `apply` -- a caller that
-      # reads `.default` directly (bypassing the module system that would otherwise merge and
-      # apply it) sees no kind-shape check at all, bogus kindValue included. Argued impossibility
-      # (ADR-0013 form): making this eager would mean forcing kindValue's shape as soon as this
-      # attrset is built, which is exactly the WHNF forcing that recurses infinitely against the
-      # self-referential idiom `options.hosts = mkInstanceRegistry {} eval.config.schema.host`
-      # (den-hoag-fvxh measured this directly: constructing the option record needs `kindValue`,
-      # a config value, before `eval`'s options phase -- needed to compute that same config -- has
-      # run). What would have to change for `.default` to become checkable: either the registry
-      # stops being constructible from a self-referential `eval.config...` kind value, or the
-      # module system stops separating the options phase from the config phase -- neither is on
-      # the table. The module-system path IS the consumer contract: every in-contract read goes
-      # through `apply` (below), which does carry the unconditional guard.
-      default = { };
+      # `default` is LAZY in `kind`: `builtins.seq kind { }` is a thunk the option record's WHNF never
+      # forces, so building the record against the self-referential idiom
+      # `options.hosts = mkInstanceRegistry {} eval.config.schema.host` still needs no `kindValue`
+      # (constructing the record reads a config value before `eval`'s options phase has run; an
+      # eager guard here recurses infinitely, den-hoag-fvxh measured it). A raw `.default` read
+      # that bypasses `apply` forces the thunk, so it refuses by name on a non-kind, where it once
+      # returned `{ }` (den-hoag-cxlc0). A registry nothing reads costs nothing new, and a registry
+      # over a genuine kind still defaults to `{ }`. Every other in-contract read goes through
+      # `apply` (below), which carries the unconditional guard.
+      default = builtins.seq kind { };
       type = merge.types.attrsOf (
         mkInstanceTypeCore kindValue {
           extraModules = allExtraModules;

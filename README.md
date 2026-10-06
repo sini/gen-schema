@@ -1637,6 +1637,13 @@ mkInstanceRegistry {
 
 Returns `lib.mkOption` with `type = attrsOf (mkInstanceType ...)` and an `apply` pipeline that runs validators then derive.
 
+**The crossing is supported.** `mkInstanceRegistry { } config.schema.host`, and the same call with the kind read
+through a `let` knot over the evaluation that declares it, both compose, as the `mkInstanceType` sibling does. The
+option's `default` is `builtins.seq kind { }`: lazy, so building the option record never reads the kind, and a
+raw `.default` read on a registry built over a value that is not a kind is refused by name
+(`expected a kind value carrying a mint-backed mark`) where it once returned `{ }`. A registry nothing reads costs
+nothing new, and one over a genuine kind still defaults to `{ }`.
+
 `derive` and `deriveEither` are mutually exclusive.
 
 **The kind-first call, `mkInstanceRegistry kindValue { … }`, is refused by name in two of its three

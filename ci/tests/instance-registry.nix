@@ -72,5 +72,42 @@ in
       expr = (builtins.tryEval (bogusRegistry.apply { a = { }; })).success;
       expected = false;
     };
+
+    # den-hoag-cxlc0: the registry crossing is SUPPORTED. Both spellings of reading the kind off the
+    # tree that declares it compose; the lazy `.default` guard must not force `kind` at the option
+    # record's WHNF, which is what an eager `assert builtins.seq kind true` would do (RED there).
+    test-crossing-composes-by-module-config-and-by-let-knot = {
+      expr =
+        let
+          kindDecl = {
+            options.schema = genSchema.mkSchemaOption { };
+            config.schema.host.options.addr = genMerge.mkOption { type = genMerge.types.str; };
+          };
+          inst.config.hosts.h1.addr = "10.0.0.1";
+          viaConfig =
+            (genMerge.evalModuleTree { } [
+              kindDecl
+              ({ config, ... }: { options.hosts = mkInstanceRegistry { } config.schema.host; })
+              inst
+            ]).config.hosts.h1.addr;
+          viaKnot =
+            let
+              knot = genMerge.evalModuleTree { } [
+                kindDecl
+                { options.hosts = mkInstanceRegistry { } knot.config.schema.host; }
+                inst
+              ];
+            in
+            knot.config.hosts.h1.addr;
+        in
+        [
+          viaConfig
+          viaKnot
+        ];
+      expected = [
+        "10.0.0.1"
+        "10.0.0.1"
+      ];
+    };
   };
 }
