@@ -113,10 +113,10 @@ in
       };
     };
 
-    # A refined type over a PARAMETRIC base reaches the same outcome by a different route: every
-    # structural type gen-merge ships carries no `__mint` AT ALL, so the base enters as a SEALED
-    # component beside the refinement's check, and the type still mints over the rest.
-    test-refined-over-a-parametric-base-seals-the-base = {
+    # A refined type over a PARAMETRIC base: gen-merge's structural types mint per component, so the
+    # base enters the refined type's mark as a component of its own and ONLY the refinement's check
+    # stays sealed (a caller lambda).
+    test-refined-over-a-parametric-base-seals-only-the-check = {
       expr = {
         parametric = regime (refined L [ refinements.nonEmpty ]);
         parametricSealed = builtins.attrNames (refined L [ refinements.nonEmpty ]).__sealed;
@@ -124,20 +124,17 @@ in
       };
       expected = {
         parametric = "minted";
-        parametricSealed = [
-          "members.0"
-          "refinements.0"
-        ];
+        parametricSealed = [ "refinements.0" ];
         nullary = "minted";
       };
     };
 
     # ── O1's live controls: the mint is not dead, and `unmintable` is ATTRIBUTABLE ─────────────
     # An INERT refinement set — no `check`, so no lambda — MINTS over a nullary base and its `__id`
-    # ANSWERS, and two inert sets SEPARATE. The same inert set over a PARAMETRIC base mints with the
-    # base sealed and refuses an `__id` demand, which attributes that refusal to the base's missing
-    # mint rather than to the predicate. Without these, every row above is satisfied by a constructor that refuses
-    # everything.
+    # ANSWERS, and two inert sets SEPARATE. The same inert set over a PARAMETRIC base also mints and
+    # answers an `__id` demand, because gen-merge's composite base is minted: with no lambda there is
+    # no sealed component, so the refusal in the cells above is attributable to the predicate alone.
+    # Without these, every row above is satisfied by a constructor that refuses everything.
     test-control-an-inert-refinement-still-mints-and-separates = {
       expr =
         let
@@ -156,7 +153,7 @@ in
         idAnswers = true;
         separates = true;
         overParametricBase = "minted";
-        overParametricBaseId = false;
+        overParametricBaseId = true;
       };
     };
 
