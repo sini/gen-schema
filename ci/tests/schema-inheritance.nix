@@ -918,5 +918,141 @@ in
         "other"
       ];
     };
+    # THE CALLER'S `defs` SHAPE IS ONE SHAPE ON BOTH PATHS (den-hoag-4d2zs): the raw defs, then the
+    # parents as ONE nested def, whether the desugar or `evalSchema`'s pass resolved them. The
+    # discriminator is `leaf`, which inherits nothing and so receives no nested def. It reads the
+    # per-def count and the nesting only: the nested def's inner order is each resolver's own.
+    test-the-mkType-caller-defs-shape-is-one-nested-def-on-both-paths =
+      let
+        shapeOpt = mkSchemaOption {
+          mkType =
+            { defs, kind, ... }:
+            {
+              __functor = _: _: { imports = map (d: d.value) defs; };
+              inherit kind;
+              shape = map (
+                d: if builtins.isAttrs d.value then builtins.length (d.value.imports or [ ]) else -1
+              ) defs;
+            };
+        };
+        decl = {
+          config.schema = {
+            site.options.site = str "s0";
+            role.options.role = str "web";
+            host = {
+              inherits = [
+                "site"
+                "role"
+              ];
+              options.addr = str "";
+            };
+            leaf.options.addr = str "";
+          };
+        };
+        bare =
+          (genMerge.evalModuleTree { } [
+            { options.schema = shapeOpt; }
+            decl
+          ]).config.schema;
+        staged = evalSchema { schemaOption = shapeOpt; } [ decl ];
+        read = t: {
+          host = t.host.shape;
+          leaf = t.leaf.shape;
+        };
+      in
+      {
+        expr = {
+          bare = read bare;
+          staged = read staged;
+        };
+        expected = {
+          bare = {
+            host = [
+              0
+              2
+            ];
+            leaf = [ 0 ];
+          };
+          staged = {
+            host = [
+              0
+              2
+            ];
+            leaf = [ 0 ];
+          };
+        };
+      };
+    # A def joins the nested def by its `file` alone, and any module may set `_file`, so a def that
+    # carries the resolved prefix without being a resolved parent lands there too. It keeps its
+    # whole value: its own keys are declared, with or without `imports`, on both paths.
+    test-a-def-carrying-the-resolved-prefix-keeps-its-whole-value-on-both-paths =
+      let
+        callerOpt = mkSchemaOption {
+          mkType =
+            { defs, kind, ... }:
+            {
+              __functor = _: _: { imports = map (d: d.value) defs; };
+              inherit kind;
+            };
+        };
+        decl = extra: [
+          {
+            config.schema = {
+              site.options.site = str "s0";
+              host = {
+                inherits = [ "site" ];
+                options.addr = str "a";
+              };
+            };
+          }
+          {
+            _file = "<gen-schema evalSchema: kind 'host' inherits 'zz'>";
+            config.schema.host = {
+              options.prefixed = str "p";
+            }
+            // extra;
+          }
+        ];
+        withImports.imports = [ { options.imported = str "i"; } ];
+        bare =
+          mods: (genMerge.evalModuleTree { } ([ { options.schema = callerOpt; } ] ++ mods)).config.schema;
+        staged = evalSchema { schemaOption = callerOpt; };
+      in
+      {
+        expr = {
+          bare = optionSet ((bare (decl { })).host);
+          staged = optionSet ((staged (decl { })).host);
+          bareWithImports = optionSet ((bare (decl withImports)).host);
+          stagedWithImports = optionSet ((staged (decl withImports)).host);
+        };
+        expected =
+          let
+            declared = [
+              "_identity"
+              "_identityKeys"
+              "addr"
+              "id_hash"
+              "name"
+              "prefixed"
+              "site"
+            ];
+            withImported = [
+              "_identity"
+              "_identityKeys"
+              "addr"
+              "id_hash"
+              "imported"
+              "name"
+              "prefixed"
+              "site"
+            ];
+          in
+          {
+            bare = declared;
+            staged = declared;
+            bareWithImports = withImported;
+            stagedWithImports = withImported;
+          };
+      };
   };
 }

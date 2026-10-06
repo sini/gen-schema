@@ -4037,4 +4037,71 @@ in
           };
         };
     };
+
+  # THE PRE-L4 REGISTRY CALL, `mkInstanceRegistry <kind> { … }`, under the options-first door
+  # (den-hoag-ht5ar). Two of its three spellings are refused by name: a kind read through a module's
+  # own `config` meets gen-merge's declaration guard, and a kind from a closed evaluation meets the
+  # door. The third, a `let` knot reading the SAME evaluation's `config`, aborts uncatchably on every
+  # evaluator, an argued exception under ADR-0025 item 1: telling the kind operand from an options
+  # set needs a read of an operand, and the option record's WHNF is in the declaration spine that
+  # same `config` waits on. Reading the first operand aborts on this order's knot, reading the second
+  # aborts on the options-first order's knot, and reading neither admits a misspelt option silently
+  # on a registry nothing reads (`lib/instance.nix`, at the door). A kind read from the evaluation
+  # the registry is declared in is the retired crossing in either order; these cells pin only how
+  # the pre-L4 order fails, and teach neither spelling.
+  flake.testsError.pre-l4-registry-call =
+    let
+      str = genMerge.mkOption { type = genMerge.types.str; };
+      kindDecl = {
+        options.schema = mkSchemaOption { };
+        config.schema.host.options.addr = str;
+      };
+      inst = {
+        config.hosts.h1.addr = "10.0.0.1";
+      };
+    in
+    {
+      test-the-pre-l4-call-through-a-let-knot-aborts = {
+        expr =
+          let
+            eval = genMerge.evalModuleTree { } [
+              kindDecl
+              { options.hosts = mkInstanceRegistry eval.config.schema.host { }; }
+              inst
+            ];
+          in
+          eval.config.hosts.h1.addr;
+        expectedError = {
+          type = "EvalError";
+          msg = "infinite recursion encountered";
+        };
+      };
+      test-the-pre-l4-call-with-a-module-config-kind-refuses = {
+        expr =
+          (genMerge.evalModuleTree { } [
+            kindDecl
+            ({ config, ... }: { options.hosts = mkInstanceRegistry config.schema.host { }; })
+            inst
+          ]).config.hosts.h1.addr;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-merge: a module read `config' while its own declarations were being folded";
+        };
+      };
+      test-the-pre-l4-call-with-a-closed-kind-refuses = {
+        expr =
+          (genMerge.evalModuleTree { } [
+            {
+              options.hosts =
+                mkInstanceRegistry (genMerge.evalModuleTree { } [ kindDecl ]).config.schema.host
+                  { };
+            }
+            inst
+          ]).config.hosts.h1.addr;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema\\.mkInstanceRegistry: '__functor' is not an option of this door; the options are closed ";
+        };
+      };
+    };
 }

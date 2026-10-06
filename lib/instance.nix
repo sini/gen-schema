@@ -379,6 +379,18 @@ let
   # the self-referential idiom reading `mkInstanceRegistry { } config.schema.host`. The options are one
   # closed set, a `prelude.door` refused by name and catchably at `mkInstanceRegistry opts`'s own WHNF,
   # which never reads the kind, so the deferred guard below keeps its timing.
+  #
+  # The kind-first call `mkInstanceRegistry kindValue { … }` is refused by name when the kind comes
+  # through the module's own `config` (gen-merge's declaration guard) or from a closed evaluation
+  # (this door). Through a `let` knot over the SAME evaluation, `eval.config.schema.host`, it aborts
+  # uncatchably (den-hoag-ht5ar). Argued impossibility (ADR-0013 form): the option record's WHNF is in
+  # the declaration spine `eval.config` waits on, and telling a kind from an options set needs a read
+  # of an operand at that WHNF, so the knot on whichever operand is read is the cycle. Reading the
+  # first operand (this door) puts the abort on the kind-first order. Reading the second puts it on the
+  # options-first order and refuses the supported module-`config` spelling above. Reading neither
+  # admits a misspelt option silently on a registry nothing reads. What would have to change: an
+  # operand on no knot in either order, which no attrset-valued kind operand can be. Pinned by
+  # `pre-l4-registry-call` in `ci/tests-error.nix`.
   mkInstanceRegistry = prelude.door {
     name = "gen-schema.mkInstanceRegistry";
     optional = [

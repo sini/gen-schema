@@ -584,7 +584,10 @@ let
   # `_file`, so the kind entry can tell a declared parent that was resolved from one nothing read —
   # the nn4 discipline (a declaration key no reader consumes is refused, never discarded) applied to
   # a key whose reader depends on how the tree was built. One derivation, read by both files.
-  inheritsResolvedFile = kind: parent: "<gen-schema evalSchema: kind '${kind}' inherits '${parent}'>";
+  inheritsResolvedFile = kind: parent: "${inheritsResolvedPrefix kind}${parent}'>";
+  # Every parent `evalSchema` resolved for `kind` carries this prefix, so a def is recognised as a
+  # resolved parent from its `file` alone, without reading which parents `kind` declares.
+  inheritsResolvedPrefix = kind: "<gen-schema evalSchema: kind '${kind}' inherits '";
   inheritsDesugaredFile = kind: parent: "<gen-schema: kind '${kind}' inherits '${parent}'>";
 
   # Where a def was written, for a kind's content witness: its first attribute's source position, or
@@ -1819,8 +1822,9 @@ let
                   # options/config from the schema kind entry into their own type systems.
                   let
                     # THE CALLER'S `defs` HAVE A DECLARATION-LEVEL SHAPE (den-hoag-24zdh): the raw defs,
-                    # stripped, then the desugared parents as ONE def, present iff `inherits` is
-                    # non-empty, nesting each parent under its own `_file`. `strippedDefs`' spine is the
+                    # stripped, then the parents as ONE def, present iff `inherits` is non-empty, nesting
+                    # each parent under its own `_file`, whichever of the desugar or `evalSchema`
+                    # composed it (den-hoag-4d2zs). `strippedDefs`' spine is the
                     # parents' classification, and the caller's result is this kind's WHNF, so a caller
                     # reading that spine made each kind on a value cycle consume its partner's WHNF before
                     # any guard ran. Scoped to this arm: the default arm's key set reads no parent, so it
@@ -1834,20 +1838,25 @@ let
                         if declaredRaw == [ ] then
                           strippedDefs
                         else
+                          let
+                            # a parent `evalSchema` resolved arrives as a raw def; it joins the nested
+                            # def, decided by its `file` alone, so the spine reads no classification.
+                            # Any module may set `_file`, so a nested def keeps its whole value.
+                            resolved = d: prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or ""));
+                          in
                           map (
                             d:
                             if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
                               d // { value = builtins.removeAttrs d.value collectionKeys; }
                             else
                               d
-                          ) defs
+                          ) (builtins.filter (d: !(resolved d)) defs)
                           ++ [
                             {
                               file = "<gen-schema: kind '${kind}' inherits>";
-                              value.imports = map (d: {
-                                _file = d.file;
-                                inherit (d.value) imports;
-                              }) desugaredDefs;
+                              value.imports = map (d: d.value // { _file = d.file; }) (
+                                builtins.filter resolved defs ++ desugaredDefs
+                              );
                             }
                           ];
                       inherit kind;

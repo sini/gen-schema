@@ -916,9 +916,11 @@ closed:
   `cross-tree-cycle-refusals.test-a-caller-reading-the-parent-imports-at-its-result-shape-aborts`.
 
   **The caller contract.** A caller `mkType` receives `defs` as the kind's raw defs (collection keys
-  stripped), followed by AT MOST ONE desugared def, present iff the kind's `inherits` is non-empty,
-  whose `value.imports` nest one module per composed parent under its own `_file`. That shape is a
-  function of the declaration alone. Its result shape may read `defs`' spine and length, each def's
+  stripped), followed by AT MOST ONE nested def, present iff the kind's `inherits` is non-empty,
+  whose `value.imports` nest one module per composed parent under its own `_file`, whichever of the
+  desugar or `evalSchema`'s pass composed it. The count and the nesting are a function of the
+  declaration alone; the inner order is the composing resolver's, so under `evalSchema` the parents it
+  resolved by name come before the ones given as a value. Its result shape may read `defs`' spine and length, each def's
   `file`, each def's `value` to WHNF with its key set, and the `inherits` spine; every value cycle is
   then refused by name, as on the default arm (`cross-tree-cycle-refusals`, the `mkType`-arm cells).
   It may not read a parent's identity; the composition reads it, behind the guard.
@@ -1517,7 +1519,7 @@ mkSchemaEntryType {
 
 The return value is merged with `computedFields` (computed wins for same-named keys — except a name in `kindResultKeys`, the kind-value contract `lib/entry-type.nix` reserves and refuses by name on both branches; `computed` may not use one of those at all), so topology and introspection fields remain authoritative.
 
-The kind value always carries the `inherits` and `parent` collections, written over the `mkType` result (a computed field still wins), because `evalSchema` and `_topology` read them off the kind value; a result that publishes no collections still composes its declared parents under `evalSchema`. On a plain tree the declared parents reach the `mkType` result as ONE more of its `defs`, present iff `inherits` is non-empty, whose `imports` nest the import each parent desugars to (the caller contract, [Kind Inheritance](#kind-inheritance)). On a kind the entry refuses (an inheritance cycle, or a declared parent on an entry type built outside a tree; see [Kind Inheritance](#kind-inheritance)), every field the `mkType` result built and its applied `__functor` are read through the same refusal; `kind`, `strict`, `keySemantics`, `inherits` and `parent` stay readable.
+The kind value always carries the `inherits` and `parent` collections, written over the `mkType` result (a computed field still wins), because `evalSchema` and `_topology` read them off the kind value; a result that publishes no collections still composes its declared parents under `evalSchema`. The declared parents reach the `mkType` result as ONE more of its `defs`, present iff `inherits` is non-empty, whose `imports` nest the import each parent desugars to (the caller contract, [Kind Inheritance](#kind-inheritance)). On a kind the entry refuses (an inheritance cycle, or a declared parent on an entry type built outside a tree; see [Kind Inheritance](#kind-inheritance)), every field the `mkType` result built and its applied `__functor` are read through the same refusal; `kind`, `strict`, `keySemantics`, `inherits` and `parent` stay readable.
 
 #### `keySemantics` — opaque per-key category surface
 
@@ -1623,6 +1625,23 @@ mkInstanceRegistry {
 Returns `lib.mkOption` with `type = attrsOf (mkInstanceType ...)` and an `apply` pipeline that runs validators then derive.
 
 `derive` and `deriveEither` are mutually exclusive.
+
+**The kind-first call, `mkInstanceRegistry kindValue { … }`, is refused by name in two of its three
+spellings.** With the kind read through the module's own `config`, gen-merge's declaration guard
+refuses it. With a kind from a closed evaluation, the door refuses it (`'__functor' is not an option of this door`). With the kind read through a `let` knot over the SAME evaluation
+(`eval.config.schema.host`), it aborts uncatchably with `infinite recursion encountered` on every
+evaluator. That abort is an **argued exception**. The option record's WHNF is in the declaration spine
+`eval.config` waits on, and the door can tell a kind from an options set only by reading an operand.
+Whichever operand it reads at that WHNF, a `let` knot on that operand aborts:
+
+- reading the first operand, the door as it is, puts the abort on the kind-first order;
+- reading the second puts it on the options-first order, and also refuses the supported
+  `mkInstanceRegistry { } config.schema.host` spelling by gen-merge's declaration guard;
+- reading neither admits a misspelt option silently on a registry nothing reads.
+
+A refusal would need an operand that is on no knot in either order, and no attrset-valued kind operand
+can be one. The remedy is the options-first order, with the kind from a strictly earlier `evalSchema`
+pass. Pinned by `pre-l4-registry-call` in `ci/tests-error.nix`.
 
 `refs` binds deferred `declarationOf` fields to concrete registries. Three forms:
 
