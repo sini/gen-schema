@@ -1293,5 +1293,39 @@ in
           "site"
         ];
       };
+    # The file test binds to the parent asked about: a one-import def under ROLE's resolver string
+    # may skip `role`, and must leave `site` composing. `x` is the def's own import, kept.
+    test-the-resolver-file-of-one-parent-skips-only-that-parent =
+      let
+        mods = [
+          { options.schema = mkSchemaOption { }; }
+          {
+            config.schema = {
+              site.options.site = str "s0";
+              role.options.role = str "r0";
+              host = {
+                inherits = [
+                  "site"
+                  "role"
+                ];
+                options.addr = str "a";
+              };
+            };
+          }
+          {
+            _file = "<gen-schema evalSchema: kind 'host' inherits 'role'>";
+            config.schema.host.imports = [ { options.x = str "x"; } ];
+          }
+        ];
+      in
+      {
+        expr = builtins.filter (n: n == "site" || n == "x") (
+          optionSet (genMerge.evalModuleTree { } mods).config.schema.host
+        );
+        expected = [
+          "site"
+          "x"
+        ];
+      };
   };
 }
