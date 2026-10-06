@@ -76,7 +76,7 @@ them off it. On a plain `mkSchemaOption` tree a declared `inherits` DESUGARS ont
 `imports = [ config.schema.<p> ]` spelling makes (`den-hoag-8c8pr` Q-a, owner-ruled 2026-09-30): the
 tree hands its own `config` to `mkSchemaEntryTypeIn`, and the desugared def imports
 `inheritedModule`, the one module `evalSchema`'s `injectFor` imports too (`inheritsDesugaredFile`;
-cells `schema-inheritance.test-plain-inherits-*`). The `mkType` caller receives those defs nested
+cells `schema-inheritance.test-plain-inherits-*`). `unresolvedInherits` counts a def's `file` as the resolver's only when the def's value is exactly one import (`resolverShaped`, den-hoag-5n8ey), so a forged `_file` label is inert; the one argued ADR-0025 item 1 exception is a def under the exact string whose value is exactly one import of any module, which skips the parent silently (README, `inherits`; not pinned). The `mkType` caller receives those defs nested
 under ONE def, present iff `inherits` is non-empty, and under `evalSchema` the parents its pass
 resolved join that def by their `file` alone (den-hoag-4d2zs), so its `defs`' shape reads no parent and a value
 cycle on that arm is refused by name (den-hoag-24zdh; cells `cross-tree-cycle-refusals`). An entry type built outside a tree

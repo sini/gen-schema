@@ -942,6 +942,19 @@ closed:
   addresses, so a key that tells twins apart never repeats on a cycle that does not pass through the
   kind read, and a walk with no visited set pays every path through a diamond lattice.
 
+**A def that carries the resolver's `_file` is the resolver's only when its value is exactly one
+import.** `unresolvedInherits` skips a declared parent when some def's `file` is the string
+`evalSchema`'s pass writes for it AND that def's value is `{ imports = [ <one module> ]; }` (exactly one
+`imports` key holding exactly one entry). A def with that `_file` and any other value, such as extra keys,
+two imports or none, is an ordinary def: its own keys compose and the parent is still imported, so the
+label alone does nothing (den-hoag-5n8ey; cells `schema-inheritance.test-a-forged-resolver-file-*`,
+`test-the-resolver-file-with-*` and `test-a-def-under-its-own-file-*`). **One argued exception to "a
+value or a named refusal" remains, not pinned:** a def under the exact string for a declared parent whose
+value is exactly one import, of any module, is taken as the resolver's and the parent is skipped, silently.
+Telling it from the resolver's def needs a value a user module cannot write, and pure Nix has none (data is
+copyable; function identity compares differently per evaluator). It takes a deliberate reconstruction of
+a private string plus the one-import shape, never a mistyped or copied label.
+
 **One declaration applied in several trees.** A helper that declares a kind, applied in two trees with
 the same parent names and the same directly declared option names, gives two kinds one witness: the
 witness is read before composition, and nothing it can read tells them apart (two trees one helper
