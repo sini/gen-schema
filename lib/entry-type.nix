@@ -144,8 +144,9 @@ let
   # evaluator aborts, uncatchably, past `sealedCollisionEq`'s `tryEval`. `records` are the type
   # records this plane's grammar places in `v`; gen-merge's `closuresFirst` decides on their closures
   # first, the subject `constructionRelation` compares by (den-hoag-bfc0k). A member of `records`
-  # that is not a record (`type = "str"`) contributes no closures there. The accessor `__id` is
-  # dropped as `componentsPreimage` drops it from a bare value. The four positions: an option's
+  # that is not a record (`type = "str"`) contributes no closures there. The value is compared whole:
+  # a type record carries no refusal-valued field (the identity demand is gen-types' `idOf`, a
+  # function). The four positions: an option's
   # `type`, the declaration's `freeformType`, a `keySemantics` entry's `option.type`
   # (`keySemanticsRecords`) and a `refs` entry's `type`.
   #
@@ -162,9 +163,7 @@ let
   # (a visited set), which pure Nix does not expose; a bounded finiteness walk closes it at a value
   # move (den-hoag-8owed arm G, owed an owner reading). This enumeration is 8owed's arm (A),
   # defaulted, reversible.
-  comparedTyped =
-    records: v:
-    merge.closuresFirst records (if builtins.isAttrs v && v ? __id then comparisonSubject v else v);
+  comparedTyped = records: v: merge.closuresFirst records v;
 
   planeOf =
     {

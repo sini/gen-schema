@@ -196,7 +196,6 @@ let
           "functor"
           "typeMerge"
           "__mint"
-          "__id"
           "__okAt"
           "__payload"
           "__sealed"
@@ -248,7 +247,7 @@ let
             baseType = baseType;
           };
 
-          # `__mint`, `__id`, `__payload`, `__sealed` and `__okAt` are gen-types' identity fields for
+          # `__mint`, `__payload`, `__sealed` and `__okAt` are gen-types' identity fields for
           # this construction (`identityFields` above), so a reader dispatches on the TAG and `typeEq`
           # decides over the mark and the sealed subjects, as for every gen-types type.
 
