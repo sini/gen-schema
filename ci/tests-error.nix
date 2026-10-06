@@ -1633,16 +1633,16 @@ in
       };
     };
 
-    # A refined type over a PARAMETRIC base names a SECOND sealed component: every structural type
-    # gen-merge ships carries no `__mint` key at all, so the base enters sealed (`members.0`) beside
-    # the refinement's check.
-    test-id-of-a-refined-parametric-type-names-the-missing-mint = {
+    # A refined type over a PARAMETRIC base names the check alone: gen-merge's structural types mint
+    # per component, so the base is a component of the mark and not a sealed one (before it minted,
+    # the base entered sealed as `members.0` beside the check).
+    test-id-of-a-refined-parametric-type-names-only-the-check = {
       expr =
         (genSchema.refined (genMerge.types.listOf genMerge.types.str) [ genSchema.refinements.nonEmpty ])
         .__id;
       expectedError = {
         type = "ThrownError";
-        msg = "^identity: type 'refined<listOf>' has sealed component\\(s\\) 'members[.]0', 'refinements[.]0' .*has no identity to demand$";
+        msg = "^identity: type 'refined<listOf>' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
       };
     };
 
@@ -2759,7 +2759,9 @@ in
               }
             ]).config.schema.host;
         in
-        builtins.deepSeq (genSchema.mkInstanceType { } kind) null;
+        # `__id` is left out: a submodule type now mints with its modules sealed, so a deep force meets
+        # the identity demand's refusal (`modules.0` has no identity to demand) before `whenEmpty`.
+        builtins.deepSeq (removeAttrs (genSchema.mkInstanceType { } kind) [ "__id" ]) null;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-merge: `submodule': its called `whenEmpty' does not evaluate the nested tree: a nested tree is a child of the one evaluation that holds it [(]`evalModuleTree'[)], read through its fold's threaded sibling, and no second evaluation is made for it$";
