@@ -1054,5 +1054,68 @@ in
             stagedWithImports = withImported;
           };
       };
+    # The same def may carry a COLLECTION key. The nested def's inner wrapper keeps the def's value
+    # but not the collection keys, which `strippedDefs` removes from every other def, so the
+    # caller's module never reads `inherits` (gen-merge refuses it as an unsupported attribute).
+    test-a-def-carrying-the-resolved-prefix-and-a-collection-key-composes-on-both-paths =
+      let
+        callerOpt = mkSchemaOption {
+          mkType =
+            { defs, kind, ... }:
+            {
+              __functor = _: _: { imports = map (d: d.value) defs; };
+              inherit kind;
+            };
+        };
+        decl = [
+          {
+            config.schema = {
+              site.options.site = str "s0";
+              role.options.role = str "r0";
+              host = {
+                inherits = [ "site" ];
+                options.addr = str "a";
+              };
+            };
+          }
+          {
+            _file = "<gen-schema evalSchema: kind 'host' inherits 'zz'>";
+            config.schema.host = {
+              options.forged = str "f";
+              inherits = [ "role" ];
+            };
+          }
+        ];
+        bare = (genMerge.evalModuleTree { } ([ { options.schema = callerOpt; } ] ++ decl)).config.schema;
+        staged = evalSchema { schemaOption = callerOpt; } decl;
+      in
+      {
+        expr = {
+          bare = optionSet bare.host;
+          staged = optionSet staged.host;
+        };
+        expected = {
+          bare = [
+            "_identity"
+            "_identityKeys"
+            "addr"
+            "forged"
+            "id_hash"
+            "name"
+            "role"
+            "site"
+          ];
+          staged = [
+            "_identity"
+            "_identityKeys"
+            "addr"
+            "forged"
+            "id_hash"
+            "name"
+            "role"
+            "site"
+          ];
+        };
+      };
   };
 }

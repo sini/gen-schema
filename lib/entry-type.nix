@@ -1841,7 +1841,7 @@ let
                           let
                             # a parent `evalSchema` resolved arrives as a raw def; it joins the nested
                             # def, decided by its `file` alone, so the spine reads no classification.
-                            # Any module may set `_file`, so a nested def keeps its whole value.
+                            # Any module may set `_file`, so a nested def keeps its value less the collection keys.
                             resolved = d: prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or ""));
                           in
                           map (
@@ -1854,7 +1854,7 @@ let
                           ++ [
                             {
                               file = "<gen-schema: kind '${kind}' inherits>";
-                              value.imports = map (d: d.value // { _file = d.file; }) (
+                              value.imports = map (d: builtins.removeAttrs d.value collectionKeys // { _file = d.file; }) (
                                 builtins.filter resolved defs ++ desugaredDefs
                               );
                             }
