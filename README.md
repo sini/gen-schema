@@ -947,7 +947,7 @@ import.** `unresolvedInherits` skips a declared parent when some def's `file` is
 `evalSchema`'s pass writes for it AND that def's value is `{ imports = [ <one module> ]; }` (exactly one
 `imports` key holding exactly one entry). A def with that `_file` and any other value, such as extra keys,
 two imports or none, is an ordinary def: its own keys compose and the parent is still imported, so the
-label alone does nothing (den-hoag-5n8ey; cells `schema-inheritance.test-a-forged-resolver-file-*`,
+label alone does nothing (cells `schema-inheritance.test-a-forged-resolver-file-*`,
 `test-the-resolver-file-with-*` and `test-a-def-under-its-own-file-*`). **One argued exception to "a
 value or a named refusal" remains, not pinned:** a def under the exact string for a declared parent whose
 value is exactly one import, of any module, is taken as the resolver's and the parent is skipped, silently.
