@@ -1631,7 +1631,7 @@ in
       expr = genTypes.idOf (genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ]);
       expectedError = {
         type = "ThrownError";
-        msg = "^identity: type 'int' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
+        msg = "^gen-types: idOf: type 'refined<int>' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
       };
     };
 
@@ -1644,7 +1644,7 @@ in
       );
       expectedError = {
         type = "ThrownError";
-        msg = "^identity: type 'listOf' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
+        msg = "^gen-types: idOf: type 'refined<listOf>' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
       };
     };
 
@@ -1699,7 +1699,7 @@ in
         genTypes.idOf (chain 1500);
       expectedError = {
         type = "ThrownError";
-        msg = "^identity: type '.*' has no identity to demand: a type nests deeper than the type-identity depth bound \\(128 levels\\); a self-referential type has no identity$";
+        msg = "^gen-types: idOf: type '.*' has no identity to demand: a type nests deeper than the type-identity depth bound \\(128 levels\\); a self-referential type has no identity$";
       };
     };
   };
