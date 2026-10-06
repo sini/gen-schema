@@ -2,9 +2,9 @@
 # invisible.
 #
 # THE CLASS. `mkRefinedType` derives its result from the base, and what it does not overwrite arrives
-# from the base verbatim. Two things arrived that way: the base's `__mint`/`__id`, so two DIFFERENT
-# refinements of one base shared an identity with each other AND with the bare base while the `__id`
-# demand still ANSWERED; and the merge decision, taken on `functor.name` alone, which carries only
+# from the base verbatim. Two things arrived that way: the base's identity fields, so two DIFFERENT
+# refinements of one base shared an identity with each other AND with the bare base while the
+# identity demand still ANSWERED; and the merge decision, taken on `functor.name` alone, which carries only
 # the base — so one option declared once as `refined int tcpPort` and once as `refined int positive`
 # MERGED, with one refinement silently dropped and the value it forbade then accepted.
 #
@@ -12,7 +12,7 @@
 # migrated, or "that component's collapse is replaced by a refusal rather than by a structural
 # identity". A silently-collapsing identity that answers is neither, which is what these cells pin.
 #
-# ★ THE `.success` ARM IS WHY THIS IS NOT AN "IT ANSWERED" CELL. Reading `a.__id != b.__id` would
+# ★ THE `.success` ARM IS WHY THIS IS NOT AN "IT ANSWERED" CELL. Reading `idOf a != idOf b` would
 # pass today for the wrong reason the moment the mint changed shape, and would also pass a refusal.
 # Asserting `.success == false` TOGETHER WITH `__mint ? unmintable` pins the REGIME rather than the
 # answer — "the ids differ" is a different and weaker claim than "the comparison refuses".
@@ -100,9 +100,9 @@ in
           # its own mark, beside the refinement's `check` as a sealed component (U1.5)
           ownMark = a.__mint.minted != t.int.__mint.minted;
           sealedComponents = builtins.attrNames a.__sealed;
-          idDemandAnswers = answers a.__id;
-          twoRefinementsCompare = answers (a.__id == b.__id);
-          refinementVsBaseCompares = answers (a.__id == t.int.__id);
+          idDemandAnswers = answers (genTypes.idOf a);
+          twoRefinementsCompare = answers (genTypes.idOf a == genTypes.idOf b);
+          refinementVsBaseCompares = answers (genTypes.idOf a == genTypes.idOf t.int);
         };
       expected = {
         ownMark = true;
@@ -129,10 +129,30 @@ in
       };
     };
 
+    # den-hoag-6orb8 A1: a refined type's record carries no `__id` field, so `deepSeq` of one over a
+    # caller lambda is total (it threw while the field was the refusal), and the demand is `idOf`.
+    # Reds on a refined record that carries the retired field again.
+    test-a-refined-record-is-total-under-deepSeq =
+      let
+        port = refined t.int [ refinements.tcpPort ];
+      in
+      {
+        expr = {
+          carriesNoId = !(port ? __id);
+          deepForces = (builtins.tryEval (builtins.deepSeq port true)).success;
+          demandRefuses = answers (genTypes.idOf port);
+        };
+        expected = {
+          carriesNoId = true;
+          deepForces = true;
+          demandRefuses = false;
+        };
+      };
+
     # ── O1's live controls: the mint is not dead, and `unmintable` is ATTRIBUTABLE ─────────────
-    # An INERT refinement set — no `check`, so no lambda — MINTS over a nullary base and its `__id`
-    # ANSWERS, and two inert sets SEPARATE. The same inert set over a PARAMETRIC base also mints and
-    # answers an `__id` demand, because gen-merge's composite base is minted: with no lambda there is
+    # An INERT refinement set — no `check`, so no lambda — MINTS over a nullary base and its identity
+    # demand ANSWERS, and two inert sets SEPARATE. The same inert set over a PARAMETRIC base also mints
+    # and answers an identity demand, because gen-merge's composite base is minted: with no lambda there is
     # no sealed component, so the refusal in the cells above is attributable to the predicate alone.
     # Without these, every row above is satisfied by a constructor that refuses everything.
     test-control-an-inert-refinement-still-mints-and-separates = {
@@ -143,10 +163,10 @@ in
         in
         {
           mints = regime one;
-          idAnswers = answers one.__id;
-          separates = one.__id != two.__id;
+          idAnswers = answers (genTypes.idOf one);
+          separates = genTypes.idOf one != genTypes.idOf two;
           overParametricBase = regime (refined L [ { message = "inert"; } ]);
-          overParametricBaseId = answers (refined L [ { message = "inert"; } ]).__id;
+          overParametricBaseId = answers (genTypes.idOf (refined L [ { message = "inert"; } ]));
         };
       expected = {
         mints = "minted";
@@ -579,7 +599,7 @@ in
           selfCycle = regime sself;
           chain100 = regime (chain 100);
           chain1500 = regime (chain 1500);
-          chain1500Answers = answers (chain 1500).__id;
+          chain1500Answers = answers (genTypes.idOf (chain 1500));
           flat = regime (
             refined (genTypes.union [
               genTypes.int

@@ -22,6 +22,7 @@
   genAlgebra,
   genIdentity,
   genGraph,
+  genTypes,
   prelude,
   ...
 }:
@@ -1621,15 +1622,16 @@ in
   # A refined type's identity refusals, and the merge refusal's wording. All three are here for this
   # file's own reason: `tryEval` discards the message, and WHICH refusal fired is the subject.
   flake.testsError.refined-identity-refusals = {
-    # Demanding `__id` of a refined type over a NULLARY base reaches gen-types' refusal for a type
+    # Demanding the identity (gen-types `idOf`) of a refined type over a NULLARY base reaches gen-types' refusal for a type
     # with a SEALED component — the refinement's `check` is a caller lambda, carried in `__sealed`
     # beside the mark. The identity is gen-types' construction (`mkIdentity`), so this message is
-    # that library's and not a paraphrase this one keeps in step by hand.
+    # that library's and not a paraphrase this one keeps in step by hand. `idOf` names the record by
+    # its own `name`, which a refined type keeps from its base.
     test-id-of-a-refined-type-refuses-by-name = {
-      expr = (genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ]).__id;
+      expr = genTypes.idOf (genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ]);
       expectedError = {
         type = "ThrownError";
-        msg = "^identity: type 'refined<int>' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
+        msg = "^identity: type 'int' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
       };
     };
 
@@ -1637,12 +1639,12 @@ in
     # per component, so the base is a component of the mark and not a sealed one (before it minted,
     # the base entered sealed as `members.0` beside the check).
     test-id-of-a-refined-parametric-type-names-only-the-check = {
-      expr =
-        (genSchema.refined (genMerge.types.listOf genMerge.types.str) [ genSchema.refinements.nonEmpty ])
-        .__id;
+      expr = genTypes.idOf (
+        genSchema.refined (genMerge.types.listOf genMerge.types.str) [ genSchema.refinements.nonEmpty ]
+      );
       expectedError = {
         type = "ThrownError";
-        msg = "^identity: type 'refined<listOf>' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
+        msg = "^identity: type 'listOf' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
       };
     };
 
@@ -1694,10 +1696,10 @@ in
             n:
             if n == 0 then genSchema.refined genMerge.types.int [ ] else genSchema.refined (chain (n - 1)) [ ];
         in
-        (chain 1500).__id;
+        genTypes.idOf (chain 1500);
       expectedError = {
         type = "ThrownError";
-        msg = "^identity: a type nests deeper than the type-identity depth bound \\(128 levels\\); a self-referential type has no identity$";
+        msg = "^identity: type '.*' has no identity to demand: a type nests deeper than the type-identity depth bound \\(128 levels\\); a self-referential type has no identity$";
       };
     };
   };
@@ -2759,9 +2761,9 @@ in
               }
             ]).config.schema.host;
         in
-        # `__id` is left out: a submodule type now mints with its modules sealed, so a deep force meets
-        # the identity demand's refusal (`modules.0` has no identity to demand) before `whenEmpty`.
-        builtins.deepSeq (removeAttrs (genSchema.mkInstanceType { } kind) [ "__id" ]) null;
+        # the record is deep-forced whole: a submodule type mints with its modules sealed, and no field
+        # of it refuses an identity demand (gen-types `idOf` is the demand), so `whenEmpty` is reached.
+        builtins.deepSeq (genSchema.mkInstanceType { } kind) null;
       expectedError = {
         type = "ThrownError";
         msg = "^gen-merge: `submodule': its called `whenEmpty' does not evaluate the nested tree: a nested tree is a child of the one evaluation that holds it [(]`evalModuleTree'[)], read through its fold's threaded sibling, and no second evaluation is made for it$";
