@@ -7,6 +7,7 @@
 # builds its own modules is pinned as the boundary. A door that refused every top-level key, or every
 # instance field named like a formal, reds the controls here.
 {
+  lib,
   genSchema,
   genMerge,
   prelude,
@@ -124,6 +125,48 @@ in
       expr = refuses (kindOf { } { imports = [ { keySemantics = "x"; } ]; }).__mint.minted;
       expected = true;
     };
+
+    # ★ THE KIND VALUE MOUNTS IN NIXPKGS (den-hoag-r05lc). The entry reservation rides on a functor
+    # record nixpkgs never reads, so a nixpkgs `lib.evalModules` importing the kind value serves an
+    # attrset entry carrying `options` (a content-level marker is an unsupported attribute there) and
+    # a function entry (where it landed as a `__reservedKeys` key on an open freeform), each as the
+    # same definitions mounted raw.
+    test-kind-value-mounts-in-nixpkgs =
+      let
+        port = lib.mkOption {
+          type = lib.types.int;
+          default = 1;
+        };
+        mount =
+          m:
+          (lib.evalModules {
+            modules = [
+              {
+                options.h = lib.mkOption {
+                  type = lib.types.submodule {
+                    imports = [ m ];
+                    freeformType = lib.types.lazyAttrsOf lib.types.anything;
+                  };
+                  default = { };
+                };
+              }
+            ];
+          }).config.h;
+        attrsDef = {
+          options.port = port;
+        };
+        functionDef = { lib, ... }: { };
+      in
+      {
+        expr = {
+          attrs = mount (kindOf { } attrsDef);
+          function = mount (kindOf { } functionDef);
+        };
+        expected = {
+          attrs = mount attrsDef;
+          function = mount functionDef;
+        };
+      };
 
     # ★ THE BOUNDARY PIN for a CUSTOM `mkType` that builds instance modules from `defs` without
     # applying `entryReservation`: gen-schema cannot reach a module a caller-supplied function
