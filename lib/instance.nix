@@ -657,7 +657,7 @@ let
       # binding, a `deriveEither` left under the default `onError`, and a throwing `derive`.
       # ★ THE OBLIGATION ON EVERY FUTURE STAGE: preserve the name set. A stage that DROPS a name
       # turns that element's read into an `attribute '…' missing` that `tryEval` does not catch;
-      # a stage that ADDS one is dropped here silently, as it was before.
+      # a stage that ADDS one is dropped here silently.
       apply =
         instances:
         let
