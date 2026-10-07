@@ -182,20 +182,20 @@ let
   # Returns the target kind name string, or null if not a ref type.
   # Recurse through nullOr/listOf wrappers to find the leaf refKind.
   #
-  # A gen record's element is read off `carries.element`, gen-merge's own statement of what it wraps,
-  # never off `nestedTypes` (den-hoag-dqw5z). On a gen submodule that alias joins `unroledNested`, the
-  # freeform type of its own module set evaluated, and gen-merge's rule (den-hoag-a0c4z,
-  # lib/interface.nix) is that no walk reads such a field: the instance's completion stamp compares
-  # `refs` at first import, so a module set reading back into the registry being built would diverge
-  # here. A foreign record states its element only in the alias, which is read as before.
+  # The element is read through gen-merge's `importedCarried`, its one reader of what a type wraps in
+  # either vocabulary: a gen record's `carries`, a foreign record's carrying spellings. A submodule's
+  # `nestedTypes`, gen (dqw5z) or nixpkgs (gi421), is the freeform type of its own module set
+  # evaluated, and gen-merge's rule (den-hoag-a0c4z, lib/interface.nix) is that no walk reads such a
+  # field: the instance's completion stamp compares `refs` at first import, so a module set reading
+  # back into the registry being built would diverge here. The reader answers a submodule with its
+  # module set and no element, without the evaluation, so the walk stops there.
   getRefKind =
     type:
     if (type.refKind or null) != null then
       type.refKind
     else
       let
-        et =
-          if type ? carries then type.carries.element or null else (type.nestedTypes or { }).elemType or null;
+        et = merge.importedCarried "element" type;
       in
       if et != null then getRefKind et else null;
 
