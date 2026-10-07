@@ -3140,6 +3140,33 @@ in
           msg = publishedMsg "refs" "/[^']*/test-fixtures/imports-route-refs[.]nix";
         };
       };
+      # Over a gen-merge that does not read a functor module's record, the reservation would be dropped
+      # silently; the kind refuses by name, naming the protocol it requires (den-hoag-r05lc).
+      test-gen-merge-without-the-record-carrier-refused-by-name =
+        let
+          withoutRecord = genMerge // {
+            moduleSyntax = removeAttrs genMerge.moduleSyntax [ "functorRecord" ];
+          };
+          oldSchema = import ../lib {
+            inherit prelude;
+            graph = genGraph;
+            merge = withoutRecord;
+            algebra = genAlgebra;
+            identity = genIdentity;
+          };
+        in
+        {
+          expr =
+            assert controls;
+            (genMerge.evalModuleTree { } [
+              { options.schema = oldSchema.mkSchemaOption { }; }
+              { config.schema.host.options.role = strOpt; }
+            ]).config.schema.host.__mint.minted;
+          expectedError = {
+            type = "ThrownError";
+            msg = "^gen-schema: kind 'host' reserves its construction formals in every module its entry imports, on the record of the module it wraps each definition in \\(`__reservedKeys'\\), and the gen-merge it is evaluated with does not read that record \\(its `moduleSyntax\\.functorRecord' does not list `__reservedKeys'\\)\\. gen-schema requires a gen-merge reading the reservation off a functor module's record; .*$";
+          };
+        };
       # A FUNCTION entry def importing a formal: the def is wrapped (an applied function's result
       # would drop an in-place marker). This is the default branch's twin of gen-aspects' functor-def
       # cell: a functor def is refused at the entry on this branch (`__functor` is reserved there).

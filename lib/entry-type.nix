@@ -708,6 +708,11 @@ let
   # every kind that composes a parent would be refused as an undeclared option, so the pairing is
   # refused by name instead, once, where the key is written.
   mergeReadsKeyEq = builtins.elem "__keyEq" merge.moduleSyntax.structured;
+  # The entry reservation rides on a functor's record (den-hoag-r05lc), which only a gen-merge
+  # publishing it in `moduleSyntax.functorRecord` reads; any other would drop it silently.
+  mergeReadsRecordReservation = builtins.elem "__reservedKeys" (
+    merge.moduleSyntax.functorRecord or [ ]
+  );
 
   # ★ THE NAMES `mkSchemaEntryType` WRITES ONTO THE KIND VALUE, each with the writer that earns
   # it. RESTATED because this is gen-schema's OWN contract, not gen-merge's: the record is built
@@ -2028,10 +2033,12 @@ let
 
                     # The defs `merged` imports carry `entryReservation` (den-hoag-8x97u), so a
                     # reserved name in a module they import refuses at gen-merge's collector. The
-                    # marker rides IN PLACE on a plain attrset def, which adds no collected entry; a
-                    # function, functor or path def is wrapped, because an applied functor's result
-                    # would drop an in-place key. The plane's `modules` stay the unmarked
-                    # `strippedDefs`, so no kind's mark moves.
+                    # marker rides on the RECORD of a functor wrapping each def, never in a module's
+                    # content (den-hoag-r05lc): the kind value is a module a foreign evaluator also
+                    # imports, and nixpkgs applies the functor and reads only its result. A plain
+                    # attrset def is that result itself, so its own top level stays this library's
+                    # door; a function, functor or path def is imported by it. The plane's `modules`
+                    # stay the unmarked `strippedDefs`, so no kind's mark moves.
                     reservation = entryReservation kind;
                     merged = resolvedOnly (
                       base.merge loc (
@@ -2039,14 +2046,17 @@ let
                           d:
                           d
                           // {
-                            value =
-                              if builtins.isAttrs d.value && !(d.value ? __functor) then
-                                d.value // { __reservedKeys = reservation; }
-                              else
-                                {
-                                  __reservedKeys = reservation;
-                                  imports = [ d.value ];
-                                };
+                            value = {
+                              __reservedKeys = reservation;
+                              __functor =
+                                _: _:
+                                if !mergeReadsRecordReservation then
+                                  throw "gen-schema: kind '${kind}' reserves its construction formals in every module its entry imports, on the record of the module it wraps each definition in (`__reservedKeys'), and the gen-merge it is evaluated with does not read that record (its `moduleSyntax.functorRecord' does not list `__reservedKeys'). gen-schema requires a gen-merge reading the reservation off a functor module's record; update the gen-merge input gen-schema is built with."
+                                else if builtins.isAttrs d.value && !(d.value ? __functor) then
+                                  d.value
+                                else
+                                  { imports = [ d.value ]; };
+                            };
                           }
                         ) strippedDefs
                         ++ injected
