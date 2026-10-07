@@ -35,7 +35,10 @@ let
       algebra = import "${algebraSrc}/lib";
     };
     memo = import memoSrc { inherit prelude graph; };
-    scope = import scopeSrc { inherit prelude graph identity; };
+    scope = import scopeSrc {
+      inherit prelude graph identity;
+      algebra = import "${algebraSrc}/lib";
+    };
   };
   S = import libSrc {
     inherit prelude merge graph;
