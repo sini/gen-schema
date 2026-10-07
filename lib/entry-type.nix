@@ -2033,31 +2033,41 @@ let
 
                     # The defs `merged` imports carry `entryReservation` (den-hoag-8x97u), so a
                     # reserved name in a module they import refuses at gen-merge's collector. The
-                    # marker rides on the RECORD of a functor wrapping each def, never in a module's
+                    # marker rides on the RECORD of a functor wrapping the def, never in a module's
                     # content (den-hoag-r05lc): the kind value is a module a foreign evaluator also
                     # imports, and nixpkgs applies the functor and reads only its result. A plain
                     # attrset def is that result itself, so its own top level stays this library's
-                    # door; a function, functor or path def is imported by it. The plane's `modules`
-                    # stay the unmarked `strippedDefs`, so no kind's mark moves.
+                    # door; a function, functor or path def is imported by it. A plain attrset def
+                    # naming no `imports` or `require` imports nothing, so the reservation has nothing
+                    # to scope and it is passed as it stands: the wrapper is applied once per
+                    # instance, and only where it has work. The plane's `modules` stay the unmarked
+                    # `strippedDefs`, so no kind's mark moves.
                     reservation = entryReservation kind;
                     merged = resolvedOnly (
                       base.merge loc (
                         map (
                           d:
-                          d
-                          // {
-                            value = {
-                              __reservedKeys = reservation;
-                              __functor =
-                                _: _:
-                                if !mergeReadsRecordReservation then
-                                  throw "gen-schema: kind '${kind}' reserves its construction formals in every module its entry imports, on the record of the module it wraps each definition in (`__reservedKeys'), and the gen-merge it is evaluated with does not read that record (its `moduleSyntax.functorRecord' does not list `__reservedKeys'). gen-schema requires a gen-merge reading the reservation off a functor module's record; update the gen-merge input gen-schema is built with."
-                                else if builtins.isAttrs d.value && !(d.value ? __functor) then
-                                  d.value
-                                else
-                                  { imports = [ d.value ]; };
-                            };
-                          }
+                          let
+                            plain = builtins.isAttrs d.value && !(d.value ? __functor);
+                          in
+                          if plain && !(d.value ? imports || d.value ? require) then
+                            d
+                          else
+                            d
+                            // {
+                              value = {
+                                __reservedKeys = reservation;
+                                __functionArgs = { };
+                                __functor =
+                                  _: _:
+                                  if !mergeReadsRecordReservation then
+                                    throw "gen-schema: kind '${kind}' reserves its construction formals in every module its entry imports, on the record of the module it wraps each definition in (`__reservedKeys'), and the gen-merge it is evaluated with does not read that record (its `moduleSyntax.functorRecord' does not list `__reservedKeys'). gen-schema requires a gen-merge reading the reservation off a functor module's record; update the gen-merge input gen-schema is built with."
+                                  else if plain then
+                                    d.value
+                                  else
+                                    { imports = [ d.value ]; };
+                              };
+                            }
                         ) strippedDefs
                         ++ injected
                       )

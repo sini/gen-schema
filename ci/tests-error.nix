@@ -3141,7 +3141,8 @@ in
         };
       };
       # Over a gen-merge that does not read a functor module's record, the reservation would be dropped
-      # silently; the kind refuses by name, naming the protocol it requires (den-hoag-r05lc).
+      # silently; a kind whose entry imports a module refuses by name, naming the protocol it requires
+      # (den-hoag-r05lc).
       test-gen-merge-without-the-record-carrier-refused-by-name =
         let
           withoutRecord = genMerge // {
@@ -3160,7 +3161,12 @@ in
             assert controls;
             (genMerge.evalModuleTree { } [
               { options.schema = oldSchema.mkSchemaOption { }; }
-              { config.schema.host.options.role = strOpt; }
+              {
+                config.schema.host = {
+                  options.role = strOpt;
+                  imports = [ { options.priority = strOpt; } ];
+                };
+              }
             ]).config.schema.host.__mint.minted;
           expectedError = {
             type = "ThrownError";
