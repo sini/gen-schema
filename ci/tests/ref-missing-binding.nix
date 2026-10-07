@@ -38,8 +38,8 @@ let
             }
           ];
         in
-        # Force evaluation of the service registry to trigger ref scanning
-        builtins.attrNames eval.config.services
+        # Read an instance to trigger ref scanning: the name set is the definitions' (den-hoag-2vo1m)
+        builtins.seq eval.config.services.nginx true
       );
     in
     !result.success;

@@ -38,7 +38,7 @@ let
             }
           ];
         in
-        builtins.attrNames eval.config.services
+        builtins.seq eval.config.services.nginx true
       );
     in
     !result.success;

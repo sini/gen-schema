@@ -4117,4 +4117,93 @@ in
         };
       };
     };
+
+  # den-hoag-2vo1m: THE KNOB, shape 3. An instance VALUE decides its own kind
+  # (`config.reg.h1.addr == …`), on the registry and on its `mkInstanceType` sibling alike. ★ ENUMERATED,
+  # NOT CLOSED (ADR-0025 item 1): the instance's value exists only once its element has imported the
+  # kind, so the kind's definition re-enters a value under construction. It is the module fixpoint's
+  # own value cycle (`config.a = config.b; config.b = config.a` aborts the same way in gen-merge with no
+  # gen-schema in it), the price ADR-0008 §3 records for every non-`circular` attribute cycle; the
+  # route that would close it is a named re-entry guard on that value, which no check gen-schema can
+  # run first supplies. Shapes 1 and 2 compose: `tests/instance-knob.nix`.
+  flake.testsError.knob-instance-value-decides-its-kind =
+    let
+      M = genMerge;
+      kindDecl = {
+        options.schema = mkSchemaOption { };
+        config.schema.host.options.addr = M.mkOption { type = M.types.str; };
+      };
+      inst.config.reg.h1.addr = "10.0.0.1";
+      byValue =
+        { config, ... }:
+        {
+          config.schema.host =
+            if config.reg.h1.addr == "10.0.0.1" then
+              {
+                options.extra = M.mkOption {
+                  type = M.types.str;
+                  default = "x";
+                };
+              }
+            else
+              { };
+        };
+      aborts = {
+        type = "EvalError";
+        msg = "infinite recursion encountered";
+      };
+    in
+    {
+      test-on-the-registry-aborts = {
+        expr =
+          builtins.attrNames
+            (M.evalModuleTree { } [
+              kindDecl
+              ({ config, ... }: { options.reg = mkInstanceRegistry { } config.schema.host; })
+              inst
+              byValue
+            ]).config.reg.h1;
+        expectedError = aborts;
+      };
+      test-on-the-sibling-aborts = {
+        expr =
+          builtins.attrNames
+            (M.evalModuleTree { } [
+              kindDecl
+              (
+                { config, ... }:
+                {
+                  options.reg = M.mkOption {
+                    type = M.types.attrsOf (genSchema.mkInstanceType { } config.schema.host);
+                    default = { };
+                  };
+                }
+              )
+              inst
+              byValue
+            ]).config.reg.h1;
+        expectedError = aborts;
+      };
+    };
+
+  # den-hoag-2vo1m: a registry-level refusal fires at the first ELEMENT read, by name; the name set is
+  # the definitions' and answers without it (`derive-either-left.test-the-name-set-is-the-definitions`).
+  # Here the derive failure: a `deriveEither` left under the default `onError`.
+  flake.testsError.derive-left-refuses-at-the-element-read = {
+    test-the-element-read-names-the-left = {
+      expr =
+        (genMerge.evalModuleTree { } [
+          {
+            options.hosts = mkInstanceRegistry {
+              deriveEither.derive = _: { left = "planted derive left"; };
+            } (kindOf { } { options.addr = genMerge.mkOption { type = genMerge.types.str; }; });
+            config.hosts.h1.addr = "10.0.0.1";
+          }
+        ]).config.hosts.h1.addr;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: unexpected validation error: \"planted derive left\"$";
+      };
+    };
+  };
 }

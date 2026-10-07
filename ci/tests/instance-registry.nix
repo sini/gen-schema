@@ -61,16 +61,23 @@ in
 
     # den-hoag-fvxh: applyPipeline's guard. Beside the well-formed self-referential registry
     # above (test-registry-keys et al., resolved through evalModuleTree, unaffected by the fix),
-    # a bogus kind value now throws as soon as the registry is actually read through the module
-    # system -- the class that used to fall through to whatever refValidation/coercion produced
+    # a bogus kind value now throws as soon as an instance of the registry is read through the
+    # module system (den-hoag-2vo1m: a name-set read answers the definitions' names and refuses
+    # nothing) -- the class that used to fall through to whatever refValidation/coercion produced
     # without ever checking kind-shape.
     test-control-self-referential-registry-still-resolves = {
       expr = (builtins.tryEval eval.config.hosts.igloo.addr).success;
       expected = true;
     };
+    # den-hoag-2vo1m: the guard fires at the first ELEMENT read; the name set is the definitions',
+    # as the `mkInstanceType` sibling's is, so it reads no kind.
     test-bogus-kind-apply-throws = {
-      expr = (builtins.tryEval (bogusRegistry.apply { a = { }; })).success;
+      expr = (builtins.tryEval (bogusRegistry.apply { a = { }; }).a).success;
       expected = false;
+    };
+    test-bogus-kind-name-set-is-the-definitions = {
+      expr = builtins.attrNames (bogusRegistry.apply { a = { }; });
+      expected = [ "a" ];
     };
 
     # den-hoag-cxlc0: the registry crossing is SUPPORTED. Both spellings of reading the kind off the

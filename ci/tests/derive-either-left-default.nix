@@ -32,5 +32,11 @@ in
         .success;
       expected = false;
     };
+    # den-hoag-2vo1m: the derive failure is refused at the ELEMENT read above; the name set is the
+    # definitions', so a name read answers it without running `derive`.
+    test-the-name-set-is-the-definitions = {
+      expr = builtins.attrNames eval.config.hosts;
+      expected = [ "igloo" ];
+    };
   };
 }

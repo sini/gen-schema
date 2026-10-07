@@ -639,7 +639,8 @@ let
       # that bypasses `apply` forces the thunk, so it refuses by name on a non-kind, where it once
       # returned `{ }` (den-hoag-cxlc0). A registry nothing reads costs nothing new, and a registry
       # over a genuine kind still defaults to `{ }`. Every other in-contract read goes through
-      # `apply` (below), which carries the unconditional guard.
+      # `apply` (below): a name-set read there answers the definitions' names and reads no kind, and
+      # an element read carries the unconditional guard.
       default = builtins.seq kind { };
       type = merge.types.attrsOf (
         mkInstanceTypeCore kindValue {
@@ -647,7 +648,22 @@ let
           inherit strict specialArgs;
         }
       );
-      apply = applyPipeline;
+      # ★ THE NAME SET IS THE DEFINITIONS', as the `mkInstanceType` sibling's is (den-hoag-2vo1m).
+      # Every stage of the pipeline maps over `instances` and adds or drops no name, so its output's
+      # key set is stated here as the input's rather than read off the pipeline, which reads the kind.
+      # A kind decided by the registry's own names (`config.reg ? h1`) therefore composes; every
+      # registry-level check still runs, at the first ELEMENT read, where the sibling refuses too.
+      # Five refusals fire there and not at a name read: the kind guard, a missing and an extra ref
+      # binding, a `deriveEither` left under the default `onError`, and a throwing `derive`.
+      # ★ THE OBLIGATION ON EVERY FUTURE STAGE: preserve the name set. A stage that DROPS a name
+      # turns that element's read into an `attribute '…' missing` that `tryEval` does not catch;
+      # a stage that ADDS one is dropped here silently, as it was before.
+      apply =
+        instances:
+        let
+          out = applyPipeline instances;
+        in
+        prelude.mapAttrs (name: _: out.${name}) instances;
     };
 in
 {

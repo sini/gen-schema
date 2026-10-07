@@ -433,8 +433,9 @@ in
     # guard was added to it and none can be (§2.4); the cell exists to show it still refuses.
     test-c7-existing-guard-still-refuses = {
       expr =
-        (builtins.tryEval ((mkInstanceRegistry { description = "d"; } { no = "kind"; }).apply { a = { }; }))
-        .success;
+        (builtins.tryEval
+          ((mkInstanceRegistry { description = "d"; } { no = "kind"; }).apply { a = { }; }).a
+        ).success;
       expected = false;
     };
 

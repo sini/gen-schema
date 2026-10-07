@@ -901,10 +901,10 @@ is decided before any mark is read, because that entry's mark is the declaring k
 computed. The kind's own name is tested by the name, never by forcing the kind, and the descendant by
 the cycle walk, which reads witnesses only to route the value: the verdict stays with the cycle walk and
 the stamp. A kind on an inheritance cycle classifies no parent: the cycle walk's verdict is read before
-any stamp or mark, because a cycle member's stamp read would re-enter the cycle. Two cases are
+any stamp or mark, because a cycle member's stamp read would re-enter the cycle. Three cases are
 exceptions to "a value or a named refusal", enumerated and pinned (`ci/tests-error.nix`,
-`inherits-value-entry-refusals`, `cross-tree-cycle-refusals` and `witness-collision-refusals`), not
-closed:
+`inherits-value-entry-refusals`, `cross-tree-cycle-refusals`, `witness-collision-refusals` and
+`knob-instance-value-decides-its-kind`), not closed:
 
 - **A caller `mkType` whose result SHAPE reads what a parent IS** (the content of the desugared def's
   `imports`, or an entry of the `inherits` collection) aborts uncatchably with `infinite recursion encountered` on every evaluator when the kind is on a value cycle. It is enumerated and argued by its
@@ -941,6 +941,17 @@ closed:
   `witness-collision-refusals.test-a-fully-shadowed-cycle-with-tagged-twins-refuses`). No key closes it: the walk reads parent values, not
   addresses, so a key that tells twins apart never repeats on a cycle that does not pass through the
   kind read, and a walk with no visited set pays every path through a diamond lattice.
+
+- **A kind decided by one of its own instances' VALUES** (`config.schema.host = if config.reg.h1.addr == … then … else …`, with `reg` a registry or an `attrsOf (mkInstanceType …)` sibling over that
+  kind) aborts uncatchably with `infinite recursion encountered` on every evaluator, on both
+  constructs. It is enumerated and argued by its mechanism: `h1.addr` exists only once `h1`'s element
+  has imported the kind, so the kind's definition reads a value its own construction is producing. That
+  is the module fixpoint's own value cycle, and `config.a = config.b; config.b = config.a` aborts the same
+  way in gen-merge with no gen-schema code in it: a cycle with no `circular` member is not detected and
+  reaches the evaluator's call-depth abort. The route that would close it is a named re-entry guard on
+  that value, not a check gen-schema can run first. A kind decided by a separate option, or by the
+  registry's instance NAMES, composes (below, "The crossing is supported"). Pinned by
+  `knob-instance-value-decides-its-kind`, one cell per construct.
 
 **A def that carries the resolver's `_file` is the resolver's only when its value is exactly one
 import.** `unresolvedInherits` skips a declared parent when some def's `file` is the string
@@ -1643,6 +1654,21 @@ option's `default` is `builtins.seq kind { }`: lazy, so building the option reco
 raw `.default` read on a registry built over a value that is not a kind is refused by name
 (`expected a kind value carrying a mint-backed mark`) where it once returned `{ }`. A registry nothing reads costs
 nothing new, and one over a genuine kind still defaults to `{ }`.
+
+The kind read off the declaring tree may be decided by that tree's own config. Decided by a separate
+option (`config.schema.host = if config.knob then … else …`), or by the registry's own instance names
+(`if config.reg ? h1 then …`), it composes on the registry and on the sibling alike, in both spellings
+(`ci/tests/instance-knob.nix`). The second holds because **the registry's name set is its definitions'**,
+as the sibling's is: `apply` states the pipeline's key set as its input's, since no stage adds or drops
+a name, so a name read (`attrNames`, `?`) never reads the kind. Every registry-level check runs at the first
+read of an instance value, and five refusals fire there, by name, rather than at a name read: the kind
+guard, a missing ref binding, an extra ref binding, a `deriveEither` left under the default `onError`,
+and a throwing `derive`. A program that reads only the names of an ill-formed registry refuses
+nothing, as it does on the sibling, and a failing whole-registry validator already behaved so. This
+holds for a registry with at least one definition. An undefined registry's name set is its default's,
+and the defaults differ: over a value that is not a kind, the registry's lazy default refuses by name
+at the name read, and the sibling's caller-written `{ }` answers `[ ]`. A kind decided by an
+instance's VALUE aborts on both constructs, the enumerated exception above.
 
 `derive` and `deriveEither` are mutually exclusive.
 
