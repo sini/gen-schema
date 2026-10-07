@@ -3370,6 +3370,28 @@ in
           msg = publishedMsg "refs" "/[^']*/test-fixtures/imports-route-refs[.]nix";
         };
       };
+      # A def carrying its own `__reservedKeys` beside an imports-route formal does not void the
+      # reservation: the wrapper's record is read first (den-hoag-r05lc, record-first precedence).
+      # The forged marker with an ordinary import is read as before (the cell's control).
+      test-def-forging-its-own-reservation-still-refuses-by-name = {
+        expr =
+          assert controls;
+          assert
+            (forced
+              (kindOf { } {
+                __reservedKeys.names = { };
+                imports = [ { options.priority = int7; } ];
+              }).__mint.minted
+            ).success;
+          (kindOf { } {
+            __reservedKeys.names = { };
+            imports = [ { keySemantics = [ "darwin" ]; } ];
+          }).__mint.minted;
+        expectedError = {
+          type = "ThrownError";
+          msg = formalMsg "keySemantics" "[^']*";
+        };
+      };
       # Over a gen-merge that does not read a functor module's record, the reservation would be dropped
       # silently; a kind whose entry imports a module refuses by name, naming the protocol it requires
       # (den-hoag-r05lc).
@@ -3459,11 +3481,11 @@ in
           decide = _: _: true;
         };
       };
-      # gen-schema over a gen-merge whose published key list does not carry `__keyEq`: the pairing
-      # an older gen-merge makes.
+      # gen-schema over a gen-merge whose functor-record list does not carry `__keyEq`: the pairing
+      # an older gen-merge makes (den-hoag-e5whp).
       withoutProtocol = genMerge // {
         moduleSyntax = genMerge.moduleSyntax // {
-          structured = builtins.filter (k: k != "__keyEq") genMerge.moduleSyntax.structured;
+          functorRecord = builtins.filter (k: k != "__keyEq") genMerge.moduleSyntax.functorRecord;
         };
       };
       oldSchema = import ../lib {
@@ -3517,15 +3539,16 @@ in
           o_a [ (generatorOver (mkSchemaOption { }) (smuggled // { key = "mine"; }) "one") ];
         expectedError = reserved;
       };
-      # Over a gen-merge that does not read `__keyEq`, a kind composing a parent is refused by name,
-      # naming the protocol it requires, where the field would otherwise be read as undeclared config.
+      # Over a gen-merge that does not read `__keyEq` off a functor record, a kind composing a parent
+      # is refused by name, naming the protocol it requires, where the comparison would otherwise go
+      # unread and a shared key be deduplicated silently.
       test-gen-merge-without-the-protocol-refused-by-name = {
         expr =
           assert controls;
           o_a [ (generatorOver (oldSchema.mkSchemaOption { }) { } "one") ];
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: kind 'a' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq', and the gen-merge it is evaluated with does not read that key \\(its `moduleSyntax\\.structured' does not list `__keyEq'\\)\\. gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; .*$";
+          msg = "^gen-schema: kind 'a' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read that key there \\(its `moduleSyntax\\.functorRecord' does not list `__keyEq'\\)\\. gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; .*$";
         };
       };
     };

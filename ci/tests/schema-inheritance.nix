@@ -889,25 +889,33 @@ in
         alone = "two";
       };
     };
-    # The module a parent-composing kind publishes carries `__keyEq` as module SYNTAX: it is
-    # structured, and every top-level key is one gen-merge reads structurally. A shorthand module
-    # hands a key its engine does not know to config, so under a gen-merge predating the protocol
-    # `__keyEq` became an instance value (silent on a freeform kind, a STRICT MODE refusal on a
-    # strict one) where a structured module is refused by name.
-    test-the-keyed-kind-module-is-structured = {
+    # A parent-composing kind publishes `__keyEq` on its RECORD, never in the module its functor
+    # returns (den-hoag-e5whp): nixpkgs collects only the result, where `__keyEq` is an unsupported
+    # attribute. The result carries the key and nothing gen-merge alone reads; a parentless kind's
+    # record carries `__keyEq = null`, so the record's names never depend on its parents.
+    test-the-keyed-kind-publishes-key-eq-on-its-record = {
       expr =
         let
           m = rel.derived { };
         in
         {
-          publishesKeyEq = m ? __keyEq;
-          structured = builtins.any (k: m ? ${k}) genMerge.moduleSyntax.structuring;
-          surplus = builtins.attrNames (builtins.removeAttrs m genMerge.moduleSyntax.structured);
+          recordKeyEq = builtins.attrNames rel.derived.__keyEq;
+          resultKeyEq = m ? __keyEq;
+          resultKeys = builtins.attrNames m;
+          parentless = rel.base.__keyEq;
         };
       expected = {
-        publishesKeyEq = true;
-        structured = true;
-        surplus = [ ];
+        recordKeyEq = [
+          "decide"
+          "subject"
+        ];
+        resultKeyEq = false;
+        resultKeys = [
+          "config"
+          "imports"
+          "key"
+        ];
+        parentless = null;
       };
     };
     test-another-trees-same-named-kind-is-not-a-cycle = {

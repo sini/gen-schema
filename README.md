@@ -1012,11 +1012,13 @@ refuses the declarations that conflict. Two declarations sharing a mark (one gen
 differing only in an option default, which enters the mark by path) share the key. Two instances of
 one kind declaration that share a key are compared: **equal** instances are one module; **unequal**
 instances are refused by name. Nothing is dropped silently. The comparison is the one the ancestor
-map makes (`kindEq`'s, through `sealedCollisionEq`), published beside the key as gen-merge's
-`__keyEq` so its key dedup applies it to instances imported side by side, in either order. A sealed
+map makes (`kindEq`'s, through `sealedCollisionEq`), published on the kind value's functor record as
+gen-merge's `__keyEq` (`null` on a kind with no parent) so its key dedup applies it to instances
+imported side by side, in either order; the module the functor returns carries only the key, so a
+nixpkgs `lib.evalModules` mount of the kind value collects nothing it does not know. A sealed
 component compares by its seal, so equal means one construction reached twice: two calls of one
 generator are refused even where their values agree. A declaration may not carry `__keyEq` itself,
-and gen-schema over a gen-merge that does not read `__keyEq` is refused by name.
+and gen-schema over a gen-merge that does not read `__keyEq` off a functor record is refused by name.
 
 **Each kind publishes its transitive ancestors, and a subkind must keep its ancestors' classes.**
 `__kindAncestors` maps each ancestor's mark to the ancestor kind value, read off `__kindImports`.
@@ -1285,8 +1287,10 @@ covers every route into the entry. A formal at the top level of a module the ent
 (nested `imports`, `require`, a function or path module, a whole-module `mkIf`) is refused at
 gen-merge's collector with the same text, saying it was "written in a module this kind entry
 imports" and naming the module. The defs `merged` imports carry `entryReservation kind`, the names
-and their texts as plain data, and gen-merge's `__reservedKeys` scope applies it over their import
-closure; a kind value in `imports` (the deprecated `inherits` spelling) is exempt by the same shape
+and their texts as plain data, on the record of a functor module wrapping each def that imports
+anything, and gen-merge's `__reservedKeys` scope applies it over their import closure; nixpkgs
+applies the functor and collects only its result, so a kind value mounted in `lib.evalModules`
+carries no marker; a kind value in `imports` (the deprecated `inherits` spelling) is exempt by the same shape
 `inherits` reads. That refusal fires where a module tree is evaluated: an instance read, or the
 kind's `options`, `refs` and mark. A read of `kind` or `strict` still returns the construction's own
 value, which is correct, because the misread value is never consumed there; the residue is stated
@@ -1297,7 +1301,12 @@ rather than honest routes: a hand-written module carrying `kind` and `__mint.min
 `inherits` alias reads it as a kind, by ruling), and so is a function module returning that shape,
 which the exemption tests after application while the alias, reading values before application,
 leaves it unaliased; and a nested `__reservedKeys` in an imported module replaces the reservation
-for its own closure.
+for its own closure. A def writing its own `__reservedKeys` beside an imported formal does not: the
+wrapper's record is read first (`imports-route-refusals.test-def-forging-its-own-reservation-still-refuses-by-name`).
+The pairing guard (a gen-merge whose `moduleSyntax.functorRecord` does not list `__reservedKeys` is
+refused by name) sees only the gen-merge gen-schema is built with: a kind value evaluated by another,
+older gen-merge in the same evaluation never reads the record, and an imported formal lands there
+silently.
 
 ### Unrecognised declaration keys are refused by name
 

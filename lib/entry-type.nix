@@ -703,11 +703,11 @@ let
   # in the option's description instead.
   declarationKeys = prelude.sort (a: b: a < b) merge.moduleSyntax.structured;
 
-  # gen-merge reads the key comparison (`__keyEq`) a keyed kind module publishes only where its own
-  # published key list carries it. Over a gen-merge without it the field is read as config, and
-  # every kind that composes a parent would be refused as an undeclared option, so the pairing is
-  # refused by name instead, once, where the key is written.
-  mergeReadsKeyEq = builtins.elem "__keyEq" merge.moduleSyntax.structured;
+  # gen-merge reads the key comparison (`__keyEq`) a keyed kind publishes on its functor record
+  # (den-hoag-e5whp) only where its `moduleSyntax.functorRecord` lists it. Over a gen-merge without
+  # it the record is never read, and two constructions sharing a mark would be deduplicated by key
+  # silently, so the pairing is refused by name instead, once, where the key is written.
+  mergeReadsKeyEq = builtins.elem "__keyEq" (merge.moduleSyntax.functorRecord or [ ]);
   # The entry reservation rides on a functor's record (den-hoag-r05lc), which only a gen-merge
   # publishing it in `moduleSyntax.functorRecord` reads; any other would drop it silently.
   mergeReadsRecordReservation = builtins.elem "__reservedKeys" (
@@ -2086,28 +2086,38 @@ let
                     # built on every application of `__functor` (every instance, every child), and a
                     # mint inside it would run once per application.
                     ownMark = markOf { inherit kind strict plane; };
-                    # The keyed module's fields, bound once per kind: the key and, beside it, the
-                    # comparison gen-merge's key dedup applies when another occurrence shares the key
-                    # (`__keyEq`, gen-merge's protocol): `sealedCollisionEq` over `kindEq`'s subject, the
+                    # The keyed module's fields, bound once per kind: the key, in the functor's result,
+                    # and on the kind value's RECORD the comparison gen-merge's key dedup applies when
+                    # another occurrence shares the key (`__keyEq`, gen-merge's protocol, read off the
+                    # unapplied module; `keyEqRecord`): `sealedCollisionEq` over `kindEq`'s subject, the
                     # decision the ancestor map makes, so the one construction reached twice is one
                     # module and two constructions sharing the mark are refused by name, in either order.
                     #
-                    # ★ STRUCTURED, so `__keyEq` is module syntax under EVERY engine that reads it, never
-                    # configuration. `mergeReadsKeyEq` sees only the gen-merge gen-schema is built with,
-                    # and the engine evaluating the instance can be another (a consumer whose gen-merge
-                    # predates the protocol). A shorthand module hands every key that engine does not
-                    # know to config, where `__keyEq` became an instance value, silently on a freeform
-                    # kind and as a STRICT MODE option refusal on a strict one; a structured module's
-                    # keys are the syntax plane, closed, so that engine refuses `__keyEq` by name.
+                    # The comparison rides on the record, never in the result, because the kind value is
+                    # a module a foreign evaluator also imports: nixpkgs applies the functor and collects
+                    # only its result, where `__keyEq` is an unsupported attribute (den-hoag-e5whp). The
+                    # record is ALWAYS present, null without a parent, so reading the record's names
+                    # never forces `kindParents` ahead of the cycle walk. Residue, stated:
+                    # `mergeReadsKeyEq` sees only the gen-merge gen-schema is built with, and the engine
+                    # evaluating the instance can be another (a consumer whose gen-merge predates the
+                    # record protocol); that engine never reads the record and deduplicates the key
+                    # silently.
                     keyed =
                       if kindParents == [ ] then
                         { }
                       else if !mergeReadsKeyEq then
-                        throw "gen-schema: kind '${kind}' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq', and the gen-merge it is evaluated with does not read that key (its `moduleSyntax.structured' does not list `__keyEq'). gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
+                        throw "gen-schema: kind '${kind}' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read that key there (its `moduleSyntax.functorRecord' does not list `__keyEq'). gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
                       else
                         {
                           key = "gen-schema-kind:${kind}#${ownMark}";
-                          __keyEq = {
+                          config = { };
+                        };
+                    keyEqRecord = {
+                      __keyEq =
+                        if kindParents == [ ] then
+                          null
+                        else
+                          {
                             subject = {
                               name = kind;
                               mark = ownMark;
@@ -2115,8 +2125,7 @@ let
                             };
                             decide = sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key";
                           };
-                          config = { };
-                        };
+                    };
                   in
                   # Precedence: computed overrides collections of the same name.
                   # __functor is reserved — collections/computed must not use it as a key.
@@ -2126,7 +2135,7 @@ let
                     # kinds with different marks keep two keys and both compose (gen-merge refuses what
                     # conflicts between them). Two declarations sharing a mark share the key: inside a kind
                     # the ancestor map's fold decides that pair, and outside one gen-merge's key dedup
-                    # applies the same decision through `__keyEq` (`keyed`).
+                    # applies the same decision through `__keyEq` (`keyed`, `keyEqRecord`).
                     __functor =
                       _:
                       { ... }:
@@ -2159,6 +2168,7 @@ let
                     __kindWitness = kindWitness;
                     __kindAncestors = resolvedOnly kindAncestors;
                   }
+                  // keyEqRecord
               )
             );
         };
