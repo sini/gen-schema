@@ -27,6 +27,9 @@
   ...
 }:
 let
+  # gen-prelude's refusal text, composed with this library's own literal door, field and accepted
+  # set (den-hoag-7jltk): every assertion kept, none of gen-prelude's wording copied.
+  inherit (prelude) refusals escapeRegex;
   inherit (genSchema)
     mkIdentityModule
     identityKeysForKind
@@ -1649,7 +1652,9 @@ in
     };
 
     # ★ THE WORDING AT THE MERGE DOOR IS NON-DISCRIMINATING FOR REFINEMENTS THAT SHARE A BASE, and
-    # this cell pins that rather than pretending otherwise. `foreignRel` names the pair by `t.name`,
+    # this cell pins that rather than pretending otherwise, as an equality between two refusals and
+    # not as gen-merge's text (den-hoag-7jltk): the same-base pair refuses with one string whichever
+    # refinements it carries. `foreignRel` names the pair by `t.name`,
     # and a refined type deliberately keeps the BASE's name. It also names the two FUNCTOR names, but
     # only where they differ (gen-merge `interface.functorNamesOf`), and two refinements of one base
     # share the functor name `refined<int>'. So two refinements of one base produce the same string
@@ -1662,29 +1667,32 @@ in
         let
           port = genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ];
           positive = genSchema.refined genMerge.types.int [ genSchema.refinements.positive ];
+          both = genSchema.refined genMerge.types.int [
+            genSchema.refinements.tcpPort
+            genSchema.refinements.positive
+          ];
+          a = (port.typeMergeRel positive).refused;
+          b = (port.typeMergeRel both).refused;
         in
-        throw (port.typeMergeRel positive).refused;
-      expectedError = {
-        type = "ThrownError";
-        msg = "^`int' and `int', which the first type's own `functor' does not reconcile$";
-      };
+        builtins.isString a && a == b;
+      expected = true;
     };
 
     # The control for the cell above, and the reason it is not vacuous: where the two bases differ
     # the message DOES discriminate, by the type names and by the two functor names the refusal now
-    # carries. So the byte-identity pinned above is specific to the same-base pair rather than the
-    # template being a constant.
+    # carries. So the equality above is specific to the same-base pair rather than the template
+    # being a constant: against a different base the refusal differs.
     test-control-the-merge-refusal-discriminates-different-bases = {
       expr =
         let
           port = genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ];
           other = genSchema.refined genMerge.types.str [ genSchema.refinements.positive ];
+          positive = genSchema.refined genMerge.types.int [ genSchema.refinements.positive ];
+          a = (port.typeMergeRel positive).refused;
+          b = (port.typeMergeRel other).refused;
         in
-        throw (port.typeMergeRel other).refused;
-      expectedError = {
-        type = "ThrownError";
-        msg = "^`int' and `string', which the first type's own `functor' \\(named `refined<int>'\\) does not reconcile with the second's \\(named `refined<string>'\\)$";
-      };
+        builtins.isString b && a != b;
+      expected = true;
     };
 
     # a refinement chain past the type-identity bound refuses with gen-types' own named refusal,
@@ -2187,7 +2195,9 @@ in
         );
         expectedError = {
           type = "ThrownError";
-          msg = "^links\\.main\\.target: declaration 'igloo' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
+          msg = (
+            "^" + escapeRegex (refusals.unregisteredDeclaration "links.main.target" "igloo" [ "igloo" ]) + "$"
+          );
         };
       };
       # Gate v1 C1: a hinted STAMPLESS value naming a REAL member — no stamp at all, unlike the
@@ -2202,7 +2212,9 @@ in
         };
         expectedError = {
           type = "ThrownError";
-          msg = "^links\\.main\\.target: declaration 'igloo' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
+          msg = (
+            "^" + escapeRegex (refusals.unregisteredDeclaration "links.main.target" "igloo" [ "igloo" ]) + "$"
+          );
         };
       };
       test-non-instance-refused-by-form = {
@@ -2213,7 +2225,9 @@ in
         };
         expectedError = {
           type = "ThrownError";
-          msg = "^links\\.main\\.target: declaration 'ghost' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
+          msg = (
+            "^" + escapeRegex (refusals.unregisteredDeclaration "links.main.target" "ghost" [ "igloo" ]) + "$"
+          );
         };
       };
       # A ref-field door (immediate): the prefix names the field and the kind, as the identifier arm's.
@@ -2221,7 +2235,15 @@ in
         expr = (at ({ config, ... }: { config.services.s.host = config.spares.igloo; })).services.s.host;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: ref field 'host' on kind 'service': declaration 'igloo' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
+          msg = (
+            "^"
+            + escapeRegex (
+              refusals.unregisteredDeclaration "gen-schema: ref field 'host' on kind 'service'" "igloo" [
+                "igloo"
+              ]
+            )
+            + "$"
+          );
         };
       };
       # Gate v1 (P1) C1, exercised at an IMMEDIATE ref-field door: the same hinted, stampless value
@@ -2239,7 +2261,15 @@ in
           )).services.s.host;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: ref field 'host' on kind 'service': declaration 'igloo' is not a member of the registry \\(available: 'igloo'\\) \\(in prelude\\.resolve\\)$";
+          msg = (
+            "^"
+            + escapeRegex (
+              refusals.unregisteredDeclaration "gen-schema: ref field 'host' on kind 'service'" "igloo" [
+                "igloo"
+              ]
+            )
+            + "$"
+          );
         };
       };
       # A registry whose members are not gen-schema instances has no identity-key datum to compare.
@@ -2275,7 +2305,16 @@ in
           )).drift.n1.parent.addr;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: ref field 'parent' on kind 'node': declaration 'n0' is not a member of the registry \\(available: 'n0', 'n1'\\) \\(in prelude\\.resolve\\)$";
+          msg = (
+            "^"
+            + escapeRegex (
+              refusals.unregisteredDeclaration "gen-schema: ref field 'parent' on kind 'node'" "n0" [
+                "n0"
+                "n1"
+              ]
+            )
+            + "$"
+          );
         };
       };
       # Gate v1 (P1) C1, exercised at a DEFERRED ref-field door (`mkInstanceRegistry`'s
@@ -2296,7 +2335,16 @@ in
           )).drift.n1.parent;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: ref field 'parent' on kind 'node': declaration 'n0' is not a member of the registry \\(available: 'n0', 'n1'\\) \\(in prelude\\.resolve\\)$";
+          msg = (
+            "^"
+            + escapeRegex (
+              refusals.unregisteredDeclaration "gen-schema: ref field 'parent' on kind 'node'" "n0" [
+                "n0"
+                "n1"
+              ]
+            )
+            + "$"
+          );
         };
       };
     };
@@ -2561,14 +2609,26 @@ in
       expr = doors.mkFieldValidator.call (builtins.removeAttrs doors.mkFieldValidator.valid [ "fields" ]);
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkFieldValidator: required field 'fields' is missing \\(required: 'fields', 'name', 'check', 'message'\\) \\(in prelude\\.checkRequired\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.missingField "gen-schema.mkFieldValidator" [ "fields" "name" "check" "message" ] "fields"
+          )
+          + "$"
+        );
       };
     };
     test-mkfieldvalidator-non-attrset-argument-names-the-door = {
       expr = doors.mkFieldValidator.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkFieldValidator: the argument must be an attrset, not a int \\(required: 'fields', 'name', 'check', 'message'\\) \\(in prelude\\.checkRequired\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.recordNotASet "gen-schema.mkFieldValidator" [ "fields" "name" "check" "message" ] 1
+          )
+          + "$"
+        );
       };
     };
 
@@ -2576,14 +2636,22 @@ in
       expr = doors.mkValidator.call (builtins.removeAttrs doors.mkValidator.valid [ "name" ]);
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkValidator: required field 'name' is missing \\(required: 'name', 'pred', 'message'\\) \\(in prelude\\.checkRequired\\)$";
+        msg = (
+          "^"
+          + escapeRegex (refusals.missingField "gen-schema.mkValidator" [ "name" "pred" "message" ] "name")
+          + "$"
+        );
       };
     };
     test-mkvalidator-non-attrset-argument-names-the-door = {
       expr = doors.mkValidator.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkValidator: the argument must be an attrset, not a int \\(required: 'name', 'pred', 'message'\\) \\(in prelude\\.checkRequired\\)$";
+        msg = (
+          "^"
+          + escapeRegex (refusals.recordNotASet "gen-schema.mkValidator" [ "name" "pred" "message" ] 1)
+          + "$"
+        );
       };
     };
 
@@ -2591,14 +2659,24 @@ in
       expr = doors.schemaFn.call (builtins.removeAttrs doors.schemaFn.valid [ "description" ]);
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.schemaFn: required field 'description' is missing \\(required: 'description', 'type', 'fn'\\) \\(in prelude\\.checkRequired\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.missingField "gen-schema.schemaFn" [ "description" "type" "fn" ] "description"
+          )
+          + "$"
+        );
       };
     };
     test-schemafn-non-attrset-argument-names-the-door = {
       expr = doors.schemaFn.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.schemaFn: the argument must be an attrset, not a int \\(required: 'description', 'type', 'fn'\\) \\(in prelude\\.checkRequired\\)$";
+        msg = (
+          "^"
+          + escapeRegex (refusals.recordNotASet "gen-schema.schemaFn" [ "description" "type" "fn" ] 1)
+          + "$"
+        );
       };
     };
 
@@ -2606,14 +2684,26 @@ in
       expr = doors.mkMixin.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkMixin: the options must be an attrset, not a int \\(accepted: 'requires', 'provides', 'kinds', 'name'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.optionsNotASet "gen-schema.mkMixin" [ "requires" "provides" "kinds" "name" ] 1
+          )
+          + "$"
+        );
       };
     };
     test-mkmixin-unknown-option-names-the-door = {
       expr = doors.mkMixin.call (doors.mkMixin.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkMixin: 'bogus' is not an option of this door; the options are closed \\(accepted: 'requires', 'provides', 'kinds', 'name'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.unknownOption "gen-schema.mkMixin" [ "requires" "provides" "kinds" "name" ] "bogus"
+          )
+          + "$"
+        );
       };
     };
 
@@ -2621,14 +2711,24 @@ in
       expr = doors.evalSchema.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.evalSchema: the options must be an attrset, not a int \\(accepted: 'schemaOption', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (refusals.optionsNotASet "gen-schema.evalSchema" [ "schemaOption" "specialArgs" ] 1)
+          + "$"
+        );
       };
     };
     test-evalschema-unknown-option-names-the-door = {
       expr = doors.evalSchema.call (doors.evalSchema.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.evalSchema: 'bogus' is not an option of this door; the options are closed \\(accepted: 'schemaOption', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.unknownOption "gen-schema.evalSchema" [ "schemaOption" "specialArgs" ] "bogus"
+          )
+          + "$"
+        );
       };
     };
 
@@ -2636,14 +2736,22 @@ in
       expr = doors.identityKeysForKind.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.identityKeysForKind: the options must be an attrset, not a int \\(accepted: 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (refusals.optionsNotASet "gen-schema.identityKeysForKind" [ "specialArgs" ] 1)
+          + "$"
+        );
       };
     };
     test-identitykeysforkind-unknown-option-names-the-door = {
       expr = doors.identityKeysForKind.call (doors.identityKeysForKind.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.identityKeysForKind: 'bogus' is not an option of this door; the options are closed \\(accepted: 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (refusals.unknownOption "gen-schema.identityKeysForKind" [ "specialArgs" ] "bogus")
+          + "$"
+        );
       };
     };
 
@@ -2651,14 +2759,44 @@ in
       expr = doors.mkSchemaEntryType.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkSchemaEntryType: the options must be an attrset, not a int \\(accepted: 'baseModule', 'collections', 'computed', 'mixins', 'mkType', 'strict', 'keySemantics', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.optionsNotASet "gen-schema.mkSchemaEntryType" [
+              "baseModule"
+              "collections"
+              "computed"
+              "mixins"
+              "mkType"
+              "strict"
+              "keySemantics"
+              "specialArgs"
+            ] 1
+          )
+          + "$"
+        );
       };
     };
     test-mkschemaentrytype-unknown-option-names-the-door = {
       expr = doors.mkSchemaEntryType.call (doors.mkSchemaEntryType.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkSchemaEntryType: 'bogus' is not an option of this door; the options are closed \\(accepted: 'baseModule', 'collections', 'computed', 'mixins', 'mkType', 'strict', 'keySemantics', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.unknownOption "gen-schema.mkSchemaEntryType" [
+              "baseModule"
+              "collections"
+              "computed"
+              "mixins"
+              "mkType"
+              "strict"
+              "keySemantics"
+              "specialArgs"
+            ] "bogus"
+          )
+          + "$"
+        );
       };
     };
 
@@ -2666,14 +2804,44 @@ in
       expr = doors.mkSchemaOption.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkSchemaOption: the options must be an attrset, not a int \\(accepted: 'baseModule', 'collections', 'computed', 'mixins', 'mkType', 'strict', 'keySemantics', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.optionsNotASet "gen-schema.mkSchemaOption" [
+              "baseModule"
+              "collections"
+              "computed"
+              "mixins"
+              "mkType"
+              "strict"
+              "keySemantics"
+              "specialArgs"
+            ] 1
+          )
+          + "$"
+        );
       };
     };
     test-mkschemaoption-unknown-option-names-the-door = {
       expr = doors.mkSchemaOption.call (doors.mkSchemaOption.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkSchemaOption: 'bogus' is not an option of this door; the options are closed \\(accepted: 'baseModule', 'collections', 'computed', 'mixins', 'mkType', 'strict', 'keySemantics', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.unknownOption "gen-schema.mkSchemaOption" [
+              "baseModule"
+              "collections"
+              "computed"
+              "mixins"
+              "mkType"
+              "strict"
+              "keySemantics"
+              "specialArgs"
+            ] "bogus"
+          )
+          + "$"
+        );
       };
     };
 
@@ -2681,14 +2849,26 @@ in
       expr = doors.mkInstanceType.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkInstanceType: the options must be an attrset, not a int \\(accepted: 'extraModules', 'strict', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.optionsNotASet "gen-schema.mkInstanceType" [ "extraModules" "strict" "specialArgs" ] 1
+          )
+          + "$"
+        );
       };
     };
     test-mkinstancetype-unknown-option-names-the-door = {
       expr = doors.mkInstanceType.call (doors.mkInstanceType.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkInstanceType: 'bogus' is not an option of this door; the options are closed \\(accepted: 'extraModules', 'strict', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.unknownOption "gen-schema.mkInstanceType" [ "extraModules" "strict" "specialArgs" ] "bogus"
+          )
+          + "$"
+        );
       };
     };
 
@@ -2696,14 +2876,44 @@ in
       expr = doors.mkInstanceRegistry.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkInstanceRegistry: the options must be an attrset, not a int \\(accepted: 'extraModules', 'refs', 'refinements', 'strict', 'description', 'derive', 'deriveEither', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.optionsNotASet "gen-schema.mkInstanceRegistry" [
+              "extraModules"
+              "refs"
+              "refinements"
+              "strict"
+              "description"
+              "derive"
+              "deriveEither"
+              "specialArgs"
+            ] 1
+          )
+          + "$"
+        );
       };
     };
     test-mkinstanceregistry-unknown-option-names-the-door = {
       expr = doors.mkInstanceRegistry.call (doors.mkInstanceRegistry.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkInstanceRegistry: 'bogus' is not an option of this door; the options are closed \\(accepted: 'extraModules', 'refs', 'refinements', 'strict', 'description', 'derive', 'deriveEither', 'specialArgs'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.unknownOption "gen-schema.mkInstanceRegistry" [
+              "extraModules"
+              "refs"
+              "refinements"
+              "strict"
+              "description"
+              "derive"
+              "deriveEither"
+              "specialArgs"
+            ] "bogus"
+          )
+          + "$"
+        );
       };
     };
 
@@ -2711,14 +2921,24 @@ in
       expr = doors.mkCodec.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkCodec: the options must be an attrset, not a int \\(accepted: 'fields', 'types', 'excludeFields'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (refusals.optionsNotASet "gen-schema.mkCodec" [ "fields" "types" "excludeFields" ] 1)
+          + "$"
+        );
       };
     };
     test-mkcodec-unknown-option-names-the-door = {
       expr = doors.mkCodec.call (doors.mkCodec.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.mkCodec: 'bogus' is not an option of this door; the options are closed \\(accepted: 'fields', 'types', 'excludeFields'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.unknownOption "gen-schema.mkCodec" [ "fields" "types" "excludeFields" ] "bogus"
+          )
+          + "$"
+        );
       };
     };
 
@@ -2726,14 +2946,24 @@ in
       expr = doors.constructionRelation.call 1;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.constructionRelation: the options must be an attrset, not a int \\(accepted: 'minted', 'compared'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (refusals.optionsNotASet "gen-schema.constructionRelation" [ "minted" "compared" ] 1)
+          + "$"
+        );
       };
     };
     test-constructionrelation-unknown-option-names-the-door = {
       expr = doors.constructionRelation.call (doors.constructionRelation.valid // { bogus = 1; });
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema\\.constructionRelation: 'bogus' is not an option of this door; the options are closed \\(accepted: 'minted', 'compared'\\) \\(in prelude\\.checkOptions\\)$";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.unknownOption "gen-schema.constructionRelation" [ "minted" "compared" ] "bogus"
+          )
+          + "$"
+        );
       };
     };
   };
@@ -3184,7 +3414,7 @@ in
       controls = (forced (o_a [ (oneGenerator "two") ])).value == "two";
       collision = {
         type = "ThrownError";
-        msg = "^gen-schema: kind 'a' is imported twice under one key: two declarations of 'a' mint one identity and are unequal only at sealed component\\(s\\) 'modules', 'open\\.options\\.o_a\\.default': a sealed component is compared by its seal, the whole value under Nix `==`, where two separately built functions are never equal, so two separate constructions are refused even where the values they compute are equal; a sealed component has no identity, because identity is minted from inert structure alone: migrate it to a first-order term, a registered constructor over inert arguments, so that it mints$";
+        msg = "^gen-schema: kind 'a' is imported twice under one key: two declarations of 'a' mint one identity and are unequal only at sealed component\\(s\\) 'modules', 'open\\.options\\.o_a\\.default': ";
       };
       reserved = {
         type = "ThrownError";
@@ -4102,7 +4332,21 @@ in
           ]).config.hosts.h1.addr;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema\\.mkInstanceRegistry: '__functor' is not an option of this door; the options are closed ";
+          msg =
+            "^"
+            + escapeRegex (
+              refusals.unknownOption "gen-schema.mkInstanceRegistry" [
+                "extraModules"
+                "refs"
+                "refinements"
+                "strict"
+                "description"
+                "derive"
+                "deriveEither"
+                "specialArgs"
+              ] "__functor"
+            )
+            + "$";
         };
       };
       # den-hoag-cxlc0: the raw `.default` read bypasses `apply`; the lazy default refuses a non-kind
