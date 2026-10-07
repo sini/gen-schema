@@ -128,9 +128,9 @@ in
 
     # ★ THE KIND VALUE MOUNTS IN NIXPKGS (den-hoag-r05lc). The entry reservation rides on a functor
     # record nixpkgs never reads, so a nixpkgs `lib.evalModules` importing the kind value serves an
-    # attrset entry carrying `options` (a content-level marker is an unsupported attribute there) and
-    # a function entry (where it landed as a `__reservedKeys` key on an open freeform), each as the
-    # same definitions mounted raw.
+    # attrset entry carrying `options`, alone or importing a module (a content-level marker is an
+    # unsupported attribute there), and a function entry (where it landed as a `__reservedKeys` key
+    # on an open freeform), each as the same definitions mounted raw.
     test-kind-value-mounts-in-nixpkgs =
       let
         port = lib.mkOption {
@@ -155,14 +155,20 @@ in
         attrsDef = {
           options.port = port;
         };
+        importingDef = {
+          options.port = port;
+          imports = [ { options.weight = port; } ];
+        };
         functionDef = { lib, ... }: { };
       in
       {
         expr = {
+          importing = mount (kindOf { } importingDef);
           attrs = mount (kindOf { } attrsDef);
           function = mount (kindOf { } functionDef);
         };
         expected = {
+          importing = mount importingDef;
           attrs = mount attrsDef;
           function = mount functionDef;
         };
