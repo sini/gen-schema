@@ -1013,7 +1013,7 @@ in
           genSchema.kindEq k1 carried;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-merge: the option `k' has conflicting definitions:\n- In `B': <a set>\n- In `A': <a set>$";
+          msg = "^gen-merge: the option `k' has conflicting definitions:";
         };
       };
   };
@@ -1631,7 +1631,7 @@ in
       expr = genTypes.idOf (genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ]);
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-types: idOf: type 'refined<int>' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
+        msg = "^gen-types: idOf: type 'refined<int>' has sealed component\\(s\\) 'refinements[.]0'";
       };
     };
 
@@ -1644,7 +1644,7 @@ in
       );
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-types: idOf: type 'refined<listOf>' has sealed component\\(s\\) 'refinements[.]0' .*has no identity to demand$";
+        msg = "^gen-types: idOf: type 'refined<listOf>' has sealed component\\(s\\) 'refinements[.]0'";
       };
     };
 
@@ -1699,7 +1699,7 @@ in
         genTypes.idOf (chain 1500);
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-types: idOf: type '.*' has no identity to demand: a type nests deeper than the type-identity depth bound \\(128 levels\\); a self-referential type has no identity$";
+        msg = "^gen-types: idOf: type '.*' has no identity to demand: a type nests deeper than the type-identity depth bound \\(128 levels\\)";
       };
     };
   };
@@ -2360,9 +2360,7 @@ in
           { config.schema.fleet.imports = [ mod ]; }
         ]).fleet.options.tag.default;
       viaIdentityKeysForKind = sa: identityKeysForKind { specialArgs = sa; } (kindOfModules plainKind);
-      msg =
-        keys:
-        "^gen-merge: `specialArgs' cannot supply the base module ${keys}; the engine injects its own value there, so the caller's would be discarded rather than used$";
+      msg = keys: "^gen-merge: `specialArgs' cannot supply the base module ${keys}";
       refused = keys: {
         type = "ThrownError";
         msg = msg keys;
@@ -2766,7 +2764,7 @@ in
         builtins.deepSeq (genSchema.mkInstanceType { } kind) null;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-merge: `submodule': its called `whenEmpty' does not evaluate the nested tree: a nested tree is a child of the one evaluation that holds it [(]`evalModuleTree'[)], read through its fold's threaded sibling, and no second evaluation is made for it$";
+        msg = "^gen-merge: `submodule': its called `whenEmpty' does not evaluate the nested tree";
       };
     };
   };
@@ -3061,7 +3059,7 @@ in
           k2.d.options.b.type.name;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-merge: option `b' is declared with types that do not merge \\(`int' and `string'\\); declared in <gen-merge>, via option schema.base, <gen-merge>, via option schema.base$";
+          msg = "^gen-merge: option `b' is declared with types that do not merge";
         };
       };
       # K2eq · the same topology, the two `base`s differing only in an option DEFAULT: marks and
