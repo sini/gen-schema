@@ -2039,7 +2039,7 @@ nix eval --override-input gen-schema ../.. .#docs --raw
 Lix (the Nix manual, *Value identity optimization*), so one function reaching both operands of an
 identity decision through two slots splits them. A bare function refinement of `refined` has no
 identity: its sealed subject is a closure allocated per construction (`lib/refined.nix`), so two
-constructions over it are refused on all three evaluators. One site cannot close that way:
+constructions over it are refused on all three evaluators. Two sites cannot close that way:
 
 - **`lib/refined.nix` `mkRefinedType`, a refinement record's `check` slice.** One `check` passed by
   selection to two refinements (`refined int { check = s.pos; message = …; }` twice) is refused on
@@ -2050,6 +2050,11 @@ constructions over it are refused on all three evaluators. One site cannot close
   same site for its own `refined`, and the rest of the split, in its README.
   `ci/tests-error.nix` `refined-evaluator-divergence` pins the split to each evaluator's own `==` on
   a literal two-slot shape, beside its partner at `true` ×3.
+- **`lib/refined.nix` `mkRefinedType` `relation`, the merge relation's `partner.__schema.refinements != normalized`.** Two declarations of one option, each `refined int f` with one function selected at each
+  site, are refused on Nix and Determinate and merged on Lix. The partner, one bound function in both
+  declarations, merges on all three. It closes with the same migration.
+  `ci/tests-error.nix` `refined-evaluator-divergence` pins the split to each evaluator's own `==`,
+  read at the merged declaration's type name, beside its partner at `"int"` ×3.
 
 ## Testing
 

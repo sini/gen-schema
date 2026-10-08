@@ -4509,7 +4509,10 @@ in
   # refinement has no identity, so two constructions over it are refused on all three evaluators.
   # A refinement record's `check` is sealed in its slot, so one `check` reached through two slots
   # splits `==`; the split cell holds the verdict to the RUNNING evaluator's own `==` on a literal
-  # two-slot shape, and the partner, one bound `check` in two refinements, is `true` ×3.
+  # two-slot shape, and the partner, one bound `check` in two refinements, is `true` ×3. The merge
+  # `relation` compares the refinement lists with `==`, so one bare function selected at two
+  # declarations of one option splits it the same way; those cells read the merged type's NAME,
+  # because checking a value against a bare function refinement aborts.
   flake.testsError.refined-evaluator-divergence =
     let
       verdict =
@@ -4537,6 +4540,7 @@ in
           check = c;
           message = "positive";
         };
+      decl = f: { options.s = genMerge.mkOption { type = genSchema.refined genMerge.types.int f; }; };
     in
     {
       test-a-bare-function-refinement-in-two-constructions-is-refused-on-every-evaluator = {
@@ -4566,6 +4570,26 @@ in
       test-a-bound-refinement-check-is-one-type = {
         expr = teq (ref pos) (ref pos);
         expected = true;
+      };
+      test-a-bare-function-refinement-by-selection-in-two-declarations-merges-as-the-evaluator-s-own-identity = {
+        expr =
+          (
+            verdict
+              (genMerge.evalModuleTree { } [
+                (decl sl.pos)
+                (decl sl.pos)
+              ]).options.s.type.name == "int"
+          ) == (twoSlots == true);
+        expected = true;
+      };
+      test-a-bound-bare-function-refinement-in-two-declarations-merges = {
+        expr =
+          verdict
+            (genMerge.evalModuleTree { } [
+              (decl pos)
+              (decl pos)
+            ]).options.s.type.name;
+        expected = "int";
       };
     };
 }
