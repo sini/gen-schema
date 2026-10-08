@@ -589,9 +589,9 @@ in
         let
           r = genTypes.union [
             genTypes.int
-            (genTypes.listOf r)
+            (genTypes.checkedListOf r)
           ];
-          sself = refined (genTypes.listOf sself) [ ];
+          sself = refined (genTypes.checkedListOf sself) [ ];
           chain = n: if n == 0 then refined t.int [ ] else refined (chain (n - 1)) [ ];
         in
         {
@@ -603,7 +603,7 @@ in
           flat = regime (
             refined (genTypes.union [
               genTypes.int
-              (genTypes.listOf genTypes.int)
+              (genTypes.checkedListOf genTypes.int)
             ]) [ ]
           );
         };

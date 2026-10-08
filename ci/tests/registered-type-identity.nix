@@ -147,13 +147,13 @@ in
           kindOf (T.listOf (T.typedef "stitched" t1'))
         );
         markShared =
-          (kindOf (genTypes.listOf (T.typedef "stitched" t1))).__mint.minted
-          == (kindOf (genTypes.listOf (T.typedef "stitched" t9))).__mint.minted;
-        different = kindEq (kindOf (genTypes.listOf (T.typedef "stitched" t1))) (
-          kindOf (genTypes.listOf (T.typedef "stitched" t9))
+          (kindOf (genTypes.checkedListOf (T.typedef "stitched" t1))).__mint.minted
+          == (kindOf (genTypes.checkedListOf (T.typedef "stitched" t9))).__mint.minted;
+        different = kindEq (kindOf (genTypes.checkedListOf (T.typedef "stitched" t1))) (
+          kindOf (genTypes.checkedListOf (T.typedef "stitched" t9))
         );
-        twins = kindEq (kindOf (genTypes.listOf (T.typedef "stitched" t1))) (
-          kindOf (genTypes.listOf (T.typedef "stitched" t1'))
+        twins = kindEq (kindOf (genTypes.checkedListOf (T.typedef "stitched" t1))) (
+          kindOf (genTypes.checkedListOf (T.typedef "stitched" t1'))
         );
       };
       expected = {
