@@ -1775,7 +1775,7 @@ in
           }) null;
         expectedError = {
           type = "ThrownError";
-          msg = "^STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME \\(instance at registry\\.INSTANCENAME, defined in <gen-merge>\\)\\.\n${fixLine "OFFENDINGKEY"}$";
+          msg = "^STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME \\(instance at registry\\.INSTANCENAME, defined in <unknown-file>\\)\\.\n${fixLine "OFFENDINGKEY"}$";
         };
       };
       # S2. An undeclared key UNDER a declared group: the blamed name is the capture path, not the
@@ -1802,7 +1802,7 @@ in
           }) null;
         expectedError = {
           type = "ThrownError";
-          msg = "^STRICT MODE: \"GROUPNAME\\.OFFENDINGKEY\" is not declared on KINDNAME \\(instance at registry\\.INSTANCENAME, defined in <gen-merge>\\)\\.\n${fixLine "GROUPNAME\\.OFFENDINGKEY"}$";
+          msg = "^STRICT MODE: \"GROUPNAME\\.OFFENDINGKEY\" is not declared on KINDNAME \\(instance at registry\\.INSTANCENAME, defined in <unknown-file>\\)\\.\n${fixLine "GROUPNAME\\.OFFENDINGKEY"}$";
         };
       };
       # S3. Two undeclared keys: both named, one remedy each.
@@ -1814,7 +1814,7 @@ in
         }) null;
         expectedError = {
           type = "ThrownError";
-          msg = "^STRICT MODE: \"OFFENDINGKEYA\", \"OFFENDINGKEYB\" are not declared on KINDNAME \\(instance at registry\\.INSTANCENAME, defined in <gen-merge>\\)\\.\n${fixLine "OFFENDINGKEYA"}\n${fixLine "OFFENDINGKEYB"}$";
+          msg = "^STRICT MODE: \"OFFENDINGKEYA\", \"OFFENDINGKEYB\" are not declared on KINDNAME \\(instance at registry\\.INSTANCENAME, defined in <unknown-file>\\)\\.\n${fixLine "OFFENDINGKEYA"}\n${fixLine "OFFENDINGKEYB"}$";
         };
       };
       # S4. mkStrictModule at a ROOT evaluation (prefix = [ ]), `ci/tests/strict-module.nix`'s shape:
@@ -1833,7 +1833,7 @@ in
             null;
         expectedError = {
           type = "ThrownError";
-          msg = "^STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME \\(defined in <gen-merge>\\)\\.\n${fixLine "OFFENDINGKEY"}$";
+          msg = "^STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME \\(defined in <unknown-file>\\)\\.\n${fixLine "OFFENDINGKEY"}$";
         };
       };
       # S4b. A PATH module's definition is attributed to the `_file` its own content sets, else its
@@ -1871,7 +1871,7 @@ in
         expectedError = {
           type = "ThrownError";
           msg = refusal [
-            "STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME (instance at registry.INSTANCENAME, defined in <gen-merge>)."
+            "STRICT MODE: \"OFFENDINGKEY\" is not declared on KINDNAME (instance at registry.INSTANCENAME, defined in <unknown-file>)."
             "Fix: schema.KINDNAME.options.OFFENDINGKEY = mkOption { ... };"
           ];
         };
@@ -1913,7 +1913,7 @@ in
         expectedError = {
           type = "ThrownError";
           msg = refusal [
-            "STRICT MODE: \"\"1DIGITKEY\"\", \"\"KEY\\\"QUOTE\"\", \"\"KEY.WITH.DOT\"\" are not declared on KINDNAME (instance at registry.INSTANCENAME, defined in <gen-merge>)."
+            "STRICT MODE: \"\"1DIGITKEY\"\", \"\"KEY\\\"QUOTE\"\", \"\"KEY.WITH.DOT\"\" are not declared on KINDNAME (instance at registry.INSTANCENAME, defined in <unknown-file>)."
             "Fix: schema.KINDNAME.options.\"1DIGITKEY\" = mkOption { ... };"
             "Fix: schema.KINDNAME.options.\"KEY\\\"QUOTE\" = mkOption { ... };"
             "Fix: schema.KINDNAME.options.\"KEY.WITH.DOT\" = mkOption { ... };"
