@@ -191,8 +191,21 @@ let
           in
           if joined == null then null else mkRefinedType joined normalized;
 
+      # ★ THE COPY IS TAKEN OF A RECORD IN GEN'S PROTOCOL. A FOREIGN base, one stating no
+      # `typeMergeRel` (the test `mergeTypes` itself splits the two arms on), is imported through
+      # gen-merge's `mkOptionType` first, and the copy below is taken of the import. Copying the raw
+      # record instead strips the `functor` whose `payload ? modules` is the one spelling by which
+      # gen-merge recognises a nixpkgs submodule as evaluating its own `nestedTypes` (ADR-0014's
+      # rider), and states no `carries` for gen's recogniser either, so the door re-entered below
+      # reads the module set evaluated: a raw `submodule` base whose module set reads the registry
+      # being built recursed uncatchably (den-hoag-60hql F2). The import states `carries.moduleSet`,
+      # which the copy keeps. Only the COPY is the import's: identity, the relation, `verify` and
+      # `__schema` keep reading `baseType` as given, so the mint, the merge answer and the published
+      # base are unchanged, and a gen base is copied as it is.
+      copied = if baseType ? typeMergeRel then baseType else merge.mkOptionType baseType;
+
       result = merge.mkOptionType (
-        builtins.removeAttrs baseType [
+        builtins.removeAttrs copied [
           "functor"
           "typeMerge"
           "__mint"

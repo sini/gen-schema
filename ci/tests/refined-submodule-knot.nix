@@ -21,7 +21,7 @@ let
   # submodule or one gen-merge imported from nixpkgs (`mkOptionType (lib.types.submodule …)`). Every
   # refinement here that is read at construction is lazy, or the read is the kind's `refs`: a strict
   # refinement demands the field when the instance is built, a second knot this file does not cover.
-  # A raw nixpkgs `submodule` base still recurses (the residue, README's `refined` section).
+  # A raw nixpkgs `submodule` base is imported by `refined` itself before it is copied, so it composes too.
   r = {
     check = _: true;
     message = "never";
@@ -91,6 +91,7 @@ let
 
   sub = hosts: t.submodule (peersOf hosts);
   imported = hosts: genMerge.mkOptionType (lib.types.submodule (nixPeersOf hosts));
+  raw = hosts: lib.types.submodule (nixPeersOf hosts);
   peers = {
     peer-iceberg = "10.0.1.2";
     peer-igloo = "10.0.1.1";
@@ -142,6 +143,62 @@ in
         doorDoorSettings = peers;
       };
     };
+    # a RAW nixpkgs submodule: `refined` imports a foreign base through `mkOptionType` before copying it
+    test-a-refined-raw-nixpkgs-submodule-knot-composes = {
+      expr = {
+        refinedLazyAddr = (knot { wrap = h: refined (raw h) [ rLazy ]; }).addr;
+        refinedLazySettings = (knot { wrap = h: refined (raw h) [ rLazy ]; }).settings;
+        refinedRefs = (knot { wrap = h: refined (raw h) [ r ]; }).refs;
+        attrsRefinedAddr = (knot { wrap = h: t.attrsOf (refined (raw h) [ r ]); }).addr;
+        attrsRefinedDefined =
+          (knot {
+            wrap = h: t.attrsOf (refined (raw h) [ rLazy ]);
+            def.e1 = { };
+          }).settings;
+        refinedRefinedLazySettings =
+          (knot { wrap = h: refined (refined (raw h) [ rLazy ]) [ rLazy ]; }).settings;
+      };
+      expected = {
+        refinedLazyAddr = "10.0.1.1";
+        refinedLazySettings = peers;
+        refinedRefs = [ ];
+        attrsRefinedAddr = "10.0.1.1";
+        attrsRefinedDefined.e1 = peers;
+        refinedRefinedLazySettings = peers;
+      };
+    };
+    # a value a foreign base rejects is refused by name through `refined`, where the copy of the raw
+    # record aborted inside the foreign check (a string base coercing an integer) or served a value
+    # its bare base refuses (`deferredModule`); a value each base accepts is still served
+    test-a-foreign-base-rejecting-a-value-refuses-catchably = {
+      expr =
+        let
+          refusedAt =
+            ty: v:
+            !(builtins.tryEval (
+              builtins.deepSeq
+                (genMerge.evalModuleTree { } [
+                  { options.o = genMerge.mkOption { type = ty; }; }
+                  { config.o = v; }
+                ]).config.o
+                true
+            )).success;
+        in
+        {
+          lines = refusedAt (refined lib.types.lines [ r ]) 5;
+          submodule = refusedAt (refined (lib.types.submodule { }) [ r ]) 5;
+          deferredModule = refusedAt (refined lib.types.deferredModule [ r ]) 5;
+          linesServesAString = !(refusedAt (refined lib.types.lines [ r ]) "a");
+          submoduleServesAModule = !(refusedAt (refined (lib.types.submodule { }) [ r ]) { });
+        };
+      expected = {
+        lines = true;
+        submodule = true;
+        deferredModule = true;
+        linesServesAString = true;
+        submoduleServesAModule = true;
+      };
+    };
     # constructing `refined` over a submodule never evaluates its module set
     test-refined-never-evaluates-the-module-set = {
       expr =
@@ -152,10 +209,14 @@ in
         {
           gen = ok (refined (t.submodule P) [ r ]);
           imported = ok (refined (genMerge.mkOptionType (lib.types.submodule P)) [ r ]);
+          raw = ok (refined (lib.types.submodule P) [ r ]);
+          rawSubmoduleWith = ok (refined (lib.types.submoduleWith { modules = [ P ]; }) [ r ]);
         };
       expected = {
         gen = true;
         imported = true;
+        raw = true;
+        rawSubmoduleWith = true;
       };
     };
   };
