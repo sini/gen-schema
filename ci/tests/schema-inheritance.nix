@@ -827,7 +827,8 @@ in
     };
     # Two trees' same-named kinds that each compose a parent carry two marks, so two module keys, and
     # both compose where one instance imports both; and a kind importing another tree's same-named
-    # kind is not a cycle (the cycle walk compares witnesses, which differ too).
+    # kind is not a cycle (the cycle walk compares witnesses, which differ too). `_module` is the
+    # engine-owned group gen-merge serves, as nixpkgs does (den-hoag-a67l3).
     test-same-named-kinds-of-two-trees-both-compose = {
       expr =
         builtins.attrNames
@@ -836,6 +837,7 @@ in
             twoTreesA.two
           ]).options;
       expected = [
+        "_module"
         "o_a"
         "o_p"
         "o_q"
