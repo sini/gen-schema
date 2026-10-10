@@ -547,9 +547,10 @@ let
           # (`lib/refined.nix`, `verify`), so this pass checks only the refinements no type carries (the
           # `refinements` argument, or a kind refinement on a field whose type is not refined), and
           # decides WHEN a field is demanded. A field whose every top-level refinement is `lazy`, its
-          # type's and the pass's alike, is left unforced and checked at access (§ Chitil 2012). One
-          # strict refinement makes construction demand the field, and its whole conjunction is decided
-          # then: on a flat value a demanded field has nothing left to defer (Chitil §7.3).
+          # type's and the pass's alike, is left unforced and checked at access (§ Chitil 2012), and so
+          # is a field carrying a module set (`accessCheckedFields`, below). On any other field one strict
+          # refinement makes construction demand it, and its whole conjunction is decided then: on a flat
+          # value a demanded field has nothing left to defer (Chitil §7.3).
           typeRefinements = prelude.filterAttrs (_: rs: rs != [ ]) (
             prelude.mapAttrs (
               _: o: if (o._type or null) == "option" && o ? type then getRefinements o.type else [ ]
@@ -562,6 +563,48 @@ let
               prelude.filterAttrs (f: _: !(typeRefinements ? ${f})) (kindValue.refinements or { });
           refinedFields = builtins.attrNames (typeRefinements // passRefinements);
 
+          # A field carrying a module set at any carried depth is checked at access, whatever its
+          # refinements: its value is a module tree whose declarations may read the registry in flight,
+          # so demanding it at construction can recurse uncatchably. What a type carries is read through
+          # gen-merge's `importedCarried`, which forces no module set, to gen-merge's own walk bound, and
+          # `true` at exhaustion: a wrong deferral moves a refusal to the field's read, a wrong demand is
+          # an uncatchable abort. A self-referential type (nixpkgs' `types.json` shape) never ends, so it
+          # exhausts the bound and is deferred: no type walk tells a cyclic type from a deep one. A field
+          # declared as an option group (any attrset not an option record, as gen-merge's declaration
+          # walk reads it) carries a module set when an option beneath it does; the group is the kind's
+          # own finite declaration, which the module system walks too. Computed once per field, never
+          # per instance.
+          carriesModuleSet =
+            let
+              go =
+                fuel: ty:
+                let
+                  e = merge.importedCarried "element" ty;
+                  alts = merge.importedCarried "alternatives" ty;
+                in
+                builtins.isAttrs ty
+                && (
+                  merge.importedCarried "moduleSet" ty != null
+                  || fuel <= 0
+                  || e != null && go (fuel - 1) e
+                  || alts != null && builtins.any (go (fuel - 1)) alts
+                );
+            in
+            go merge.importedTypeWalkFuel;
+          declCarriesModuleSet =
+            o:
+            if (o._type or null) == "option" then
+              o ? type && carriesModuleSet o.type
+            else
+              builtins.isAttrs o && builtins.any declCarriesModuleSet (builtins.attrValues o);
+          accessCheckedFields = prelude.genAttrs refinedFields (
+            f:
+            declCarriesModuleSet ((kindValue.options or { }).${f} or null)
+            || builtins.all (r: r.lazy or false) (
+              (typeRefinements.${f} or [ ]) ++ (passRefinements.${f} or [ ])
+            )
+          );
+
           refinementChecked =
             if refinedFields == [ ] then
               coerced
@@ -573,7 +616,7 @@ let
                   let
                     refs' = passRefinements.${fieldName} or [ ];
                     at = "${kind}:${instanceName}.${fieldName}";
-                    deferred = builtins.all (r: r.lazy or false) ((typeRefinements.${fieldName} or [ ]) ++ refs');
+                    deferred = accessCheckedFields.${fieldName};
                     value = inst.${fieldName} or null;
                     failing = builtins.filter (r: !(r.check value)) refs';
                   in

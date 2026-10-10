@@ -2,7 +2,8 @@
 # `{v:B | e}` has no member failing `e`), den-hoag-refined-outside-kind-silent-1jlsq. Outside a kind
 # the type refuses a violating value by name; inside one, a field whose refinements are ALL `lazy` is
 # decided when it is demanded, and one strict refinement makes construction decide the whole
-# conjunction (position (ii), defaulted and reversible). No registry argument, mixin path or nesting
+# conjunction of a field carrying no module set (`refined-module-set-access.nix` covers the field
+# that carries one). No registry argument, mixin path or nesting
 # drops a declared refinement. Every value cell reads a value or "REFUSED" (`tryEval` over `deepSeq`);
 # the `testsError` cells pin WHICH refusal fired.
 {

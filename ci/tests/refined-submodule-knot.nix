@@ -19,8 +19,8 @@ let
   # evaluated) for its roles, reached from the kind's `refs` read: an uncatchable recursion. gen-merge's
   # `evaluatesOwnRoles` now recognises any record carrying `carries.moduleSet`, so the base is a gen
   # submodule or one gen-merge imported from nixpkgs (`mkOptionType (lib.types.submodule …)`). Every
-  # refinement here that is read at construction is lazy, or the read is the kind's `refs`: a strict
-  # refinement demands the field when the instance is built, a second knot this file does not cover.
+  # refinement here that is read at construction is lazy, or the read is the kind's `refs`; a strict
+  # refinement on such a field is checked at access (`refined-module-set-access.nix`).
   # A raw nixpkgs `submodule` base is imported by `refined` itself before it is copied, so it composes too.
   r = {
     check = _: true;

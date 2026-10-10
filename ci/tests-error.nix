@@ -4622,4 +4622,53 @@ in
         expected = "REFUSED";
       };
     };
+
+  # A failing strict refinement on a field carrying a module set is checked when the field is read
+  # (gen-schema `refinementChecked`), so the read refuses with the refinement's own message, naming
+  # the field: a registry refinement through the deferred pass, a type refinement through the
+  # refined type's own check.
+  flake.testsError.refined-module-set-access =
+    let
+      fail = {
+        check = _: false;
+        message = "always fails";
+      };
+      settingsOf =
+        args: ty:
+        (genMerge.evalModuleTree { } [
+          {
+            options.hosts = genSchema.mkInstanceRegistry args (
+              (genSchema.evalSchema { } [
+                {
+                  config.schema.host = {
+                    options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                    options.settings = genMerge.mkOption {
+                      type = ty;
+                      default = { };
+                    };
+                  };
+                }
+              ]).host
+            );
+            config.hosts.igloo.addr = "10.0.1.1";
+          }
+        ]).config.hosts.igloo.settings;
+      sub = genMerge.types.submodule { };
+    in
+    {
+      test-a-registry-refinement-refuses-the-module-set-field-at-access = {
+        expr = settingsOf { refinements.settings = [ fail ]; } sub;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: lazy contract violated at host:igloo[.]settings: always fails$";
+        };
+      };
+      test-a-type-refinement-refuses-the-module-set-field-at-access = {
+        expr = settingsOf { } (genSchema.refined sub [ fail ]);
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-merge: a definition for option `hosts[.]igloo[.]settings' is not of the expected type: always fails$";
+        };
+      };
+    };
 }
