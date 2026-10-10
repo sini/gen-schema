@@ -438,11 +438,16 @@ let
   # witness is a FUNCTION, never the record: a record would make every kind value cyclic, and a
   # walker that stops at option types and derivations (gen-demo `c94`'s `pathsNamed`) overflows on
   # it; no walker descends into a lambda.
+  # The witness declaration gen-algebra's `conservativeEq` reads: the completion stamp above.
+  kindWitness = {
+    completion = "__kindSelf";
+  };
   completed =
     r:
     let
       s = r // {
         __kindSelf = _: s;
+        __witness = kindWitness;
       };
     in
     s;
@@ -743,6 +748,7 @@ let
     "__kindAncestors"
     "__kindCycleParents"
     "__kindSelf"
+    "__witness"
   ];
 
   # ★ THE COLLECTION KEY SPACE'S RESERVED SET (den-hoag-6vgwm). A caller-supplied collection NAME
@@ -876,6 +882,7 @@ let
         "__kindImports"
         "__kindSelf"
         "__kindWitness"
+        "__witness"
         "__mint"
         "__sealed"
       ]
@@ -887,6 +894,7 @@ let
         "__kindImports"
         "__kindSelf"
         "__kindWitness"
+        "__witness"
         "__mint"
         "__sealed"
       ];

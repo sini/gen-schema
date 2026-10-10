@@ -58,6 +58,7 @@ let
     "__kindWitness"
     "__mint"
     "__sealed"
+    "__witness"
     "keySemantics"
     "kind"
     "mixins"

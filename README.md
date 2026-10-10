@@ -1256,11 +1256,11 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 **Scope.** That idiom reads collection values on the **default entry-type path**. Two caveats, both
 real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
-with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__kindAncestors`, `__kindCycleParents`,
-`__kindImports`, `__kindSelf`, `__kindWitness`, `__mint`, `__pureModule`, `__reservedKeys`, `__sealed`, `_class`, `_file`, `_module`, `baseModule`,
+with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__keyEq`, `__kindAncestors`, `__kindCycleParents`,
+`__kindImports`, `__kindSelf`, `__kindWitness`, `__mint`, `__pureModule`, `__reservedKeys`, `__sealed`, `__witness`, `_class`, `_file`, `_module`, `baseModule`,
 `collections`, `computed`, `config`, `disabledModules`, `freeformType`, `imports`, `key`,
 `keySemantics`, `kind`, `meta`, `mixins`, `mkType`, `options`, `refinements`, `refs`, `require`,
-`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 31 names: gen-merge's published
+`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 34 names: gen-merge's published
 `moduleSyntax.structured` and `moduleSyntax.shorthandMeta`, the names gen-schema writes onto the kind
 value itself, and the schema's construction formals) is refused when `_collectionKeys` is read, exactly as it is refused when a
 kind is merged.
@@ -1614,8 +1614,10 @@ only at a sealed component, for example open-module content beyond an option's `
 refuses by name, naming the component (`…only at sealed component(s) 'open.options.<path>.<attr>'…`).
 An operand that is not a kind value carrying a mint-backed mark is refused by name, and so is a kind
 value that is not the value its schema built: each kind value carries a completion stamp, `__kindSelf`, a
-function returning the value the schema's merge built, so a `//` copy (`k // { options = …; }`), which
-keeps the mark while changing what it stands for, is refused naming the kind (`…the kind value '<k>' is not the value its schema built…`). The same refusal guards these doors:
+function returning the value the schema's merge built, declared beside it as the value's witness
+(`__witness = { completion = "__kindSelf"; }`, which gen-algebra's `conservativeEq` reads too), so a
+`//` copy (`k // { options = …; }`), which keeps the mark while changing what it stands for, is
+refused naming the kind (`…the kind value '<k>' is not the value its schema built…`). The same refusal guards these doors:
 the `inherits` value door, the ancestor fold (a kind reached through the `imports` spelling, at any depth)
 and `mkInstanceType`'s import of the kind. Two doors compose a `//` copy unread, enumerated here as
 exceptions: a kind value imported inside
