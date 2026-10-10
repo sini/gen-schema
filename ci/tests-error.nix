@@ -4504,4 +4504,68 @@ in
       };
     };
   };
+
+  # ★ THE EVALUATOR DIVERGENCE OF `refined` (README "Evaluator divergences (stated)"). A bare function
+  # refinement has no identity, so two constructions over it are refused on all three evaluators.
+  # A refinement record's `check` is sealed in its slot, so one `check` reached through two slots
+  # splits `==`; the split cell holds the verdict to the RUNNING evaluator's own `==` on a literal
+  # two-slot shape, and the partner, one bound `check` in two refinements, is `true` ×3.
+  flake.testsError.refined-evaluator-divergence =
+    let
+      verdict =
+        v:
+        let
+          o = builtins.tryEval (builtins.deepSeq v v);
+        in
+        if o.success then o.value else "REFUSED";
+      teq = a: b: verdict (genTypes.typeEq a b);
+      ownEq =
+        x: y:
+        let
+          o = builtins.tryEval (x == y);
+        in
+        o.success && o.value;
+      sl = {
+        f = x: x;
+        pos = x: x > 0;
+      };
+      pos = sl.pos;
+      twoSlots = if ownEq { c = sl.f; } { c = sl.f; } then true else "REFUSED";
+      ref =
+        c:
+        genSchema.refined genMerge.types.int {
+          check = c;
+          message = "positive";
+        };
+    in
+    {
+      test-a-bare-function-refinement-in-two-constructions-is-refused-on-every-evaluator = {
+        expr = {
+          bound = teq (genSchema.refined genMerge.types.int pos) (genSchema.refined genMerge.types.int pos);
+          selected = teq (genSchema.refined genMerge.types.int sl.pos) (
+            genSchema.refined genMerge.types.int sl.pos
+          );
+        };
+        expected = {
+          bound = "REFUSED";
+          selected = "REFUSED";
+        };
+      };
+      test-a-bare-function-refinement-in-one-construction-is-itself = {
+        expr =
+          let
+            x = genSchema.refined genMerge.types.int pos;
+          in
+          teq x x;
+        expected = true;
+      };
+      test-a-refinement-check-by-selection-answers-as-the-evaluator-s-own-identity = {
+        expr = teq (ref sl.pos) (ref sl.pos) == twoSlots;
+        expected = true;
+      };
+      test-a-bound-refinement-check-is-one-type = {
+        expr = teq (ref pos) (ref pos);
+        expected = true;
+      };
+    };
 }
