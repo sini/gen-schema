@@ -117,9 +117,14 @@ let
       # content, not per thing — otherwise one sealed component drags a whole kind onto the
       # comparison limb." `refined` has two components and they sit on different limbs:
       #
-      #   refinements — SEALED. Caller lambdas admit no total preimage, so this is the ruling's
-      #                 "where it decides rather than mints, it compares the reified value itself"
-      #                 under Nix `==`.
+      #   refinements — SEALED. Caller lambdas admit no total preimage, so the relation decides
+      #                 rather than mints, under Nix `==` over the refinement lists. A function is
+      #                 compared through its box, the list or record slot holding it, not as the
+      #                 reified value itself: Nix and Determinate compare that slot, Lix the
+      #                 object, and the README states the split as an evaluator divergence. A
+      #                 registered construction (gen-algebra `mkIntensional`) is compared by its
+      #                 declared subject where every refinement on both sides is one, as `typeEq`
+      #                 compares it above.
       #   baseType    — NOT sealed. It is a type that STATES ITS OWN MERGE RELATION, so the
       #                 relation is asked, through `merge.mergeTypes`. Taking `==` over the base
       #                 record instead would be "a copy of the relation living here", which this
@@ -185,13 +190,22 @@ let
         in
         if !(builtins.isAttrs partner && partner ? __schema) then
           null
-        else if partner.__schema.refinements != normalized then
+        else if !(sameRefinements partner.__schema.refinements) then
           null
         else
           let
             joined = merge.mergeTypes baseType partner.__schema.baseType;
           in
           if joined == null then null else mkRefinedType joined normalized;
+
+      # Raw `==` first, so every refinement keeps its slot; mapping both sides to subjects
+      # unconditionally would copy each element out of its slot and split a bound function too.
+      registered =
+        l: l != [ ] && builtins.all (r: builtins.isAttrs r && r ? check && hasDeclaredSubject r.check) l;
+      bySubject = map (r: r // { check = r.check.__mint.unmintable.subject; });
+      sameRefinements =
+        l:
+        l == normalized || (registered l && registered normalized && bySubject l == bySubject normalized);
 
       # ★ THE COPY IS TAKEN OF A RECORD IN GEN'S PROTOCOL. A FOREIGN base, one stating no
       # `typeMergeRel` (the test `mergeTypes` itself splits the two arms on), is imported through

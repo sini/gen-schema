@@ -2054,7 +2054,11 @@ constructions over it are refused on all three evaluators. Two sites cannot clos
   a literal two-slot shape, beside its partner at `true` ×3.
 - **`lib/refined.nix` `mkRefinedType` `relation`, the merge relation's `partner.__schema.refinements != normalized`.** Two declarations of one option, each `refined int f` with one function selected at each
   site, are refused on Nix and Determinate and merged on Lix. The partner, one bound function in both
-  declarations, merges on all three. It closes with the same migration.
+  declarations, merges on all three. It closes when every refinement on both declarations carries
+  a registered check (gen-algebra `mkIntensional`): the relation then compares their declared
+  subjects, so two constructions of one term merge on all three and terms over different
+  arguments are refused. A list mixing a registered check with a caller lambda is compared by
+  `==` alone.
   `ci/tests-error.nix` `refined-evaluator-divergence` pins the split to each evaluator's own `==`,
   read at the merged declaration's type name, beside its partner at `"int"` ×3.
 

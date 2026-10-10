@@ -4512,7 +4512,8 @@ in
   # two-slot shape, and the partner, one bound `check` in two refinements, is `true` ×3. The merge
   # `relation` compares the refinement lists with `==`, so one bare function selected at two
   # declarations of one option splits it the same way; those cells read the merged type's NAME,
-  # because checking a value against a bare function refinement aborts.
+  # because checking a value against a bare function refinement aborts. A registered check is
+  # compared by its declared subject there, so it splits nothing.
   flake.testsError.refined-evaluator-divergence =
     let
       verdict =
@@ -4541,6 +4542,15 @@ in
           message = "positive";
         };
       decl = f: { options.s = genMerge.mkOption { type = genSchema.refined genMerge.types.int f; }; };
+      registry = {
+        revision = "r1";
+        members.gtN = n: x: x > n;
+      };
+      term = genAlgebra.mkIntensional genIdentity.hashIdentity registry "gtN";
+      registered = n: {
+        check = term n;
+        message = "positive";
+      };
     in
     {
       test-a-bare-function-refinement-in-two-constructions-is-refused-on-every-evaluator = {
@@ -4590,6 +4600,26 @@ in
               (decl pos)
             ]).options.s.type.name;
         expected = "int";
+      };
+      # A registered check is decided by its declared subject, as `typeEq` decides it, so two
+      # constructions of one term merge on all three and two terms over different arguments do not.
+      test-two-constructions-of-one-registered-check-in-two-declarations-merge = {
+        expr =
+          verdict
+            (genMerge.evalModuleTree { } [
+              (decl (registered 0))
+              (decl (registered 0))
+            ]).options.s.type.name;
+        expected = "int";
+      };
+      test-registered-checks-over-different-arguments-in-two-declarations-are-refused = {
+        expr =
+          verdict
+            (genMerge.evalModuleTree { } [
+              (decl (registered 0))
+              (decl (registered 1))
+            ]).options.s.type.name;
+        expected = "REFUSED";
       };
     };
 }
