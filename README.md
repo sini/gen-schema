@@ -2048,7 +2048,7 @@ constructions over it are refused on all three evaluators. Two sites cannot clos
   Nix and Determinate and `true` on Lix. Its partner, one bound `check` in two refinements, is
   `true` on all three, and Lix gives the two one verdict, so a closure here would move the partner
   with the split; upstream has no observer of closure identity to raise the split to `true`. It
-  closes when the caller's `check` migrates to a first-order term (ADR-0034). gen-types states the
+  closes when the caller's `check` migrates to a first-order term. gen-types states the
   same site for its own `refined`, and the rest of the split, in its README.
   `ci/tests-error.nix` `refined-evaluator-divergence` pins the split to each evaluator's own `==` on
   a literal two-slot shape, beside its partner at `true` ×3.
