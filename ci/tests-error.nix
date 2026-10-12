@@ -4671,4 +4671,75 @@ in
         };
       };
     };
+
+  # OPEN DEFECT: nixpkgs' twin serves .ok; construction den-hoag-olrmz. `refined` over a container of a gen `submodule`
+  # (nullOr / listOf / attrsOf / either / nullOr nullOr, and the nixpkgs container over one) hands gen-merge's `mkOptionType`
+  # an unstamped copy of a container that declares a nested gen element, which it refuses by name at the door
+  # (`nestingImportRefusal`) for the accepted value and the rejected one alike. Under ADR-0025 item 1 and the owner's
+  # parity-defect rule (2026-10-09, rule 1) that is an open defect, never a stated price. Each cell reads one value, so
+  # `.ok` and `.bad` each pin the same refusal: serving either through the generic import is the second root the rule
+  # forecloses, and the cells go green-to-red on the day olrmz serves `.ok` (and refuses `.bad` by the container's text).
+  flake.testsError.refined-gen-container-open-defect =
+    let
+      t = genMerge.types;
+      sub = t.submodule { options.a = genMerge.mkOption { type = t.int; }; };
+      refinement = [
+        {
+          check =
+            let
+              bad =
+                v:
+                v == 1
+                || (builtins.isAttrs v && ((v.a or null) == 1 || builtins.any bad (builtins.attrValues v)))
+                || (builtins.isList v && builtins.any bad v);
+            in
+            v: !(bad v);
+          message = "a must not be 1";
+        }
+      ];
+      read =
+        ty: v:
+        let
+          x =
+            (genMerge.evalModuleTree { } [
+              { options.x = genMerge.mkOption { type = ty; }; }
+              { x = v; }
+            ]).config.x;
+        in
+        builtins.deepSeq x x;
+      refused = name: key: {
+        type = "ThrownError";
+        msg = "^gen-merge: `mkOptionType': the option type `${name}' declares a gen nesting type as an element [(]its `nestedTypes[.]${key}'[)]";
+      };
+      shape = ty: wrap: name: key: {
+        ok = {
+          expr = read (genSchema.refined ty refinement) (wrap {
+            a = 2;
+          });
+          expectedError = refused name key;
+        };
+        bad = {
+          expr = read (genSchema.refined ty refinement) (wrap {
+            a = 1;
+          });
+          expectedError = refused name key;
+        };
+      };
+      id = v: v;
+      shapes = {
+        nullOr = shape (t.nullOr sub) id "nullOr" "elemType";
+        listOf = shape (t.listOf sub) (v: [ v ]) "listOf" "elemType";
+        attrsOf = shape (t.attrsOf sub) (v: { k = v; }) "attrsOf" "elemType";
+        either = shape (t.either sub t.str) id "either" "left";
+        nullOr-nullOr = shape (t.nullOr (t.nullOr sub)) id "nullOr" "elemType";
+        np-nullOr = shape (lib.types.nullOr sub) id "nullOr" "elemType";
+        np-listOf = shape (lib.types.listOf sub) (v: [ v ]) "listOf" "elemType";
+        np-attrsOf = shape (lib.types.attrsOf sub) (v: { k = v; }) "attrsOf" "elemType";
+        np-either = shape (lib.types.either sub lib.types.str) id "either" "left";
+      };
+    in
+    lib.concatMapAttrs (n: s: {
+      "test-${n}-ok" = s.ok;
+      "test-${n}-bad" = s.bad;
+    }) shapes;
 }
