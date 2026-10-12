@@ -25,6 +25,7 @@
   declarationForm,
   filterValidators,
   getRefinements,
+  assertRefinementMap,
 }:
 let
   # OPTIONS FIRST, then the kind (den-hoag-7gp66 P2, rules 2 and 4): `mkInstanceType { extraModules?;
@@ -672,6 +673,7 @@ let
         # even when no validators or deferred coerce are present.
         builtins.seq refValidation result;
     in
+    assert assertRefinementMap "mkInstanceRegistry" refinements;
     merge.mkOption {
       inherit description;
       # `default` is LAZY in `kind`: `builtins.seq kind { }` is a thunk the option record's WHNF never

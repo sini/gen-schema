@@ -150,23 +150,23 @@ in
       };
 
     # ── O1's live controls: the mint is not dead, and `unmintable` is ATTRIBUTABLE ─────────────
-    # An INERT refinement set — no `check`, so no lambda — MINTS over a nullary base and its identity
-    # demand ANSWERS, and two inert sets SEPARATE. The same inert set over a PARAMETRIC base also mints
+    # An EMPTY refinement set — no `check`, so no lambda — MINTS over a nullary base and its identity
+    # demand ANSWERS, and two empty sets over different bases SEPARATE. The same empty set over a PARAMETRIC base also mints
     # and answers an identity demand, because gen-merge's composite base is minted: with no lambda there is
     # no sealed component, so the refusal in the cells above is attributable to the predicate alone.
     # Without these, every row above is satisfied by a constructor that refuses everything.
-    test-control-an-inert-refinement-still-mints-and-separates = {
+    test-control-an-empty-refinement-set-still-mints-and-separates = {
       expr =
         let
-          one = refined t.int [ { message = "inert"; } ];
-          two = refined t.int [ { message = "inert-two"; } ];
+          one = refined t.int [ ];
+          two = refined t.str [ ];
         in
         {
           mints = regime one;
           idAnswers = answers (genTypes.idOf one);
           separates = genTypes.idOf one != genTypes.idOf two;
-          overParametricBase = regime (refined L [ { message = "inert"; } ]);
-          overParametricBaseId = answers (genTypes.idOf (refined L [ { message = "inert"; } ]));
+          overParametricBase = regime (refined L [ ]);
+          overParametricBaseId = answers (genTypes.idOf (refined L [ ]));
         };
       expected = {
         mints = "minted";

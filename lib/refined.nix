@@ -13,6 +13,41 @@
 let
   normalizeRefinements = r: if builtins.isList r then r else [ r ];
 
+  # A refinement is a RECORD `{ check; message; lazy? }` (Findler 2002: a predicate paired with the
+  # blame it reports). `message` is not optional decoration: the first failing refinement is reported
+  # BY ITS MESSAGE, and a bare predicate has none to report, so a bare function is refused rather than
+  # given an invented one. The shape is decided where the refinement enters, because every reader
+  # downstream (`verify`, the instance pass) selects `check`, `message` and `lazy` off it and a
+  # selection off any other shape aborts uncatchably.
+  refinementFault =
+    r:
+    if !(builtins.isAttrs r) then
+      "is of type `${builtins.typeOf r}`, not a refinement record"
+    else if !(r ? check) then
+      "has no `check`"
+    else if !(builtins.isFunction r.check || (r.check ? __functor)) then
+      "has a `check` of type `${builtins.typeOf r.check}`, not a function"
+    else if !(r ? message) then
+      "has no `message`"
+    else if !(builtins.isString r.message) then
+      "has a `message` of type `${builtins.typeOf r.message}`, not a string"
+    else if r ? lazy && !(builtins.isBool r.lazy) then
+      "has a `lazy` of type `${builtins.typeOf r.lazy}`, not a bool"
+    else
+      null;
+
+  # assertRefinements : string -> [ any ] -> true — `site` names the entry point in the refusal.
+  assertRefinements =
+    site: rs:
+    builtins.all (
+      i:
+      let
+        fault = refinementFault (builtins.elemAt rs i);
+      in
+      fault == null
+      || throw "gen-schema: ${site}: refinement ${toString i} ${fault}. A refinement is a record `{ check = <value -> bool>; message = \"<what a violation reports>\"; }` (`lazy = true` optional); a bare predicate has no message to report, so write it as `{ check = <predicate>; message = \"…\"; }`."
+    ) (builtins.genList (i: i) (builtins.length rs));
+
   # A refined type is DERIVED from its base rather than described from scratch: it keeps the
   # base's value behaviour and adds the predicate metadata. That derivation still has to go
   # through the completion path. `baseType // { __schema = …; }` is an override over an already
@@ -65,17 +100,8 @@ let
           [ baseType ]
           (tags: {
             base = builtins.head tags;
-            # a refinement's `check` is sealed; one with no `check` is inert and enters whole, and
-            # one that is not a record is sealed whole
-            refinements = map (
-              r:
-              if !(builtins.isAttrs r) then
-                sealedMarker
-              else if r ? check then
-                r // { check = sealedMarker; }
-              else
-                r
-            ) normalized;
+            # a refinement's `check` is sealed (every refinement is a record with one, `assertRefinements`)
+            refinements = map (r: r // { check = sealedMarker; }) normalized;
           })
           (builtins.concatLists (
             builtins.genList (
@@ -87,25 +113,13 @@ let
                   (toString i)
                 ];
               in
-              if !(builtins.isAttrs r) then
-                [
-                  {
-                    inherit path;
-                    # a bare function refinement has no identity: a closure per construction, as
-                    # gen-types' `refined` and `mkIdentity` give one
-                    value = if builtins.isFunction r then { fn = _: r; } else r;
-                  }
-                ]
-              else if !(r ? check) then
-                [ ]
-              else
-                [
-                  {
-                    inherit path;
-                    # a slice keeps the check's slot, where a selection would be a fresh thunk
-                    value = if hasDeclaredSubject r.check then r.check else builtins.intersectAttrs { check = null; } r;
-                  }
-                ]
+              [
+                {
+                  inherit path;
+                  # a slice keeps the check's slot, where a selection would be a fresh thunk
+                  value = if hasDeclaredSubject r.check then r.check else builtins.intersectAttrs { check = null; } r;
+                }
+              ]
             ) (builtins.length normalized)
           ))
           functorName;
@@ -220,88 +234,108 @@ let
       # base are unchanged, and a gen base is copied as it is.
       copied = if baseType ? typeMergeRel then baseType else merge.mkOptionType baseType;
 
-      result = merge.mkOptionType (
-        builtins.removeAttrs copied [
-          "functor"
-          "typeMerge"
-          "__mint"
-          "__okAt"
-          "__payload"
-          "__sealed"
-          # the base's completion stamp names the BASE's record; this record is completed by
-          # gen-merge's `mkOptionType`, whose boundary stamps it
-          "__typeSelf"
-        ]
-        // identityFields
-        // {
-          # THE REFINEMENT IS PART OF THE TYPE'S MEMBERSHIP, wherever the type is used (§ Rondon 2008:
-          # `{v:B | e}` has no member failing `e`). The base answers first, then the first failing
-          # refinement by its own message, evaluated in order and stopping there — gen-types' `refined`
-          # (`firstFailingRefinement`) matched, through the `verify` reason channel gen-merge reads, so
-          # an earlier refinement guards a later one. Every refinement is included, `lazy` ones too:
-          # gen-merge runs `verify` when the value is demanded, which is a lazy refinement's access. A
-          # refinement's `check` is a caller lambda; one ill-typed over the base aborts uncatchably, so
-          # each application carries the refinement's message as error context.
-          verify =
-            v:
-            let
-              baseReason =
-                if baseType ? verify then
-                  baseType.verify v
-                else if baseType.check v then
-                  null
-                else
-                  "not of type `${baseType.name or "?"}'";
-              firstFailing =
-                i:
-                let
-                  r = builtins.elemAt normalized i;
-                in
-                if i == builtins.length normalized then
-                  null
-                else if
-                  builtins.addErrorContext "gen-schema: refined: while checking the refinement \"${r.message or "?"}\"" (
-                    r.check v
-                  )
-                then
-                  firstFailing (i + 1)
-                else
-                  r.message;
-            in
-            if baseReason != null then baseReason else firstFailing 0;
-          # No `check` is stated: gen-merge derives the published `check` and its witness from
-          # `verify` (`exportType`, "check <- verify"), so the domain is stated once.
-          __schema = {
-            refinements = normalized;
-            baseType = baseType;
-          };
+      result =
+        assert assertRefinements "refined" normalized;
+        merge.mkOptionType (
+          builtins.removeAttrs copied [
+            "functor"
+            "typeMerge"
+            "__mint"
+            "__okAt"
+            "__payload"
+            "__sealed"
+            # the base's completion stamp names the BASE's record; this record is completed by
+            # gen-merge's `mkOptionType`, whose boundary stamps it
+            "__typeSelf"
+          ]
+          // identityFields
+          // {
+            # THE REFINEMENT IS PART OF THE TYPE'S MEMBERSHIP, wherever the type is used (§ Rondon 2008:
+            # `{v:B | e}` has no member failing `e`). The base answers first, then the first failing
+            # refinement by its own message, evaluated in order and stopping there — gen-types' `refined`
+            # (`firstFailingRefinement`) matched, through the `verify` reason channel gen-merge reads, so
+            # an earlier refinement guards a later one. Every refinement is included, `lazy` ones too:
+            # gen-merge runs `verify` when the value is demanded, which is a lazy refinement's access. A
+            # refinement's `check` is a caller lambda; one ill-typed over the base aborts uncatchably, so
+            # each application carries the refinement's message as error context.
+            verify =
+              v:
+              let
+                baseReason =
+                  if baseType ? verify then
+                    baseType.verify v
+                  else if baseType.check v then
+                    null
+                  else
+                    "not of type `${baseType.name or "?"}'";
+                firstFailing =
+                  i:
+                  let
+                    r = builtins.elemAt normalized i;
+                  in
+                  if i == builtins.length normalized then
+                    null
+                  else if
+                    builtins.addErrorContext "gen-schema: refined: while checking the refinement \"${r.message}\"" (
+                      r.check v
+                    )
+                  then
+                    firstFailing (i + 1)
+                  else
+                    r.message;
+              in
+              if baseReason != null then baseReason else firstFailing 0;
+            # No `check` is stated: gen-merge derives the published `check` and its witness from
+            # `verify` (`exportType`, "check <- verify"), so the domain is stated once.
+            __schema = {
+              refinements = normalized;
+              baseType = baseType;
+            };
 
-          # `__mint`, `__payload`, `__sealed` and `__okAt` are gen-types' identity fields for
-          # this construction (`identityFields` above), so a reader dispatches on the TAG and `typeEq`
-          # decides over the mark and the sealed subjects, as for every gen-types type.
+            # `__mint`, `__payload`, `__sealed` and `__okAt` are gen-types' identity fields for
+            # this construction (`identityFields` above), so a reader dispatches on the TAG and `typeEq`
+            # decides over the mark and the sealed subjects, as for every gen-types type.
 
-          typeMerge = relation;
-          # payload null is the honest shape for a metadata decoration: there is nothing to fold
-          # when two of these meet, only an identity to agree on. A base whose own functor carries
-          # a payload does not lose it — a refined type and its base never merge in the first place.
-          functor = {
-            name = functorName;
-            type = result;
-            payload = null;
-            binOp = _a: _b: null;
-          };
-          # A base that carries no module set answers null to a substitution, and so does a
-          # refinement of it — refining null would be a type where the base refused to give one.
-          substSubModules =
-            m:
-            let
-              substituted = if baseType ? substSubModules then baseType.substSubModules m else null;
-            in
-            if substituted == null then null else mkRefinedType substituted normalized;
-        }
-      );
+            typeMerge = relation;
+            # payload null is the honest shape for a metadata decoration: there is nothing to fold
+            # when two of these meet, only an identity to agree on. A base whose own functor carries
+            # a payload does not lose it — a refined type and its base never merge in the first place.
+            functor = {
+              name = functorName;
+              type = result;
+              payload = null;
+              binOp = _a: _b: null;
+            };
+            # A base that carries no module set answers null to a substitution, and so does a
+            # refinement of it — refining null would be a type where the base refused to give one.
+            substSubModules =
+              m:
+              let
+                substituted = if baseType ? substSubModules then baseType.substSubModules m else null;
+              in
+              if substituted == null then null else mkRefinedType substituted normalized;
+          }
+        );
     in
     result;
+
+  # assertRefinementMap : string -> { field = [ refinement ]; } -> true — the registry's `refinements`
+  # argument, which reaches the instance pass without passing through `refined`.
+  assertRefinementMap =
+    site: m:
+    if !(builtins.isAttrs m) then
+      throw "gen-schema: ${site}: refinements is of type `${builtins.typeOf m}`, not an attrset of lists of refinement records"
+    else
+      builtins.all (
+        f:
+        let
+          rs = m.${f};
+        in
+        if builtins.isList rs then
+          assertRefinements "${site}: refinements.${f}" rs
+        else
+          throw "gen-schema: ${site}: refinements.${f} is of type `${builtins.typeOf rs}`, not a list of refinement records"
+      ) (builtins.attrNames m);
 
   getRefinements = type: if type ? __schema then type.__schema.refinements else [ ];
 
@@ -345,6 +379,8 @@ in
 {
   inherit
     mkRefinedType
+    assertRefinements
+    assertRefinementMap
     getRefinements
     isRefined
     checkRefinements

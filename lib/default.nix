@@ -221,7 +221,7 @@ let
       isCanonicalOf
       declarationForm
       ;
-    inherit (refinedLib) getRefinements;
+    inherit (refinedLib) getRefinements assertRefinementMap;
   };
   docs = import ./docs.nix { inherit prelude; };
   codecLib = import ./codec.nix {

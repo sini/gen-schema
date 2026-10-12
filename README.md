@@ -1886,6 +1886,11 @@ port = mkOption {
 port = mkOption { type = genSchema.refined lib.types.int genSchema.refinements.tcpPort; };
 ```
 
+A refinement is a record `{ check; message; lazy? }`: the predicate paired with the blame it reports. Anything else
+(a bare predicate, a record with no `check` or no `message`, a `check` that is not a function, a `message` that is not
+a string, a `lazy` that is not a bool) is refused by name and catchably where it enters, at `refined`, at
+`checkRefinements`' type and at `mkInstanceRegistry`'s `refinements`, rather than aborting when a value is first checked.
+
 Set `lazy = true` on a refinement to defer its check until the value is demanded (§ Chitil 2012). Inside a kind, a field is left unforced when the instance is built and checked when it is read, so reading a sibling never fails on it, in two cases: every refinement on the field is `lazy`, or the field carries a module set at any carried depth (its type is a `submodule`, or one under `nullOr`, `attrsOf`, `either` or any other container, but not a `refined` over such a container, which is refused: see below; or it is an option group with such an option beneath it). Any other field with one strict refinement is demanded at construction, and its whole conjunction, lazy refinements included, is decided then: on a flat value (an `int`, a `str`) the demanded value has nothing left to defer (Chitil §7.3, *lazy contracts behave like eager contracts*). On a non-flat base carrying no module set (`lazyAttrsOf`, `listOf`) a lazy predicate decided then may force parts of the value nothing else demanded. A field carrying a module set is the exception because its value is a module tree whose declarations may read back into the registry being built, and demanding it at construction would recurse uncatchably: a failing refinement on it refuses that field's read, and its siblings still read. What a type carries is read to gen-merge's type-walk bound, and a type the walk does not finish within that bound is treated as carrying a module set, because demanding a module set nested past the bound would be the same uncatchable recursion. That includes every self-referential type, which never ends: nixpkgs' `types.json` shape, the `settings` type of `pkgs.formats`, is checked at access although its value is flat, since no type walk can tell a cyclic type from a deep one. A lazy refinement reads:
 
 ```nix
@@ -2053,9 +2058,8 @@ nix eval --override-input gen-schema ../.. .#docs --raw
 
 `==` compares a function by its value SLOT on upstream Nix and Determinate and by its OBJECT on
 Lix (the Nix manual, *Value identity optimization*), so one function reaching both operands of an
-identity decision through two slots splits them. A bare function refinement of `refined` has no
-identity: its sealed subject is a closure allocated per construction (`lib/refined.nix`), so two
-constructions over it are refused on all three evaluators. Two sites cannot close that way:
+identity decision through two slots splits them. Two sites cannot close that way, both on a
+refinement record's `check` (a refinement that is not such a record is refused at formation):
 
 - **`lib/refined.nix` `mkRefinedType`, a refinement record's `check` slice.** One `check` passed by
   selection to two refinements (`refined int { check = s.pos; message = …; }` twice) is refused on

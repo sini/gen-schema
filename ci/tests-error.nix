@@ -4505,14 +4505,13 @@ in
     };
   };
 
-  # ★ THE EVALUATOR DIVERGENCE OF `refined` (README "Evaluator divergences (stated)"). A bare function
-  # refinement has no identity, so two constructions over it are refused on all three evaluators.
-  # A refinement record's `check` is sealed in its slot, so one `check` reached through two slots
+  # ★ THE EVALUATOR DIVERGENCE OF `refined` (README "Evaluator divergences (stated)"). A refinement
+  # record's `check` is sealed in its slot, so one `check` reached through two slots
   # splits `==`; the split cell holds the verdict to the RUNNING evaluator's own `==` on a literal
   # two-slot shape, and the partner, one bound `check` in two refinements, is `true` ×3. The merge
-  # `relation` compares the refinement lists with `==`, so one bare function selected at two
-  # declarations of one option splits it the same way; those cells read the merged type's NAME,
-  # because checking a value against a bare function refinement aborts. A registered check is
+  # `relation` compares the refinement lists with `==`, so one refinement `check` selected at two
+  # declarations of one option splits it the same way; those cells read the merged type's NAME.
+  # A registered check is
   # compared by its declared subject there, so it splits nothing.
   flake.testsError.refined-evaluator-divergence =
     let
@@ -4541,7 +4540,11 @@ in
           check = c;
           message = "positive";
         };
-      decl = f: { options.s = genMerge.mkOption { type = genSchema.refined genMerge.types.int f; }; };
+      decl = r: { options.s = genMerge.mkOption { type = genSchema.refined genMerge.types.int r; }; };
+      rc = c: {
+        check = c;
+        message = "positive";
+      };
       registry = {
         revision = "r1";
         members.gtN = n: x: x > n;
@@ -4553,26 +4556,6 @@ in
       };
     in
     {
-      test-a-bare-function-refinement-in-two-constructions-is-refused-on-every-evaluator = {
-        expr = {
-          bound = teq (genSchema.refined genMerge.types.int pos) (genSchema.refined genMerge.types.int pos);
-          selected = teq (genSchema.refined genMerge.types.int sl.pos) (
-            genSchema.refined genMerge.types.int sl.pos
-          );
-        };
-        expected = {
-          bound = "REFUSED";
-          selected = "REFUSED";
-        };
-      };
-      test-a-bare-function-refinement-in-one-construction-is-itself = {
-        expr =
-          let
-            x = genSchema.refined genMerge.types.int pos;
-          in
-          teq x x;
-        expected = true;
-      };
       test-a-refinement-check-by-selection-answers-as-the-evaluator-s-own-identity = {
         expr = teq (ref sl.pos) (ref sl.pos) == twoSlots;
         expected = true;
@@ -4581,23 +4564,23 @@ in
         expr = teq (ref pos) (ref pos);
         expected = true;
       };
-      test-a-bare-function-refinement-by-selection-in-two-declarations-merges-as-the-evaluator-s-own-identity = {
+      test-a-refinement-check-by-selection-in-two-declarations-merges-as-the-evaluator-s-own-identity = {
         expr =
           (
             verdict
               (genMerge.evalModuleTree { } [
-                (decl sl.pos)
-                (decl sl.pos)
+                (decl (rc sl.pos))
+                (decl (rc sl.pos))
               ]).options.s.type.name == "int"
           ) == (twoSlots == true);
         expected = true;
       };
-      test-a-bound-bare-function-refinement-in-two-declarations-merges = {
+      test-a-bound-refinement-check-in-two-declarations-merges = {
         expr =
           verdict
             (genMerge.evalModuleTree { } [
-              (decl pos)
-              (decl pos)
+              (decl (rc pos))
+              (decl (rc pos))
             ]).options.s.type.name;
         expected = "int";
       };
@@ -4669,6 +4652,87 @@ in
           type = "ThrownError";
           msg = "^gen-merge: a definition for option `hosts[.]igloo[.]settings' is not of the expected type: always fails$";
         };
+      };
+    };
+
+  # A refinement is a RECORD `{ check; message; lazy? }`, decided where it enters, so a malformed one
+  # (a bare predicate above all) refuses by name and catchably at the entry point, instead of aborting
+  # uncatchably ("expected a set but found a function") when a value is first checked against it.
+  # `ThrownError` is the catchable class: an interpreter error would read as another `type`. Every cell
+  # reads the type's NAME or builds the registry and nothing more, so no value is ever checked.
+  flake.testsError.refined-refinement-shape =
+    let
+      pos = x: x > 0;
+      rec_ = {
+        check = pos;
+        message = "must be positive";
+      };
+      refusal = at: why: "^gen-schema: ${at}: ${why}[.] A refinement is a record .*[.]$";
+      nameOf = rs: (genSchema.refined genMerge.types.int rs).name;
+      regOf =
+        refinements:
+        (genMerge.evalModuleTree { } [
+          {
+            options.hosts = genSchema.mkInstanceRegistry { inherit refinements; } (
+              (genSchema.evalSchema { } [
+                {
+                  config.schema.host.options.port = genMerge.mkOption { type = genMerge.types.int; };
+                }
+              ]).host
+            );
+            config.hosts.h1.port = 5;
+          }
+        ]).config.hosts.h1.port;
+      refused = expr: msg: {
+        inherit expr;
+        expectedError = {
+          type = "ThrownError";
+          inherit msg;
+        };
+      };
+    in
+    {
+      test-a-bare-predicate-refuses-at-formation = refused (nameOf pos) (
+        refusal "refined" "refinement 0 is of type `lambda`, not a refinement record"
+      );
+      test-a-bare-predicate-in-a-list-refuses-at-its-index = refused (nameOf [
+        rec_
+        pos
+      ]) (refusal "refined" "refinement 1 is of type `lambda`, not a refinement record");
+      test-a-refinement-with-no-message-refuses = refused (nameOf { check = pos; }) (
+        refusal "refined" "refinement 0 has no `message`"
+      );
+      test-a-refinement-with-no-check-refuses = refused (nameOf { message = "m"; }) (
+        refusal "refined" "refinement 0 has no `check`"
+      );
+      test-a-refinement-whose-check-is-not-a-function-refuses = refused (nameOf {
+        check = "x";
+        message = "m";
+      }) (refusal "refined" "refinement 0 has a `check` of type `string`, not a function");
+      test-a-refinement-whose-lazy-is-not-a-bool-refuses = refused (nameOf (rec_ // { lazy = "yes"; })) (
+        refusal "refined" "refinement 0 has a `lazy` of type `string`, not a bool"
+      );
+      test-a-refinement-whose-message-is-not-a-string-refuses = refused (nameOf {
+        check = pos;
+        message = 3;
+      }) (refusal "refined" "refinement 0 has a `message` of type `int`, not a string");
+      test-a-registry-bare-predicate-refuses = refused (regOf { port = [ pos ]; }) (
+        refusal "mkInstanceRegistry" "refinements[.]port: refinement 0 is of type `lambda`, not a refinement record"
+      );
+      test-a-registry-refinements-that-is-not-an-attrset-refuses =
+        refused (regOf [ rec_ ])
+          "^gen-schema: mkInstanceRegistry: refinements is of type `list`, not an attrset of lists of refinement records$";
+      test-a-registry-field-that-is-not-a-list-refuses =
+        refused (regOf { port = rec_; })
+          "^gen-schema: mkInstanceRegistry: refinements[.]port is of type `set`, not a list of refinement records$";
+      # the controls: the same constructions over well-formed records answer
+      test-control-a-record-refinement-forms = {
+        expr = nameOf rec_;
+        expected = "int";
+      };
+      test-control-a-registry-record-refinement-builds = {
+        expr = regOf { port = [ rec_ ]; };
+        expected = 5;
       };
     };
 
