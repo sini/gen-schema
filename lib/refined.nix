@@ -11,42 +11,45 @@
   sealedMarker,
 }:
 let
-  normalizeRefinements = r: if builtins.isList r then r else [ r ];
-
   # A refinement is a RECORD `{ check; message; lazy? }` (Findler 2002: a predicate paired with the
   # blame it reports). `message` is not optional decoration: the first failing refinement is reported
   # BY ITS MESSAGE, and a bare predicate has none to report, so a bare function is refused rather than
   # given an invented one. The shape is decided where the refinement enters, because every reader
   # downstream (`verify`, the instance pass) selects `check`, `message` and `lazy` off it and a
   # selection off any other shape aborts uncatchably.
-  refinementFault =
-    r:
-    if !(builtins.isAttrs r) then
-      "is of type `${builtins.typeOf r}`, not a refinement record"
-    else if !(r ? check) then
-      "has no `check`"
-    else if !(builtins.isFunction r.check || (r.check ? __functor)) then
-      "has a `check` of type `${builtins.typeOf r.check}`, not a function"
-    else if !(r ? message) then
-      "has no `message`"
-    else if !(builtins.isString r.message) then
-      "has a `message` of type `${builtins.typeOf r.message}`, not a string"
-    else if r ? lazy && !(builtins.isBool r.lazy) then
-      "has a `lazy` of type `${builtins.typeOf r.lazy}`, not a bool"
-    else
-      null;
-
-  # assertRefinements : string -> [ any ] -> true — `site` names the entry point in the refusal.
-  assertRefinements =
-    site: rs:
-    builtins.all (
+  # normalizeRefinements : string -> refinement | [ refinement ] -> [ refinement ] — the list a
+  # refinement argument denotes, every member checked against the record shape; `site` names the entry
+  # point in the refusal.
+  normalizeRefinements =
+    site: r:
+    let
+      rs = if builtins.isList r then r else [ r ];
+      shape =
+        r:
+        if !(builtins.isAttrs r) then
+          "is of type `${builtins.typeOf r}`, not a refinement record"
+        else if !(r ? check) then
+          "has no `check`"
+        else if !(builtins.isFunction r.check || (r.check ? __functor)) then
+          "has a `check` of type `${builtins.typeOf r.check}`, not a function"
+        else if !(r ? message) then
+          "has no `message`"
+        else if !(builtins.isString r.message) then
+          "has a `message` of type `${builtins.typeOf r.message}`, not a string"
+        else if r ? lazy && !(builtins.isBool r.lazy) then
+          "has a `lazy` of type `${builtins.typeOf r.lazy}`, not a bool"
+        else
+          null;
+    in
+    assert builtins.all (
       i:
       let
-        fault = refinementFault (builtins.elemAt rs i);
+        reason = shape (builtins.elemAt rs i);
       in
-      fault == null
-      || throw "gen-schema: ${site}: refinement ${toString i} ${fault}. A refinement is a record `{ check = <value -> bool>; message = \"<what a violation reports>\"; }` (`lazy = true` optional); a bare predicate has no message to report, so write it as `{ check = <predicate>; message = \"…\"; }`."
+      reason == null
+      || throw "gen-schema: ${site}: refinement ${toString i} ${reason}. A refinement is a record `{ check = <value -> bool>; message = \"<what a violation reports>\"; }` (`lazy = true` optional); a bare predicate has no message to report, so write it as `{ check = <predicate>; message = \"…\"; }`."
     ) (builtins.genList (i: i) (builtins.length rs));
+    rs;
 
   # A refined type is DERIVED from its base rather than described from scratch: it keeps the
   # base's value behaviour and adds the predicate metadata. That derivation still has to go
@@ -77,7 +80,7 @@ let
   mkRefinedType =
     baseType: refinements:
     let
-      normalized = normalizeRefinements refinements;
+      normalized = normalizeRefinements "refined" refinements;
 
       # ★ THE IDENTITY, PER COMPONENT (ADR-0034's per-component clause; den-hoag-6orb8 U1.5): the
       # constructor, the base and each refinement, built by gen-types' `mkIdentity`. The base enters
@@ -100,7 +103,7 @@ let
           [ baseType ]
           (tags: {
             base = builtins.head tags;
-            # a refinement's `check` is sealed (every refinement is a record with one, `assertRefinements`)
+            # a refinement's `check` is sealed (every refinement is a record with one, `normalizeRefinements`)
             refinements = map (r: r // { check = sealedMarker; }) normalized;
           })
           (builtins.concatLists (
@@ -235,7 +238,8 @@ let
       copied = if baseType ? typeMergeRel then baseType else merge.mkOptionType baseType;
 
       result =
-        assert assertRefinements "refined" normalized;
+        # forced with the type: the shape refusal is not left to the first reader of `normalized`
+        assert builtins.isList normalized;
         merge.mkOptionType (
           builtins.removeAttrs copied [
             "functor"
@@ -319,24 +323,6 @@ let
     in
     result;
 
-  # assertRefinementMap : string -> { field = [ refinement ]; } -> true — the registry's `refinements`
-  # argument, which reaches the instance pass without passing through `refined`.
-  assertRefinementMap =
-    site: m:
-    if !(builtins.isAttrs m) then
-      throw "gen-schema: ${site}: refinements is of type `${builtins.typeOf m}`, not an attrset of lists of refinement records"
-    else
-      builtins.all (
-        f:
-        let
-          rs = m.${f};
-        in
-        if builtins.isList rs then
-          assertRefinements "${site}: refinements.${f}" rs
-        else
-          throw "gen-schema: ${site}: refinements.${f} is of type `${builtins.typeOf rs}`, not a list of refinement records"
-      ) (builtins.attrNames m);
-
   getRefinements = type: if type ? __schema then type.__schema.refinements else [ ];
 
   isRefined = type: type ? __schema && type.__schema ? refinements;
@@ -379,8 +365,7 @@ in
 {
   inherit
     mkRefinedType
-    assertRefinements
-    assertRefinementMap
+    normalizeRefinements
     getRefinements
     isRefined
     checkRefinements

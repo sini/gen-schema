@@ -24,8 +24,7 @@
   isCanonicalOf,
   declarationForm,
   filterValidators,
-  getRefinements,
-  assertRefinementMap,
+  refinedLib,
 }:
 let
   # OPTIONS FIRST, then the kind (den-hoag-7gp66 P2, rules 2 and 4): `mkInstanceType { extraModules?;
@@ -554,7 +553,7 @@ let
           # value a demanded field has nothing left to defer (Chitil §7.3).
           typeRefinements = prelude.filterAttrs (_: rs: rs != [ ]) (
             prelude.mapAttrs (
-              _: o: if (o._type or null) == "option" && o ? type then getRefinements o.type else [ ]
+              _: o: if (o._type or null) == "option" && o ? type then refinedLib.getRefinements o.type else [ ]
             ) (kindValue.options or { })
           );
           passRefinements =
@@ -673,7 +672,23 @@ let
         # even when no validators or deferred coerce are present.
         builtins.seq refValidation result;
     in
-    assert assertRefinementMap "mkInstanceRegistry" refinements;
+    assert
+      refinements == { }
+      || (
+        if !(builtins.isAttrs refinements) then
+          throw "gen-schema: mkInstanceRegistry: refinements is of type `${builtins.typeOf refinements}`, not an attrset of lists of refinement records"
+        else
+          builtins.all (
+            f:
+            let
+              rs = refinements.${f};
+            in
+            if builtins.isList rs then
+              builtins.isList (refinedLib.normalizeRefinements "mkInstanceRegistry: refinements.${f}" rs)
+            else
+              throw "gen-schema: mkInstanceRegistry: refinements.${f} is of type `${builtins.typeOf rs}`, not a list of refinement records"
+          ) (builtins.attrNames refinements)
+      );
     merge.mkOption {
       inherit description;
       # `default` is LAZY in `kind`: `builtins.seq kind { }` is a thunk the option record's WHNF never
