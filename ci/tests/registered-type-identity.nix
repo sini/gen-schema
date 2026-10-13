@@ -65,6 +65,7 @@ let
     };
   kindOfChk = c: kindOf (srf T.int c);
   oddBase = lib.types.addCheck T.int (v: builtins.bitAnd v 1 == 1);
+  joinedBase = genMerge.mergeTypes (lib.types.enum [ "a" ]) (lib.types.enum [ "b" ]);
 in
 {
   flake.tests.registered-type-identity = {
@@ -189,6 +190,70 @@ in
           "REFUSED"
         ];
         controlBaseStr = false;
+      };
+    };
+
+    # A refined type over a rewritten or a met-joined base states its domain once, in `verify`, and
+    # its published pair is derived from it, so two constructions over one base record are one type,
+    # as over `int`. While the copy carried the base's rewritten pair, `typeEq` decided them `false`.
+    test-a-refined-type-over-a-rewritten-base-is-its-twin = {
+      expr = {
+        rewritten = T.typeEq (srf oddBase t1) (srf oddBase t1');
+        joined = T.typeEq (srf joinedBase t1) (srf joinedBase t1');
+        control = T.typeEq (srf T.int t1) (srf T.int t1');
+      };
+      expected = {
+        rewritten = true;
+        joined = true;
+        control = true;
+      };
+    };
+
+    # THE IDENTITY RESIDUE of a merge over two DIFFERENT bases. Each conjoined refinement is owed
+    # relative to its own operand's base, `(B => e)`, which is a fresh caller lambda per merge, so two
+    # separately built merges are refused by `typeEq` (ADR-0034: that component's collapse is replaced
+    # by a refusal). Over ONE base no operand is widened, the refinements keep their slots, and the
+    # twins decide `true`; so does a shared refinement.
+    test-a-merge-over-differing-bases-refuses-its-twin = {
+      expr =
+        let
+          reg = {
+            revision = "r1";
+            members.ne = a: v: v != a.x;
+          };
+          ne = x: genAlgebra.mkIntensional genIdentity.hashIdentity reg "ne" { inherit x; };
+          decl =
+            ts:
+            (genMerge.evalModuleTree { } (map (ty: { options.o = genMerge.mkOption { type = ty; }; }) ts))
+            .options.o.type;
+          twins =
+            a: b:
+            let
+              r = builtins.tryEval (
+                T.typeEq
+                  (decl [
+                    (a 0)
+                    (b 0)
+                  ])
+                  (decl [
+                    (a 1)
+                    (b 1)
+                  ])
+              );
+            in
+            if r.success then r.value else "REFUSED";
+        in
+        {
+          oneBase = twins (_: srf T.int (ne 1)) (_: srf T.int (ne 2));
+          shared = twins (_: srf T.int (ne 1)) (_: srf T.int (ne 1));
+          differingBases = twins (_: srf (T.enum "e" [ "a" ]) (ne "b")) (
+            _: srf (T.enum "e" [ "b" ]) (ne "a")
+          );
+        };
+      expected = {
+        oneBase = true;
+        shared = true;
+        differingBases = "REFUSED";
       };
     };
 

@@ -1727,18 +1727,12 @@ in
       };
     };
 
-    # ★ THE WORDING AT THE MERGE DOOR IS NON-DISCRIMINATING FOR REFINEMENTS THAT SHARE A BASE, and
-    # this cell pins that rather than pretending otherwise, as an equality between two refusals and
-    # not as gen-merge's text (den-hoag-7jltk): the same-base pair refuses with one string whichever
-    # refinements it carries. `foreignRel` names the pair by `t.name`,
-    # and a refined type deliberately keeps the BASE's name. It also names the two FUNCTOR names, but
-    # only where they differ (gen-merge `interface.functorNamesOf`), and two refinements of one base
-    # share the functor name `refined<int>'. So two refinements of one base produce the same string
-    # whichever refinements they carry, and an oracle pinning only this message cannot tell them
-    # apart; that discrimination is carried by the answer-and-survivors tables in
-    # `ci/tests/refined-identity.nix`, never by the wording. A refined type against its BARE base, or
-    # against a refinement of a different base, differs in functor name and is named by it.
-    test-the-merge-refusal-names-the-unreconciled-pair = {
+    # TWO REFINEMENTS OF ONE BASE MEET at the merge door, so no same-base refusal wording is left
+    # to pin (den-hoag-7jltk's non-discriminating string is gone with the refusal): the relation
+    # answers the base refined by both, in this operand's order, and a partner already holding a
+    # refinement adds nothing. The answer-and-survivors tables in `ci/tests/refined-identity.nix`
+    # carry the same reading through the declaration fold.
+    test-two-refinements-of-one-base-meet-at-the-merge-door = {
       expr =
         let
           port = genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ];
@@ -1747,27 +1741,36 @@ in
             genSchema.refinements.tcpPort
             genSchema.refinements.positive
           ];
-          a = (port.typeMergeRel positive).refused;
-          b = (port.typeMergeRel both).refused;
+          msgs = r: map (x: x.message) r.merged.__schema.refinements;
         in
-        builtins.isString a && a == b;
-      expected = true;
+        {
+          positive = msgs (port.typeMergeRel positive);
+          both = msgs (port.typeMergeRel both);
+        };
+      expected = {
+        positive = [
+          "must be a valid TCP port (1-65535)"
+          "must be positive"
+        ];
+        both = [
+          "must be a valid TCP port (1-65535)"
+          "must be positive"
+        ];
+      };
     };
 
-    # The control for the cell above, and the reason it is not vacuous: where the two bases differ
-    # the message DOES discriminate, by the type names and by the two functor names the refusal now
-    # carries. So the equality above is specific to the same-base pair rather than the template
-    # being a constant: against a different base the refusal differs.
+    # The control for the cell above, and the reason it is not vacuous: a pair whose bases do not
+    # join still refuses, named by the type names and the two functor names, so the meet is the
+    # relation's answer and not a door that merges everything.
     test-control-the-merge-refusal-discriminates-different-bases = {
       expr =
         let
           port = genSchema.refined genMerge.types.int [ genSchema.refinements.tcpPort ];
           other = genSchema.refined genMerge.types.str [ genSchema.refinements.positive ];
           positive = genSchema.refined genMerge.types.int [ genSchema.refinements.positive ];
-          a = (port.typeMergeRel positive).refused;
           b = (port.typeMergeRel other).refused;
         in
-        builtins.isString b && a != b;
+        builtins.isString b && (port.typeMergeRel positive) ? merged;
       expected = true;
     };
 
@@ -4640,16 +4643,25 @@ in
         expr = teq (ref pos) (ref pos);
         expected = true;
       };
+      # The pair merges on every evaluator (the meet), and the evaluator's own identity decides only
+      # whether the two refinements are held once: 1 on Lix, 2 on Nix and Determinate.
       test-a-refinement-check-by-selection-in-two-declarations-merges-as-the-evaluator-s-own-identity = {
         expr =
-          (
-            verdict
+          let
+            ty =
               (genMerge.evalModuleTree { } [
                 (decl (rc sl.pos))
                 (decl (rc sl.pos))
-              ]).options.s.type.name == "int"
-          ) == (twoSlots == true);
-        expected = true;
+              ]).options.s.type;
+          in
+          {
+            name = verdict ty.name;
+            heldOnce = (builtins.length ty.__schema.refinements == 1) == (twoSlots == true);
+          };
+        expected = {
+          name = "int";
+          heldOnce = true;
+        };
       };
       test-a-bound-refinement-check-in-two-declarations-merges = {
         expr =
@@ -4661,7 +4673,8 @@ in
         expected = "int";
       };
       # A registered check is decided by its declared subject, as `typeEq` decides it, so two
-      # constructions of one term merge on all three and two terms over different arguments do not.
+      # constructions of one term merge on all three as one check, and two terms over different
+      # arguments meet as two.
       test-two-constructions-of-one-registered-check-in-two-declarations-merge = {
         expr =
           verdict
@@ -4671,14 +4684,14 @@ in
             ]).options.s.type.name;
         expected = "int";
       };
-      test-registered-checks-over-different-arguments-in-two-declarations-are-refused = {
+      test-registered-checks-over-different-arguments-in-two-declarations-meet = {
         expr =
           verdict
             (genMerge.evalModuleTree { } [
               (decl (registered 0))
               (decl (registered 1))
             ]).options.s.type.name;
-        expected = "REFUSED";
+        expected = "int";
       };
     };
 

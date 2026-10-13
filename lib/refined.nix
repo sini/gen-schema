@@ -134,14 +134,13 @@ let
       # content, not per thing — otherwise one sealed component drags a whole kind onto the
       # comparison limb." `refined` has two components and they sit on different limbs:
       #
-      #   refinements — SEALED. Caller lambdas admit no total preimage, so the relation decides
-      #                 rather than mints, under Nix `==` over the refinement lists. A function is
-      #                 compared through its box, the list or record slot holding it, not as the
-      #                 reified value itself: Nix and Determinate compare that slot, Lix the
-      #                 object, and the README states the split as an evaluator divergence. A
-      #                 registered construction (gen-algebra `mkIntensional`) is compared by its
-      #                 declared subject where every refinement on both sides is one, as `typeEq`
-      #                 compares it above.
+      #   refinements — SEALED. Caller lambdas admit no total preimage, so they are never minted.
+      #                 The relation CONJOINS them (the meet, below) and compares them only to hold
+      #                 each check once: a function is compared through its box, the list or record
+      #                 slot holding it, not as the reified value itself (Nix and Determinate
+      #                 compare that slot, Lix the object, and the README states the split as an
+      #                 evaluator divergence), and a registered construction (gen-algebra
+      #                 `mkIntensional`) by its declared subject, as `typeEq` compares it above.
       #   baseType    — NOT sealed. It is a type that STATES ITS OWN MERGE RELATION, so the
       #                 relation is asked, through `merge.mergeTypes`. Taking `==` over the base
       #                 record instead would be "a copy of the relation living here", which this
@@ -188,18 +187,23 @@ let
       # the same pair declared bare is refused. `examples/demo`'s network kind declares `refined
       # lib.types.str …` and `refined lib.types.int …`, so the foreign population is live.
       #
-      # The property is PARITY: a refined pair whose refinements agree answers what its bare bases
-      # answer under `mergeTypes`, so a refinement is never more mergeable than its base. Two
+      # The property is PARITY: a refined pair answers what its bare bases answer under `mergeTypes`,
+      # so a refinement is never more mergeable than its base, and a refined type beside its bare
+      # base is refused in both orders (`partner ? __schema`). Two
       # IDENTICAL foreign bases are refused where the base's own relation refuses them — a
       # `coercedTo` twin (its coercion is a caller lambda, and ADR-0034's sealed-component clause
       # replaces that component's collapse with a refusal), a `json` or `attrListOf` twin, and a
       # nest deeper than the fuel — because the bare pair is refused the same way. Copying the
       # foreign relation here instead would drop the fuel guard and answer the question twice.
       #
-      # RESIDUE, stated rather than hidden: this relation can only answer `null`, so a refused
-      # refined twin is reported with gen-merge's generic "functor does not reconcile" wording
-      # even where the bare pair would name the exhausted fuel. The reason channel is gen-merge's
-      # wording door, not this constructor's.
+      # ★ DIFFERENT REFINEMENTS MEET (ADR-0039: a redeclared option accepts a definition only if every
+      # declared check does). `{v:B1 | e1} ⊓ {v:B2 | e2}` is the base join refined by both operands'
+      # refinements, each held once (`conjoined`), so the merged type rejects what either rejects.
+      #
+      # RESIDUE, stated rather than hidden: where the bases do not join this relation answers `null`,
+      # so a refused refined pair is reported with gen-merge's generic "functor does not reconcile"
+      # wording even where the bare pair would name the exhausted fuel. The reason channel is
+      # gen-merge's wording door, not this constructor's.
       relation =
         f:
         let
@@ -207,13 +211,44 @@ let
         in
         if !(builtins.isAttrs partner && partner ? __schema) then
           null
-        else if !(sameRefinements partner.__schema.refinements) then
-          null
         else
           let
             joined = merge.mergeTypes baseType partner.__schema.baseType;
           in
-          if joined == null then null else mkRefinedType joined normalized;
+          if joined == null then null else mkRefinedType joined (conjoined partner.__schema);
+
+      # The refinements the join carries: this operand's, then each of the partner's that this operand
+      # does not already hold (one slot, or one registered subject, as `sameRefinements` compares).
+      held =
+        r:
+        builtins.any (
+          n: [ n ] == [ r ] || (registered [ n ] && registered [ r ] && bySubject [ n ] == bySubject [ r ])
+        ) normalized;
+      # RELATIVE TO ITS OWN BASE: a join that widens an operand (the enum union, ADR-0039) owes each
+      # refinement only where its own operand's base admits the value, `(B1 => e1) && (B2 => e2)`, as
+      # gen-merge `meetOf` relativises a widened operand's wrapped check. Over ONE base (`typeEq`) no
+      # operand is widened, `(B => e)` is `e`, and the refinements keep their slots, so two merges of
+      # one pair stay one type. Over two bases each relativised check is a fresh lambda, so two
+      # separately built merges are refused by `typeEq` (ADR-0034's sealed-component refusal).
+      conjoined =
+        ps:
+        let
+          l = ps.refinements;
+          inBase = b: v: (b.check.__verifyProjection or b.check) v && (!(b ? verify) || b.verify v == null);
+          rel = b: r: r // { check = v: !(inBase b v) || r.check v; };
+          oneBase =
+            let
+              t = builtins.tryEval (merge.types.typeEq baseType ps.baseType);
+            in
+            t.success && t.value;
+          extra = builtins.filter (r: !(held r)) l;
+        in
+        if sameRefinements l then
+          normalized
+        else if oneBase then
+          normalized ++ extra
+        else
+          map (rel baseType) normalized ++ map (rel ps.baseType) extra;
 
       # Raw `==` first, so every refinement keeps its slot; mapping both sides to subjects
       # unconditionally would copy each element out of its slot and split a bound function too.
@@ -253,6 +288,16 @@ let
             "__typeSelf"
           ]
           // identityFields
+          # A copy arriving as a WITNESSED REWRITE (a met join, an `addCheck` over a gen record) would
+          # publish its own `check` through that derivation, the BASE's domain with the refinements
+          # unread. Its pair is replaced by one witnessed pair over this type's `verify`, which already
+          # reads the rewrite (`baseReason`), so the derivation applies to it as to every other copy.
+          // (
+            if copied ? _checkWitness && copied ? check && copied.check != copied._checkWitness then
+              merge.types.witnessedCheck (v: result.verify v == null)
+            else
+              { }
+          )
           // {
             # THE REFINEMENT IS PART OF THE TYPE'S MEMBERSHIP, wherever the type is used (§ Rondon 2008:
             # `{v:B | e}` has no member failing `e`). The base answers first, then the first failing
@@ -265,10 +310,25 @@ let
             verify =
               v:
               let
+                # the base's declared domain, read as gen-types' published `verifiersOf` reads a member
+                # and gen-merge's meet reads an operand (`interface.meetOf` `dom`): its `verify`, and its
+                # `check` where a wrapper rewrote it, since there the rewrite is the only place the
+                # wrapper's predicate is stated. Restated inline, not called: `verifiersOf` refuses a
+                # base that carries no `verify` (a foreign record), and per-type bindings cost the
+                # member load +37 B
                 baseReason =
-                  if baseType ? verify then
-                    baseType.verify v
-                  else if baseType.check v then
+                  let
+                    r = if baseType ? verify then baseType.verify v else null;
+                  in
+                  if r != null then
+                    r
+                  # gen-types' `rewritesCheck`, restated inline as gen-merge's per-fold sites restate it
+                  else if
+                    baseType ? verify
+                    && !(baseType ? _checkWitness && baseType ? check && baseType.check != baseType._checkWitness)
+                  then
+                    null
+                  else if (baseType.check.__verifyProjection or baseType.check) v then
                     null
                   else
                     "not of type `${baseType.name or "?"}'";
@@ -289,8 +349,8 @@ let
                     r.message;
               in
               if baseReason != null then baseReason else firstFailing 0;
-            # No `check` is stated: gen-merge derives the published `check` and its witness from
-            # `verify` (`exportType`, "check <- verify"), so the domain is stated once.
+            # No `check` is stated: gen-merge derives the published `check` and its witness from `verify`
+            # (`exportType`, "check <- verify"), so the domain is stated once.
             __schema = {
               refinements = normalized;
               baseType = baseType;

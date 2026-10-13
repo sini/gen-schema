@@ -1897,7 +1897,7 @@ Set `lazy = true` on a refinement to defer its check until the value is demanded
 { check = self: self > 0; message = "must be positive"; lazy = true; }
 ```
 
-A refined type keeps its base's `name` — a refined `int` still says `int` in its error messages — but carries a distinct functor name, `refined<int>`, which is the identity two declarations of the same option are compared on. Declaring an option twice as the same refined type merges to that type with its refinements intact; declaring it once refined and once as the bare base is a reported type conflict rather than a silent drop to the unrefined type.
+A refined type keeps its base's `name` — a refined `int` still says `int` in its error messages — but carries a distinct functor name, `refined<int>`, which is the identity two declarations of the same option are compared on. Declaring an option twice as the same refined type merges to that type with its refinements intact. Declaring it with two different refinements over bases that join merges to the meet (ADR-0039: a redeclared option accepts a definition only if every declared check does): the base join refined by both, each refinement owed relative to its own operand's base where the join widens one (an `enum` union), so the merged type rejects what either declaration rejects. Declaring it once refined and once as the bare base is a reported type conflict rather than a silent drop to the unrefined type.
 
 A refined type's **identity** is gen-types' per-component construction (`mkIdentity`): it mints over the constructor, the base and each refinement's inert content, with each refinement's `check` a sealed component carried in `__sealed`. A `check` may be a lambda or a registered construction (gen-algebra `mkIntensional`); on any other base a registered one is compared by its declared subject, so two constructions of one registered term are one type under `typeEq` and one kind under `kindEq`, and a different argument or revision is another. The base enters by its mark, or **sealed** where it carries no mint or a wrapper rewrote its `check`, so `refined int r` and `refined (addCheck int odd) r` are two types. A refinement over a container of submodules is the exception: two separate constructions of one such refined container share no identity, because the mint cannot take a `verify` closure. The site is sealed, so it carries no identity and a total tagged field, and `typeEq` of two such constructions is a named refusal whenever an identity is demanded. That is by design, and no attestation field restores it.
 
@@ -2070,15 +2070,23 @@ refinement record's `check` (a refinement that is not such a record is refused a
   same site for its own `refined`, and the rest of the split, in its README.
   `ci/tests-error.nix` `refined-evaluator-divergence` pins the split to each evaluator's own `==` on
   a literal two-slot shape, beside its partner at `true` ×3.
-- **`lib/refined.nix` `mkRefinedType` `relation`, the merge relation's `partner.__schema.refinements != normalized`.** Two declarations of one option, each `refined int f` with one function selected at each
-  site, are refused on Nix and Determinate and merged on Lix. The partner, one bound function in both
-  declarations, merges on all three. It closes when every refinement on both declarations carries
-  a registered check (gen-algebra `mkIntensional`): the relation then compares their declared
-  subjects, so two constructions of one term merge on all three and terms over different
-  arguments are refused. A list mixing a registered check with a caller lambda is compared by
-  `==` alone.
+- **`lib/refined.nix` `mkRefinedType` `relation`, the merge relation's `held` slot test.** Two
+  declarations of one option, each `refined int f` with one function selected at each site, merge on
+  every evaluator to the meet, so the value split is closed: each evaluator serves and refuses the
+  same values. An introspection split remains: the merged `__schema.refinements` holds 2 entries on
+  Nix and Determinate and 1 on Lix, because `held` compares refinements by `==` over functions. The
+  partner, one bound function in both declarations, holds 1 on all three. It closes when every
+  refinement on both declarations carries a registered check (gen-algebra `mkIntensional`): the
+  relation then compares their declared subjects, so two constructions of one term are held once on
+  all three and terms over different arguments are held as two. A list mixing a registered check
+  with a caller lambda is compared by `==` alone.
   `ci/tests-error.nix` `refined-evaluator-divergence` pins the split to each evaluator's own `==`,
-  read at the merged declaration's type name, beside its partner at `"int"` ×3.
+  read at the merged declaration's refinement count, beside its partner at `"int"` ×3.
+- **The identity of a merge over two DIFFERENT bases.** Where the base join widens an operand, each
+  conjoined refinement is relativised to its own operand's base, a fresh caller lambda per merge, so
+  two separately built merges of one pair are refused by `typeEq` (ADR-0034's sealed-component
+  refusal). Over one base the refinements keep their slots and the twins decide `true`.
+  `ci/tests/registered-type-identity.nix` `test-a-merge-over-differing-bases-refuses-its-twin`.
 
 ## Testing
 

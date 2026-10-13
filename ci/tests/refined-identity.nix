@@ -218,7 +218,9 @@ in
       };
     };
 
-    test-redeclaration-refuses-two-different-refinements-of-one-base = {
+    # Two different refinements of one base MEET (ADR-0039): the merged type is the base refined by
+    # both, this declaration's refinements first, so it rejects what either rejects.
+    test-redeclaration-meets-two-different-refinements-of-one-base = {
       expr = {
         nullaryBase = redeclare (refined t.int [ refinements.tcpPort ]) (
           refined t.int [ refinements.positive ]
@@ -229,12 +231,18 @@ in
       };
       expected = {
         nullaryBase = {
-          answer = "refused";
-          survivors = [ ];
+          answer = "merged";
+          survivors = [
+            "must be positive"
+            "must be a valid TCP port (1-65535)"
+          ];
         };
         parametricBase = {
-          answer = "refused";
-          survivors = [ ];
+          answer = "merged";
+          survivors = [
+            "must be positive"
+            "must not be empty"
+          ];
         };
       };
     };
@@ -343,8 +351,11 @@ in
         };
       expected = {
         differentRefinement = {
-          answer = "null";
-          survivors = [ ];
+          answer = "merged";
+          survivors = [
+            "must be a valid TCP port (1-65535)"
+            "must be positive"
+          ];
         };
         sameRefinement = {
           answer = "merged";
@@ -366,8 +377,8 @@ in
     };
 
     # The fixpoint case: a refined type's base may itself be refined, and the delegation then asks
-    # THIS relation rather than the shipped one. All three nested pairs were wrong before — the
-    # inner-differing pair merged — so the recursion is what closes them.
+    # THIS relation rather than the shipped one, so a pair differing at either depth meets at that
+    # depth (the inner join is itself the meet of the inner refinements).
     test-nested-refinement-discriminates-at-both-depths = {
       expr =
         let
@@ -397,8 +408,8 @@ in
           );
         };
       expected = {
-        innerDiffers = "refused";
-        outerDiffers = "refused";
+        innerDiffers = "merged";
+        outerDiffers = "merged";
         identical = "merged";
       };
     };
@@ -407,7 +418,8 @@ in
     # O1 and O2b can both be green while a refinement goes unenforced, because neither ever defines
     # a value. Declaring one option as `refined int tcpPort` and as `refined int positive` used to
     # merge with `tcpPort` dropped, and `70000` — which `tcpPort` forbids — was then ACCEPTED with
-    # `checkRefinements` returning `[ ]`. Now the declaration refuses before any value is produced.
+    # `checkRefinements` returning `[ ]`. Now the declaration is the meet of both refinements, so
+    # `checkRefinements` reports `tcpPort`'s violation and the option refuses the value.
     #
     # The control is the other arm, and it is what makes this non-vacuous: the SAME refinement
     # declared twice merges, `checkRefinements` reports that `70000` VIOLATES it, and the option
@@ -453,8 +465,8 @@ in
         };
       expected = {
         twoDifferentRefinements = {
-          answer = "refused";
-          violations = [ ];
+          answer = "declared";
+          violations = [ "must be a valid TCP port (1-65535)" ];
           value = "refused";
         };
         control = {
@@ -490,8 +502,8 @@ in
           foreignParametric = direct (refined (f.listOf f.str) [ refinements.nonEmpty ]) (
             refined (f.listOf f.str) [ refinements.nonEmpty ]
           );
-          # THE FIX STILL HOLDS over the foreign population: the refinements half is decided here
-          # regardless of whether the base can answer.
+          # THE MEET HOLDS over the foreign population: the refinements half is conjoined here
+          # wherever the base can answer.
           foreignDifferentRefinement = direct (refined f.int [ refinements.tcpPort ]) (
             refined f.int [ refinements.positive ]
           );
@@ -515,8 +527,11 @@ in
           survivors = [ "must not be empty" ];
         };
         foreignDifferentRefinement = {
-          answer = "null";
-          survivors = [ ];
+          answer = "merged";
+          survivors = [
+            "must be a valid TCP port (1-65535)"
+            "must be positive"
+          ];
         };
         genMergeTwin = {
           answer = "merged";
