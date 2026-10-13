@@ -1907,10 +1907,10 @@ Constructing a refined `submodule` never evaluates the submodule's module set, s
 `refined (listOf sub) r`, `refined (attrsOf sub) r`, `refined (either sub str) r` and `refined (nullOr (nullOr sub)) r`, and
 the nixpkgs spellings of the first four (`lib.types.nullOr sub` and so on) over a gen `submodule` `sub`, are not served. The
 construction reaches gen-merge's `mkOptionType` as an unstamped copy of a container that declares a nested gen element, and
-the door refuses it with `nestingImportRefusal` for the accepted value and the rejected one alike. Under ADR-0025 item 1 and
-the owner's parity-defect rule (2026-10-09, rule 1) that is an **open defect, not a price**: nixpkgs' `addCheck` twin over the
-native container serves the accepted value. Its construction is `den-hoag-olrmz` (gen-merge applying a stamped container's
-`verify` over its threaded fold, so the refinement keeps membership semantics and the nested tree is threaded). A refined
+the door refuses it with `nestingImportRefusal` for the accepted value and the rejected one alike. Under the parity-defect rule
+that is an **open defect, not a price**: nixpkgs' `addCheck` twin over the
+native container serves the accepted value. Its construction is gen-merge applying a stamped container's
+`verify` over its threaded fold, so the refinement keeps membership semantics and the nested tree is threaded. A refined
 bare `submodule`, and a container of a refined `submodule`, are served (above). Pinned by `ci/tests-error.nix`
 (`refined-gen-container-open-defect`, nine shapes, one accepted and one rejected value each), which goes red on the day the
 construction serves the accepted value.
