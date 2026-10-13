@@ -167,8 +167,12 @@ let
 
   planeOf =
     {
+      kind,
       options,
       collections,
+      kept,
+      guard,
+      projected,
       keySemantics,
       refs,
       computed,
@@ -348,66 +352,97 @@ let
           (((m.config or { })._module or { }).freeformType or null)
         ]) open
       );
-    in
-    componentsPreimage identity.hashIdentity (
-      optionComponents [ ] options
-      ++ openComponents
-      ++ [
-        {
-          path = [ "collectionNames" ];
-          value = prelude.attrNames collections;
-        }
-      ]
-      ++ prelude.concatMap (c: spread [ "collections" c ] (_: [ ]) collections.${c}) (
-        prelude.attrNames collections
-      )
-      ++ spread [ "keySemantics" ] (e: keySemanticsRecords { inherit e; }) keySemantics
-      # A ref entry is `{ refKind; type; }` (ref.nix `refsFromOptionsWithTypes`).
-      ++ spread [ "refs" ] (e: [ e.type ]) refs
-      ++ spread [ "computed" ] (_: [ ]) computed
-      ++ [
-        {
-          path = [ "modules" ];
-          value = map (m: m.opaque) (builtins.filter (m: m ? opaque) walked);
-        }
-        (
-          if builtins.any isSealedType freeforms then
-            {
-              path = [ "freeformType" ];
-              value = comparedTyped freeforms freeforms;
-              sealed = true;
-            }
-          else
-            {
-              path = [ "freeformType" ];
-              value = freeforms;
-            }
-        )
-      ]
-      # The schema's own functions are sealed BY CONSTRUCTOR — declared, never forced. Bound by a
-      # lambda's formal, never selected: upstream Nix `==` keeps a function's identity only for the
-      # one slot it was bound to, and a selection `functions.${n}` is a fresh slot, so one shared
-      # `mkType` handed to two constructions would be refused on Nix and merged on Lix
-      # (den-hoag-jzatq). The formal IS the attribute's own slot, and `componentsPreimage` carries
-      # it into `sealed` unchanged. An absent function is inert and minted as `null`, so the mark
-      # does not move.
-      ++ builtins.attrValues (
-        builtins.mapAttrs (
-          n: f:
-          let
-            sealed = f != null;
-          in
+      p = componentsPreimage identity.hashIdentity (
+        optionComponents [ ] options
+        ++ openComponents
+        ++ [
           {
-            path = [
-              "functions"
-              n
-            ];
-            value = f;
-            inherit sealed;
+            path = [ "collectionNames" ];
+            value = prelude.attrNames collections;
           }
-        ) functions
-      )
-    );
+        ]
+        ++ prelude.concatMap (c: spread [ "collections" c ] (_: [ ]) collections.${c}) (kept)
+        ++ spread [ "keySemantics" ] (e: keySemanticsRecords { inherit e; }) keySemantics
+        # A ref entry is `{ refKind; type; }` (ref.nix `refsFromOptionsWithTypes`).
+        ++ spread [ "refs" ] (e: [ e.type ]) refs
+        ++ spread [ "computed" ] (_: [ ]) computed
+        ++ [
+          {
+            path = [ "modules" ];
+            value = map (m: m.opaque) (builtins.filter (m: m ? opaque) walked);
+          }
+          (
+            if builtins.any isSealedType freeforms then
+              {
+                path = [ "freeformType" ];
+                value = comparedTyped freeforms freeforms;
+                sealed = true;
+              }
+            else
+              {
+                path = [ "freeformType" ];
+                value = freeforms;
+              }
+          )
+        ]
+        # The schema's own functions are sealed BY CONSTRUCTOR — declared, never forced. Bound by a
+        # lambda's formal, never selected: upstream Nix `==` keeps a function's identity only for the
+        # one slot it was bound to, and a selection `functions.${n}` is a fresh slot, so one shared
+        # `mkType` handed to two constructions would be refused on Nix and merged on Lix
+        # (den-hoag-jzatq). The formal IS the attribute's own slot, and `componentsPreimage` carries
+        # it into `sealed` unchanged. An absent function is inert and minted as `null`, so the mark
+        # does not move.
+        ++ builtins.attrValues (
+          builtins.mapAttrs (
+            n: f:
+            let
+              sealed = f != null;
+            in
+            {
+              path = [
+                "functions"
+                n
+              ];
+              value = f;
+              inherit sealed;
+            }
+          ) functions
+        )
+      );
+      # ★ THE GUARD (den-hoag-ux9xg). A collection whose contents read an instance of this kind,
+      # left in the identity, makes the mark read the instance under construction, and the evaluator's
+      # `infinite recursion` is not a `throw`: no `tryEval` catches it, and pure Nix exposes no re-entry
+      # a door could test. So the abort is ATTRIBUTED: each collection component's tag is forced inside
+      # an error context naming the kind, the component and the declaration that takes it out. `sealed`
+      # forces every attributed tag, each inside its frame, before it reads `p.sealed`, which forces
+      # every tag raw; so the stamp's read meets the same frame. The fold carries `null`, not
+      # `p.sealed`: `foldl'` forces each step's result, so a `p.sealed` accumulator would force every
+      # tag raw right after the first attributed one. Only where the
+      # schema declares a collection of its own that stays in the identity (`guard`): a built-in holds
+      # names, kind values, methods and validators, none of them built from an instance. A computed
+      # field on a schema that declares a collection out is attributed too (`projected`): it is minted
+      # over the declaration with that collection taken out, which its `computed` may not have met.
+      attributed = builtins.mapAttrs (
+        n: t:
+        if guard && prelude.hasPrefix "collections." n then
+          builtins.addErrorContext "gen-schema: while minting the identity of kind '${kind}' over its component '${n}': a kind's identity covers the contents of every collection not declared `identity = false`, so a collection holding a value that reads an instance of this kind recurses here; declare that collection `identity = false` on the schema" t
+        else if projected && prelude.hasPrefix "computed." n then
+          builtins.addErrorContext "gen-schema: while minting the identity of kind '${kind}' over its component '${n}': on a schema declaring a collection `identity = false`, a computed field enters the identity as `computed` returns it for this kind's declaration with those collections taken out (at their defaults), so `computed` must be total there" t
+        else
+          t
+      ) p.tags;
+    in
+    if !guard && !projected then
+      p
+    else
+      {
+        tags = attributed;
+        sealed = builtins.seq (builtins.foldl' (s: n: builtins.seq attributed.${n} s) null (
+          builtins.filter (n: prelude.hasPrefix "collections." n || prelude.hasPrefix "computed." n) (
+            builtins.attrNames attributed
+          )
+        )) p.sealed;
+      };
 
   markOf =
     {
@@ -637,7 +672,7 @@ let
   # published key set must reach the same refusal a kind merge does, so a schema that
   # declares a reserved collection is refused whether or not it declares a kind.
   mkAllCollections =
-    collections:
+    mkType: collections:
     let
       merged = {
         methods = {
@@ -675,9 +710,42 @@ let
       // collections;
 
       offending = builtins.filter (k: merged ? ${k}) reservedCollectionKeys;
+      core = [
+        "inherits"
+        "methods"
+        "parent"
+        "validators"
+      ];
+      # ★ A COLLECTION DECLARED `identity = false` LEAVES THE KIND'S IDENTITY PLANE (den-hoag-ux9xg arm
+      # P): its contents enter no mark, no sealed subject and no module key, the collection-level twin of
+      # an option's `identity = false` (`id-hash.nix`). Undeclared, a collection's contents are identity.
+      # The four built-ins decide what the kind composes (`methods` and `inherits`), validates
+      # (`validators`) or nests under (`parent`), so each is identity by gen's own semantics, and leaving
+      # one out would let two kinds that compose differently share a key. A schema built with `mkType`
+      # declares none: its `mkType` receives every collection and its result is what an instance
+      # imports, so ADR-0034's a0gc argument (the excluded content cannot affect the merged result)
+      # cannot be made there.
+      bad = builtins.filter (
+        k:
+        let
+          i = merged.${k}.identity or true;
+        in
+        !(builtins.isBool i) || (!i && (mkType != null || builtins.elem k core))
+      ) (builtins.attrNames merged);
     in
     if offending != [ ] then
       throw "gen-schema: collection '${builtins.head offending}' is reserved — cannot be used as a collection key"
+    else if bad != [ ] then
+      let
+        k = builtins.head bad;
+        i = merged.${k}.identity;
+      in
+      if !(builtins.isBool i) then
+        throw "gen-schema: collection '${k}': `identity` must be a bool (`false` takes the collection's contents out of the kind's identity); got a ${builtins.typeOf i}"
+      else if !(builtins.elem k core) then
+        throw "gen-schema: collection '${k}' cannot be declared `identity = false` on a schema built with `mkType`: the `mkType` result receives every collection and is the module an instance imports, so a collection outside the kind's identity could change an instance's merged config without moving its `id_hash`"
+      else
+        throw "gen-schema: collection '${k}' is built in and decides what the kind composes, validates or nests under, so its contents are the kind's identity; it cannot be declared `identity = false`"
     else
       merged;
 
@@ -1094,7 +1162,7 @@ let
             refs = refsFromOptionsWithTypes options;
           };
 
-        allCollections = mkAllCollections collections;
+        allCollections = mkAllCollections mkType collections;
 
         # Infer merge strategy from default type
         inferMerge =
@@ -1109,6 +1177,21 @@ let
             throw "gen-schema: collection '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
 
         collectionKeys = prelude.attrNames allCollections;
+        # Per schema, never per kind: the collections whose contents enter the kind's identity, and
+        # those of them the schema declared itself (the guard's, in `planeOf`).
+        kept = builtins.filter (n: allCollections.${n}.identity or true) collectionKeys;
+        dropped = builtins.filter (n: !(allCollections.${n}.identity or true)) collectionKeys;
+        # whether the computed fields enter the plane through the projection (`minted`)
+        projected = computed != null && dropped != [ ];
+        guard = builtins.any (
+          n:
+          !(builtins.elem n [
+            "inherits"
+            "methods"
+            "parent"
+            "validators"
+          ])
+        ) kept;
 
         # THE CONSTRUCTION, for the entry type's merge relation (den-hoag-bfc0k). The type is a
         # function of these formals and nothing else, so each is a component, and its regime is
@@ -1686,6 +1769,38 @@ let
                 else
                   fields;
 
+              # THE COMPUTED FIELDS AS THE IDENTITY READS THEM (den-hoag-ux9xg C1): `computed` over the
+              # declaration with every collection declared `identity = false` taken out, from `defs` and
+              # so from the collections, which fall to their defaults. A mark component must agree on two
+              # declarations the quotient identifies, and a computed field is the caller's function of
+              # the collections and the raw defs, so it enters the plane composed with that projection:
+              # a field over a declared collection carries none of its contents into a mark, and the kind
+              # value keeps the field as computed. A schema declaring none, or with no `computed`, reads
+              # `computedFields` itself.
+              minted =
+                if !projected then
+                  computedFields
+                else
+                  computed
+                    (
+                      extractedCollections
+                      // builtins.listToAttrs (
+                        map (n: {
+                          name = n;
+                          value = allCollections.${n}.default;
+                        }) dropped
+                      )
+                    )
+                    (
+                      map (
+                        d:
+                        if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) dropped then
+                          d // { value = builtins.removeAttrs d.value dropped; }
+                        else
+                          d
+                      ) defs
+                    );
+
               # Strip all collection keys before deferredModule merge. The desugared parents join here,
               # where `evalSchema`'s injected defs arrive: the default branch composes this list and both
               # planes read it, while the `mkType` caller receives the parents nested (at `custom`).
@@ -1833,7 +1948,10 @@ let
             in
             completed (
               checkDeclarationKeys (
-                if mkType != null then
+                # The collection door is read at this arm's WHNF: its result publishes no collection, so
+                # a schema the door refuses (an `identity = false` beside `mkType`) would otherwise be
+                # served on every read that forces no collection, its `kind` among them.
+                if mkType != null && builtins.seq allCollections true then
                   # Custom entry type: collection extraction runs first (above),
                   # then mkType controls the result. The mixin pipeline and __functor
                   # wrapping are skipped; `options`, `refs` and `refinements` are DERIVED, from the
@@ -1916,10 +2034,16 @@ let
                     # ONE plane for the published fields, the mark and `kindEq` (c+): this arm's option
                     # plane is the tree an instance imports, so it enters the preimage.
                     plane = planeOf {
+                      inherit
+                        kind
+                        kept
+                        guard
+                        projected
+                        ;
                       inherit (introspect) options refs;
                       collections = extractedCollections;
                       inherit keySemantics;
-                      computed = computedFields;
+                      computed = minted;
                       modules = map (d: d.value) strippedDefs ++ [ resolvedBase ];
                       functions = { inherit mkType computed; };
                     };
@@ -2083,10 +2207,16 @@ let
 
                     introspect = introspectOf merged;
                     plane = planeOf {
+                      inherit
+                        kind
+                        kept
+                        guard
+                        projected
+                        ;
                       inherit (introspect) options refs;
                       collections = finalCollections;
                       inherit keySemantics;
-                      computed = computedFields;
+                      computed = minted;
                       modules = map (d: d.value) strippedDefs ++ [ effectiveBase ];
                       functions = { inherit mkType computed; };
                     };
@@ -2477,7 +2607,7 @@ let
                 _leaves = leaves;
                 # The same derivation the entry type extracts with — not a second spelling.
                 # attrNames is already sorted, so no sort is added.
-                _collectionKeys = prelude.attrNames (mkAllCollections collections);
+                _collectionKeys = prelude.attrNames (mkAllCollections mkType collections);
                 # Likewise ONE derivation with the guard's own predicate.
                 _declarationKeys = declarationKeys;
                 _reservedCollectionKeys = reservedCollectionKeys;

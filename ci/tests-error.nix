@@ -423,6 +423,82 @@ in
         };
     };
 
+  # den-hoag-ux9xg: `identity` on a collection is a bool, and a built-in collection cannot leave the
+  # kind's identity, since each decides what the kind composes, validates or nests under.
+  flake.testsError.collection-identity-false-refusals =
+    let
+      hostWith =
+        collections:
+        (genMerge.evalModuleTree { } [
+          { options.schema = mkSchemaOption { inherit collections; }; }
+          { config.schema.host = { }; }
+        ]).config.schema.host.kind;
+    in
+    {
+      # C2: a `mkType` result receives every collection and is what an instance imports, so the a0gc
+      # argument cannot be made there and the declaration is refused by name.
+      test-mkType-schema-declares-none = {
+        expr =
+          (genMerge.evalModuleTree { } [
+            {
+              options.schema = mkSchemaOption {
+                collections.tags = {
+                  default = [ ];
+                  identity = false;
+                };
+                mkType =
+                  { kind, ... }:
+                  {
+                    __functor = _: { ... }: { };
+                    inherit kind;
+                  };
+              };
+            }
+            { config.schema.host = { }; }
+          ]).config.schema.host.kind;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: collection 'tags' cannot be declared `identity = false` on a schema built with `mkType`";
+        };
+      };
+      test-identity-is-a-bool = {
+        expr = hostWith {
+          tags = {
+            default = [ ];
+            identity = "no";
+          };
+        };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: collection 'tags': `identity` must be a bool";
+        };
+      };
+    }
+    // builtins.listToAttrs (
+      map
+        (n: {
+          name = "test-builtin-${n}-keeps-its-identity";
+          value = {
+            expr = hostWith {
+              ${n} = {
+                default = [ ];
+                identity = false;
+              };
+            };
+            expectedError = {
+              type = "ThrownError";
+              msg = "^gen-schema: collection '${n}' is built in and decides what the kind composes, validates or nests under";
+            };
+          };
+        })
+        [
+          "inherits"
+          "methods"
+          "parent"
+          "validators"
+        ]
+    );
+
   # A SAME-TREE CYCLE IN THE VALUE SPELLING (den-hoag-l0y G1): `inherits = [ config.schema.b ]` is the
   # name `b` (F4), and telling it from a foreign value forces both marks, so a walk over the
   # CLASSIFIED parents would need the cycle's own composition and recurse uncatchably. The walk reads

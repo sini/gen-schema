@@ -98,9 +98,46 @@
         attributed=$(grep -c 'gen-schema: refined: while checking the refinement "must be positive"' "$TMPDIR/err" || true)
         [ "$attributed" = "1" ] || die refined-attribution "expected 1 attribution line, counted $attributed"
 
+        # den-hoag-ux9xg · an identity-bearing collection that reads its own kind's instance aborts
+        # uncatchably, and the abort names the kind and the collection. --show-trace as above.
+        rc=0
+        inst --show-trace --argstr arm collection-identity-guard > /dev/null 2> "$TMPDIR/err" || rc=$?
+        ran=$((ran + 1))
+        [ "$rc" -ne 0 ] || die collection-identity-guard "expected an abort, got exit 0"
+        grep -q 'infinite recursion' "$TMPDIR/err" ||
+          die collection-identity-guard "expected the recursion abort: $(tail -n 3 "$TMPDIR/err")"
+        guarded=$(grep -c "gen-schema: while minting the identity of kind 'host' over its component 'collections.excludes'" "$TMPDIR/err" || true)
+        [ "$guarded" -ge 1 ] || die collection-identity-guard "expected the attribution naming 'collections.excludes', counted 0"
+
+        # den-hoag-ux9xg C1 · a computed field partial on the projected declaration aborts, attributed.
+        rc=0
+        inst --show-trace --argstr arm computed-projection-attribution > /dev/null 2> "$TMPDIR/err" || rc=$?
+        ran=$((ran + 1))
+        [ "$rc" -ne 0 ] || die computed-projection-attribution "expected an abort, got exit 0"
+        projected=$(grep -c "gen-schema: while minting the identity of kind 'host' over its component 'computed.firstTag'" "$TMPDIR/err" || true)
+        [ "$projected" -ge 1 ] || die computed-projection-attribution "expected the attribution naming 'computed.firstTag', counted 0"
+
+        # den-hoag-ux9xg C1 · the same abort met through an instance read (the stamp's path), attributed.
+        rc=0
+        inst --show-trace --argstr arm computed-projection-instance > /dev/null 2> "$TMPDIR/err" || rc=$?
+        ran=$((ran + 1))
+        [ "$rc" -ne 0 ] || die computed-projection-instance "expected an abort, got exit 0"
+        projectedInst=$(grep -c "gen-schema: while minting the identity of kind 'host' over its component 'computed.firstTag'" "$TMPDIR/err" || true)
+        [ "$projectedInst" -ge 1 ] || die computed-projection-instance "expected the attribution naming 'computed.firstTag', counted 0"
+
+        # den-hoag-ux9xg C1 · the guard over a collection whose tag sorts after every built-in's.
+        rc=0
+        inst --show-trace --argstr arm collection-identity-guard-sorted-last > /dev/null 2> "$TMPDIR/err" || rc=$?
+        ran=$((ran + 1))
+        [ "$rc" -ne 0 ] || die collection-identity-guard-sorted-last "expected an abort, got exit 0"
+        grep -q 'infinite recursion' "$TMPDIR/err" ||
+          die collection-identity-guard-sorted-last "expected the recursion abort: $(tail -n 3 "$TMPDIR/err")"
+        guardedLast=$(grep -c "gen-schema: while minting the identity of kind 'host' over its component 'collections.zones'" "$TMPDIR/err" || true)
+        [ "$guardedLast" -ge 1 ] || die collection-identity-guard-sorted-last "expected the attribution naming 'collections.zones', counted 0"
+
         # 0/0 is a false pass: the runner must have executed every cell above.
-        [ "$ran" = "8" ] || die runner "expected 8 evaluations, ran $ran"
-        echo "tests-process: 8 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; refined predicate applications 1/1/1/3; attribution $attributed"
+        [ "$ran" = "12" ] || die runner "expected 12 evaluations, ran $ran"
+        echo "tests-process: 12 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst"
       '';
     };
 }

@@ -135,6 +135,99 @@ in
     2
     3
   ];
+  # den-hoag-ux9xg · THE GUARD: a collection NOT declared `identity = false` holding a value that reads
+  # an instance of its kind. The kind's identity reads the instance under construction, which aborts
+  # uncatchably on every evaluator (the kind has a parent, so its module key reads the mark); the abort
+  # names the kind, the collection and the declaration that takes it out of the identity.
+  collection-identity-guard =
+    (merge.evalModuleTree { } [
+      (
+        { config, ... }:
+        {
+          options.schema = S.mkSchemaOption {
+            collections.excludes = {
+              default = [ ];
+              merge = acc: val: acc ++ val;
+            };
+          };
+          options.hosts = S.mkInstanceRegistry { } config.schema.host;
+          options.aspects = merge.mkOption { type = merge.types.attrsOf merge.types.anything; };
+          config.schema.conf = { };
+          config.schema.host = {
+            inherits = [ config.schema.conf ];
+            options.addr = merge.mkOption { type = merge.types.str; };
+            excludes = [ config.aspects.unwanted ];
+          };
+          config.hosts.igloo.addr = "10.0.1.1";
+          config.aspects.unwanted.domain = config.hosts.igloo.addr;
+        }
+      )
+    ]).config.hosts.igloo.addr;
+  # den-hoag-ux9xg C1 · a computed field on a schema that declares a collection `identity = false` is
+  # minted over the declaration with that collection taken out; a `computed` partial there aborts, and
+  # the abort names the kind and the computed field.
+  computed-projection-attribution =
+    (merge.evalModuleTree { } [
+      {
+        options.schema = S.mkSchemaOption {
+          collections.tags = {
+            default = [ ];
+            identity = false;
+          };
+          computed = c: _: { firstTag = builtins.head c.tags; };
+        };
+        config.schema.host.tags = [ "x" ];
+      }
+    ]).config.schema.host.__mint.minted;
+  # den-hoag-ux9xg C1 · the same partial `computed`, met through an INSTANCE read: the stamp's path
+  # forces the sealed subject, and the abort still names the kind and the computed field.
+  computed-projection-instance =
+    (merge.evalModuleTree { } [
+      (
+        { config, ... }:
+        {
+          options.schema = S.mkSchemaOption {
+            collections.tags = {
+              default = [ ];
+              identity = false;
+            };
+            computed = c: _: { firstTag = builtins.head c.tags; };
+          };
+          options.hosts = S.mkInstanceRegistry { } config.schema.host;
+          config.schema.host = {
+            options.addr = merge.mkOption { type = merge.types.str; };
+            tags = [ "x" ];
+          };
+          config.hosts.igloo.addr = "10.0.1.1";
+        }
+      )
+    ]).config.hosts.igloo.id_hash;
+  # den-hoag-ux9xg C1 · THE GUARD with a collection whose name sorts after every built-in (`zones`
+  # after `validators`): the attribution does not depend on where the collection's tag sorts.
+  collection-identity-guard-sorted-last =
+    (merge.evalModuleTree { } [
+      (
+        { config, ... }:
+        {
+          options.schema = S.mkSchemaOption {
+            collections.zones = {
+              default = [ ];
+              merge = acc: val: acc ++ val;
+            };
+          };
+          options.hosts = S.mkInstanceRegistry { } config.schema.host;
+          options.aspects = merge.mkOption { type = merge.types.attrsOf merge.types.anything; };
+          config.schema.conf = { };
+          config.schema.host = {
+            inherits = [ config.schema.conf ];
+            options.addr = merge.mkOption { type = merge.types.str; };
+            zones = [ config.aspects.unwanted ];
+          };
+          config.hosts.igloo.addr = "10.0.1.1";
+          config.aspects.unwanted.domain = config.hosts.igloo.addr;
+        }
+      )
+    ]).config.hosts.igloo.addr;
   # A predicate ill-typed over its base aborts uncatchably; the abort names the refinement.
   refined-attribution = outsideRead (S.refined T.str {
     check = v: v > 0;
