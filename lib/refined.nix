@@ -361,9 +361,9 @@ let
             # decides over the mark and the sealed subjects, as for every gen-types type.
 
             typeMerge = relation;
-            # payload null is the honest shape for a metadata decoration: there is nothing to fold
-            # when two of these meet, only an identity to agree on. A base whose own functor carries
-            # a payload does not lose it — a refined type and its base never merge in the first place.
+            # `refined` is its own constructor (`refined<base>`); its payload is the construction (the refinements
+            # are sealed components, ADR-0034), and its base, whose parameters are its own, is declared as `wraps`,
+            # which gen-merge's meet reads for shape and stock while the refinements stay owed whole.
             functor = {
               name = functorName;
               type = p: mkRefinedType p.baseType p.refinements;
