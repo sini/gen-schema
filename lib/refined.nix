@@ -207,15 +207,15 @@ let
       relation =
         f:
         let
-          partner = f.type or null;
+          ps = f.payload or null;
         in
-        if !(builtins.isAttrs partner && partner ? __schema) then
+        if !(builtins.isAttrs ps && ps ? baseType && ps ? refinements) then
           null
         else
           let
-            joined = merge.mergeTypes baseType partner.__schema.baseType;
+            joined = merge.mergeTypes baseType ps.baseType;
           in
-          if joined == null then null else mkRefinedType joined (conjoined partner.__schema);
+          if joined == null then null else mkRefinedType joined (conjoined ps);
 
       # The refinements the join carries: this operand's, then each of the partner's that this operand
       # does not already hold (one slot, or one registered subject, as `sameRefinements` compares).
@@ -366,10 +366,14 @@ let
             # a payload does not lose it — a refined type and its base never merge in the first place.
             functor = {
               name = functorName;
-              type = result;
-              payload = null;
+              type = p: mkRefinedType p.baseType p.refinements;
+              payload = {
+                inherit baseType;
+                refinements = normalized;
+              };
               binOp = _a: _b: null;
             };
+            wraps = baseType;
             # A base that carries no module set answers null to a substitution, and so does a
             # refinement of it — refining null would be a type where the base refused to give one.
             substSubModules =
