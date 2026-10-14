@@ -175,12 +175,13 @@ in
     # no name with that answer either. `relation` (`lib/refined.nix`) asks `mergeTypes` structurally
     # and never compares `baseType.name` to the partner's, so the fold stays closed and renames
     # twice, keeping the refinements. A `baseType.name`-keyed gate would refuse at the first join,
-    # where `renameA' and `renameB' disagree.
+    # where `renameA' and `renameB' disagree. Each partner is handed as the protocol hands it: its own
+    # published `functor`, whose payload states the construction (`baseType`, `refinements`).
     test-a-renaming-join-stays-closed-over-three-declarations = {
       expr =
         let
-          step1 = (R renameA).typeMerge { type = R renameB; };
-          step2 = if step1 == null then null else step1.typeMerge { type = R renameC; };
+          step1 = (R renameA).typeMerge (R renameB).functor;
+          step2 = if step1 == null then null else step1.typeMerge (R renameC).functor;
         in
         if step2 == null then
           "refused"
