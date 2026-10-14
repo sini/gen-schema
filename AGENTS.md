@@ -476,7 +476,7 @@ nix eval --json .#lib --apply 'l: { top = builtins.attrNames l; internal = built
 Current output (verbatim):
 
 ```json
-{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","constructionRelation","declarationOf","defaultOnError","emitModule","evalSchema","fieldDeclarationMarker","fieldDeclarationsIn","fieldRef","fieldRefMarker","fieldRefsIn","filterValidators","formatErrors","identityHashForKind","identityKeysForKind","isFieldDeclaration","isFieldRef","keySemanticsRecords","kindEq","mkCodec","mkFieldDeclaration","mkFieldValidator","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMixin","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator{ name = ","; pred = ref; message = ","; }refined","refinements","renderDocs","runValidators","schemaFn{ description = ","; type = setOf; fn = ","; }toSet","validateInstances"]}
+{"internal":["mkMethodsModule"],"top":["_internal","applyMixin","beta","blame","checkRefinements","composeMixins","constructionRelation","declarationOf","defaultOnError","emitModule","entryReservation","evalSchema","fieldDeclarationMarker","fieldDeclarationsIn","fieldRef","fieldRefMarker","fieldRefsIn","filterValidators","formatErrors","identityHashForKind","identityKeysForKind","isFieldDeclaration","isFieldRef","keySemanticsRecords","kindEq","mkCodec","mkFieldDeclaration","mkFieldValidator","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMixin","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","validateInstances"]}
 ```
 
 **Checks.** Test-runner invocation (from the repo root; CI runs the same command with
