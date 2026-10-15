@@ -247,11 +247,11 @@ in
       };
     };
 
-    # A refinement redeclared against its BARE base refuses whichever declaration comes first, and
-    # under a gen container as directly (gen-merge's declared-type fold: the earlier gen relation's
-    # refusal is never overruled, and the later declaration decides). Before it, the bare base
-    # declared first merged and dropped every refinement (`no-refinements`, nothing said).
-    test-redeclaration-refuses-a-refinement-against-its-bare-base-declared-first =
+    # A refinement redeclared against its BARE base is MET whichever declaration comes first, and
+    # under a gen container as directly: the refinement survives on the merged type (on the element,
+    # under a container). Before the meet it was refused; before that, the bare base declared first
+    # merged and dropped every refinement (`no-refinements`, nothing said), which this cell still rules out.
+    test-redeclaration-meets-a-refinement-against-its-bare-base-declared-first =
       let
         R = refined t.int [ refinements.tcpPort ];
         redeclareAll =
@@ -277,17 +277,43 @@ in
               answer = "refused";
               survivors = [ ];
             };
-        refused = {
-          answer = "refused";
-          survivors = [ ];
+        met = {
+          answer = "merged";
+          survivors = [ "must be a valid TCP port (1-65535)" ];
         };
+        # the element's refinements under a container, whose own record states no `__schema`
+        elem =
+          tA: tB:
+          let
+            attempt = builtins.tryEval (
+              let
+                opt =
+                  (genMerge.evalModuleTree { } [
+                    { options.probe = genMerge.mkOption { type = tA; }; }
+                    { options.probe = genMerge.mkOption { type = tB; }; }
+                  ]).options.probe;
+                msgs = map (r: r.message) (opt.type.nestedTypes.elemType.__schema.refinements or [ ]);
+              in
+              builtins.deepSeq msgs msgs
+            );
+          in
+          if attempt.success then
+            {
+              answer = "merged";
+              survivors = attempt.value;
+            }
+          else
+            {
+              answer = "refused";
+              survivors = [ ];
+            };
       in
       {
         expr = {
           bareFirst = redeclare t.int R;
-          listOfBareFirst = redeclare (t.listOf t.int) (t.listOf R);
-          attrsOfBareFirst = redeclare (t.attrsOf t.int) (t.attrsOf R);
-          nullOrBareFirst = redeclare (t.nullOr t.int) (t.nullOr R);
+          listOfBareFirst = elem (t.listOf t.int) (t.listOf R);
+          attrsOfBareFirst = elem (t.attrsOf t.int) (t.attrsOf R);
+          nullOrBareFirst = elem (t.nullOr t.int) (t.nullOr R);
           threeBareBareRefined = redeclareAll [
             t.int
             t.int
@@ -295,11 +321,11 @@ in
           ];
         };
         expected = {
-          bareFirst = refused;
-          listOfBareFirst = refused;
-          attrsOfBareFirst = refused;
-          nullOrBareFirst = refused;
-          threeBareBareRefined = refused;
+          bareFirst = met;
+          listOfBareFirst = met;
+          attrsOfBareFirst = met;
+          nullOrBareFirst = met;
+          threeBareBareRefined = met;
         };
       };
 
@@ -313,7 +339,8 @@ in
         differentBase = redeclare (refined t.int [ refinements.tcpPort ]) (
           refined t.str [ refinements.positive ]
         );
-        refinedVersusBare = redeclare (refined t.int [ refinements.tcpPort ]) t.int;
+        # a bare partner of ANOTHER key: no base join exists, so the meet is refused
+        refinedVersusOtherBare = redeclare (refined t.int [ refinements.tcpPort ]) t.str;
       };
       expected = {
         differentElement = {
@@ -324,7 +351,7 @@ in
           answer = "refused";
           survivors = [ ];
         };
-        refinedVersusBare = {
+        refinedVersusOtherBare = {
           answer = "refused";
           survivors = [ ];
         };
@@ -362,12 +389,12 @@ in
           survivors = [ "must be a valid TCP port (1-65535)" ];
         };
         refinedFirst = {
-          answer = "null";
-          survivors = [ ];
+          answer = "merged";
+          survivors = [ "must be a valid TCP port (1-65535)" ];
         };
         bareFirst = {
-          answer = "null";
-          survivors = [ ];
+          answer = "merged";
+          survivors = [ "must be a valid TCP port (1-65535)" ];
         };
         differentBase = {
           answer = "null";

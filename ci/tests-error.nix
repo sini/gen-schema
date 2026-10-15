@@ -1338,7 +1338,7 @@ in
         } 70000;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-merge: option `myPort' is declared with types that do not merge";
+        msg = "^gen-merge: a definition for option `hosts[.]a[.]myPort' is not of the expected type: must be a valid TCP port [(]1-65535[)]";
       };
     };
   };

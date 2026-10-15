@@ -168,16 +168,21 @@ in
       };
     };
 
-    # Fail CLOSED, both directions: declaring an option once as refined and once as the bare base
-    # is a conflict to state, not a refinement to drop.
-    test-refined-does-not-merge-with-its-bare-base = {
-      expr = {
-        refinedFirst = refinedPort.typeMerge genMerge.types.int.functor;
-        bareFirst = genMerge.types.int.typeMerge refinedPort.functor;
-      };
+    # The refinement is never dropped, in both directions: declaring an option once as refined and
+    # once as its bare base is the MEET, `{v:B | e} ⊓ B = {v:B | e}` (ADR-0039), so the answer is the
+    # refined type with its refinement intact, whichever relation the foreign entry asks first.
+    test-refined-meets-its-bare-base-keeping-the-refinement = {
+      expr =
+        let
+          survivors = x: if x == null then null else map (r: r.message) x.__schema.refinements;
+        in
+        {
+          refinedFirst = survivors (refinedPort.typeMerge genMerge.types.int.functor);
+          bareFirst = survivors (genMerge.types.int.typeMerge refinedPort.functor);
+        };
       expected = {
-        refinedFirst = null;
-        bareFirst = null;
+        refinedFirst = [ "must be a valid TCP port (1-65535)" ];
+        bareFirst = [ "must be a valid TCP port (1-65535)" ];
       };
     };
 

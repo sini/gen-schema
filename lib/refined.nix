@@ -159,9 +159,10 @@ let
       # nixpkgs' own check family no longer supplies a live example of that disagreement: gen-merge's
       # witness (`lib/interface.nix`) now refuses a foreign join that drops an operand's own name —
       # `ints.between` included — rather than silently renaming past it, so a name gate and the
-      # witness would agree on every check-family pair, not disagree. What still keeps a refined type
-      # and its BARE base apart: here, the `partner ? __schema` clause; in the foreign direction, the
-      # published `functor.name` above, which the bare type's own relation compares and refuses.
+      # witness would agree on every check-family pair, not disagree. A refined type beside its BARE
+      # base meets it (`bareMeet` below); in the foreign direction the bare type's own relation sees
+      # the published `functor.name` above and defers to this relation, because this record declares
+      # the base it `wraps` (gen-merge `wrapsKeyOf`).
       #
       # ★ THE MERGED TYPE IS THE BASE RELATION'S JOIN, REFINED AGAIN — never this declaration's own
       # `result`. A base relation that JOINS (two `submodule`s to one carrying both option sets, two
@@ -189,7 +190,7 @@ let
       #
       # The property is PARITY: a refined pair answers what its bare bases answer under `mergeTypes`,
       # so a refinement is never more mergeable than its base, and a refined type beside its bare
-      # base is refused in both orders (`partner ? __schema`). Two
+      # base meets it in both orders (`bareMeet`). Two
       # IDENTICAL foreign bases are refused where the base's own relation refuses them — a
       # `coercedTo` twin (its coercion is a caller lambda, and ADR-0034's sealed-component clause
       # replaces that component's collapse with a refusal), a `json` or `attrListOf` twin, and a
@@ -210,12 +211,42 @@ let
           ps = f.payload or null;
         in
         if !(builtins.isAttrs ps && ps ? baseType && ps ? refinements) then
-          null
+          bareMeet f
         else
           let
             joined = merge.mergeTypes baseType ps.baseType;
           in
           if joined == null then null else mkRefinedType joined (conjoined ps);
+
+      # A BARE partner is the trivial refinement of itself, `B = {v:B | true}`, so its meet with this type is
+      # the refined pair's meet with no partner refinement: the base join, asked of the BASE's own relation
+      # with the partner's functor (the base's key decides whether they join at all), refined again by this
+      # type's refinements, each relative to its own base where the join widened it (`(B => e)`, as
+      # `conjoined` relativises) and in its own slot where it did not.
+      bareMeet =
+        f:
+        let
+          joined = copied.typeMerge f;
+          same =
+            let
+              t = builtins.tryEval (merge.types.typeEq baseType joined);
+            in
+            t.success && t.value;
+          inBase =
+            v:
+            (baseType.check.__verifyProjection or baseType.check) v
+            && (!(baseType ? verify) || baseType.verify v == null);
+        in
+        # over one base the meet IS this type, `{v:B | e} ⊓ B = {v:B | e}`: the partner is this type's own base (its
+        # functor is the base's, the one value), or the base's relation joins the two to the base itself
+        if f == baseType.functor || f == copied.functor then
+          result
+        else if joined == null then
+          null
+        else if same then
+          result
+        else
+          mkRefinedType joined (map (r: r // { check = v: !(inBase v) || r.check v; }) normalized);
 
       # The refinements the join carries: this operand's, then each of the partner's that this operand
       # does not already hold (one slot, or one registered subject, as `sameRefinements` compares).
