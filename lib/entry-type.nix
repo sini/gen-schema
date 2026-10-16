@@ -548,6 +548,13 @@ let
     in
     a: b: cellAgrees a b a b;
   stampOk = k: builtins.isFunction k.__kindSelf && stampAgrees (k.__kindSelf null) k;
+  # PROTOTYPE (den-hoag-9zyp7 arm C): the stamp an IMPORT door reads compares every cell but the
+  # identity cells derived from them, so importing a kind never demands its identity.
+  identityCells = [ "__sealed" ];
+  stampImportOk =
+    k:
+    builtins.isFunction k.__kindSelf
+    && stampAgrees (builtins.removeAttrs (k.__kindSelf null) identityCells) (builtins.removeAttrs k identityCells);
 
   stampRefusal =
     site: k:
@@ -1324,7 +1331,7 @@ let
                 # mark is this kind's, in flight. The witness walk only ROUTES the value here: the
                 # verdict stays with the cycle walk and the stamp, never a witness comparison.
                 else if tree != null && builtins.elem v.kind tree._kindNames && reachesThis v.kind then
-                  if v ? __kindSelf && !(stampOk v) then
+                  if v ? __kindSelf && !(stampImportOk v) then
                     stampRefusal "gen-schema: kind '${kind}' inherits" v
                   else
                     "value"
@@ -1340,7 +1347,7 @@ let
                 # Guarded by `? __kindSelf`: a stamp-less kind-shaped value is admitted foreign as
                 # before (`ci/test-fixtures/cxlc0/kind-shaped.nix`), and the fold below refuses it
                 # by name only where a diamond decides it.
-                else if v ? __kindSelf && !(stampOk v) then
+                else if v ? __kindSelf && !(stampImportOk v) then
                   stampRefusal "gen-schema: kind '${kind}' inherits" v
                 else
                   "value";
@@ -1475,7 +1482,7 @@ let
                     # inside a FUNCTION module, and `types.submodule k`. Neither reaches this fold; both
                     # apply the kind's `__functor`, which ignores its `self`. ADR-0025's cxlc0 rider;
                     # pinned by `kind-value-swap.test-*-composes-unread`, closed under den-hoag-jrbis.
-                    else if p ? __kindSelf && !(stampOk p) then
+                    else if p ? __kindSelf && !(stampImportOk p) then
                       stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${arrow here}" p
                     else
                       builtins.foldl' (step here) (
@@ -2662,6 +2669,7 @@ in
     isSchemaKind
     kindEq
     stampOk
+    stampImportOk
     stampRefusal
     inheritsResolvedFile
     inheritedModule
