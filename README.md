@@ -1623,7 +1623,7 @@ an instance's `id_hash` and `identityHashForKind`. `mkInstanceType`'s import of 
 over the content cells only, every cell but the mark (`__mint`) and the sealed subjects (`__sealed`): the
 import composes no identity, so it demands none, and a collection kept in the identity may read an
 instance of the kind it types. A copy of the content is refused there, and a copy of an identity cell at
-the instance's identity reads (den-hoag-9zyp7). Two doors compose a `//` copy unread, enumerated here as
+the instance's identity reads. Two doors compose a `//` copy unread, enumerated here as
 exceptions: a kind value imported inside
 a function module, and `types.submodule k`. Their `__functor` ignores its `self`, so the copy composes the
 original. Other doors that decide by the mark are outside this refusal (the 1a4f6 spec's §3b.1 censuses them).
