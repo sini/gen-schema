@@ -548,12 +548,13 @@ let
     in
     a: b: cellAgrees a b a b;
   stampOk = k: builtins.isFunction k.__kindSelf && stampAgrees (k.__kindSelf null) k;
-  # THE IMPORT DOOR'S STAMP (den-hoag-9zyp7): every cell but the two identity cells, the mark
-  # (`__mint`) and the sealed subjects (`__sealed`). An import composes the content cells and reads no
-  # identity, so it never demands one: on Nix and Determinate `==` forces each cell, and an identity
-  # cell's value is minted over the collections, which may read the instance being built. A copy
-  # replacing an identity cell is refused where an identity is read, by `stampOk` (`kindSubject`,
-  # and `id_hash`'s `kindMark`).
+  # THE INSTANCE IMPORT'S STAMP (den-hoag-9zyp7): every cell but the two identity cells, the mark
+  # (`__mint`) and the sealed subjects (`__sealed`). An instance's import composes the content cells
+  # and reads no identity, so it never demands one: on Nix and Determinate `==` forces each cell, and
+  # an identity cell's value is minted over the collections, which may read the instance being built.
+  # A copy replacing an identity cell is refused where the instance's identity is read (`id_hash`'s
+  # `kindMark`, `stampOk`). Read by `mkInstanceType` alone: `formOf` and the ancestor fold hand the
+  # value they admit to a mark (a parent enters its child's plane), so they hold `stampOk`.
   stampImportOk =
     k:
     let
@@ -1341,7 +1342,7 @@ let
                 # mark is this kind's, in flight. The witness walk only ROUTES the value here: the
                 # verdict stays with the cycle walk and the stamp, never a witness comparison.
                 else if tree != null && builtins.elem v.kind tree._kindNames && reachesThis v.kind then
-                  if v ? __kindSelf && !(stampImportOk v) then
+                  if v ? __kindSelf && !(stampOk v) then
                     stampRefusal "gen-schema: kind '${kind}' inherits" v
                   else
                     "value"
@@ -1357,7 +1358,7 @@ let
                 # Guarded by `? __kindSelf`: a stamp-less kind-shaped value is admitted foreign as
                 # before (`ci/test-fixtures/cxlc0/kind-shaped.nix`), and the fold below refuses it
                 # by name only where a diamond decides it.
-                else if v ? __kindSelf && !(stampImportOk v) then
+                else if v ? __kindSelf && !(stampOk v) then
                   stampRefusal "gen-schema: kind '${kind}' inherits" v
                 else
                   "value";
@@ -1492,7 +1493,7 @@ let
                     # inside a FUNCTION module, and `types.submodule k`. Neither reaches this fold; both
                     # apply the kind's `__functor`, which ignores its `self`. ADR-0025's cxlc0 rider;
                     # pinned by `kind-value-swap.test-*-composes-unread`, closed under den-hoag-jrbis.
-                    else if p ? __kindSelf && !(stampImportOk p) then
+                    else if p ? __kindSelf && !(stampOk p) then
                       stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${arrow here}" p
                     else
                       builtins.foldl' (step here) (

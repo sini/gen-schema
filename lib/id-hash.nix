@@ -239,10 +239,10 @@ in
       };
       kindValue = kindOperand "mkIdentityModule" kindValue0;
       kind = kindValue.kind;
-      # THE IDENTITY DOOR HOLDS THE WHOLE STAMP (den-hoag-9zyp7). The import reads the content cells
-      # only (`stampImportOk`), so a `//` copy replacing a kind's identity cells alone is refused here,
-      # at the first read whose answer is an identity, by the stamp every mark-reading door holds
-      # (`kindSubject`). Once per TYPE, like the descriptor above.
+      # THE IDENTITY DOOR HOLDS THE WHOLE STAMP (den-hoag-9zyp7). `mkInstanceType`'s import reads the
+      # content cells only (`stampImportOk`), so a `//` copy replacing a kind's identity cells alone is
+      # refused here, at the instance's one read whose answer is an identity, by the stamp every
+      # mark-reading door holds (`kindSubject`). Once per TYPE, like the descriptor above.
       kindMark =
         if kindValue ? __kindSelf && !(stampOk kindValue) then
           stampRefusal "gen-schema: id_hash" kindValue
