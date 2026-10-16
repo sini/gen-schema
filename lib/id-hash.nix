@@ -239,6 +239,15 @@ in
       };
       kindValue = kindOperand "mkIdentityModule" kindValue0;
       kind = kindValue.kind;
+      # THE IDENTITY DOOR HOLDS THE WHOLE STAMP (den-hoag-9zyp7). The import reads the content cells
+      # only (`stampImportOk`), so a `//` copy replacing a kind's identity cells alone is refused here,
+      # at the first read whose answer is an identity, by the stamp every mark-reading door holds
+      # (`kindSubject`). Once per TYPE, like the descriptor above.
+      kindMark =
+        if kindValue ? __kindSelf && !(stampOk kindValue) then
+          stampRefusal "gen-schema: id_hash" kindValue
+        else
+          kindValue.__mint.minted;
     in
     # The operand is judged when the module is APPLIED, not when `id_hash` is forced: a door that
     # refused only on the stamp would admit a name through every fixture that never reads it. On
@@ -296,15 +305,8 @@ in
             # than that one key costs the same and is total over the whole set.
             identity.hashIdentity kind ([ "_identity" ] ++ keys) (
               k:
-              # THE IDENTITY DOOR HOLDS THE WHOLE STAMP (den-hoag-9zyp7). The import reads the content
-              # cells only (`stampImportOk`), so a `//` copy replacing a kind's identity cells alone is
-              # refused here, at the first read whose answer is an identity, by the stamp every
-              # mark-reading door holds (`kindSubject`).
               if k == "_identity" then
-                if kindValue ? __kindSelf && !(stampOk kindValue) then
-                  stampRefusal "gen-schema: id_hash" kindValue
-                else
-                  kindValue.__mint.minted
+                kindMark
               else if config ? ${k} then
                 config.${k}
               else
