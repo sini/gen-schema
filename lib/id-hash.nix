@@ -45,6 +45,8 @@
   merge,
   identity,
   isSchemaKind,
+  stampOk,
+  stampRefusal,
 }:
 let
   # THE identity-key predicate. It used to need a warning about two derivations agreeing; it no
@@ -191,18 +193,27 @@ in
   # `_identity.keys` (the instance carries those, not the kind-value), and the `null` answer above, which
   # a stamp computed over an instance of its own kind has no counterpart for.
   identityHashForKind =
-    kindValue0: instance:
+    kindValue0:
     let
       kindValue = kindOperand "identityHashForKind" kindValue0;
+      # THE RECOMPUTE PATH HOLDS THE WHOLE STAMP (den-hoag-9zyp7), as `id_hash` does: its answer is
+      # an identity, and an instance imports past a `//` copy of its kind's identity cells, so without
+      # it this door would hash the copy's mark. Once per kind, before the instance is taken.
+      mark =
+        if kindValue ? __kindSelf && !(stampOk kindValue) then
+          stampRefusal "gen-schema: identityHashForKind" kindValue
+        else
+          kindValue.__mint.minted;
       # No base args: this path takes only a kind value and an instance, so it has none to pass and
       # nowhere to accept them. A kind whose modules need an argument is therefore still refused
       # HERE, unchanged by the thread above — giving this path a channel cascades to its own callers
       # and is a separate decision.
       keys = identityKeysForKind { } kindValue;
     in
+    instance:
     if prelude.all (k: instance ? ${k}) keys then
       identity.hashIdentity kindValue.kind ([ "_identity" ] ++ keys) (
-        k: if k == "_identity" then kindValue.__mint.minted else instance.${k}
+        k: if k == "_identity" then mark else instance.${k}
       )
     else
       null;
@@ -237,6 +248,15 @@ in
       };
       kindValue = kindOperand "mkIdentityModule" kindValue0;
       kind = kindValue.kind;
+      # THE IDENTITY DOOR HOLDS THE WHOLE STAMP (den-hoag-9zyp7). `mkInstanceType`'s import reads the
+      # content cells only (`stampImportOk`), so a `//` copy replacing a kind's identity cells alone is
+      # refused where an answer is an identity, here and at `identityHashForKind`, by the stamp every
+      # mark-reading door holds (`kindSubject`). Once per TYPE, like the descriptor above.
+      mark =
+        if kindValue ? __kindSelf && !(stampOk kindValue) then
+          stampRefusal "gen-schema: id_hash" kindValue
+        else
+          kindValue.__mint.minted;
     in
     # The operand is judged when the module is APPLIED, not when `id_hash` is forced: a door that
     # refused only on the stamp would admit a name through every fixture that never reads it. On
@@ -295,7 +315,7 @@ in
             identity.hashIdentity kind ([ "_identity" ] ++ keys) (
               k:
               if k == "_identity" then
-                kindValue.__mint.minted
+                mark
               else if config ? ${k} then
                 config.${k}
               else

@@ -4895,4 +4895,69 @@ in
       "test-${n}-ok" = s.ok;
       "test-${n}-bad" = s.bad;
     }) shapes;
+
+  # den-hoag-9zyp7: the instance's import reads the content stamp alone (`stampImportOk`); every door
+  # whose answer is an identity holds the whole stamp. So a `//` copy of a kind's identity cells
+  # imports and is refused BY NAME at `id_hash` and at `identityHashForKind` (on the copy's own
+  # instance and on the honest one); a content copy is refused at the import; a parent copy is
+  # refused at the child's admission (`formOf` keeps the whole stamp). Trees:
+  # ./test-fixtures/collection-in-identity.nix; the serving reads: `collection-in-identity`.
+  flake.testsError.collection-in-identity-refusals =
+    let
+      F = import ./test-fixtures/collection-in-identity.nix { inherit genSchema genMerge genAlgebra; };
+      notBuilt = site: kind: {
+        type = "ThrownError";
+        msg = "^${escapeRegex site}: the kind value '${kind}' is not the value its schema built";
+      };
+      idHash = s: mode: {
+        "test-${s}-${mode}-copy-id-hash-refuses-by-name" = {
+          expr = (F.copyTree s mode).hosts.igloo.id_hash;
+          expectedError = notBuilt "gen-schema: id_hash" "host";
+        };
+      };
+      content = s: {
+        "test-${s}-content-copy-import-refuses-by-name" = {
+          expr = (F.copyTree s "content").hosts.igloo.addr;
+          expectedError = notBuilt "gen-schema: mkInstanceType" "host";
+        };
+      };
+      recompute = s: mode: inst: {
+        "test-${s}-${mode}-copy-recompute-${inst}-refuses-by-name" = {
+          expr = F.recompute s mode inst;
+          expectedError = notBuilt "gen-schema: identityHashForKind" "host";
+        };
+      };
+      parent = read: {
+        "test-parent-mint-copy-${read}-refuses-by-name" = {
+          expr =
+            let
+              kid = F.childOf "mint";
+            in
+            if read == "mark" then kid.__mint.minted else builtins.attrNames kid.__sealed;
+          expectedError = notBuilt "gen-schema: kind 'kid' inherits" "par";
+        };
+      };
+    in
+    idHash "U" "mint"
+    // idHash "UC" "mint"
+    // idHash "GC" "mint"
+    // idHash "GP" "mint"
+    // idHash "UC" "sealed"
+    // idHash "GC" "sealed"
+    // content "U"
+    // content "UC"
+    // content "GC"
+    // content "GP"
+    // recompute "U" "mint" "own"
+    // recompute "UC" "mint" "own"
+    // recompute "GC" "mint" "own"
+    // recompute "UC" "sealed" "own"
+    // recompute "GC" "sealed" "own"
+    // recompute "U" "mint" "honest"
+    // recompute "UC" "mint" "honest"
+    // recompute "GC" "mint" "honest"
+    // recompute "UC" "sealed" "honest"
+    // recompute "GC" "sealed" "honest"
+    // parent "mark"
+    // parent "sealedNames";
 }

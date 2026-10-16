@@ -548,6 +548,29 @@ let
     in
     a: b: cellAgrees a b a b;
   stampOk = k: builtins.isFunction k.__kindSelf && stampAgrees (k.__kindSelf null) k;
+  # THE INSTANCE IMPORT'S STAMP (den-hoag-9zyp7): every cell but the two identity cells, the mark
+  # (`__mint`) and the sealed subjects (`__sealed`). An instance's import composes the content cells
+  # and reads no identity, so it never demands one: on Nix and Determinate `==` forces each cell, and
+  # an identity cell's value is minted over the collections, which may read the instance being built.
+  # A copy replacing an identity cell is refused where an identity is answered (`id_hash` and
+  # `identityHashForKind` hold `stampOk`). Read by `mkInstanceType` alone: `formOf` and the ancestor
+  # fold hand the value they admit to a mark (a parent enters its child's plane), so they hold
+  # `stampOk`.
+  stampImportOk =
+    k:
+    builtins.isFunction k.__kindSelf
+    &&
+      stampAgrees
+        (builtins.removeAttrs (k.__kindSelf null) [
+          "__mint"
+          "__sealed"
+        ])
+        (
+          builtins.removeAttrs k [
+            "__mint"
+            "__sealed"
+          ]
+        );
 
   stampRefusal =
     site: k:
@@ -2662,6 +2685,7 @@ in
     isSchemaKind
     kindEq
     stampOk
+    stampImportOk
     stampRefusal
     inheritsResolvedFile
     inheritedModule

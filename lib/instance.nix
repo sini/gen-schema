@@ -84,7 +84,8 @@ let
       # is the kind's `__functor`, the original module, so a `//` copy of the kind would otherwise
       # build instances of the original and drop the caller's change. Lazy and once per TYPE, forced
       # at the first instance's import, at config-demand time; never at the guard above, which runs
-      # at option-DECLARATION time and must not force the kind's slots.
+      # at option-DECLARATION time and must not force the kind's slots. `stampOk` here is the CONTENT
+      # stamp (`stampImportOk`, den-hoag-9zyp7): the import reads no identity cell, so it demands none.
       importedKind =
         if kindValue ? __kindSelf && !(stampOk kindValue) then
           stampRefusal "gen-schema: mkInstanceType" kindValue
