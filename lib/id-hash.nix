@@ -45,6 +45,8 @@
   merge,
   identity,
   isSchemaKind,
+  stampOk,
+  stampRefusal,
 }:
 let
   # THE identity-key predicate. It used to need a warning about two derivations agreeing; it no
@@ -294,8 +296,15 @@ in
             # than that one key costs the same and is total over the whole set.
             identity.hashIdentity kind ([ "_identity" ] ++ keys) (
               k:
+              # THE IDENTITY DOOR HOLDS THE WHOLE STAMP (den-hoag-9zyp7). The import reads the content
+              # cells only (`stampImportOk`), so a `//` copy replacing a kind's identity cells alone is
+              # refused here, at the first read whose answer is an identity, by the stamp every
+              # mark-reading door holds (`kindSubject`).
               if k == "_identity" then
-                kindValue.__mint.minted
+                if kindValue ? __kindSelf && !(stampOk kindValue) then
+                  stampRefusal "gen-schema: id_hash" kindValue
+                else
+                  kindValue.__mint.minted
               else if config ? ${k} then
                 config.${k}
               else

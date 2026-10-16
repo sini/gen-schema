@@ -18,7 +18,7 @@ let
   # LIBRARY called gen-identity is a reader's trap rather than a tidy-up.
   idHashLib = import ./id-hash.nix {
     inherit prelude merge identity;
-    inherit (entryType) isSchemaKind;
+    inherit (entryType) isSchemaKind stampOk stampRefusal;
   };
   # THE MERGE RELATION OF A TYPE BUILT PER CONSTRUCTION (den-hoag-bfc0k). `schemaKindEntry`,
   # `declarationOf(<kind>)` and `strict` are built fresh on every call — the entry type and `strict` on every
