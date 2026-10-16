@@ -548,13 +548,23 @@ let
     in
     a: b: cellAgrees a b a b;
   stampOk = k: builtins.isFunction k.__kindSelf && stampAgrees (k.__kindSelf null) k;
-  # PROTOTYPE (den-hoag-9zyp7 arm C): the stamp an IMPORT door reads compares every cell but the
-  # identity cells derived from them, so importing a kind never demands its identity.
-  identityCells = [ "__sealed" ];
+  # THE IMPORT DOOR'S STAMP (den-hoag-9zyp7): every cell but the two identity cells, the mark
+  # (`__mint`) and the sealed subjects (`__sealed`). An import composes the content cells and reads no
+  # identity, so it never demands one: on Nix and Determinate `==` forces each cell, and an identity
+  # cell's value is minted over the collections, which may read the instance being built. A copy
+  # replacing an identity cell is refused where an identity is read, by `stampOk` (`kindSubject`,
+  # and `id_hash`'s `kindMark`).
   stampImportOk =
     k:
-    builtins.isFunction k.__kindSelf
-    && stampAgrees (builtins.removeAttrs (k.__kindSelf null) identityCells) (builtins.removeAttrs k identityCells);
+    let
+      content =
+        v:
+        builtins.removeAttrs v [
+          "__mint"
+          "__sealed"
+        ];
+    in
+    builtins.isFunction k.__kindSelf && stampAgrees (content (k.__kindSelf null)) (content k);
 
   stampRefusal =
     site: k:
