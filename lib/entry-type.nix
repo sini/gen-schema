@@ -564,13 +564,25 @@ let
         (builtins.removeAttrs (k.__kindSelf null) [
           "__mint"
           "__sealed"
+          "__kindAncestors"
         ])
         (
           builtins.removeAttrs k [
             "__mint"
             "__sealed"
+            "__kindAncestors"
           ]
         );
+
+  # ONE CONSTRUCTION, REACHED AS ITSELF (den-hoag-c2836): `b` carries `a`'s completion-stamp slot and its
+  # content cells are what that stamp built (`stampImportOk`). Decided by slot, so neither mark is read;
+  # a door that composes takes this, and a door that answers an identity holds the whole stamp.
+  sameConstruction =
+    a: b:
+    a ? __kindSelf
+    && b ? __kindSelf
+    && builtins.intersectAttrs { __kindSelf = null; } a == builtins.intersectAttrs { __kindSelf = null; } b
+    && stampImportOk b;
 
   stampRefusal =
     site: k:
@@ -1303,7 +1315,10 @@ let
               # according to the collection's merge strategy.
               extractedCollections = prelude.mapAttrs (
                 name: collection:
-                if name == "inherits" then aliasedInherits declaredRendered else declaredOf name collection
+                if name == "inherits" then
+                  map (e: builtins.seq inheritsVerdict e) (aliasedInherits declaredRendered)
+                else
+                  declaredOf name collection
               ) allCollections;
 
               declaredOf =
@@ -1328,8 +1343,8 @@ let
               # and every value off a tree, is foreign and stays a VALUE entry, never resolved against
               # an in-tree name (ADR-0034: identity through the one mint, never by name). It forces
               # both marks where `inherits` is read, so the cycle walk reads `cycleParents` instead.
-              formOf =
-                v:
+              formOfWith =
+                composing: v:
                 if !(isSchemaKind v) then
                   throw "gen-schema: kind '${kind}' inherits ${
                     if builtins.isAttrs v then "an attrset with no mark" else "a ${builtins.typeOf v}"
@@ -1364,8 +1379,10 @@ let
                 else if
                   tree != null
                   && builtins.elem v.kind tree._kindNames
-                  && tree.${v.kind}.__mint.minted == v.__mint.minted
-                  && kindEq tree.${v.kind} v
+                  && (
+                    (composing && sameConstruction tree.${v.kind} v)
+                    || (tree.${v.kind}.__mint.minted == v.__mint.minted && kindEq tree.${v.kind} v)
+                  )
                 then
                   "name"
                 # A FOREIGN value decides by no `kindEq`, so its stamp is read here: a `//` copy of a
@@ -1377,6 +1394,20 @@ let
                   stampRefusal "gen-schema: kind '${kind}' inherits" v
                 else
                   "value";
+              # TWO DOORS OVER ONE CLASSIFICATION (den-hoag-c2836). Composition (`options`, `refs`, an
+              # instance's import) reads `formOf`, which takes the tree's own construction by its stamp
+              # slot and reads no mark, as `mkInstanceType`'s import reads the content stamp alone: a
+              # parent whose collection reads an instance of this kind composes. Every read that answers
+              # an identity (the mark, `__sealed`, an `inherits` entry, `__kindAncestors`, `id_hash`)
+              # first forces `identityVerdict`: the ancestors' whole stamps in walk order, then each
+              # parent value classified by mark and `kindEq` (`inheritsVerdict`, which an `inherits`
+              # entry forces alone). So a `//` copy over a parent's identity cells is refused there, and
+              # no answer reads an identity a copy forged.
+              formOf = formOfWith true;
+              inheritsVerdict = builtins.foldl' (acc: v: builtins.seq (formOfWith false v) acc) true (
+                builtins.filter (v: !(builtins.isString v)) (declaredRaw ++ kindImports)
+              );
+              identityVerdict = builtins.seq lineageStamped inheritsVerdict;
               rendered = v: if builtins.isString v || formOf v == "value" then v else v.kind;
               declaredRaw = declaredOf "inherits" allCollections.inherits;
               declaredRendered = map rendered declaredRaw;
@@ -1486,19 +1517,31 @@ let
                   step =
                     path: acc: p:
                     let
-                      m = p.__mint.minted;
+                      n = p.kind;
                       here = path ++ [ p.kind ];
+                      held = acc.byName.${n} or [ ];
+                      same = builtins.filter (e: sameConstruction e.value p) held;
+                      met = if same != [ ] then same else builtins.filter (e: e.value.__mint.minted == p.__mint.minted) held;
+                      e = builtins.head met;
+                      entry = {
+                        value = p;
+                        path = here;
+                      };
+                      seen = acc // {
+                        order = acc.order ++ [ entry ];
+                      };
                     in
-                    if acc ? ${m} then
+                    if held != [ ] && met != [ ] then
                       if
-                        sealedCollisionEq
-                          "gen-schema: kind '${kind}' reaches ${ancestorName p.kind} along ${arrow acc.${m}.path} and along ${arrow here}"
-                          (subjectOf acc.${m}.value)
+                        same != [ ]
+                        || sealedCollisionEq
+                          "gen-schema: kind '${kind}' reaches ${ancestorName p.kind} along ${arrow e.path} and along ${arrow here}"
+                          (subjectOf e.value)
                           (subjectOf p)
                       then
-                        acc
+                        seen
                       else
-                        throw "gen-schema: kind '${kind}' reaches two kinds named '${p.kind}' that share one mark, along ${arrow acc.${m}.path} and along ${arrow here}: they differ only at a declared subject (a registered construction), which the mark is blind to, and the ancestor map is keyed by the mark, so it cannot hold both; give the two kinds different names or one construction"
+                        throw "gen-schema: kind '${kind}' reaches two kinds named '${p.kind}' that share one mark, along ${arrow e.path} and along ${arrow here}: they differ only at a declared subject (a registered construction), which the mark is blind to, and the ancestor map is keyed by the mark, so it cannot hold both; give the two kinds different names or one construction"
                     # Every ancestor's stamp is read on entry, not only at a diamond: a kind reached
                     # through the `imports` spelling, at any depth, meets no `formOf`, and a `//` copy
                     # there would compose the original while this map published the copy (an
@@ -1508,20 +1551,41 @@ let
                     # inside a FUNCTION module, and `types.submodule k`. Neither reaches this fold; both
                     # apply the kind's `__functor`, which ignores its `self`. ADR-0025's cxlc0 rider;
                     # pinned by `kind-value-swap.test-*-composes-unread`, closed under den-hoag-jrbis.
-                    else if p ? __kindSelf && !(stampOk p) then
+                    else if p ? __kindSelf && !(stampImportOk p) then
                       stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${arrow here}" p
                     else
                       builtins.foldl' (step here) (
-                        acc
+                        seen
                         // {
-                          ${m} = {
-                            value = p;
-                            path = here;
+                          byName = acc.byName // {
+                            ${n} = held ++ [ entry ];
                           };
                         }
                       ) (p.__kindImports or [ ]);
                 in
-                prelude.mapAttrs (_: e: e.value) (builtins.foldl' (step [ kind ]) { } kindParents);
+                builtins.foldl' (step [ kind ]) {
+                  byName = { };
+                  order = [ ];
+                } kindParents;
+              kindAncestorValues = map (e: e.value) (builtins.concatLists (builtins.attrValues kindAncestors.byName));
+              # THE IDENTITY HALF OF THE FOLD: every ancestor reached, in walk order, holds its whole stamp,
+              # in the fold's own words, before any identity this kind answers reads it.
+              lineageStamped = builtins.foldl' (
+                acc: e:
+                if e.value ? __kindSelf && !(stampOk e.value) then
+                  stampRefusal "gen-schema: kind '${kind}' reaches '${e.value.kind}' along ${prelude.concatStringsSep " -> " e.path}" e.value
+                else
+                  acc
+              ) true kindAncestors.order;
+              # the published map, keyed by mark (an identity read)
+              kindAncestorsByMark = builtins.seq identityVerdict (
+                builtins.listToAttrs (
+                  map (a: {
+                    name = a.__mint.minted;
+                    value = a;
+                  }) kindAncestorValues
+                )
+              );
 
               # THE CLASS RULE IS A CHECK (den-hoag-l0y C2): `keySemantics` is a construction formal,
               # fixed before the tree resolves `inherits`, so a subkind cannot take a union of its
@@ -1530,9 +1594,21 @@ let
               # interpreted (the vocabulary is the consumer's).
               classDefects =
                 let
+                  bad = builtins.filter (x: x.ds != [ ]) (
+                    map (a: {
+                      inherit a;
+                      ds = classDefectsOf a;
+                    }) kindAncestorValues
+                  );
+                in
+                prelude.concatMap (x: x.ds) (
+                  if builtins.length bad <= 1 then bad else prelude.sort (x: y: x.a.__mint.minted < y.a.__mint.minted) bad
+                );
+              classDefectsOf =
+                let
                   catOf = e: if builtins.isAttrs e then e.category or null else null;
                 in
-                prelude.concatMap (
+                (
                   a:
                   let
                     theirs = a.keySemantics or { };
@@ -1560,7 +1636,7 @@ let
                     else
                       [ ]
                   ) (prelude.attrNames theirs)
-                ) (builtins.attrValues kindAncestors);
+                );
 
               # THE PARENTS THIS KIND COMPOSES, as kind VALUES, in either spelling: the spelled ones
               # (`kindImports`) and, on a tree, each declared name the tree holds and nothing spelled.
@@ -2130,13 +2206,13 @@ let
                     # reads it.
                     inherit kind;
                     __mint = {
-                      minted = markOf { inherit kind strict plane; };
+                      minted = builtins.seq identityVerdict (markOf { inherit kind strict plane; });
                     };
-                    __sealed = plane.sealed;
-                    __kindImports = kindParents;
+                    __sealed = builtins.seq identityVerdict plane.sealed;
+                    __kindImports = resolvedOnly kindParents;
                     __kindCycleParents = cycleParents;
                     __kindWitness = kindWitness;
-                    __kindAncestors = resolvedOnly kindAncestors;
+                    __kindAncestors = resolvedOnly kindAncestorsByMark;
                   }
                 else
                   let
@@ -2261,7 +2337,7 @@ let
                     # Bound ONCE per kind and read by both the module key and `__mint`: the key is
                     # built on every application of `__functor` (every instance, every child), and a
                     # mint inside it would run once per application.
-                    ownMark = markOf { inherit kind strict plane; };
+                    ownMark = builtins.seq identityVerdict (markOf { inherit kind strict plane; });
                     # The keyed module's fields, bound once per kind: the key, in the functor's result,
                     # and on the kind value's RECORD the comparison gen-merge's key dedup applies when
                     # another occurrence shares the key (`__keyEq`, gen-merge's protocol, read off the
@@ -2347,13 +2423,13 @@ let
                     __mint = {
                       minted = ownMark;
                     };
-                    __sealed = plane.sealed;
+                    __sealed = builtins.seq identityVerdict plane.sealed;
                     # the parents as VALUES, read by the ancestor map; the parents as written and the
                     # witness, read by the cycle walk of every kind below
-                    __kindImports = kindParents;
+                    __kindImports = resolvedOnly kindParents;
                     __kindCycleParents = cycleParents;
                     __kindWitness = kindWitness;
-                    __kindAncestors = resolvedOnly kindAncestors;
+                    __kindAncestors = resolvedOnly kindAncestorsByMark;
                   }
                   // keyEqRecord
               )
