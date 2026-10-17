@@ -1572,7 +1572,8 @@ let
               # in the fold's own words, before any identity this kind answers reads it.
               lineageStamped = builtins.foldl' (
                 acc: e:
-                if e.value ? __kindSelf && !(stampOk e.value) then
+                # each ancestor's own identity verdict first, so a refusal names the walk that owns it
+                if builtins.seq (e.value.__kindAncestors or null) (e.value ? __kindSelf && !(stampOk e.value)) then
                   stampRefusal "gen-schema: kind '${kind}' reaches '${e.value.kind}' along ${prelude.concatStringsSep " -> " e.path}" e.value
                 else
                   acc
