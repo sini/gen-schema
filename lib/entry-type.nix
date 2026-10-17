@@ -2305,25 +2305,24 @@ let
                             decide = sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key";
                             # two occurrences of one kind name meet (`meeting`, the key's mark-free
                             # part, so every pair sharing the key meets, whatever their nodes); at a
-                            # meeting, different marks are two declarations and both compose, and
-                            # equal marks are decided by `decide`
+                            # meeting gen-merge reads the key, where different marks are two
+                            # declarations and both compose, and equal marks are decided by `decide`
                             meeting = "gen-schema-kind:${kind}";
-                            refine = s: s.mark;
                           };
                     };
                   in
                   # Precedence: computed overrides collections of the same name.
                   # __functor is reserved — collections/computed must not use it as a key.
                   {
-                    # A kind that composes a parent is keyed, in gen's engine, by its DECLARATION NODE
-                    # (`__moduleKey`, the content witness through the one mint; den-hoag-9zyp7 OQ2), and
-                    # in a foreign evaluator by the result's `key`, its MARK (ADR-0034, identity through the
-                    # one mint), so a parent reached on two branches (a diamond) is composed once. In gen's
-                    # engine two occurrences of one node meet at gen-merge's key dedup, which applies
-                    # `__keyEq`: equal marks are decided by `decide` (one module, or refused by name), and
-                    # different marks (`refine`) are two constructions of one declaration, which both
-                    # compose, as two mark keys did (`keyed`, `keyEqRecord`); a foreign evaluator meets
-                    # them by mark, as before. Inside a kind the ancestor map's fold decides the pair.
+                    # A kind that composes a parent is a node of gen's module graph by its DECLARATION
+                    # NODE (`__moduleKey`, the content witness through the one mint; den-hoag-9zyp7 OQ2),
+                    # and keyed in every evaluator by the result's `key`, its MARK (ADR-0034, identity
+                    # through the one mint), so a parent reached on two branches (a diamond) is composed
+                    # once. gen-merge reads the key only where two occurrences of one kind name meet
+                    # (`__keyEq.meeting`), so the import of a lone kind demands no mark: equal marks are
+                    # decided by `decide` (one module, or refused by name), and different marks are two
+                    # declarations, which both compose (`keyed`, `keyEqRecord`). Inside a kind the
+                    # ancestor map's fold decides the pair.
                     __functor =
                       _:
                       { ... }:
