@@ -3047,13 +3047,13 @@ in
     };
   };
 
-  # den-hoag-n6dh7 Unit 2.4 (item 1; OQ2 α): a nested tree is a child of the one evaluation that
-  # holds it, so a submodule's CALLED `whenEmpty.value` refuses by name rather than evaluating the
-  # tree standalone. A deep force of a submodule-based TYPE record (here `mkInstanceType`'s) reaches
-  # that field, so it meets the refusal, catchably; the value side and a shallow read are untouched
-  # (`ci/tests/mktype-kind-value.nix`).
+  # den-hoag-n6dh7 item 1, narrowed by den-hoag-8qenh: a free-standing submodule's `whenEmpty.value`,
+  # which no gen evaluation holds, is the bridge's one root evaluation, nixpkgs' `base.config`. A deep
+  # force of a submodule-based TYPE record (here `mkInstanceType`'s) reaches that field, so it
+  # resolves, as nixpkgs' deep force of a submodule type does; the value side and a shallow read are
+  # untouched (`ci/tests/mktype-kind-value.nix`).
   flake.testsError.type-record-deep-force = {
-    test-a-deep-force-of-a-submodule-based-type-meets-the-called-empty-value-refusal = {
+    test-a-deep-force-of-a-submodule-based-type-reads-its-empty-value = {
       expr =
         let
           # every option defaulted, so the deep force reaches the type's own fields first
@@ -3070,11 +3070,8 @@ in
         in
         # the record is deep-forced whole: a submodule type mints with its modules sealed, and no field
         # of it refuses an identity demand (gen-types `idOf` is the demand), so `whenEmpty` is reached.
-        builtins.deepSeq (genSchema.mkInstanceType { } kind) null;
-      expectedError = {
-        type = "ThrownError";
-        msg = "^gen-merge: `submodule': its called `whenEmpty' does not evaluate the nested tree";
-      };
+        builtins.deepSeq (genSchema.mkInstanceType { } kind) true;
+      expected = true;
     };
   };
 

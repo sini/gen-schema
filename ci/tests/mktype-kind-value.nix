@@ -63,9 +63,9 @@ in
   # reaches the mark, so the no-`kind` kind value refused with the FALSE reason "no mark" even
   # though `__mint.minted` was present and correct. Admission, not the mark, is what this pins, and
   # it is read through a USE of the type: an instance of it in an evaluation reads its field. A
-  # `deepSeq` of the type record is not an admission test, and since den-hoag-n6dh7 Unit 2.4 it
-  # reaches a submodule's called `whenEmpty.value`, which refuses by name (item 1; OQ2 α: never a
-  # silent standalone evaluation); `ci/tests-error.nix` `type-record-deep-force` pins that refusal.
+  # `deepSeq` of the type record is not an admission test: it reaches a submodule's `whenEmpty.value`,
+  # the empty value nixpkgs' deep force also reads (den-hoag-n6dh7 item 1, narrowed by
+  # den-hoag-8qenh); `ci/tests-error.nix` `type-record-deep-force` pins that it resolves.
   # Nor is `name` + `check`: both answer for a kind `isSchemaKind` does not admit (Unit 2 landing
   # gate, C2), where this instance read refuses.
   flake.tests.mktype-kind-value.test-mktype-arm-with-no-kind-echo-is-admitted-by-mkInstanceType = {
