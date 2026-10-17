@@ -2303,8 +2303,11 @@ let
                               inherit (plane) sealed;
                             };
                             decide = sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key";
-                            # two occurrences of one declaration node with different marks are two
-                            # constructions, and both compose; read only where two occurrences meet
+                            # two occurrences of one kind name meet (`meeting`, the key's mark-free
+                            # part, so every pair sharing the key meets, whatever their nodes); at a
+                            # meeting, different marks are two declarations and both compose, and
+                            # equal marks are decided by `decide`
+                            meeting = "gen-schema-kind:${kind}";
                             refine = s: s.mark;
                           };
                     };
