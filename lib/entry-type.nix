@@ -1594,20 +1594,24 @@ let
               # parents' names and its declared option names, read before composition. Its one reader
               # is the inheritance-cycle walk, which runs before composition and so cannot read a mark;
               # the module key is the mark (below). Published as `__kindWitness`.
-              kindWitness = builtins.hashString "sha256" (
-                builtins.unsafeDiscardStringContext "${kind}@${
-                  prelude.concatStringsSep ";" (map (d: "${toString (d.file or "?")}=${witnessPos d.value}") defs)
-                }|parents=${prelude.concatStringsSep "," (map (k: k.kind) cycleParents)}|opts=${
-                  prelude.concatStringsSep "," (
-                    prelude.concatMap (
-                      d:
-                      if builtins.isAttrs d.value && builtins.isAttrs (d.value.options or null) then
-                        builtins.attrNames d.value.options
-                      else
-                        [ ]
-                    ) defs
-                  )
-                }"
+              kindWitness = identity.hashIdentity "schemawitness" [ "defs" "kind" "options" "parents" ] (
+                l:
+                {
+                  inherit kind;
+                  defs = map (d: {
+                    file = builtins.unsafeDiscardStringContext (toString (d.file or "?"));
+                    pos = witnessPos d.value;
+                  }) defs;
+                  parents = map (k: k.kind) cycleParents;
+                  options = prelude.concatMap (
+                    d:
+                    if builtins.isAttrs d.value && builtins.isAttrs (d.value.options or null) then
+                      builtins.attrNames d.value.options
+                    else
+                      [ ]
+                  ) defs;
+                }
+                .${l}
               );
 
               # THE ONE INHERITANCE-CYCLE WALK (8c8pr Q-b arm (i), 2026-09-30), for both spellings: a
@@ -2270,7 +2274,7 @@ let
                         throw "gen-schema: kind '${kind}' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read that key there (its `moduleSyntax.functorRecord' does not list `__keyEq'). gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
                       else
                         {
-                          key = "gen-schema-kind:${kind}#${ownMark}";
+                          key = "gen-schema-kind:${kind}#${kindWitness}";
                           config = { };
                         };
                     keyEqRecord = {
