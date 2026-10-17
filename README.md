@@ -1040,7 +1040,12 @@ omits or re-categorises a key is refused by name, naming the kind, the key and t
 ancestor that carries the kind's own name is foreign (one tree holds one entry per name), and both
 refusals name it as `the foreign kind value '<k>'`. Both
 refusals fire where the kind is composed (its options, refs, mark or an instance, and the map itself),
-never at its WHNF, and after the cycle walk.
+never at its WHNF, and after the cycle walk. The fold meets ancestors by NAME and reads marks only where
+two constructions of one name meet; the same construction reached again is one entry, decided by its
+stamp slot. Equal marks imply equal names, so every pair the marks would meet still meets, and a parent
+whose collection kept in the identity reads an instance of a kind inheriting it composes
+(den-hoag-c2836). Its residue, a parent meeting ANOTHER tree's construction of its name, reads both marks
+and still recurses (an open defect).
 
 **The deprecated inheritance spelling is read as `inherits`, with a warning, where a value test can
 see it, and nowhere else (a declared exception to "a value or a named refusal").** A kind value
@@ -1627,11 +1632,17 @@ function returning the value the schema's merge built, declared beside it as the
 `//` copy (`k // { options = …; }`), which keeps the mark while changing what it stands for, is
 refused naming the kind (`…the kind value '<k>' is not the value its schema built…`). The same refusal guards these doors:
 the `inherits` value door, the ancestor fold (a kind reached through the `imports` spelling, at any depth),
-an instance's `id_hash` and `identityHashForKind`. `mkInstanceType`'s import of the kind reads the stamp
-over the content cells only, every cell but the mark (`__mint`) and the sealed subjects (`__sealed`): the
-import composes no identity, so it demands none, and a collection kept in the identity may read an
-instance of the kind it types. A copy of the content is refused there, and a copy of an identity cell at
-the instance's identity reads. Two doors compose a `//` copy unread, enumerated here as
+an instance's `id_hash` and `identityHashForKind`. A door that composes reads the stamp over the content
+cells only (`stampImportOk`), every cell but the three identity cells: the mark (`__mint`), the sealed
+subjects (`__sealed`) and the ancestor map (`__kindAncestors`, keyed by marks). Those doors are
+`mkInstanceType`'s import of the kind and a parent read where its child composes (`options`, `refs`, an
+instance's import), where `formOf` takes the tree's own construction by its stamp slot and the ancestor
+fold meets by name. They compose no identity, so they demand none, and a collection kept in the identity
+may read an instance of the kind it types or of a kind inheriting it. A copy of the content is refused
+there. A copy of identity cells alone composes the construction it was taken from, and it is refused
+wherever an identity is answered: an instance's `id_hash`, `identityHashForKind`, and a child's mark,
+`__sealed`, `inherits` entries and `__kindAncestors`, each of which first reads every parent's and
+ancestor's whole stamp. Two doors compose a `//` copy unread, enumerated here as
 exceptions: a kind value imported inside
 a function module, and `types.submodule k`. Their `__functor` ignores its `self`, so the copy composes the
 original. Other doors that decide by the mark are outside this refusal (the 1a4f6 spec's §3b.1 censuses them).

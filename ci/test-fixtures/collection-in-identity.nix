@@ -104,6 +104,43 @@ let
         }
       )
     ]).config.schema.kid;
+  # den-hoag-c2836: a copy over the THIRD identity cell alone, `par // { __kindAncestors = { }; }`,
+  # where `par` inherits `gpar` (so the `{ }` changes the cell), handed to the instance import
+  # (`door = "registry"`) or to a child by value (`"inherits"`) or in `imports`. The registry types
+  # `par` itself on the first door and `kid` on the other two.
+  ancestorsCopyTree =
+    door:
+    (genMerge.evalModuleTree { } [
+      (
+        { config, ... }:
+        let
+          copy = config.schema.par // {
+            __kindAncestors = { };
+          };
+        in
+        {
+          options.schema = mkSchemaOption { };
+          options.hosts = mkInstanceRegistry { } (if door == "registry" then copy else config.schema.kid);
+          config.schema.gpar.options.g = genMerge.mkOption {
+            type = str;
+            default = "g";
+          };
+          config.schema.par = {
+            inherits = [ "gpar" ];
+            options.addr = genMerge.mkOption { type = str; };
+          };
+          config.schema.kid =
+            (if door == "imports" then { imports = [ copy ]; } else { inherits = [ copy ]; })
+            // {
+              options.r = genMerge.mkOption {
+                type = str;
+                default = "r";
+              };
+            };
+          config.hosts.igloo.addr = "10.0.1.1";
+        }
+      )
+    ]).config;
   # A `computed` field partial on the projection (`tags` declared out of the identity).
   partialTree =
     (genMerge.evalModuleTree { } [
@@ -136,6 +173,7 @@ in
     shapeTree
     copyTree
     childOf
+    ancestorsCopyTree
     partialTree
     recompute
     ;

@@ -548,14 +548,15 @@ let
     in
     a: b: cellAgrees a b a b;
   stampOk = k: builtins.isFunction k.__kindSelf && stampAgrees (k.__kindSelf null) k;
-  # THE INSTANCE IMPORT'S STAMP (den-hoag-9zyp7): every cell but the two identity cells, the mark
-  # (`__mint`) and the sealed subjects (`__sealed`). An instance's import composes the content cells
-  # and reads no identity, so it never demands one: on Nix and Determinate `==` forces each cell, and
-  # an identity cell's value is minted over the collections, which may read the instance being built.
-  # A copy replacing an identity cell is refused where an identity is answered (`id_hash` and
-  # `identityHashForKind` hold `stampOk`). Read by `mkInstanceType` alone: `formOf` and the ancestor
-  # fold hand the value they admit to a mark (a parent enters its child's plane), so they hold
-  # `stampOk`.
+  # THE CONTENT STAMP (den-hoag-9zyp7, den-hoag-c2836): every cell but the three identity cells, the
+  # mark (`__mint`), the sealed subjects (`__sealed`) and the ancestor map (`__kindAncestors`, keyed by
+  # marks). A door that composes reads the content cells and no identity, so it never demands one: on
+  # Nix and Determinate `==` forces each cell, and an identity cell's value is minted over the
+  # collections, which may read the instance being built. Its readers answer no identity:
+  # `mkInstanceType`'s import, and `sameConstruction` in `formOf`'s composing arm, the fold's meeting
+  # and the fold's entry. A copy replacing identity cells alone composes the construction it was taken
+  # from and is refused where an identity is answered (`id_hash`, `identityHashForKind`, and a child's
+  # mark, `__sealed`, `inherits` and `__kindAncestors`, which force `identityVerdict`), by `stampOk`.
   stampImportOk =
     k:
     builtins.isFunction k.__kindSelf
@@ -581,7 +582,8 @@ let
     a: b:
     a ? __kindSelf
     && b ? __kindSelf
-    && builtins.intersectAttrs { __kindSelf = null; } a == builtins.intersectAttrs { __kindSelf = null; } b
+    &&
+      builtins.intersectAttrs { __kindSelf = null; } a == builtins.intersectAttrs { __kindSelf = null; } b
     && stampImportOk b;
 
   stampRefusal =
@@ -1521,7 +1523,8 @@ let
                       here = path ++ [ p.kind ];
                       held = acc.byName.${n} or [ ];
                       same = builtins.filter (e: sameConstruction e.value p) held;
-                      met = if same != [ ] then same else builtins.filter (e: e.value.__mint.minted == p.__mint.minted) held;
+                      met =
+                        if same != [ ] then same else builtins.filter (e: e.value.__mint.minted == p.__mint.minted) held;
                       e = builtins.head met;
                       entry = {
                         value = p;
@@ -1534,10 +1537,11 @@ let
                     if held != [ ] && met != [ ] then
                       if
                         same != [ ]
-                        || sealedCollisionEq
-                          "gen-schema: kind '${kind}' reaches ${ancestorName p.kind} along ${arrow e.path} and along ${arrow here}"
-                          (subjectOf e.value)
-                          (subjectOf p)
+                        ||
+                          sealedCollisionEq
+                            "gen-schema: kind '${kind}' reaches ${ancestorName p.kind} along ${arrow e.path} and along ${arrow here}"
+                            (subjectOf e.value)
+                            (subjectOf p)
                       then
                         seen
                       else
@@ -1567,7 +1571,9 @@ let
                   byName = { };
                   order = [ ];
                 } kindParents;
-              kindAncestorValues = map (e: e.value) (builtins.concatLists (builtins.attrValues kindAncestors.byName));
+              kindAncestorValues = map (e: e.value) (
+                builtins.concatLists (builtins.attrValues kindAncestors.byName)
+              );
               # THE IDENTITY HALF OF THE FOLD: every ancestor reached, in walk order, holds its whole stamp,
               # in the fold's own words, before any identity this kind answers reads it.
               lineageStamped = builtins.foldl' (
@@ -1603,7 +1609,10 @@ let
                   );
                 in
                 prelude.concatMap (x: x.ds) (
-                  if builtins.length bad <= 1 then bad else prelude.sort (x: y: x.a.__mint.minted < y.a.__mint.minted) bad
+                  if builtins.length bad <= 1 then
+                    bad
+                  else
+                    prelude.sort (x: y: x.a.__mint.minted < y.a.__mint.minted) bad
                 );
               classDefectsOf =
                 let
@@ -2207,7 +2216,9 @@ let
                     # reads it.
                     inherit kind;
                     __mint = {
-                      minted = builtins.seq identityVerdict (markOf { inherit kind strict plane; });
+                      minted = builtins.seq identityVerdict (markOf {
+                        inherit kind strict plane;
+                      });
                     };
                     __sealed = builtins.seq identityVerdict plane.sealed;
                     __kindImports = resolvedOnly kindParents;
@@ -2338,7 +2349,9 @@ let
                     # Bound ONCE per kind and read by both the module key and `__mint`: the key is
                     # built on every application of `__functor` (every instance, every child), and a
                     # mint inside it would run once per application.
-                    ownMark = builtins.seq identityVerdict (markOf { inherit kind strict plane; });
+                    ownMark = builtins.seq identityVerdict (markOf {
+                      inherit kind strict plane;
+                    });
                     # The keyed module's fields, bound once per kind: the key, in the functor's result,
                     # and on the kind value's RECORD the comparison gen-merge's key dedup applies when
                     # another occurrence shares the key (`__keyEq`, gen-merge's protocol, read off the

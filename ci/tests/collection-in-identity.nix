@@ -19,6 +19,23 @@ let
       expected = "10.0.1.1";
     };
   };
+  # den-hoag-c2836: a copy over `__kindAncestors` alone composes at every door that reads content (the
+  # instance import, a child by value, a child's `imports`); its identity reads are refused
+  # (`collection-in-identity-refusals`).
+  ancestorsCopyComposes = door: {
+    "test-ancestors-copy-${door}-composes-the-options" = {
+      expr = builtins.attrNames (F.ancestorsCopyTree door).schema.kid.options;
+      expected = [
+        "addr"
+        "g"
+        "r"
+      ];
+    };
+    "test-ancestors-copy-${door}-instance-reads-the-honest-value" = {
+      expr = (F.ancestorsCopyTree door).hosts.igloo.addr;
+      expected = "10.0.1.1";
+    };
+  };
   recomputeAgrees = s: {
     "test-${s}-recompute-is-the-instance-identity" = {
       expr = F.recompute s "none" "own" == (F.copyTree s "none").hosts.igloo.id_hash;
@@ -74,6 +91,19 @@ in
   // copyServes "GC" "mint"
   // copyServes "GC" "sealed"
   // copyServes "GP" "mint"
+  // {
+    # the `{ }` is a change: `par` inherits `gpar`
+    test-ancestors-copy-replaces-a-nonempty-map = {
+      expr = builtins.attrNames (F.ancestorsCopyTree "inherits").schema.par.__kindAncestors != [ ];
+      expected = true;
+    };
+    test-ancestors-copy-registry-instance-reads-the-honest-value = {
+      expr = (F.ancestorsCopyTree "registry").hosts.igloo.addr;
+      expected = "10.0.1.1";
+    };
+  }
+  // ancestorsCopyComposes "inherits"
+  // ancestorsCopyComposes "imports"
   // recomputeAgrees "U"
   // recomputeAgrees "UC"
   // recomputeAgrees "GC";

@@ -4896,8 +4896,9 @@ in
   # den-hoag-9zyp7: the instance's import reads the content stamp alone (`stampImportOk`); every door
   # whose answer is an identity holds the whole stamp. So a `//` copy of a kind's identity cells
   # imports and is refused BY NAME at `id_hash` and at `identityHashForKind` (on the copy's own
-  # instance and on the honest one); a content copy is refused at the import; a parent copy is
-  # refused at the child's admission (`formOf` keeps the whole stamp). Trees:
+  # instance and on the honest one); a content copy is refused at the import; a parent copy of the
+  # identity cells (`__mint`, `__sealed`, `__kindAncestors`) composes and is refused at the child's
+  # identity reads (den-hoag-c2836: they force the whole-stamp verdict). Trees:
   # ./test-fixtures/collection-in-identity.nix; the serving reads: `collection-in-identity`.
   flake.testsError.collection-in-identity-refusals =
     let
@@ -4934,6 +4935,19 @@ in
           expectedError = notBuilt "gen-schema: kind 'kid' inherits" "par";
         };
       };
+      # den-hoag-c2836: the third identity cell. A copy over `__kindAncestors` alone composes (the
+      # `collection-in-identity` tree) and is refused wherever an identity is answered, at the door
+      # that reads the parent: `id_hash` on the instance import, `kindEq` by value, the fold in `imports`.
+      ancestors = door: site: {
+        "test-ancestors-copy-${door}-mark-refuses-by-name" = {
+          expr = (F.ancestorsCopyTree door).schema.kid.__mint.minted;
+          expectedError = notBuilt site "par";
+        };
+        "test-ancestors-copy-${door}-ancestors-refuses-by-name" = {
+          expr = builtins.attrNames (F.ancestorsCopyTree door).schema.kid.__kindAncestors;
+          expectedError = notBuilt site "par";
+        };
+      };
     in
     idHash "U" "mint"
     // idHash "UC" "mint"
@@ -4956,5 +4970,13 @@ in
     // recompute "UC" "sealed" "honest"
     // recompute "GC" "sealed" "honest"
     // parent "mark"
-    // parent "sealedNames";
+    // parent "sealedNames"
+    // {
+      test-ancestors-copy-registry-id-hash-refuses-by-name = {
+        expr = (F.ancestorsCopyTree "registry").hosts.igloo.id_hash;
+        expectedError = notBuilt "gen-schema: id_hash" "par";
+      };
+    }
+    // ancestors "inherits" "gen-schema: kindEq"
+    // ancestors "imports" "gen-schema: kind 'kid' reaches 'par' along kid -> par";
 }
