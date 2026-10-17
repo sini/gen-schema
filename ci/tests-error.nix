@@ -1116,7 +1116,7 @@ in
         (kindOf { computed = _: _: { options = "COMPUTED"; }; } { options.role = strOpt; }).options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
+        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
       };
     };
 
@@ -1146,7 +1146,7 @@ in
         } { }).refs;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
+        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
       };
     };
   };
@@ -3624,7 +3624,7 @@ in
           o_a [ (generatorOver (oldSchema.mkSchemaOption { }) { } "one") ];
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: kind 'a' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read that key there \\(its `moduleSyntax\\.functorRecord' does not list `__keyEq'\\)\\. gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; .*$";
+          msg = "^gen-schema: kind 'a' composes a parent, so it publishes its node key `__moduleKey' and the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read both there \\(its `moduleSyntax\\.functorRecord' does not list both `__moduleKey' and `__keyEq'\\)\\. gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; .*$";
         };
       };
     };

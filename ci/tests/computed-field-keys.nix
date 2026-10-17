@@ -57,6 +57,7 @@ let
     "__kindSelf"
     "__kindWitness"
     "__mint"
+    "__moduleKey"
     "__sealed"
     "__witness"
     "keySemantics"

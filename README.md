@@ -1019,7 +1019,15 @@ imported side by side, in either order; the module the functor returns carries o
 nixpkgs `lib.evalModules` mount of the kind value collects nothing it does not know. A sealed
 component compares by its seal, so equal means one construction reached twice: two calls of one
 generator are refused even where their values agree. A declaration may not carry `__keyEq` itself,
-and gen-schema over a gen-merge that does not read `__keyEq` off a functor record is refused by name.
+and gen-schema over a gen-merge that does not read `__keyEq` and `__moduleKey` off a functor record
+is refused by name. The record also names the module's graph node, `__moduleKey`, by the kind's
+declaration node (`__kindWitness`, read before composition), and its meeting, `__keyEq.meeting = "gen-schema-kind:<kind>"`: gen-merge reads the mark key only where another occurrence of the kind's
+name meets it, so importing a lone kind demands no mark, and a kind whose identity-bearing collection
+reads an instance of itself composes. Where another tree's kind of the same NAME reaches that import,
+the meeting forces the mark and the read still recurses (an open defect, pinned in
+`ci/tests-process.nix`). gen-merge trusts a stated meeting without forcing the key it should prefix
+(gen-merge README); gen-schema's always prefixes the kind's key, so a module stating that key meets
+the kind and is refused by name.
 
 **Each kind publishes its transitive ancestors, and a subkind must keep its ancestors' classes.**
 `__kindAncestors` maps each ancestor's mark to the ancestor kind value, read off `__kindImports`.

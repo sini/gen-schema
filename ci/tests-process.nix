@@ -135,9 +135,18 @@
         guardedLast=$(grep -c "gen-schema: while minting the identity of kind 'host' over its component 'collections.zones'" "$TMPDIR/err" || true)
         [ "$guardedLast" -ge 1 ] || die collection-identity-guard-sorted-last "expected the attribution naming 'collections.zones', counted 0"
 
+        # den-hoag-9zyp7 OQ2 · the residue: an instance read beside another tree's same-named kind
+        # still recurses uncatchably (pinned at its class; the control is a suite cell).
+        rc=0
+        inst --argstr arm inheriting-same-name-residue > /dev/null 2> "$TMPDIR/err" || rc=$?
+        ran=$((ran + 1))
+        [ "$rc" -ne 0 ] || die inheriting-same-name-residue "expected the abort, got exit 0"
+        grep -q 'infinite recursion' "$TMPDIR/err" ||
+          die inheriting-same-name-residue "expected the recursion abort: $(tail -n 3 "$TMPDIR/err")"
+
         # 0/0 is a false pass: the runner must have executed every cell above.
-        [ "$ran" = "12" ] || die runner "expected 12 evaluations, ran $ran"
-        echo "tests-process: 12 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst"
+        [ "$ran" = "13" ] || die runner "expected 13 evaluations, ran $ran"
+        echo "tests-process: 13 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst"
       '';
     };
 }

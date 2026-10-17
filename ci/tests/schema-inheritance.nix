@@ -891,6 +891,95 @@ in
         alone = "two";
       };
     };
+    # ONE declaration from two declaration sites (`_file`s): its two `a`s share a mark, so a key, under
+    # two declaration nodes (`__moduleKey`). gen-merge meets them by kind name (`__keyEq.meeting`), so
+    # they are compared at the key as two constructions are, and refused in both orders and at any
+    # depth, as when the node was the mark. A plain module stating the key meets it too, and is refused
+    # (only one publishes a comparison). `o_l` is a list, so one module reads one element and two
+    # would read two (a `str` option merges the doubled definition and could not tell them apart).
+    test-two-declaration-sites-of-one-mark-meet-at-the-key =
+      let
+        oL.options.o_l = genMerge.mkOption {
+          type = genMerge.types.listOf genMerge.types.str;
+          default = [ ];
+        };
+        site =
+          file:
+          (plainTree [
+            {
+              _file = file;
+              imports = [
+                (
+                  { config, ... }:
+                  {
+                    config.schema.p.options.o_p = str "p";
+                    config.schema.a = {
+                      imports = [ config.schema.p ];
+                      options.o_a = str "x";
+                      config.o_l = [ "one" ];
+                    };
+                  }
+                )
+              ];
+            }
+          ]).a;
+        f1 = site "/fx/f1.nix";
+        f2 = site "/fx/f2.nix";
+        o_l =
+          modules:
+          let
+            r = builtins.tryEval (
+              builtins.deepSeq (genMerge.evalModuleTree { } ([ oL ] ++ modules)).config.o_l
+                (genMerge.evalModuleTree { } ([ oL ] ++ modules)).config.o_l
+            );
+          in
+          if r.success then r.value else "REFUSED";
+        deep = m: { imports = [ { imports = [ m ]; } ]; };
+        forge = {
+          key = (f1.__functor f1 { }).key;
+          config.o_l = [ "f" ];
+        };
+      in
+      {
+        expr = {
+          oneKey = (f1.__functor f1 { }).key == (f2.__functor f2 { }).key;
+          twoNodes = f1.__moduleKey != f2.__moduleKey;
+          f1f2 = o_l [
+            f1
+            f2
+          ];
+          f2f1 = o_l [
+            f2
+            f1
+          ];
+          deepF2 = o_l [
+            f1
+            (deep f2)
+          ];
+          oneSiteTwice = o_l [
+            f1
+            (deep f1)
+          ];
+          forgeAfter = o_l [
+            f1
+            forge
+          ];
+          forgeBefore = o_l [
+            forge
+            f1
+          ];
+        };
+        expected = {
+          oneKey = true;
+          twoNodes = true;
+          f1f2 = "REFUSED";
+          f2f1 = "REFUSED";
+          deepF2 = "REFUSED";
+          oneSiteTwice = [ "one" ];
+          forgeAfter = "REFUSED";
+          forgeBefore = "REFUSED";
+        };
+      };
     # A parent-composing kind publishes `__keyEq` on its RECORD, never in the module its functor
     # returns (den-hoag-e5whp): nixpkgs collects only the result, where `__keyEq` is an unsupported
     # attribute. The result carries the key and nothing gen-merge alone reads; a parentless kind's
@@ -909,6 +998,7 @@ in
       expected = {
         recordKeyEq = [
           "decide"
+          "meeting"
           "subject"
         ];
         resultKeyEq = false;
@@ -928,6 +1018,64 @@ in
         "o_q"
         "other"
       ];
+    };
+    # An instance read composes beside another tree's kind (den-hoag-9zyp7 OQ2): `host`'s collection
+    # reads an instance of `host`, and `host` inherits another tree's kind. Named `box`, it meets
+    # nothing by name, so no mark is read at the import. The CONTROL of `tests-process`'s
+    # `inheriting-same-name-residue`, where the other kind is named `host` and the read still recurses.
+    test-an-instance-read-composes-beside-another-trees-kind = {
+      expr =
+        let
+          excludes = {
+            default = [ ];
+            merge = acc: val: acc ++ val;
+          };
+          box =
+            (genMerge.evalModuleTree { } [
+              (
+                { config, ... }:
+                {
+                  options.schema = mkSchemaOption { collections.excludes = excludes; };
+                  config.schema.conf = { };
+                  config.schema.box = {
+                    inherits = [ config.schema.conf ];
+                    options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                  };
+                }
+              )
+            ]).config.schema.box;
+          tree = genMerge.evalModuleTree { } [
+            (
+              { config, ... }:
+              {
+                options.schema = mkSchemaOption { collections.excludes = excludes; };
+                options.hosts = mkInstanceRegistry { } config.schema.host;
+                options.aspects = genMerge.mkOption {
+                  type = genMerge.types.attrsOf genMerge.types.anything;
+                };
+                config.schema.conf = { };
+                config.schema.host = {
+                  inherits = [
+                    config.schema.conf
+                    box
+                  ];
+                  options.addr = genMerge.mkOption { type = genMerge.types.str; };
+                  excludes = [ config.aspects.unwanted ];
+                };
+                config.hosts.igloo.addr = "10.0.1.1";
+                config.aspects.unwanted.domain = config.hosts.igloo.addr;
+              }
+            )
+          ];
+        in
+        {
+          addr = tree.config.hosts.igloo.addr;
+          held = map (x: x.domain) tree.config.schema.host.excludes;
+        };
+      expected = {
+        addr = "10.0.1.1";
+        held = [ "10.0.1.1" ];
+      };
     };
     # THE CALLER'S `defs` SHAPE IS ONE SHAPE ON BOTH PATHS (den-hoag-4d2zs): the raw defs, then the
     # parents as ONE nested def, whether the desugar or `evalSchema`'s pass resolved them. The

@@ -666,13 +666,18 @@ let
     if p == null then builtins.typeOf v else "${p.file}:${toString p.line}:${toString p.column}";
 
   # WHAT a resolved parent contributes to its child, on either tree: the parent's MODULE, its
-  # `__functor` applied, never its kind value — a kind value in a kind entry's `imports` is the
+  # `__functor` with the record channel (`__moduleKey`, `__keyEq`) carried, so gen's engine keys a parent
+  # reached through its child as it keys the parent reached directly (den-hoag-9zyp7 OQ2), never its kind value — a kind value in a kind entry's `imports` is the
   # deprecated spelling, which the entry type reads as `inherits` and warns on (den-hoag-cxlc0). One
   # derivation for `evalSchema`'s pass and the unstaged desugar, so the two compose one module.
   inheritedModule =
     kind: parent: v:
     if v ? __functor then
-      v.__functor v
+      {
+        inherit (v) __functor;
+        __moduleKey = v.__moduleKey or null;
+        __keyEq = v.__keyEq or null;
+      }
     else
       throw "gen-schema: kind '${kind}' inherits '${parent}', whose kind value is not a module (its `mkType` result carries no `__functor`), so there is nothing to compose";
 
@@ -803,7 +808,9 @@ let
   # (den-hoag-e5whp) only where its `moduleSyntax.functorRecord` lists it. Over a gen-merge without
   # it the record is never read, and two constructions sharing a mark would be deduplicated by key
   # silently, so the pairing is refused by name instead, once, where the key is written.
-  mergeReadsKeyEq = builtins.elem "__keyEq" (merge.moduleSyntax.functorRecord or [ ]);
+  mergeReadsKeyEq =
+    builtins.elem "__keyEq" (merge.moduleSyntax.functorRecord or [ ])
+    && builtins.elem "__moduleKey" (merge.moduleSyntax.functorRecord or [ ]);
   # The entry reservation rides on a functor's record (den-hoag-r05lc), which only a gen-merge
   # publishing it in `moduleSyntax.functorRecord` reads; any other would drop it silently.
   mergeReadsRecordReservation = builtins.elem "__reservedKeys" (
@@ -834,6 +841,7 @@ let
     # inheritance-cycle walk reads.
     "__kindImports"
     "__kindWitness"
+    "__moduleKey"
     # Written beside them, both branches, for the same reason: the transitive ancestor map, and the
     # parents as written, which the cycle walk reads.
     "__kindAncestors"
@@ -968,6 +976,7 @@ let
       [
         "__functor"
         "__keyEq"
+        "__moduleKey"
         "__kindAncestors"
         "__kindCycleParents"
         "__kindImports"
@@ -980,6 +989,7 @@ let
     else
       [
         "__keyEq"
+        "__moduleKey"
         "__kindAncestors"
         "__kindCycleParents"
         "__kindImports"
@@ -1593,21 +1603,26 @@ let
               # THE CONTENT WITNESS: the kind's name, each def's file and first-attribute position, its
               # parents' names and its declared option names, read before composition. Its one reader
               # is the inheritance-cycle walk, which runs before composition and so cannot read a mark;
-              # the module key is the mark (below). Published as `__kindWitness`.
-              kindWitness = builtins.hashString "sha256" (
-                builtins.unsafeDiscardStringContext "${kind}@${
-                  prelude.concatStringsSep ";" (map (d: "${toString (d.file or "?")}=${witnessPos d.value}") defs)
-                }|parents=${prelude.concatStringsSep "," (map (k: k.kind) cycleParents)}|opts=${
-                  prelude.concatStringsSep "," (
-                    prelude.concatMap (
-                      d:
-                      if builtins.isAttrs d.value && builtins.isAttrs (d.value.options or null) then
-                        builtins.attrNames d.value.options
-                      else
-                        [ ]
-                    ) defs
-                  )
-                }"
+              # its other reader is gen's engine: it is the declaration node gen-merge keys a kind that
+              # composes a parent by (`__moduleKey`, below). Published as `__kindWitness`.
+              kindWitness = identity.hashIdentity "schemawitness" [ "defs" "kind" "options" "parents" ] (
+                l:
+                {
+                  inherit kind;
+                  defs = map (d: {
+                    file = builtins.unsafeDiscardStringContext (toString (d.file or "?"));
+                    pos = witnessPos d.value;
+                  }) defs;
+                  parents = map (k: k.kind) cycleParents;
+                  options = prelude.concatMap (
+                    d:
+                    if builtins.isAttrs d.value && builtins.isAttrs (d.value.options or null) then
+                      builtins.attrNames d.value.options
+                    else
+                      [ ]
+                  ) defs;
+                }
+                .${l}
               );
 
               # THE ONE INHERITANCE-CYCLE WALK (8c8pr Q-b arm (i), 2026-09-30), for both spellings: a
@@ -2267,13 +2282,16 @@ let
                       if kindParents == [ ] then
                         { }
                       else if !mergeReadsKeyEq then
-                        throw "gen-schema: kind '${kind}' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read that key there (its `moduleSyntax.functorRecord' does not list `__keyEq'). gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
+                        throw "gen-schema: kind '${kind}' composes a parent, so it publishes its node key `__moduleKey' and the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read both there (its `moduleSyntax.functorRecord' does not list both `__moduleKey' and `__keyEq'). gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
                       else
                         {
                           key = "gen-schema-kind:${kind}#${ownMark}";
                           config = { };
                         };
                     keyEqRecord = {
+                      # gen-merge's node key: the declaration node, read off the record before
+                      # composition; the result's `key` (the mark) is what a foreign evaluator reads.
+                      __moduleKey = if kindParents == [ ] then null else "gen-schema-kind:${kind}#${kindWitness}";
                       __keyEq =
                         if kindParents == [ ] then
                           null
@@ -2285,18 +2303,26 @@ let
                               inherit (plane) sealed;
                             };
                             decide = sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key";
+                            # two occurrences of one kind name meet (`meeting`, the key's mark-free
+                            # part, so every pair sharing the key meets, whatever their nodes); at a
+                            # meeting gen-merge reads the key, where different marks are two
+                            # declarations and both compose, and equal marks are decided by `decide`
+                            meeting = "gen-schema-kind:${kind}";
                           };
                     };
                   in
                   # Precedence: computed overrides collections of the same name.
                   # __functor is reserved — collections/computed must not use it as a key.
                   {
-                    # A kind that composes a parent is keyed by its MARK (ADR-0034, identity through the
-                    # one mint), so a parent reached on two branches (a diamond) is composed once, and two
-                    # kinds with different marks keep two keys and both compose (gen-merge refuses what
-                    # conflicts between them). Two declarations sharing a mark share the key: inside a kind
-                    # the ancestor map's fold decides that pair, and outside one gen-merge's key dedup
-                    # applies the same decision through `__keyEq` (`keyed`, `keyEqRecord`).
+                    # A kind that composes a parent is a node of gen's module graph by its DECLARATION
+                    # NODE (`__moduleKey`, the content witness through the one mint; den-hoag-9zyp7 OQ2),
+                    # and keyed in every evaluator by the result's `key`, its MARK (ADR-0034, identity
+                    # through the one mint), so a parent reached on two branches (a diamond) is composed
+                    # once. gen-merge reads the key only where two occurrences of one kind name meet
+                    # (`__keyEq.meeting`), so the import of a lone kind demands no mark: equal marks are
+                    # decided by `decide` (one module, or refused by name), and different marks are two
+                    # declarations, which both compose (`keyed`, `keyEqRecord`). Inside a kind the
+                    # ancestor map's fold decides the pair.
                     __functor =
                       _:
                       { ... }:
