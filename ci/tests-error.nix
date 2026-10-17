@@ -1116,7 +1116,7 @@ in
         (kindOf { computed = _: _: { options = "COMPUTED"; }; } { options.role = strOpt; }).options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
+        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
       };
     };
 
@@ -1146,7 +1146,7 @@ in
         } { }).refs;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
+        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
       };
     };
   };

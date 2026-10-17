@@ -909,6 +909,7 @@ in
       expected = {
         recordKeyEq = [
           "decide"
+          "refine"
           "subject"
         ];
         resultKeyEq = false;

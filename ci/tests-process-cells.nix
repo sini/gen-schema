@@ -136,9 +136,10 @@ in
     3
   ];
   # den-hoag-ux9xg · THE GUARD: a collection NOT declared `identity = false` holding a value that reads
-  # an instance of its kind. The kind's identity reads the instance under construction, which aborts
-  # uncatchably on every evaluator (the kind has a parent, so its module key reads the mark); the abort
-  # names the kind, the collection and the declaration that takes it out of the identity.
+  # its own instance's `id_hash` (the selfId class, an ADR-0025 item 1 enumerated exception, 9zyp7 OQ4):
+  # the identity read has no solution and aborts uncatchably on every evaluator; the abort names the
+  # kind, the collection and the declaration that takes it out of the identity. (A collection reading
+  # only the instance's other fields is served: den-hoag-9zyp7 arm C and OQ2.)
   collection-identity-guard =
     (merge.evalModuleTree { } [
       (
@@ -152,17 +153,15 @@ in
           };
           options.hosts = S.mkInstanceRegistry { } config.schema.host;
           options.aspects = merge.mkOption { type = merge.types.attrsOf merge.types.anything; };
-          config.schema.conf = { };
           config.schema.host = {
-            inherits = [ config.schema.conf ];
             options.addr = merge.mkOption { type = merge.types.str; };
             excludes = [ config.aspects.unwanted ];
           };
           config.hosts.igloo.addr = "10.0.1.1";
-          config.aspects.unwanted.domain = config.hosts.igloo.addr;
+          config.aspects.unwanted.domain = config.hosts.igloo.id_hash;
         }
       )
-    ]).config.hosts.igloo.addr;
+    ]).config.hosts.igloo.id_hash;
   # den-hoag-ux9xg C1 · a computed field on a schema that declares a collection `identity = false` is
   # minted over the declaration with that collection taken out; a `computed` partial there aborts, and
   # the abort names the kind and the computed field.
@@ -217,17 +216,15 @@ in
           };
           options.hosts = S.mkInstanceRegistry { } config.schema.host;
           options.aspects = merge.mkOption { type = merge.types.attrsOf merge.types.anything; };
-          config.schema.conf = { };
           config.schema.host = {
-            inherits = [ config.schema.conf ];
             options.addr = merge.mkOption { type = merge.types.str; };
             zones = [ config.aspects.unwanted ];
           };
           config.hosts.igloo.addr = "10.0.1.1";
-          config.aspects.unwanted.domain = config.hosts.igloo.addr;
+          config.aspects.unwanted.domain = config.hosts.igloo.id_hash;
         }
       )
-    ]).config.hosts.igloo.addr;
+    ]).config.hosts.igloo.id_hash;
   # A predicate ill-typed over its base aborts uncatchably; the abort names the refinement.
   refined-attribution = outsideRead (S.refined T.str {
     check = v: v > 0;
