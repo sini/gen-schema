@@ -672,7 +672,11 @@ let
   inheritedModule =
     kind: parent: v:
     if v ? __functor then
-      v.__functor v
+      {
+        inherit (v) __functor;
+        __moduleKey = v.__moduleKey or null;
+        __keyEq = v.__keyEq or null;
+      }
     else
       throw "gen-schema: kind '${kind}' inherits '${parent}', whose kind value is not a module (its `mkType` result carries no `__functor`), so there is nothing to compose";
 
@@ -803,7 +807,9 @@ let
   # (den-hoag-e5whp) only where its `moduleSyntax.functorRecord` lists it. Over a gen-merge without
   # it the record is never read, and two constructions sharing a mark would be deduplicated by key
   # silently, so the pairing is refused by name instead, once, where the key is written.
-  mergeReadsKeyEq = builtins.elem "__keyEq" (merge.moduleSyntax.functorRecord or [ ]);
+  mergeReadsKeyEq =
+    builtins.elem "__keyEq" (merge.moduleSyntax.functorRecord or [ ])
+    && builtins.elem "__moduleKey" (merge.moduleSyntax.functorRecord or [ ]);
   # The entry reservation rides on a functor's record (den-hoag-r05lc), which only a gen-merge
   # publishing it in `moduleSyntax.functorRecord` reads; any other would drop it silently.
   mergeReadsRecordReservation = builtins.elem "__reservedKeys" (
@@ -834,6 +840,7 @@ let
     # inheritance-cycle walk reads.
     "__kindImports"
     "__kindWitness"
+    "__moduleKey"
     # Written beside them, both branches, for the same reason: the transitive ancestor map, and the
     # parents as written, which the cycle walk reads.
     "__kindAncestors"
@@ -968,6 +975,7 @@ let
       [
         "__functor"
         "__keyEq"
+        "__moduleKey"
         "__kindAncestors"
         "__kindCycleParents"
         "__kindImports"
@@ -980,6 +988,7 @@ let
     else
       [
         "__keyEq"
+        "__moduleKey"
         "__kindAncestors"
         "__kindCycleParents"
         "__kindImports"
@@ -2274,10 +2283,13 @@ let
                         throw "gen-schema: kind '${kind}' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read that key there (its `moduleSyntax.functorRecord' does not list `__keyEq'). gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
                       else
                         {
-                          key = "gen-schema-kind:${kind}#${kindWitness}";
+                          key = "gen-schema-kind:${kind}#${ownMark}";
                           config = { };
                         };
                     keyEqRecord = {
+                      # gen-merge's node key: the declaration node, read off the record before
+                      # composition; the result's `key` (the mark) is what a foreign evaluator reads.
+                      __moduleKey = if kindParents == [ ] then null else "gen-schema-kind:${kind}#${kindWitness}";
                       __keyEq =
                         if kindParents == [ ] then
                           null
@@ -2289,6 +2301,9 @@ let
                               inherit (plane) sealed;
                             };
                             decide = sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key";
+                            # two occurrences of one declaration node with different marks are two
+                            # constructions, and both compose; read only where two occurrences meet
+                            refine = s: s.mark;
                           };
                     };
                   in
