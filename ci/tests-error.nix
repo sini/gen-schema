@@ -3627,7 +3627,7 @@ in
           o_a [ (generatorOver (oldSchema.mkSchemaOption { }) { } "one") ];
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: kind 'a' composes a parent, so its module is keyed by its mark and publishes the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read that key there \\(its `moduleSyntax\\.functorRecord' does not list `__keyEq'\\)\\. gen-schema requires a gen-merge carrying the `__keyEq' key-comparison protocol; .*$";
+          msg = "^gen-schema: kind 'a' composes a parent, so it publishes its node key `__moduleKey' and the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read both there \\(its `moduleSyntax\\.functorRecord' does not list both `__moduleKey' and `__keyEq'\\)\\. gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; .*$";
         };
       };
     };
