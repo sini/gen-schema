@@ -1043,9 +1043,8 @@ refusals fire where the kind is composed (its options, refs, mark or an instance
 never at its WHNF, and after the cycle walk. The fold meets ancestors by NAME and reads marks only where
 two constructions of one name meet; the same construction reached again is one entry, decided by its
 stamp slot. Equal marks imply equal names, so every pair the marks would meet still meets, and a parent
-whose collection kept in the identity reads an instance of a kind inheriting it composes
-(den-hoag-c2836). Its residue, a parent meeting ANOTHER tree's construction of its name, reads both marks
-and still recurses (an open defect).
+whose collection kept in the identity reads an instance of a kind inheriting it composes. Its residue, a
+parent meeting ANOTHER tree's construction of its name, reads both marks and still recurses (an open defect).
 
 **The deprecated inheritance spelling is read as `inherits`, with a warning, where a value test can
 see it, and nowhere else (a declared exception to "a value or a named refusal").** A kind value
