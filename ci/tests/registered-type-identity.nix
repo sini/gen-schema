@@ -114,11 +114,11 @@ in
       expr = {
         schemaRefinedTwins = T.typeEq (srf T.int t1) (srf T.int t1');
         schemaRefinedDifferent = T.typeEq (srf T.int t1) (srf T.int t9);
-        kindTypedefTwins = kindEq (kindOf (T.typedef "stitched" t1)) (kindOf (T.typedef "stitched" t1'));
-        kindTypedefDifferent = kindEq (kindOf (T.typedef "stitched" t1)) (kindOf (T.typedef "stitched" t9));
+        kindTypedefTwins = kindEq (kindOf (T.typedef { } "stitched" t1)) (kindOf (T.typedef { } "stitched" t1'));
+        kindTypedefDifferent = kindEq (kindOf (T.typedef { } "stitched" t1)) (kindOf (T.typedef { } "stitched" t9));
         checks = [
-          (tryOpt (T.typedef "stitched" t1) 5)
-          (tryOpt (T.typedef "stitched" t1) 50)
+          (tryOpt (T.typedef { } "stitched" t1) 5)
+          (tryOpt (T.typedef { } "stitched" t1) 50)
         ];
       };
       expected = {
@@ -139,22 +139,22 @@ in
     test-sealed-subjects-propagate-into-the-kind = {
       expr = {
         overGenMergeRefused = refused (
-          kindEq (kindOf (T.listOf (T.typedef "stitched" t1))) (kindOf (T.listOf (T.typedef "stitched" t9)))
+          kindEq (kindOf (T.listOf (T.typedef { } "stitched" t1))) (kindOf (T.listOf (T.typedef { } "stitched" t9)))
         );
-        overGenMergeDifferent = kindEq (kindOf (T.listOf (T.typedef "stitched" t1))) (
-          kindOf (T.listOf (T.typedef "stitched" t9))
+        overGenMergeDifferent = kindEq (kindOf (T.listOf (T.typedef { } "stitched" t1))) (
+          kindOf (T.listOf (T.typedef { } "stitched" t9))
         );
-        overGenMergeTwins = kindEq (kindOf (T.listOf (T.typedef "stitched" t1))) (
-          kindOf (T.listOf (T.typedef "stitched" t1'))
+        overGenMergeTwins = kindEq (kindOf (T.listOf (T.typedef { } "stitched" t1))) (
+          kindOf (T.listOf (T.typedef { } "stitched" t1'))
         );
         markShared =
-          (kindOf (genTypes.checkedListOf (T.typedef "stitched" t1))).__mint.minted
-          == (kindOf (genTypes.checkedListOf (T.typedef "stitched" t9))).__mint.minted;
-        different = kindEq (kindOf (genTypes.checkedListOf (T.typedef "stitched" t1))) (
-          kindOf (genTypes.checkedListOf (T.typedef "stitched" t9))
+          (kindOf (genTypes.checkedListOf (T.typedef { } "stitched" t1))).__mint.minted
+          == (kindOf (genTypes.checkedListOf (T.typedef { } "stitched" t9))).__mint.minted;
+        different = kindEq (kindOf (genTypes.checkedListOf (T.typedef { } "stitched" t1))) (
+          kindOf (genTypes.checkedListOf (T.typedef { } "stitched" t9))
         );
-        twins = kindEq (kindOf (genTypes.checkedListOf (T.typedef "stitched" t1))) (
-          kindOf (genTypes.checkedListOf (T.typedef "stitched" t1'))
+        twins = kindEq (kindOf (genTypes.checkedListOf (T.typedef { } "stitched" t1))) (
+          kindOf (genTypes.checkedListOf (T.typedef { } "stitched" t1'))
         );
       };
       expected = {
@@ -289,8 +289,8 @@ in
                 ];
               }
             ]).d;
-          p1 = pWith (T.typedef "s" t1);
-          p9 = pWith (T.typedef "s" t9);
+          p1 = pWith (T.typedef { } "s" t1);
+          p9 = pWith (T.typedef { } "s" t9);
         in
         {
           marksEqual = p1.__mint.minted == p9.__mint.minted;
