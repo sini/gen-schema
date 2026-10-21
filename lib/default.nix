@@ -258,6 +258,7 @@ in
     mkSchemaOption
     mkSchemaEntryType
     kindEq
+    ancestorsForKind
     entryReservation
     ;
   inherit (evalSchemaLib) evalSchema;

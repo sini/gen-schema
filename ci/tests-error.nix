@@ -1052,6 +1052,63 @@ in
     };
   };
 
+  # `ancestorsForKind`'s door (den-hoag-w523e): a kind NAME is refused as a reference, in
+  # `identityKeysForKind`'s words, and every other operand passes `kindSubject`, so a mark-carrying
+  # value that is not the schema's own is refused by name rather than walked. The catchability of
+  # each is pinned in `kind-ancestors-in-order.test-refusals-are-catchable`.
+  flake.testsError.ancestors-for-kind-refusals =
+    let
+      inherit (genSchema) ancestorsForKind;
+      intOpt = genMerge.mkOption { type = genMerge.types.int; };
+      t = plainTree [
+        {
+          config.schema = {
+            a.options.oa = intOpt;
+            b = {
+              inherits = [ "a" ];
+              options.ob = intOpt;
+            };
+            c = {
+              inherits = [ "b" ];
+              options.oc = intOpt;
+            };
+          };
+        }
+      ];
+      refused = msg: {
+        type = "ThrownError";
+        msg = "^gen-schema: ancestorsForKind: ${msg}$";
+      };
+      notBuilt =
+        kind:
+        refused "the kind value '${kind}' is not the value its schema built: a `//` over a kind value keeps its mark while changing what the mark stands for; declare the change in the kind entry, or pass the kind value the schema published";
+    in
+    {
+      test-a-kind-name-is-refused-as-a-reference = {
+        expr = ancestorsForKind "a";
+        expectedError = refused "a kind name is a reference, and this door takes the kind declaration \\(a kind value carrying `__mint.minted`\\); got the string 'a'";
+      };
+      test-an-unmarked-attrset-is-refused = {
+        expr = ancestorsForKind { kind = "a"; };
+        expectedError = refused "expected a kind value carrying a mint-backed mark \\(`__mint.minted`\\); got an attrset with no mark";
+      };
+      test-a-hand-built-mark-is-refused = {
+        expr = ancestorsForKind {
+          kind = "a";
+          __mint.minted = "m0";
+        };
+        expectedError = refused "the kind value 'a' carries a mark but no sealed subjects \\(`__sealed`\\), so it cannot be compared by its mark; take the kind from a gen-schema that publishes both";
+      };
+      test-a-copy-with-other-imports-is-refused = {
+        expr = ancestorsForKind (t.c // { __kindImports = [ ]; });
+        expectedError = notBuilt "c";
+      };
+      test-a-copy-with-another-ancestor-map-is-refused = {
+        expr = ancestorsForKind (t.c // { __kindAncestors = { }; });
+        expectedError = notBuilt "c";
+      };
+    };
+
   # ★★ THE TWIN COST OF THE CARRY, STATED. gen-merge's `anything` carries a `__mint` carrier whole
   # through its leaf fold, which compares definitions with `==`. Two INDEPENDENT constructions of one
   # type-only kind are one identity (the control: `kindEq` answers `true`), but their closures are

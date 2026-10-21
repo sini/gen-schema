@@ -1046,6 +1046,8 @@ stamp slot. Equal marks imply equal names, so every pair the marks would meet st
 whose collection kept in the identity reads an instance of a kind inheriting it composes. Its residue, a
 parent meeting ANOTHER tree's construction of its name, reads both marks and still recurses (an open defect).
 
+`ancestorsForKind kind` lists those ancestors in order (below, [`ancestorsForKind`](#ancestorsforkind)).
+
 **The deprecated inheritance spelling is read as `inherits`, with a warning, where a value test can
 see it, and nowhere else (a declared exception to "a value or a named refusal").** A kind value
 appearing in a kind entry's `imports` (or a shorthand module's `require`), at any depth of plain
@@ -1655,6 +1657,40 @@ compared with itself after being carried through gen-merge's `types.anything` de
 Determinate and Lix: `anything` carries a value carrying `__mint` whole. Two independent
 constructions of one kind defined twice through `anything` are refused as conflicting definitions,
 because `anything`'s leaf fold compares values, not identities.
+
+### `ancestorsForKind`
+
+```nix
+ancestorsForKind kind   # → [ kind ], or a refusal by name
+```
+
+It returns each transitive ancestor once, as the value `__kindAncestors` holds at its mark, without the kind itself. The order is a linear
+extension of inheritance: every kind comes before each of its ancestors, so a single-parent chain reads
+nearest first and root last (`last (ancestorsForKind k)` is the root), and a diamond's shared ancestor
+comes once, after every kind that inherits it. Where inheritance leaves two kinds unordered, the one
+reached first in a depth-first walk over `__kindImports` comes first. That walk follows composition
+order, which puts a foreign kind value ahead of a name, so `inherits = [ "b" f ]` with `f` foreign
+answers `[ f b ]`. Both walks are gen-graph's: the first-reach key is `expandPreorder`, and the order is
+`topoOrderKahn`, bound by name.
+
+```nix
+# d inherits [ "b" "c" ], b and c inherit "a"
+map (k: k.kind) (genSchema.ancestorsForKind config.schema.d)
+# → [ "b" "c" "a" ]
+```
+
+**It is not a precedence order.** It is a lineage listing, not a method resolution order. A
+hierarchy that C3 cannot linearise is answered rather than refused, and the answer is not monotone:
+with `a` inheriting `[ b c ]`, `b` inheriting `[ d e ]` and `c` inheriting `[ e d ]`, `a` answers
+`[ b c d e ]`, which keeps `b`'s order of `d` and `e` and not `c`'s. ADR-0029's precondition is that
+"the declared order must never be DERIVED from a kind hierarchy", so a consumer needing an order among
+kinds (which ancestor's value wins, which is most specific) declares that order itself rather than
+reading it here. The door takes the kind declaration, a kind value: a kind name is a reference with no
+tree to resolve it against, so it is refused by name, catchably, in `identityKeysForKind`'s words (R1's
+identifier arm is narrowed here, as at the other kind doors). Every other operand is read through the
+whole stamp, as `kindEq` reads it, so a non-kind, a hand-built mark and a `//` copy of a kind value are
+refused by name. Each call walks the ancestor subgraph again (it is a function, not a field), so a
+consumer reading it per instance binds the result once per kind.
 
 ### `mkInstanceType`
 

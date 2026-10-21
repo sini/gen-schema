@@ -627,6 +627,69 @@ let
       kindSubject "gen-schema: kindEq" b
     );
 
+  # A KIND'S ANCESTORS IN ORDER (den-hoag-w523e): each transitive ancestor once, as the value
+  # `__kindAncestors` holds at its mark, in a linear extension of inheritance — every kind before each
+  # of its ancestors, so a chain reads nearest first and root last. Where inheritance leaves two kinds
+  # unordered, the one first reached over `__kindImports` (composition order: foreign kind values
+  # first) comes first. NOT a precedence order (ADR-0029: a declared order is never derived from a
+  # kind hierarchy). Both walks are gen-graph's (ADR-0009): the first-reach key is `expandPreorder`,
+  # and the order is `topoOrderKahn` by name, because the front door's permutation is ruled to move.
+  # The operand passes `kindSubject`, so the whole stamp holds and every mark the walk reaches is a
+  # key of the map; a kind NAME is refused as a reference, as `identityKeysForKind` refuses it.
+  ancestorsForKind =
+    k:
+    let
+      site = "gen-schema: ancestorsForKind";
+      subject =
+        if builtins.isString k then
+          throw "${site}: a kind name is a reference, and this door takes the kind declaration (a kind value carrying `__mint.minted`); got the string '${k}'"
+        else
+          kindSubject site k;
+      byMark = k.__kindAncestors;
+      markOf = v: v.__mint.minted;
+      reached =
+        (graph.expandPreorder
+          {
+            resolve = v: byMark.${markOf v};
+            emit = _: markOf;
+          }
+          {
+            roots = k.__kindImports;
+            key = markOf;
+            edges = v: v.__kindImports;
+          }
+        ).nodes;
+      pos = builtins.listToAttrs (
+        builtins.genList (i: {
+          name = builtins.elemAt reached i;
+          value = i;
+        }) (builtins.length reached)
+      );
+      nodes = prelude.attrNames byMark;
+      # one grouping pass over the (parent, child) pairs: a kind's children are its dependents
+      childrenOf = builtins.mapAttrs (_: map (e: e.child)) (
+        builtins.groupBy (e: e.parent) (
+          prelude.concatMap (
+            c:
+            map (p: {
+              parent = markOf p;
+              child = c;
+            }) byMark.${c}.__kindImports
+          ) nodes
+        )
+      );
+      r = graph.topoOrderKahn { lessThan = a: b: pos.${a} < pos.${b}; } {
+        inherit nodes;
+        edges = m: childrenOf.${m} or [ ];
+      };
+    in
+    builtins.seq subject (
+      if r.ok then
+        map (m: byMark.${m}) r.order
+      else
+        throw "${site}: the kind '${k.kind}' has a cycle among its ancestors, which the walk building `__kindAncestors` refuses first"
+    );
+
   # THE READER of the mark, and the seam's whole admission test. FOUR READS, NONE OF WHICH FORCES
   # THE DIGEST: `v ? __mint` forces `v` to WHNF, and `v.__mint ? minted` forces the mark RECORD and
   # never `minted` itself. That is what lets a guard placed at option-DECLARATION time keep its
@@ -2800,6 +2863,7 @@ in
     mkSchemaOption
     isSchemaKind
     kindEq
+    ancestorsForKind
     stampOk
     stampImportOk
     stampRefusal
