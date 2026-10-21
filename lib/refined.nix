@@ -6,11 +6,20 @@
 # per-component construction as gen-types' own `refined` and decided by the same `typeEq`; this file
 # mints nothing itself and ADR-0034's count of minting authorities stays at one.
 {
+  prelude,
   merge,
   hasDeclaredSubject,
   sealedMarker,
 }:
 let
+  # A functor whose walk exhausts the bound is `set` by type; name the bound after it.
+  exhausted =
+    v:
+    let
+      k = prelude.applicableKindOf v;
+    in
+    if k == "a ${builtins.typeOf v}" then "" else " (${k})";
+
   # A refinement is a RECORD `{ check; message; lazy? }` (Findler 2002: a predicate paired with the
   # blame it reports). `message` is not optional decoration: the first failing refinement is reported
   # BY ITS MESSAGE, and a bare predicate has none to report, so a bare function is refused rather than
@@ -30,8 +39,10 @@ let
           "is of type `${builtins.typeOf r}`, not a refinement record"
         else if !(r ? check) then
           "has no `check`"
-        else if !(builtins.isFunction r.check || (r.check ? __functor)) then
-          "has a `check` of type `${builtins.typeOf r.check}`, not a function"
+        # what Nix can apply (gen-prelude `isApplicable`): carrying `__functor` is not it, and
+        # `{ __functor = _: 5; }` aborted where a value was first checked
+        else if !(prelude.isApplicable r.check) then
+          "has a `check` of type `${builtins.typeOf r.check}`${exhausted r.check}, not a function"
         else if !(r ? message) then
           "has no `message`"
         else if !(builtins.isString r.message) then

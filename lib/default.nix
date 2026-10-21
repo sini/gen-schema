@@ -154,7 +154,7 @@ let
     ) (builtins.attrValues ks);
 
   refinedLib = import ./refined.nix {
-    inherit merge;
+    inherit prelude merge;
     inherit (algebra) hasDeclaredSubject sealedMarker;
   };
   blameLib = import ./blame.nix;

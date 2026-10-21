@@ -10,6 +10,7 @@ let
   R = genAlgebra.record;
   record = R;
   refinedLib = import ../../lib/refined.nix {
+    inherit prelude;
     merge = genMerge;
     inherit (genAlgebra) hasDeclaredSubject sealedMarker;
   };

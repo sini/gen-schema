@@ -11,6 +11,7 @@ let
   record = R;
   mixinLib = import ../../lib/mixin.nix { inherit prelude record; };
   refinedLib = import ../../lib/refined.nix {
+    inherit prelude;
     merge = genMerge;
     inherit (genAlgebra) hasDeclaredSubject sealedMarker;
   };

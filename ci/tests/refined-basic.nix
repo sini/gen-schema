@@ -3,10 +3,12 @@
   genSchema,
   genMerge,
   genAlgebra,
+  prelude,
   ...
 }:
 let
   refinedLib = import ../../lib/refined.nix {
+    inherit prelude;
     merge = genMerge;
     inherit (genAlgebra) hasDeclaredSubject sealedMarker;
   };

@@ -7,12 +7,14 @@
   genSchema,
   genMerge,
   genAlgebra,
+  prelude,
   ...
 }:
 let
   inherit (genSchema) mkSchemaOption mkSchemaEntryType mkInstanceRegistry;
   R = genAlgebra.record;
   refinedLib = import ../../lib/refined.nix {
+    inherit prelude;
     merge = genMerge;
     inherit (genAlgebra) hasDeclaredSubject sealedMarker;
   };

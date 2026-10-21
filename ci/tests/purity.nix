@@ -160,12 +160,13 @@ let
     ) srcs;
 
   # The live counterpart to `forbidden`: the name this library reaches for where a tether would reach
-  # for nixpkgs. Every gen-schema source but TWO carries it, and both exclusions are modules that
-  # take no `prelude` formal — `lib/blame.nix` is a bare attrset of blame constructors taking no
-  # argument at all, and `lib/refined.nix` takes `{ merge, identity }`. `lib/mixin.nix` used to be a
-  # third (`{ record }`, no `prelude`) until P1 (den-hoag-7gp66) gave `mkMixin` a door check.
-  # Those exclusions are what give the assertion its teeth: the expected list is a PROPER SUBSET of
-  # the manifest, so a read returning one fixed text for every file lands outside it either way —
+  # for nixpkgs. Every gen-schema source but ONE carries it, and the exclusion is a module that
+  # takes no `prelude` formal — `lib/blame.nix` is a bare attrset of blame constructors taking no
+  # argument at all. `lib/mixin.nix` (`{ record }`) and `lib/refined.nix` (`{ merge, … }`) used to be
+  # two more, until P1 (den-hoag-7gp66) gave `mkMixin` a door check and a refinement's `check` took
+  # gen-prelude's `isApplicable`. That exclusion is what gives the assertion its teeth: the expected
+  # list is a PROPER SUBSET of the manifest, so a read returning one fixed text for every file lands
+  # outside it either way —
   # without the token the list collapses toward empty, with it the list swells to every source.
   liveToken = "prelude";
   liveReads = map (src: src.name) (lib.filter (src: genPrelude.hasInfix liveToken src.code) sources);
@@ -239,6 +240,7 @@ in
       "lib/methods.nix"
       "lib/mixin.nix"
       "lib/ref.nix"
+      "lib/refined.nix"
       "lib/strict.nix"
       "lib/validate.nix"
       "flake.nix"
