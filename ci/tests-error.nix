@@ -190,8 +190,8 @@ in
   # and WHICH refusal fired is the subject.
   flake.testsError.schema-inheritance-refusals = {
     # An inheritance cycle refuses by NAME, where HEAD's `imports` idiom diverges into an
-    # uncatchable `stack overflow; max-call-depth exceeded`. ADR-0016 ruling 7: a kind may inherit
-    # only kinds resolved in a strictly earlier pass, and the substrate refuses by name.
+    # uncatchable `stack overflow; max-call-depth exceeded`. A kind may inherit only kinds strictly
+    # earlier in the name graph (ruling 7 by analogy), and the substrate refuses by name.
     test-cycle-refuses-by-name = {
       expr = evalSchema { } [
         {
@@ -208,7 +208,7 @@ in
     # cxlc0, the deprecated spelling: a kind CYCLE written in that spelling refuses by name, never
     # recursing. Reading the spelling as `inherits` FORCES each spelled kind's mark (den-hoag-l0y:
     # telling the tree's own kind from a foreign one decides by mark and `kindEq`), and `evalSchema`
-    # reads `inherits` on pass 0, so the cycle partner's own guard refuses first, in the entry
+    # reads `inherits` on its names read, so the cycle partner's own guard refuses first, in the entry
     # type's wording with the path, before `evalSchema`'s name graph is reached. The members are the
     # same `[a b]`.
     test-deprecated-spelling-cycle-refuses-by-name = {
@@ -503,7 +503,7 @@ in
   # name `b` (F4), and telling it from a foreign value forces both marks, so a walk over the
   # CLASSIFIED parents would need the cycle's own composition and recurse uncatchably. The walk reads
   # every kind's parents as written (`__kindCycleParents`), so each shape refuses by name, on a plain
-  # tree and under `evalSchema` (whose pass 0 reads `inherits`, so the partner's guard fires first).
+  # tree and under `evalSchema` (whose names read reads `inherits`, so the partner's guard fires first).
   flake.testsError.same-tree-value-cycle-refusals =
     let
       refuses = members: path: kind: {

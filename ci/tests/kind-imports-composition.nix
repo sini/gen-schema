@@ -1,7 +1,7 @@
 # Kind-to-kind inheritance: the motivating case for moving strict/identity to instance level.
 # Multiple kinds inheriting a shared base kind should not cause duplicate module conflicts when
-# instantiated. The relation travels as a NAME through `inherits`, resolved by `evalSchema` against
-# the frozen output of a strictly earlier pass.
+# instantiated. The relation travels as a NAME through `inherits`, resolved by `evalSchema` off the
+# one tree it returns.
 {
   lib,
   genSchema,

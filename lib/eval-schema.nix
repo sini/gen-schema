@@ -1,13 +1,20 @@
 # The schema pass — kind inheritance resolved BEFORE evaluation, at gen-schema's own stratum.
 #
-# A kind is a node, an inheritance edge is a relation, and a kind may inherit only kinds frozen by
-# a STRICTLY EARLIER pass (ADR-0016 ruling 7). The reference travels as a NAME — `inherits = [ "p" ]`
-# — never as a value read out of the tree being declared, and that is the whole of what separates
-# this from the `imports = [ config.schema.p ]` idiom it replaces (now deprecated, and read as
-# `inherits` with a warning): no `config` is
-# read at any point below, so nothing here consumes its own stratum's in-flight output.
+# A kind is a node, an inheritance edge is a relation, and a kind may inherit only kinds strictly
+# earlier in the inheritance name graph. That is ADR-0016 ruling 7 applied by ANALOGY: the ruling
+# governs a binding's relata (ADR-0033's ledger reading, 2026-09-22), and `inherits` is a
+# payload-free edge, not a binding. The graph is read off a names-only evaluation and refused by name
+# if it is cyclic. The reference travels as a NAME — `inherits = [ "p" ]` — never as a value read out
+# of the tree being declared, and that is the whole of what separates this from the
+# `imports = [ config.schema.p ]` idiom it replaces (now deprecated, and read as `inherits` with a
+# warning).
 #
-# The user-visible consequence is ruling 7's own: a structure two levels deep takes two passes.
+# The tree is then evaluated ONCE, with each declared parent injected from that same evaluation, so
+# every kind is one construction (ADR-0012: a module however often imported is one node), whoever
+# reads it and however deep the reader. That is the knot the plain-tree desugar already ties (the
+# owner-ruled 8c8pr Q-a, "C, desugar form"); this keeps the resolver's provenance. ADR-0033: the one
+# evaluation reads its own output, as the desugar does, and a cycle is refused by name before it is
+# forced, by the name-graph check below and again by the entry type's witness walk.
 {
   prelude,
   merge,
@@ -59,23 +66,23 @@ let
         else
           schemaOption;
 
-      # One evaluation of the schema tree. `injected` carries this pass's parent defs and is empty
-      # at pass 0.
+      # One evaluation of the schema tree. `injected` carries the resolver's parent defs and is empty
+      # for the names-only read.
       evalAt =
         injected:
         (merge.evalModuleTree { } ([ { options.schema = resolvedSchemaOption; } ] ++ modules ++ injected))
         .config.schema;
 
-      # Pass 0 freezes every kind that inherits nothing. Reading `.inherits` off it is safe on a
-      # kind whose parents have not been injected yet: collections are extracted by the entry
-      # type's own merge, which folds over defs directly and never enters the nested
-      # evalModuleTree that `options`/`refs` come from.
-      pass0 = evalAt [ ];
-      kindNames = pass0._kindNames;
+      # THE NAMES READ: the tree with no parent injected, read for kind names and `inherits` only,
+      # never composed. Reading `.inherits` off it is safe: collections are extracted by the entry
+      # type's own merge, which folds over defs directly and never enters the nested evalModuleTree
+      # that `options`/`refs` come from.
+      names = evalAt [ ];
+      kindNames = names._kindNames;
       # Every kind value carries `inherits`: the entry type writes it on both branches. A VALUE entry
       # (a foreign kind, den-hoag-l0y) is already minted, so it is strictly earlier and stages
       # nothing: the entry type composes it, and the name graph reads names only.
-      parentsOf = k: builtins.filter builtins.isString pass0.${k}.inherits;
+      parentsOf = k: builtins.filter builtins.isString names.${k}.inherits;
 
       undeclared = prelude.concatMap (
         k:
@@ -84,10 +91,9 @@ let
         )
       ) kindNames;
 
-      # Depth over the NAME graph alone, so pass assignment is a function of the names and not of
-      # presentation order — ruling 7's first staging obligation, discharged by construction
-      # rather than asserted. Bounded iteration with the bound = the kind count: an acyclic graph
-      # settles within it and a cyclic one does not, which is exactly the cycle test below.
+      # Depth over the NAME graph alone, a function of the names and not of presentation order. It
+      # feeds only the cycle test: bounded iteration with the bound = the kind count, where an acyclic
+      # graph settles within it and a cyclic one does not.
       step =
         d:
         prelude.genAttrs kindNames (
@@ -102,9 +108,13 @@ let
       once = step settled;
       cyclic = prelude.filter (k: once.${k} != settled.${k}) kindNames;
 
-      maxDepth = builtins.foldl' (a: k: if settled.${k} > a then settled.${k} else a) 0 kindNames;
-
-      # One module per (kind, parent) pair, carrying the parent's value as frozen at pass n-1.
+      # One module per (kind, parent) pair, carrying the parent's ONE construction: the kind the tree
+      # this function returns holds (ADR-0012). The tree is evaluated once, so a kind is built once
+      # and every reader of it (a child's injected parent, a value another kind reads off
+      # `config.schema`, the tree returned, the deprecated spelling) holds that one value, however
+      # deep the reader. Well-founded by the name graph checked above: the injection reads a parent's
+      # construction only, and that reads only its own ancestors' injections. A read of a child that
+      # the parent's own author writes is theirs, served or refused as on a plain tree.
       #
       # It is IMPORTED rather than assigned bare. A bare `config.schema.<k> = prev.<p>` hands the
       # entry type the parent's own collections as well, so the child would inherit the parent's
@@ -121,30 +131,33 @@ let
       # `evalSchema` warn too, so it moves this first. A parent with no `__functor` (an `mkType` result that is not a module) has nothing
       # to compose and is refused by name.
       injectFor =
-        prev: n:
+        tree:
         prelude.concatMap (
           k:
-          if settled.${k} > n then
-            [ ]
-          else
-            map (p: {
-              # the resolver's provenance: the kind entry reads it to tell a resolved parent from one
-              # nothing read (den-hoag-8c8pr)
-              _file = inheritsResolvedFile k p;
-              config.schema.${k} = {
-                imports = [ (inheritedModule k p prev.${p}) ];
-              };
-            }) (parentsOf k)
+          map (p: {
+            # the resolver's provenance: the kind entry reads it to tell a resolved parent from one
+            # nothing read (den-hoag-8c8pr)
+            _file = inheritsResolvedFile k p;
+            config.schema.${k} = {
+              imports = [ (inheritedModule k p tree.${p}) ];
+            };
+          }) (parentsOf k)
         ) kindNames;
+
+      # The tree, evaluated once with every declared parent injected from itself. With no parent
+      # declared there is nothing to inject, and the names read is that one evaluation.
+      injected = injectFor resolved;
+      resolved = if injected == [ ] then names else evalAt injected;
     in
     if undeclared != [ ] then
       throw (builtins.head undeclared)
     else if cyclic != [ ] then
-      throw "gen-schema: inheritance cycle among kinds [${prelude.concatStringsSep " " cyclic}] — a kind may inherit only kinds resolved in a strictly earlier pass"
+      # "pass" here is a stratum of the name graph: the wording is shared with the entry type's
+      # witness walk and pinned in the error plane.
+      throw
+        "gen-schema: inheritance cycle among kinds [${prelude.concatStringsSep " " cyclic}] — a kind may inherit only kinds resolved in a strictly earlier pass"
     else
-      builtins.foldl' (prev: n: evalAt (injectFor prev n)) pass0 (
-        if maxDepth == 0 then [ ] else prelude.range 1 maxDepth
-      );
+      resolved;
 in
 {
   inherit evalSchema;

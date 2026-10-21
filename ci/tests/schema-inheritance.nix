@@ -1,8 +1,8 @@
-# `evalSchema` — the staged pass, the `inherits` relation, and the `type = "inherits"` edges.
+# `evalSchema` — the resolver, the `inherits` relation, and the `type = "inherits"` edges.
 #
 # The cells here are the acceptance battery for the relocation: kind composition moves off the
 # `imports = [ config.schema.<p> ]` idiom, which reads the tree being declared, onto a pass that
-# resolves parents by NAME against the frozen output of strictly earlier passes (ADR-0016 ruling 7).
+# resolves parents by NAME, over an acyclic name graph, off the one tree it returns (ADR-0012).
 #
 # Every composition cell carries its own discriminator — the same tree with `inherits` dropped —
 # because an equality between two arms that agree measures nothing.
@@ -57,7 +57,7 @@ let
 
   optionSet = kindValue: builtins.attrNames (instanceOf kindValue { });
 
-  # ── C8: a depth-2 chain — ruling 7's "two levels deep takes two passes" ──────────────────────
+  # ── C8: a depth-2 chain ─────────────────────────────────────────────────────────────────────────
   depth2 = evalSchema { } [
     {
       config.schema.base.options.description = str "";
@@ -439,7 +439,7 @@ in
       expected = false;
     };
 
-    # C8 — a depth-2 chain composes: ruling 7's "a structure two levels deep takes two passes".
+    # C8 — a depth-2 chain composes, each kind once.
     test-c8-depth-2-chain = {
       expr = optionSet depth2.leaf;
       expected = [

@@ -1503,7 +1503,7 @@ let
                     p: !(builtins.any (resolvedBy p) defs) && !(builtins.elem p spelled)
                   ) declaredInherits;
               # Sited on the COMPOSED value (`merged`, `treeModule`), never the kind's WHNF: `evalSchema`
-              # reads `inherits` off pass 0, where no parent is resolved yet, and the collections, `kind`
+              # reads `inherits` off its names read, where no parent is injected, and the collections, `kind`
               # and `_kindNames` stay readable. It carries two refusals, each at every read that would
               # compose the parent: `options`, `refs` (so `_edges`), the mark, an instance. An
               # inheritance cycle, in either spelling, on any tree; and a declared parent on an entry
@@ -1716,8 +1716,8 @@ let
               # Both compose through the same applied functor, so one list carries both to the cycle
               # walk and the ancestor map. A declared parent is published as `tree.${p}`, the value a
               # caller reads off the tree, whether the desugar or `evalSchema` composed it: the parent
-              # `evalSchema` composed is its pass n-1 twin, which `kindEq` refuses against the value read
-              # whenever an option carries a default. Published as `__kindImports`.
+              # `evalSchema` injected is read off the one tree it returns, so it is the value read (K3a).
+              # Published as `__kindImports`.
               kindParents =
                 kindImports
                 ++ declaredValues
@@ -1777,8 +1777,8 @@ let
               # THE ONE INHERITANCE-CYCLE WALK (8c8pr Q-b arm (i), 2026-09-30), for both spellings: a
               # kind that reaches its own witness through its parents' `__kindCycleParents` would import
               # itself into itself, and the module system recurses uncatchably. It is refused by name,
-              # in `evalSchema`'s wording, because a kind may inherit only kinds resolved in a strictly
-              # earlier pass (ADR-0016 ruling 7). A parent reached twice is a diamond, not a cycle: the
+              # in `evalSchema`'s wording, because a kind may inherit only kinds strictly earlier in the
+              # name graph (ADR-0016 ruling 7, by analogy). A parent reached twice is a diamond, not a cycle: the
               # visited set is keyed by witness, so the walk is linear in the parents reached. Compared
               # by witness, never by name, so another tree's same-named kind is not this one. The
               # answer is the path, first member to its return, or `null`. The refusal names the members
@@ -1881,7 +1881,7 @@ let
               # ★ NOT AT THE KIND'S WHNF. `formOf` forces each spelled value's mark, and so the other
               # kind's composition, where `inherits` is read. A CYCLE is therefore refused by the
               # cycle walk over `cycleParents` (above), which forces no mark, in the entry type's
-              # wording — under `evalSchema` too, whose pass 0 reads `inherits` and so meets the
+              # wording — under `evalSchema` too, whose names read reads `inherits` and so meets the
               # partner's own guard before its name graph does.
               aliasedInherits =
                 declared:
@@ -2244,7 +2244,7 @@ let
                   # because their readers take them off the kind value — `evalSchema` reads `inherits`,
                   # `_topology` reads `parent` — and a result that publishes no collections would otherwise
                   # lose a declared edge without a word (den-hoag-fwoa8). Unguarded: both are read on an
-                  # unresolved kind (`evalSchema`'s pass 0). Before the computed fields, which win over a
+                  # unresolved kind (`evalSchema`'s names read). Before the computed fields, which win over a
                   # collection on both branches.
                   // {
                     inherit (extractedCollections) inherits parent;

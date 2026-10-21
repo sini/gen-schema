@@ -843,8 +843,8 @@ gen-schema provides generic introspection options (`_topology`, `_edges`, `_kind
 ### Kind Inheritance
 
 A kind inherits another kind's options by NAME. Declare the parent in `inherits` and build the
-schema with `evalSchema`, which resolves each parent in a strictly earlier pass and composes its
-module into the child:
+schema with `evalSchema`, which reads the parent names first, refuses a cycle by name, and then
+evaluates the tree once, composing each parent's module into the child:
 
 ```nix
 schema = genSchema.evalSchema { } [
@@ -864,7 +864,8 @@ schema = genSchema.evalSchema { } [
 
 Each gets its own registry. Identity hashes include the kind prefix — a user "root" and an admin "root" hash differently.
 
-Multiple parents compose, and a chain two levels deep takes two passes. Each inheritance is also an edge, `type = "inherits"`, in `_edges`:
+Multiple parents compose, and a kind is one value however many children reach it, whatever their
+depth. Each inheritance is also an edge, `type = "inherits"`, in `_edges`:
 
 ```nix
 config.schema.deploy-user.inherits = [ "user" "ssh-access" "sudo-access" ];
@@ -874,7 +875,7 @@ On a tree `evalSchema` did not build (a plain `mkSchemaOption` tree), a declared
 means what the spelling `imports = [ config.schema.<p> ]` below means there: the kind entry reads the
 parent off its own tree and imports the parent's module, the one `evalSchema` composes. So the two
 spellings compose byte-identically (options, `inherits`, `_edges`, the mark and an instance's
-`id_hash`), and a plain tree composes the same kind `evalSchema` stages. A parent the tree does not
+`id_hash`), and a plain tree composes the same kind `evalSchema` returns. A parent the tree does not
 declare is refused by name, `gen-schema: kind '<k>' inherits '<p>' which is not a declared kind`,
 as `evalSchema` refuses it. An entry type built outside a tree (`lazyAttrsOf (mkSchemaEntryType { })`)
 has no tree to read a parent off, so there a declared `inherits` is refused by name at every read
@@ -1061,9 +1062,8 @@ spelling is the same kind as the hand-written `inherits` that `evalSchema` resol
 retires it automatically: retiring it is a deliberate decision. Declare `inherits = [ "<parent>" ]`,
 which composes the same kind on either tree.
 
-Each spelled kind warns once per MODULE-TREE PASS that reads its `inherits`: once on a plain tree,
-and once per pass under `evalSchema`, which evaluates the tree at pass 0 and again per inheritance
-depth. The reads that fire it are the ones that force `inherits`: the collection itself, `_edges`,
+Each spelled kind warns once per MODULE-TREE EVALUATION that reads its `inherits`: once on a plain
+tree, and twice under `evalSchema`, whose names read and whose one evaluation each read it. The reads that fire it are the ones that force `inherits`: the collection itself, `_edges`,
 the kind's mark (`__mint.minted`) and an instance's `id_hash`, whose preimages carry the collections.
 A read of the kind's `options` only, of `.kind`, or of `_kindNames` does not warn. The warning is `builtins.warn`, so under `abort-on-warn` the evaluation
 aborts at the first spelled kind read, and `tryEval` does not catch it; an evaluator without
@@ -1607,9 +1607,10 @@ evalSchema {
 ```
 
 Returns the evaluated schema (`config.schema`) with kind inheritance resolved. A
-kind names its parents in `inherits = [ "<parent>" ]`; `evalSchema` evaluates the tree at pass 0 and
-once more per inheritance depth, and at pass n imports into each child the parent's module as frozen at
-pass n-1. Each inheritance is an `_edges` entry with `type = "inherits"`. Refused by name: an undeclared
+kind names its parents in `inherits = [ "<parent>" ]`; `evalSchema` reads the kind names and `inherits`
+off the tree with no parent injected, then evaluates the tree once, importing into each child the
+parent's module read off that same evaluation, so every reader holds one value per kind (with no
+parent declared, the names read is that evaluation). Each inheritance is an `_edges` entry with `type = "inherits"`. Refused by name: an undeclared
 parent, an inheritance cycle, `schemaOption` together with `specialArgs`, and a parent whose kind value
 has no `__functor` (an `mkType` result that is not a module). Outside `evalSchema` the kind entry
 desugars a declared parent onto the import the `imports` spelling makes, reading it off the same tree,
