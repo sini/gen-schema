@@ -13,7 +13,7 @@ let
   refinedLib = import ../../lib/refined.nix {
     inherit prelude;
     merge = genMerge;
-    inherit (genAlgebra) hasDeclaredSubject sealedMarker;
+    inherit (genAlgebra) hasDeclaredSubject declaresSubject sealedMarker;
   };
   bridgeLib = import ../../lib/bridge.nix {
     inherit prelude record;

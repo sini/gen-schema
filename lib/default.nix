@@ -155,7 +155,7 @@ let
 
   refinedLib = import ./refined.nix {
     inherit prelude merge;
-    inherit (algebra) hasDeclaredSubject sealedMarker;
+    inherit (algebra) hasDeclaredSubject declaresSubject sealedMarker;
   };
   blameLib = import ./blame.nix;
   mixinLib = import ./mixin.nix { inherit prelude record; };

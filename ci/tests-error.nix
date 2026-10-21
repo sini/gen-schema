@@ -5102,4 +5102,84 @@ in
     }
     // ancestors "inherits" "gen-schema: kindEq"
     // ancestors "imports" "gen-schema: kind 'kid' reaches 'par' along kid -> par";
+
+  # ★ A DEPARTED CONSTRUCTION AS A REFINEMENT CHECK (den-hoag-28dnv): two self-including `//` extensions of
+  # one registered construction are refused BY NAME, never compared as their records (an uncatchable stack
+  # overflow); a copy against itself is refused, and against another term decides `false`. Live control:
+  # two constructions of one term are one type.
+  flake.testsError.refined-departed-construction =
+    let
+      mk = genAlgebra.mkIntensional genIdentity.hashIdentity {
+        revision = 1;
+        members.mk = _: _: true;
+      } "mk";
+      d1 = mk 1;
+      x = d1 // {
+        note = "x";
+      };
+      selfIncluding =
+        _:
+        let
+          s = d1 // {
+            includes = [ s ];
+          };
+        in
+        s;
+      rf =
+        v:
+        genSchema.refined genMerge.types.int {
+          check = v;
+          message = "m";
+        };
+      verdict =
+        v:
+        let
+          o = builtins.tryEval (builtins.deepSeq v v);
+        in
+        if o.success then o.value else "REFUSED";
+      teq = a: b: verdict (genMerge.types.typeEq a b);
+      inherit (genSchema) kindEq;
+      kindOf =
+        ty:
+        (genMerge.evalModuleTree { } [
+          { options.schema = genSchema.mkSchemaOption { }; }
+          { config.schema.bobbin.options.n = genMerge.mkOption { type = ty; }; }
+        ]).config.schema.bobbin;
+      ctl = teq (rf d1) (rf (mk 1)) == true && kindEq (kindOf (rf d1)) (kindOf (rf (mk 1)));
+    in
+    {
+      test-a-refined-over-a-departed-construction-against-itself-is-refused = {
+        expr =
+          assert ctl;
+          teq (rf x) (rf x);
+        expected = "REFUSED";
+      };
+      test-two-refined-over-self-including-extensions-are-refused = {
+        expr =
+          assert ctl;
+          teq (rf (selfIncluding 1)) (rf (selfIncluding 2));
+        expected = "REFUSED";
+      };
+      test-a-refined-over-a-departed-construction-against-another-term-is-false = {
+        expr =
+          assert ctl;
+          teq (rf x) (rf (mk 2));
+        expected = false;
+      };
+      # one level down: a kind over a refined type propagates the type's sealed map
+      test-kinds-over-two-departed-extensions-are-refused = {
+        expr =
+          assert ctl;
+          verdict (
+            kindEq (kindOf (rf (d1 // { includes = [ "A" ]; }))) (kindOf (rf (d1 // { includes = [ "B" ]; })))
+          );
+        expected = "REFUSED";
+      };
+      test-a-kind-over-a-departed-construction-against-another-term-is-false = {
+        expr =
+          assert ctl;
+          verdict (kindEq (kindOf (rf x)) (kindOf (rf (mk 2))));
+        expected = false;
+      };
+    };
 }
