@@ -1683,8 +1683,8 @@ map (k: k.kind) (genSchema.ancestorsForKind config.schema.d)
 **It is not a precedence order.** It is a lineage listing, not a method resolution order. A
 hierarchy that C3 cannot linearise is answered rather than refused, and the answer is not monotone:
 with `a` inheriting `[ b c ]`, `b` inheriting `[ d e ]` and `c` inheriting `[ e d ]`, `a` answers
-`[ b c d e ]`, which keeps `b`'s order of `d` and `e` and not `c`'s. ADR-0029's precondition is that
-"the declared order must never be DERIVED from a kind hierarchy", so a consumer needing an order among
+`[ b c d e ]`, which keeps `b`'s order of `d` and `e` and not `c`'s. A declared order is never
+derived from a kind hierarchy, so a consumer needing an order among
 kinds (which ancestor's value wins, which is most specific) declares that order itself rather than
 reading it here. The door takes the kind declaration, a kind value: a kind name is a reference with no
 tree to resolve it against, so it is refused by name, catchably, in `identityKeysForKind`'s words (R1's
