@@ -1255,7 +1255,9 @@ let
         base = merge.types.deferredModule;
 
         # ONE introspection for both arms: the option tree an instance imports and its refs, from
-        # one `evalModuleTree` over the module an instance imports. Each arm
+        # gen-merge's declaration stratum (`declaredOptions`) over the module an instance imports: its
+        # declarations, with no value folded, so a definition its parent kind declares is not refused
+        # here as the checked `.options` of the module alone would refuse it. Each arm
         # publishes `options` and `refs` from it and `planeOf` and `refinements` read the same
         # binding, so the published plane, the mark and `__sealed` are one plane.
         #
@@ -1264,8 +1266,9 @@ let
         introspectOf =
           module:
           let
-            tree = merge.evalModuleTree { specialArgs = specialArgs; } [ module ];
-            options = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) tree.options;
+            options = prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) (
+              merge.declaredOptions { specialArgs = specialArgs; } [ module ]
+            );
           in
           {
             inherit options;
