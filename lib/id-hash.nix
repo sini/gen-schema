@@ -140,8 +140,9 @@ let
       prelude.unique (
         [ "name" ]
         ++ prelude.attrNames (
-          prelude.filterAttrs isPrimitiveOption
-            (merge.evalModuleTree { specialArgs = specialArgs; } [ kindValue ]).options
+          prelude.filterAttrs isPrimitiveOption (
+            merge.declaredOptions { specialArgs = specialArgs; } [ kindValue ]
+          )
         )
       )
     );
