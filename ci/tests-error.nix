@@ -2226,6 +2226,19 @@ in
           msg = "^gen-schema: conflicting parent declarations: <a int> vs 'b'$";
         };
       };
+      # one priority, two values: still refused, and naming its subjects, because the module system
+      # resolves the `mkDefault`s before the fold; the raw override records refused as `<a set> vs <a set>`
+      test-two-mkdefault-parents-refuse-by-name = {
+        expr =
+          (schemaOf [
+            { config.schema.k.parent = genMerge.mkDefault "a"; }
+            { config.schema.k.parent = genMerge.mkDefault "b"; }
+          ]).k.parent;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: conflicting parent declarations: 'a' vs 'b'$";
+        };
+      };
     };
 
   # The retired name `ref` (lib/ref.nix, THE RETIRED NAME): applying it refuses with the message

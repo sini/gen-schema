@@ -1286,6 +1286,20 @@ let
           else
             throw "gen-schema: collection '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
 
+        # Each collection's type, built once per schema, never per kind merge: the strategy folds
+        # definitions gen-merge's spine has already resolved (`mkDefault`/`mkForce`/`mkOverride`,
+        # `mkIf`, `mkMerge`, `mkOrder`), seeded by the default. Only a definition's top level is
+        # resolved: the collection is untyped, so a property nested inside its value is not.
+        collectionTypes = prelude.mapAttrs (
+          name: collection:
+          merge.mkOptionType {
+            name = "schemaCollection";
+            merge = _: prelude.foldl' (acc: d: inferMerge name collection acc d.value) collection.default;
+            # every definition discharged (`mkIf false`) answers the default, as no definition does
+            emptyValue.value = collection.default;
+          }
+        ) allCollections;
+
         collectionKeys = prelude.attrNames allCollections;
         # Per schema, never per kind: the collections whose contents enter the kind's identity, and
         # those of them the schema declared itself (the guard's, in `planeOf`).
@@ -1388,13 +1402,18 @@ let
 
               declaredOf =
                 name: collection:
-                prelude.foldl' (
-                  acc: d:
-                  if builtins.isAttrs d.value && d.value ? ${name} then
-                    inferMerge name collection acc d.value.${name}
-                  else
-                    acc
-                ) collection.default defs;
+                let
+                  present = builtins.filter (d: builtins.isAttrs d.value && d.value ? ${name}) defs;
+                in
+                if present == [ ] then
+                  collection.default
+                else
+                  merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} (
+                    map (d: {
+                      inherit (d) file;
+                      value = d.value.${name};
+                    }) present
+                  );
 
               # A DECLARED parent nothing else composes (den-hoag-8c8pr), which the desugar below
               # imports: no def of this kind carries the resolver's provenance for it, and it is not

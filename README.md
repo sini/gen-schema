@@ -1209,6 +1209,8 @@ config.schema.host.includes = [ policy-b policy-c ];
 # Result: [ policy-a policy-b policy-c ]
 ```
 
+Properties on a collection's own definitions (`mkDefault`/`mkForce`/`mkOverride`, `mkIf`, `mkMerge`, `mkBefore`/`mkAfter`/`mkOrder`) are resolved by the module system before the strategy folds, so `includes = mkDefault [ policy-a ]` beside a plain `includes = [ policy-b ]` yields `[ policy-b ]`, as nixpkgs would for an option. Properties nested inside a collection value (a list element, an attrset key) are not resolved: a collection is untyped and has no element fold. A collection's `default` is kept beside its definitions as the fold's seed; nixpkgs drops an option default once any definition exists, so here a `default = [ "base" ]` with one definition `[ "a" ]` yields `[ "base" "a" ]` where nixpkgs yields `[ "a" ]`.
+
 ### Computed Fields
 
 Derived values computed from collection content and raw definitions:
