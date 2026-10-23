@@ -5115,4 +5115,126 @@ in
     }
     // ancestors "inherits" "gen-schema: kindEq"
     // ancestors "imports" "gen-schema: kind 'kid' reaches 'par' along kid -> par";
+
+  # A list or attrset collection is a container: a definition of the wrong shape is refused by name
+  # (it reached `++`/`//` and aborted uncatchably), and an element or key whose definitions all
+  # discharge is kept and refused when it is read (it was served as the raw `{ _type = …; }` record).
+  flake.testsError.collection-element-refusals =
+    let
+      # `coll` null: a built-in collection, never redeclared
+      userOf =
+        coll: field: defs:
+        builtins.deepSeq
+          (genMerge.evalModuleTree { } (
+            [
+              {
+                options.schema = mkSchemaOption (if coll == null then { } else { collections.${field} = coll; });
+              }
+            ]
+            ++ map (v: { config.schema.user.${field} = v; }) defs
+          )).config.schema.user.${field}
+          null;
+      L = {
+        default = [ ];
+      };
+      A = {
+        default = { };
+      };
+      notList = field: {
+        type = "ThrownError";
+        msg =
+          "^" + escapeRegex "gen-merge: a definition for option `schema.user.${field}' is not of type `list'";
+      };
+      notAttrs = field: {
+        type = "ThrownError";
+        msg =
+          "^"
+          + escapeRegex "gen-merge: option `schema.user.${field}' has definitions `lazyAttrsOf' cannot consume";
+      };
+      discharged = at: {
+        type = "ThrownError";
+        msg =
+          "^"
+          + escapeRegex "gen-merge: option `schema.user.${at}' has no definitions after priority resolution";
+      };
+    in
+    {
+      test-shape-list-mkdefault = {
+        expr = userOf L "classes" [ (genMerge.mkDefault "x") ];
+        expectedError = notList "classes";
+      };
+      test-shape-list-plain = {
+        expr = userOf L "classes" [ "x" ];
+        expectedError = notList "classes";
+      };
+      test-shape-list-after-list = {
+        expr = userOf L "classes" [
+          [ "a" ]
+          { k = "x"; }
+        ];
+        expectedError = notList "classes";
+      };
+      test-shape-attrs-list = {
+        expr = userOf A "metadata" [ [ "x" ] ];
+        expectedError = notAttrs "metadata";
+      };
+      test-shape-attrs-mkforce-string = {
+        expr = userOf A "metadata" [
+          { a = "b"; }
+          (genMerge.mkForce "x")
+        ];
+        expectedError = notAttrs "metadata";
+      };
+      test-shape-builtin-inherits = {
+        expr = userOf null "inherits" [ "x" ];
+        expectedError = notList "inherits";
+      };
+      test-shape-builtin-validators = {
+        expr = userOf null "validators" [ (genMerge.mkDefault "x") ];
+        expectedError = notList "validators";
+      };
+      test-shape-builtin-methods = {
+        expr = userOf null "methods" [ [ ] ];
+        expectedError = notAttrs "methods";
+      };
+      test-list-element-discharged-refuses-on-read = {
+        expr = userOf L "classes" [
+          [
+            (genMerge.mkIf false "a")
+            "b"
+          ]
+        ];
+        expectedError = discharged ''classes."[definition 1-entry 1]"'';
+      };
+      test-attrs-key-discharged-refuses-on-read = {
+        expr = userOf A "metadata" [
+          {
+            region = genMerge.mkIf false "eu";
+            tier = "x";
+          }
+        ];
+        expectedError = discharged "metadata.region";
+      };
+      test-builtin-inherits-element-discharged-refuses-on-read = {
+        expr = userOf null "inherits" [ [ (genMerge.mkIf false "x") ] ];
+        expectedError = discharged ''inherits."[definition 1-entry 1]"'';
+      };
+      # nixpkgs' `listOf str` refuses the same element with its own `conflicting definition values`
+      test-list-element-mkmerge-unequal-conflicts = {
+        expr = userOf L "classes" [
+          [
+            (genMerge.mkMerge [
+              "a"
+              "b"
+            ])
+          ]
+        ];
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex ''gen-merge: the option `schema.user.classes."[definition 1-entry 1]"' has conflicting definitions'';
+        };
+      };
+    };
 }

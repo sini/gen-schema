@@ -1286,18 +1286,61 @@ let
           else
             throw "gen-schema: collection '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
 
-        # Each collection's type, built once per schema, never per kind merge: the strategy folds
-        # definitions gen-merge's spine has already resolved (`mkDefault`/`mkForce`/`mkOverride`,
-        # `mkIf`, `mkMerge`, `mkOrder`), seeded by the default. Only a definition's top level is
-        # resolved: the collection is untyped, so a property nested inside its value is not.
+        # Each collection's type, built once per schema, never per kind merge, branching as
+        # `inferMerge` does. A list or attrset collection is a lazy container whose element is opaque:
+        # gen-merge's spine resolves each element's properties (`mkDefault`/`mkForce`/`mkOverride`,
+        # `mkIf`, `mkMerge`, `mkOrder`) when the element is read, and the container's shape refuses
+        # a definition of the wrong shape by name. A list element is `merge.raw`, an attrset key keeps
+        # `//`'s last-wins among the definitions that survive; `declaredOf` seeds both with the
+        # default. The containers stay lazy because an `inherits` element is a kind value whose
+        # forcing can be the very cycle the walk refuses by name. An explicit `merge` folds whole
+        # definitions, whose top level alone is resolved.
         collectionTypes = prelude.mapAttrs (
           name: collection:
-          merge.mkOptionType {
-            name = "schemaCollection";
-            merge = _: prelude.foldl' (acc: d: inferMerge name collection acc d.value) collection.default;
-            # every definition discharged (`mkIf false`) answers the default, as no definition does
-            emptyValue.value = collection.default;
-          }
+          if collection ? merge then
+            merge.mkOptionType {
+              name = "schemaCollection";
+              merge = _: prelude.foldl' (acc: d: inferMerge name collection acc d.value) collection.default;
+              # every definition discharged (`mkIf false`) answers the default, as no definition does
+              emptyValue.value = collection.default;
+            }
+          else if builtins.isList collection.default then
+            merge.mkOptionType {
+              name = "list";
+              check = builtins.isList;
+              emptyValue.value = [ ];
+              # per definition and per index, one element thunk resolved on read; the location
+              # segment is gen-merge's `listOf` segment
+              merge =
+                loc: defs:
+                builtins.concatLists (
+                  builtins.genList (
+                    n:
+                    let
+                      d = builtins.elemAt defs n;
+                    in
+                    builtins.genList (
+                      i:
+                      merge.mergeDefs (loc ++ [ "[definition ${toString (n + 1)}-entry ${toString (i + 1)}]" ]) merge.raw
+                        [
+                          {
+                            inherit (d) file;
+                            value = builtins.elemAt d.value i;
+                          }
+                        ]
+                    ) (builtins.length d.value)
+                  ) (builtins.length defs)
+                );
+            }
+          else if builtins.isAttrs collection.default then
+            merge.lazyAttrsOf (
+              merge.mkOptionType {
+                name = "value";
+                merge = _: defs: (prelude.last defs).value;
+              }
+            )
+          else
+            inferMerge name collection
         ) allCollections;
 
         collectionKeys = prelude.attrNames allCollections;
@@ -1406,12 +1449,17 @@ let
                 if !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs) then
                   collection.default
                 else
-                  merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} (
-                    map (d: {
-                      inherit (d) file;
-                      value = d.value.${name};
-                    }) (builtins.filter (d: builtins.isAttrs d.value && d.value ? ${name}) defs)
-                  );
+                  let
+                    merged = merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} (
+                      map (d: {
+                        inherit (d) file;
+                        value = d.value.${name};
+                      }) (builtins.filter (d: builtins.isAttrs d.value && d.value ? ${name}) defs)
+                    );
+                  in
+                  # an explicit collection's type seeds itself; a list or attrset is seeded after the
+                  # merge, which equals the left fold because `++` and `//` are associative
+                  if collection ? merge then merged else inferMerge name collection collection.default merged;
 
               # A DECLARED parent nothing else composes (den-hoag-8c8pr), which the desugar below
               # imports: no def of this kind carries the resolver's provenance for it, and it is not
