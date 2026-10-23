@@ -2421,7 +2421,7 @@ let
                                 || (t == "if" && v.condition && ranked v.content);
                             in
                             if builtins.any ranked stacks then
-                              throw "gen-schema: kind '${kind}': a mixin's `inherits` carries a priority (mkForce, mkDefault or mkOverride), which is refused: the parent walk reads the kind's own `inherits` only, and whether a mixin may declare a parent is unruled (den-hoag-ppctt)"
+                              throw "gen-schema: kind '${kind}': a mixin's `inherits` carrying a priority (mkForce, mkDefault or mkOverride) is not admitted: the parent walk reads only the kind's own `inherits`, so no priority can rank a mixin's parents against the kind's"
                             else
                               extractedCollections.inherits ++ merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} merged
                           else

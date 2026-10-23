@@ -5341,7 +5341,7 @@ in
           type = "ThrownError";
           msg =
             "^"
-            + escapeRegex "gen-schema: kind 'user': a mixin's `inherits` carries a priority (mkForce, mkDefault or mkOverride), which is refused";
+            + escapeRegex "gen-schema: kind 'user': a mixin's `inherits` carrying a priority (mkForce, mkDefault or mkOverride) is not admitted: the parent walk reads only the kind's own `inherits`";
         };
       };
     };
