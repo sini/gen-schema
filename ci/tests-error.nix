@@ -5345,4 +5345,112 @@ in
         };
       };
     };
+
+  # A property at the top of a collection's `default` is refused by name (nixpkgs resolves none on an
+  # option's default; it served the raw record, or refused naming `lazyAttrsOf`, before). A
+  # discharged or conflicting element of a default is refused on read, as one on a definition is.
+  flake.testsError.collection-default-refusals =
+    let
+      userOf =
+        coll: field:
+        builtins.deepSeq
+          (genMerge.evalModuleTree { } [
+            { options.schema = mkSchemaOption { collections.${field} = coll; }; }
+            { config.schema.user = { }; }
+          ]).config.schema.user.${field}
+          null;
+      top =
+        field: t:
+        "^"
+        + escapeRegex "gen-schema: collection '${field}': a property (`${t}`) at the top of its `default` is not resolved";
+    in
+    {
+      test-top-list-mkif = {
+        expr = userOf { default = genMerge.mkIf true [ "a" ]; } "classes";
+        expectedError = {
+          type = "ThrownError";
+          msg = top "classes" "if";
+        };
+      };
+      test-top-list-mkmerge = {
+        expr = userOf {
+          default = genMerge.mkMerge [
+            [ "a" ]
+            [ "b" ]
+          ];
+        } "classes";
+        expectedError = {
+          type = "ThrownError";
+          msg = top "classes" "merge";
+        };
+      };
+      test-top-list-mkdefault = {
+        expr = userOf { default = genMerge.mkDefault [ "a" ]; } "classes";
+        expectedError = {
+          type = "ThrownError";
+          msg = top "classes" "override";
+        };
+      };
+      test-top-attrs-mkif = {
+        expr = userOf { default = genMerge.mkIf true { r = "eu"; }; } "metadata";
+        expectedError = {
+          type = "ThrownError";
+          msg = top "metadata" "if";
+        };
+      };
+      test-top-explicit-mkif = {
+        expr = userOf {
+          default = genMerge.mkIf true 5;
+          merge = acc: v: if acc == null then v else acc;
+        } "rank";
+        expectedError = {
+          type = "ThrownError";
+          msg = top "rank" "if";
+        };
+      };
+      test-list-element-discharged-refuses-on-read = {
+        expr = userOf {
+          default = [
+            (genMerge.mkIf false "a")
+            "b"
+          ];
+        } "classes";
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex ''gen-merge: option `collections.classes.default."[definition 1-entry 1]"' has no definitions after priority resolution'';
+        };
+      };
+      test-list-element-mkmerge-unequal-conflicts = {
+        expr = userOf {
+          default = [
+            (genMerge.mkMerge [
+              "a"
+              "b"
+            ])
+          ];
+        } "classes";
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex ''gen-merge: the option `collections.classes.default."[definition 1-entry 1]"' has conflicting definitions'';
+        };
+      };
+      test-attrs-key-discharged-refuses-on-read = {
+        expr = userOf {
+          default = {
+            r = genMerge.mkIf false "eu";
+            t = "x";
+          };
+        } "metadata";
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex "gen-merge: option `collections.metadata.default.r' has no definitions after priority resolution";
+        };
+      };
+    };
 }

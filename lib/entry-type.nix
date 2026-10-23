@@ -812,7 +812,33 @@ let
           default = [ ];
         };
       }
-      // collections;
+      # A default is the fold's seed. As with an option's default, one `mkOrder` at its top is
+      # stripped and any other property there is refused; its elements resolve per schema. A
+      # built-in's default is plain, so only the declared collections are read.
+      // prelude.mapAttrs (
+        name: c:
+        if !(builtins.isAttrs (c.default or null) && c.default ? _type) then
+          c
+        else
+          c
+          // {
+            default =
+              let
+                d = if c.default._type == "order" then c.default.content else c.default;
+              in
+              if
+                builtins.elem (d._type or null) [
+                  "if"
+                  "merge"
+                  "override"
+                  "order"
+                ]
+              then
+                throw "gen-schema: collection '${name}': a property (`${d._type}`) at the top of its `default` is not resolved, as no property at the top of an option's default is; write it on the default's elements or on a definition"
+              else
+                d;
+          }
+      ) collections;
 
       offending = builtins.filter (k: merged ? ${k}) reservedCollectionKeys;
       core = [
@@ -1343,6 +1369,32 @@ let
             inferMerge name collection
         ) allCollections;
 
+        # The seed `declaredOf` folds: a list or attrset default resolved alone, as one definition of
+        # its collection, once per schema; an explicit collection's default is its type's own seed,
+        # and any other is served as it is to a kind that never defines it (only a definition needs
+        # a merge strategy). A built-in's default is plain, so only the declared collections are
+        # resolved.
+        collectionDefaults = prelude.mapAttrs (
+          name: _:
+          let
+            collection = allCollections.${name};
+          in
+          if
+            collection ? merge
+            || !(builtins.isList collection.default || builtins.isAttrs collection.default)
+            || collection.default == [ ]
+            || collection.default == { }
+          then
+            collection.default
+          else
+            merge.mergeDefs [ "collections" name "default" ] collectionTypes.${name} [
+              {
+                file = "gen-schema/default";
+                value = collection.default;
+              }
+            ]
+        ) collections;
+
         collectionKeys = prelude.attrNames allCollections;
         # Per schema, never per kind: the collections whose contents enter the kind's identity, and
         # those of them the schema declared itself (the guard's, in `planeOf`).
@@ -1448,7 +1500,7 @@ let
                 name: collection: stacks:
                 # tested before it is filtered, so a kind that never defines the collection binds nothing
                 if stacks == [ ] && !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs) then
-                  collection.default
+                  collectionDefaults.${name} or collection.default
                 else
                   let
                     merged = merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} (
@@ -1461,7 +1513,10 @@ let
                   in
                   # an explicit collection's type seeds itself; a list or attrset is seeded after the
                   # merge, which equals the left fold because `++` and `//` are associative
-                  if collection ? merge then merged else inferMerge name collection collection.default merged;
+                  if collection ? merge then
+                    merged
+                  else
+                    inferMerge name collection (collectionDefaults.${name} or collection.default) merged;
 
               # A DECLARED parent nothing else composes (den-hoag-8c8pr), which the desugar below
               # imports: no def of this kind carries the resolver's provenance for it, and it is not
@@ -2041,7 +2096,7 @@ let
                       // builtins.listToAttrs (
                         map (n: {
                           name = n;
-                          value = allCollections.${n}.default;
+                          value = collectionDefaults.${n} or allCollections.${n}.default;
                         }) dropped
                       )
                     )
