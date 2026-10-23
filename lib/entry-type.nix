@@ -1402,17 +1402,15 @@ let
 
               declaredOf =
                 name: collection:
-                let
-                  present = builtins.filter (d: builtins.isAttrs d.value && d.value ? ${name}) defs;
-                in
-                if present == [ ] then
+                # tested before it is filtered, so a kind that never defines the collection binds nothing
+                if !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs) then
                   collection.default
                 else
                   merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} (
                     map (d: {
                       inherit (d) file;
                       value = d.value.${name};
-                    }) present
+                    }) (builtins.filter (d: builtins.isAttrs d.value && d.value ? ${name}) defs)
                   );
 
               # A DECLARED parent nothing else composes (den-hoag-8c8pr), which the desugar below
