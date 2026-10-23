@@ -5237,4 +5237,112 @@ in
         };
       };
     };
+  # A collection value a mixin contributes is a definition of the collection: one of the wrong
+  # shape is refused by name (it reached `++`/`//` and aborted uncatchably), and an element or key
+  # whose definitions all discharge is refused when read (it was served as the raw record).
+  flake.testsError.collection-mixin-refusals =
+    let
+      userOf =
+        coll: field: mix:
+        builtins.deepSeq
+          (genMerge.evalModuleTree { } [
+            {
+              options.schema = mkSchemaOption {
+                collections.${field} = coll;
+                baseModule = { };
+                mixins = map (
+                  v:
+                  mkMixin { } (_: {
+                    ${field} = v;
+                  })
+                ) mix;
+              };
+            }
+            { config.schema.user = { }; }
+          ]).config.schema.user.${field}
+          null;
+      L = {
+        default = [ ];
+      };
+      A = {
+        default = { };
+      };
+    in
+    {
+      test-shape-list = {
+        expr = userOf L "classes" [ "x" ];
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex "gen-merge: a definition for option `schema.user.classes' is not of type `list', in `gen-schema/mixin'";
+        };
+      };
+      test-shape-attrs = {
+        expr = userOf A "metadata" [ [ "x" ] ];
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex "gen-merge: option `schema.user.metadata' has definitions `lazyAttrsOf' cannot consume (gen-schema/mixin)";
+        };
+      };
+      test-list-element-discharged-refuses-on-read = {
+        expr = userOf L "classes" [
+          [
+            (genMerge.mkIf false "a")
+            "b"
+          ]
+        ];
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex ''gen-merge: option `schema.user.classes."[definition 1-entry 1]"' has no definitions after priority resolution'';
+        };
+      };
+      test-list-element-mkmerge-unequal-conflicts = {
+        expr = userOf L "classes" [
+          [
+            (genMerge.mkMerge [
+              "a"
+              "b"
+            ])
+          ]
+        ];
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex ''gen-merge: the option `schema.user.classes."[definition 1-entry 1]"' has conflicting definitions'';
+        };
+      };
+      # the walk reads the kind's own parents only, so a priority on a mixin's `inherits` has no pool
+      # to rank it in, and is refused (it aborted before, and the pool would serve `[ "p" "x" ]`)
+      test-inherits-mixin-priority-refused = {
+        expr =
+          builtins.deepSeq
+            (genMerge.evalModuleTree { } [
+              {
+                options.schema = mkSchemaOption {
+                  baseModule = { };
+                  mixins = [
+                    (mkMixin { } (_: {
+                      inherits = genMerge.mkDefault [ "x" ];
+                    }))
+                  ];
+                };
+              }
+              { config.schema.p = { }; }
+              { config.schema.user.inherits = [ "p" ]; }
+            ]).config.schema.user.inherits
+            null;
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex "gen-schema: kind 'user': a mixin's `inherits` carries a priority (mkForce, mkDefault or mkOverride), which is refused";
+        };
+      };
+    };
 }

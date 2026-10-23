@@ -1440,13 +1440,14 @@ let
                 if name == "inherits" then
                   map (e: builtins.seq inheritsVerdict e) (aliasedInherits declaredRendered)
                 else
-                  declaredOf name collection
+                  declaredOf name collection [ ]
               ) allCollections;
 
+              # `stacks`: definitions a mixin contributes, after the kind's own, in one priority pool
               declaredOf =
-                name: collection:
+                name: collection: stacks:
                 # tested before it is filtered, so a kind that never defines the collection binds nothing
-                if !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs) then
+                if stacks == [ ] && !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs) then
                   collection.default
                 else
                   let
@@ -1455,6 +1456,7 @@ let
                         inherit (d) file;
                         value = d.value.${name};
                       }) (builtins.filter (d: builtins.isAttrs d.value && d.value ? ${name}) defs)
+                      ++ stacks
                     );
                   in
                   # an explicit collection's type seeds itself; a list or attrset is seeded after the
@@ -1539,7 +1541,7 @@ let
               );
               identityVerdict = builtins.seq lineageStamped inheritsVerdict;
               rendered = v: if builtins.isString v || formOf v == "value" then v else v.kind;
-              declaredRaw = declaredOf "inherits" allCollections.inherits;
+              declaredRaw = declaredOf "inherits" allCollections.inherits [ ];
               declaredRendered = map rendered declaredRaw;
               declaredInherits = builtins.filter builtins.isString declaredRendered;
               declaredValues = builtins.filter (v: !(builtins.isString v)) declaredRendered;
@@ -2390,15 +2392,40 @@ let
                         )
                       );
 
-                    # Merge bridge-extracted collections into the collection results
+                    # A collection a mixin contributes to is folded with the kind's own definitions, each
+                    # stack entry one definition after them, through the collection's type (`declaredOf`).
+                    # `inherits` keeps the kind's rendered value first and resolves the mixin's after it.
+                    # A priority on a mixin's `inherits` is refused: the walk reads the kind's own parents
+                    # only, so no pool can rank it, and whether a mixin may declare a parent is unruled
+                    # (den-hoag-ppctt).
                     bridgeCollections =
                       if mixinResult != null then
                         prelude.mapAttrs (
                           name: stacks:
                           let
-                            merge = inferMerge name allCollections.${name};
+                            merged = map (value: {
+                              file = "gen-schema/mixin";
+                              inherit value;
+                            }) stacks;
                           in
-                          builtins.foldl' merge (extractedCollections.${name} or allCollections.${name}.default) stacks
+                          if name == "inherits" then
+                            let
+                              ranked =
+                                v:
+                                let
+                                  t = if builtins.isAttrs v then v._type or null else null;
+                                in
+                                t == "override"
+                                || (t == "definition" && (v.value._type or null) == "override")
+                                || (t == "merge" && builtins.any ranked v.contents)
+                                || (t == "if" && v.condition && ranked v.content);
+                            in
+                            if builtins.any ranked stacks then
+                              throw "gen-schema: kind '${kind}': a mixin's `inherits` carries a priority (mkForce, mkDefault or mkOverride), which is refused: the parent walk reads the kind's own `inherits` only, and whether a mixin may declare a parent is unruled (den-hoag-ppctt)"
+                            else
+                              extractedCollections.inherits ++ merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} merged
+                          else
+                            declaredOf name allCollections.${name} merged
                         ) (prelude.filterAttrs (n: _: allCollections ? ${n}) mixinResult.collections)
                       else
                         { };
