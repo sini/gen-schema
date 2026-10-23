@@ -1377,7 +1377,7 @@ let
         # and any other is served as it is to a kind that never defines it (only a definition needs
         # a merge strategy). A built-in's default is plain, so only the declared collections are
         # resolved.
-        collectionDefaults = prelude.mapAttrs (
+        seeds = prelude.mapAttrs (
           name: _:
           let
             collection = allCollections.${name};
@@ -1503,7 +1503,7 @@ let
                 name: collection: stacks:
                 # tested before it is filtered, so a kind that never defines the collection binds nothing
                 if stacks == [ ] && !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs) then
-                  collectionDefaults.${name} or collection.default
+                  seeds.${name} or collection.default
                 else
                   let
                     merged = merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} (
@@ -1519,7 +1519,7 @@ let
                   if collection ? merge then
                     merged
                   else
-                    inferMerge name collection (collectionDefaults.${name} or collection.default) merged;
+                    inferMerge name collection (seeds.${name} or collection.default) merged;
 
               # A DECLARED parent nothing else composes (den-hoag-8c8pr), which the desugar below
               # imports: no def of this kind carries the resolver's provenance for it, and it is not
@@ -2099,7 +2099,7 @@ let
                       // builtins.listToAttrs (
                         map (n: {
                           name = n;
-                          value = collectionDefaults.${n} or allCollections.${n}.default;
+                          value = seeds.${n} or allCollections.${n}.default;
                         }) dropped
                       )
                     )
