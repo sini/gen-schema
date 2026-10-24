@@ -2498,53 +2498,37 @@ in
       };
     };
 
-  # ── the kind-tree channel's reserved keys (den-hoag-v9gjd, G5/G6) ────────────────────────────
+  # ── the kind-tree channel's reserved keys (den-hoag-v9gjd, G5/G6; den-hoag-58bib arm S) ─────────────
   # `evalSchema`, `mkSchemaOption` and `identityKeysForKind` forward `specialArgs` verbatim into
-  # `merge.evalModuleTree`'s own `baseArgs` (S2/S3/S4 in the spec's channel census). The gen-merge
-  # landing this row depends on (`f5a2420`, den-hoag-v9gjd) refuses a caller's `config`/`options`/
-  # `prefix` there by name, closing this channel BY CONSTRUCTION — no lib/ change on this side, only
-  # the cells that show it. Each refusal cell reads the TEXT, because `tryEval` alone would pass on
-  # any refusal anywhere in the construction.
+  # `merge.evalModuleTree`'s own `baseArgs` (S2/S3/S4 in the spec's channel census). gen-merge serves a
+  # caller's `config`/`options`/`prefix` there as nixpkgs serves them (den-hoag-58bib arm S), so a kind
+  # module reading one of them reads the caller's value. Each cell reads that VALUE, not merely the
+  # absence of a refusal.
   flake.testsError.kind-tree-reserved-args =
     let
-      # A kind needing no formal of its own — merely applying it during introspection is what
-      # forces `baseArgs` on `identityKeysForKind`'s path (the build report's S4 note: a
-      # names-only read already throws).
-      plainKind = {
-        options.tag = genMerge.mkOption {
-          type = genMerge.types.str;
-          default = "plain";
-        };
-      };
-      # `evalSchema`/`mkSchemaOption`'s own path only forces `baseArgs` for a module whose
-      # FORMAL NAMES the reserved key — `builtins.functionArgs` on a bare attrset or a
-      # non-pattern lambda returns `{ }`, and `intersectAttrs { } specialArgs` never touches
-      # `specialArgs` at all, so the guard's `throw` is never reached. Driven directly
-      # (`den-hoag-v9gjd` probe): a bare-attrset kind does NOT throw here even at f5a2420; a
-      # `{ config, ... }: …` kind does. One pattern-formal kind per reserved key, naming it but
-      # not reading it — the refusal fires on the DECLARATION, not on a use of the value.
+      # One pattern-formal kind per key, publishing what it was handed as its `tag` default.
       configKind =
         { config, ... }:
         {
           options.tag = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "plain";
+            type = genMerge.types.raw;
+            default = config;
           };
         };
       optionsKind =
         { options, ... }:
         {
           options.tag = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "plain";
+            type = genMerge.types.raw;
+            default = options;
           };
         };
       prefixKind =
         { prefix, ... }:
         {
           options.tag = genMerge.mkOption {
-            type = genMerge.types.str;
-            default = "plain";
+            type = genMerge.types.raw;
+            default = prefix;
           };
         };
       viaEvalSchema =
@@ -2556,12 +2540,6 @@ in
         (evalSchema { schemaOption = mkSchemaOption { specialArgs = sa; }; } [
           { config.schema.fleet.imports = [ mod ]; }
         ]).fleet.options.tag.default;
-      viaIdentityKeysForKind = sa: identityKeysForKind { specialArgs = sa; } (kindOfModules plainKind);
-      msg = keys: "^gen-merge: `specialArgs' cannot supply the base module ${keys}";
-      refused = keys: {
-        type = "ThrownError";
-        msg = msg keys;
-      };
       one = k: { ${k} = "CALLER"; };
 
       # ── G6: the value plane, which must NOT flip ────────────────────────────────────────────
@@ -2613,33 +2591,44 @@ in
         mod: sa: builtins.elem "marker" (identityKeysForKind { specialArgs = sa; } (kindOfModules mod));
     in
     {
-      test-evalSchema-refuses-a-caller-config-by-name = {
+      test-evalSchema-serves-a-caller-config = {
         expr = viaEvalSchema configKind (one "config");
-        expectedError = refused "argument `config'";
+        expected = "CALLER";
       };
-      test-evalSchema-refuses-a-caller-options-by-name = {
+      test-evalSchema-serves-a-caller-options = {
         expr = viaEvalSchema optionsKind (one "options");
-        expectedError = refused "argument `options'";
+        expected = "CALLER";
       };
-      test-evalSchema-refuses-a-caller-prefix-by-name = {
+      test-evalSchema-serves-a-caller-prefix = {
         expr = viaEvalSchema prefixKind (one "prefix");
-        expectedError = refused "argument `prefix'";
+        expected = "CALLER";
       };
-      test-mkSchemaOption-refuses-a-caller-config-by-name = {
+      test-mkSchemaOption-serves-a-caller-config = {
         expr = viaMkSchemaOption configKind (one "config");
-        expectedError = refused "argument `config'";
+        expected = "CALLER";
       };
-      test-mkSchemaOption-refuses-a-caller-options-by-name = {
+      test-mkSchemaOption-serves-a-caller-options = {
         expr = viaMkSchemaOption optionsKind (one "options");
-        expectedError = refused "argument `options'";
+        expected = "CALLER";
       };
-      test-mkSchemaOption-refuses-a-caller-prefix-by-name = {
+      test-mkSchemaOption-serves-a-caller-prefix = {
         expr = viaMkSchemaOption prefixKind (one "prefix");
-        expectedError = refused "argument `prefix'";
+        expected = "CALLER";
       };
-      test-identityKeysForKind-refuses-a-caller-prefix-by-name = {
-        expr = viaIdentityKeysForKind (one "prefix");
-        expectedError = refused "argument `prefix'";
+      test-identityKeysForKind-serves-a-caller-prefix = {
+        expr = viaIdentityKeysForKindGated (
+          { prefix, ... }:
+          if prefix == "CALLER" then
+            {
+              options.marker = genMerge.mkOption {
+                type = genMerge.types.str;
+                default = "hit";
+              };
+            }
+          else
+            { }
+        ) (one "prefix");
+        expected = true;
       };
       test-kind-tree-channels-agree-argand-and-name-survive-control = {
         expr = {
@@ -2670,6 +2659,170 @@ in
             name = true;
           };
         };
+      };
+    };
+
+  # ── a caller's base module arguments reaching an instance's own evaluation (den-hoag-58bib β) ──────────
+  # gen-merge serves a caller's `config`, `options` and `prefix` as nixpkgs serves them, and an instance's
+  # own modules read `config` to bind the kind argument and the identity. The instance type is a
+  # `refusingSubmodule` stating those three keys, so gen-merge refuses each by name, on presence, on every
+  # route a caller's args join the instance: the type's `withArgs`, a derivation's lifted `withArgs`, and a
+  # redeclaration's union in either order. The constructor's door refuses `config` first, in this
+  # library's words. `configInst` (another instance's evaluated `config`) is the value a read-site check
+  # cannot tell from the instance's own; presence refuses it as it refuses a marker. Each cell reads the
+  # TEXT; `tryEval` alone passes on any refusal.
+  flake.testsError.instance-caller-config =
+    let
+      routeHost =
+        (evalSchema { } [
+          {
+            config.schema.host = {
+              imports = [
+                (
+                  { host, ... }:
+                  {
+                    options.selfAddr = genMerge.mkOption {
+                      type = genMerge.types.raw;
+                      default = host.addr or "<host has no addr>";
+                    };
+                  }
+                )
+              ];
+              options.addr = genMerge.mkOption { type = genMerge.types.str; };
+            };
+          }
+        ]).host;
+      plainTy = genSchema.mkInstanceType { } routeHost;
+      one =
+        ty:
+        (genMerge.evalModuleTree { } [
+          {
+            options.h1 = genMerge.mkOption {
+              type = ty;
+              default = { };
+            };
+            config.h1.addr = "10.0.1.2";
+          }
+        ]).config.h1;
+      redecl =
+        first: second:
+        (genMerge.evalModuleTree { } [
+          { options.h1 = genMerge.mkOption { type = first; }; }
+          {
+            options.h1 = genMerge.mkOption {
+              type = second;
+              default = { };
+            };
+            config.h1.addr = "10.0.1.2";
+          }
+        ]).config.h1;
+      # another host's own evaluated `config`
+      other =
+        (genMerge.evalModuleTree { } [
+          {
+            options.h0 = genMerge.mkOption {
+              type = plainTy;
+              default = { };
+            };
+            config.h0.addr = "10.9.9.9";
+          }
+        ]).config.h0;
+      routes = sa: {
+        door = one (genSchema.mkInstanceType { specialArgs = sa; } routeHost);
+        reg =
+          (genMerge.evalModuleTree { } [
+            {
+              options.hosts = mkInstanceRegistry { specialArgs = sa; } routeHost;
+              config.hosts.h1.addr = "10.0.1.2";
+            }
+          ]).config.hosts.h1;
+        wa = one (plainTy.withArgs sa);
+        derive = one ((genMerge.deriveType { } "hostD" plainTy).withArgs sa);
+        redecl = redecl plainTy ((genMerge.types.submodule [ ]).withArgs sa);
+        redeclr = redecl ((genMerge.types.submodule [ ]).withArgs sa) plainTy;
+      };
+      args = {
+        config.config.marker = "CALLER";
+        configInst.config = other;
+        options.options.marker = "CALLER";
+        prefix.prefix.marker = "CALLER";
+      };
+      keyOf = k: if k == "configInst" then "config" else k;
+      reason =
+        via: k:
+        "${via} supplies the base module argument `${keyOf k}' to a `submodule' that refuses it from a caller (`refusingSubmodule'): the type states it as an argument its own evaluation supplies, so a caller's value would replace the evaluation's own";
+      exact = m: {
+        type = "ThrownError";
+        msg = "^" + escapeRegex m + "$";
+      };
+      door = exact "gen-schema: mkInstanceType: `specialArgs' cannot supply `config' to kind 'host': the instance's own module reads its `config' to bind the kind argument `host' and its identity, so a caller's value would replace the instance's own";
+      withArgsRefusal = k: exact ("gen-merge: " + reason "`withArgs'" k);
+      unionRefusal =
+        k:
+        exact "gen-merge: option `h1' is declared with types that do not merge (${reason "a redeclaration" k}); declared in <unknown-file>, <unknown-file>";
+      # route -> key -> the refusal that names it
+      expect = {
+        door = {
+          config = door;
+          options = withArgsRefusal "options";
+          prefix = withArgsRefusal "prefix";
+        };
+        reg = expect.door;
+        wa = {
+          config = withArgsRefusal "config";
+          configInst = withArgsRefusal "configInst";
+          options = withArgsRefusal "options";
+          prefix = withArgsRefusal "prefix";
+        };
+        derive = expect.wa;
+        redecl = builtins.mapAttrs (k: _: unionRefusal k) expect.wa;
+        redeclr = expect.redecl;
+      };
+      served =
+        sa:
+        builtins.mapAttrs (_: i: [
+          i.selfAddr
+          (builtins.match "host:[0-9a-f]{64}" i.id_hash != null)
+          (i.id_hash != other.id_hash)
+        ]) (routes sa);
+    in
+    builtins.listToAttrs (
+      builtins.concatLists (
+        builtins.attrValues (
+          builtins.mapAttrs (
+            route: keys:
+            builtins.attrValues (
+              builtins.mapAttrs (k: e: {
+                name = "test-${route}-refuses-a-caller-${k}-by-name";
+                value = {
+                  expr = ((routes args.${k}).${route}).selfAddr;
+                  expectedError = e;
+                };
+              }) keys
+            )
+          ) expect
+        )
+      )
+    )
+    // {
+      test-control-no-key-and-a-fresh-key-serve-the-instance-own-values-on-every-route = {
+        expr = map served [
+          { }
+          { argand = "CALLER"; }
+        ];
+        expected =
+          let
+            own = [
+              "10.0.1.2"
+              true
+              true
+            ];
+            all = builtins.mapAttrs (_: _: own) expect;
+          in
+          [
+            all
+            all
+          ];
       };
     };
 

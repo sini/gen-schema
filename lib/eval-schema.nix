@@ -52,8 +52,8 @@ let
       # `schemaOption` is already built and its entry type has already closed over whatever args it
       # was given, so args stated here would be threaded nowhere and the kind tree would diverge
       # exactly as if none had been supplied — the very failure this channel exists to remove,
-      # reappearing at the one call that states both. Refused where the caller states it, which is
-      # the same discipline `withArgs` applies to a reserved key.
+      # reappearing at the one call that states both. Refused where the caller states it, as a
+      # `refusingSubmodule`'s `withArgs` refuses a key the type states (den-hoag-58bib β).
       resolvedSchemaOption =
         if schemaOption == null then
           mkSchemaOption { inherit specialArgs; }

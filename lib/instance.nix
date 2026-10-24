@@ -95,48 +95,58 @@ let
     # ★ THE INLET IS ON THE TYPE, NOT THE CONSTRUCTOR, and it is applied UNCONDITIONALLY rather than
     # behind an `if specialArgs == { }` — one path, so every instance gen-schema builds goes through
     # the same construction and the empty case is not a second, untested one.
-    (merge.types.submodule (
-      { name, config, ... }:
-      {
-        imports = [
-          (builtins.seq _ importedKind)
-        ]
-        ++ [
-          (
-            if strict then
-              mkStrictModule kind
-            # gen-merge reads `_module` only from `config`, so the non-strict freeform
-            # must live under `config` (a top-level `_module` is dropped).
-            else
-              { config._module.freeformType = merge.types.attrsOf merge.types.anything; }
-          )
-          identityModule
-        ]
-        ++ extraModules;
-        config._module.args.${kind} = config;
-        options.name = merge.mkOption {
-          type = merge.types.str;
-          default = name;
-        };
-        # The closed key set, published beside `id_hash` as a readable datum.
-        #
-        # WHY A DATUM AND NOT A CHECK. Two COLD evaluations a week apart is the one region of this
-        # class the substrate cannot close: nothing here holds the earlier evaluation, and no party
-        # can compare against what it does not have. Inventing a comparison that cannot see the
-        # second evaluation would be worse than the gap, so what is offered instead is the set
-        # itself — a caller pins it, diffs it across runs, or hashes it into its own acceptance
-        # corpus, and the caller is then the party that holds both. That is the whole of what is
-        # available, and a caller whose pinned set goes stale hears NOTHING from this library.
-        options._identityKeys = merge.mkOption {
-          readOnly = true;
-          internal = true;
-          type = merge.types.listOf merge.types.str;
-          default = identityKeys;
-          description = "The closed identity-key set this kind's instances are minted over.";
-        };
-      }
-    )).withArgs
-      specialArgs;
+    #
+    # ★ THE INSTANCE REFUSES A CALLER'S `config`, `options` AND `prefix` (den-hoag-58bib β). Its own modules read
+    # `config` to bind the kind argument and the identity, and gen-merge serves a caller's base module
+    # args as nixpkgs serves them, so the type states the three keys and gen-merge refuses each by name
+    # on presence wherever a caller's args join it: this `withArgs`, a returned type's `withArgs`, a
+    # derivation's, and a redeclaration's union. The door below refuses `config` first, in this
+    # library's own words.
+    if specialArgs ? config then
+      throw "gen-schema: mkInstanceType: `specialArgs' cannot supply `config' to kind '${kind}': the instance's own module reads its `config' to bind the kind argument `${kind}' and its identity, so a caller's value would replace the instance's own"
+    else
+      (merge.refusingSubmodule [ "config" "options" "prefix" ] (
+        { name, config, ... }:
+        {
+          imports = [
+            (builtins.seq _ importedKind)
+          ]
+          ++ [
+            (
+              if strict then
+                mkStrictModule kind
+              # gen-merge reads `_module` only from `config`, so the non-strict freeform
+              # must live under `config` (a top-level `_module` is dropped).
+              else
+                { config._module.freeformType = merge.types.attrsOf merge.types.anything; }
+            )
+            identityModule
+          ]
+          ++ extraModules;
+          config._module.args.${kind} = config;
+          options.name = merge.mkOption {
+            type = merge.types.str;
+            default = name;
+          };
+          # The closed key set, published beside `id_hash` as a readable datum.
+          #
+          # WHY A DATUM AND NOT A CHECK. Two COLD evaluations a week apart is the one region of this
+          # class the substrate cannot close: nothing here holds the earlier evaluation, and no party
+          # can compare against what it does not have. Inventing a comparison that cannot see the
+          # second evaluation would be worse than the gap, so what is offered instead is the set
+          # itself — a caller pins it, diffs it across runs, or hashes it into its own acceptance
+          # corpus, and the caller is then the party that holds both. That is the whole of what is
+          # available, and a caller whose pinned set goes stale hears NOTHING from this library.
+          options._identityKeys = merge.mkOption {
+            readOnly = true;
+            internal = true;
+            type = merge.types.listOf merge.types.str;
+            default = identityKeys;
+            description = "The closed identity-key set this kind's instances are minted over.";
+          };
+        }
+      )).withArgs
+        specialArgs;
 
   # Type-tree predicates for coercion chain dispatch.
   isRefLeaf = t: (t.refKind or null) != null;
