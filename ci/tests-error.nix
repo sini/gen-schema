@@ -5669,4 +5669,101 @@ in
         };
       };
     };
+
+  flake.testsError.collection-no-default-refusals =
+    let
+      userOf =
+        coll: field: kind:
+        builtins.deepSeq
+          (genMerge.evalModuleTree { } (
+            [
+              { options.schema = mkSchemaOption { collections.${field} = coll; }; }
+              { config.schema.user = { }; }
+            ]
+            ++ map (v: { config.schema.user.${field} = v; }) kind
+          )).config.schema.user.${field}
+          null;
+      noSeed =
+        at: field:
+        "^"
+        # the whole message, so the four sites that write it cannot drift apart unseen
+        + escapeRegex "gen-schema: `${at}': collection '${field}' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`"
+        + "$";
+    in
+    {
+      test-undefined-refuses-by-name = {
+        expr = userOf { } "rank" [ ];
+        expectedError = {
+          type = "ThrownError";
+          msg = noSeed "schema.user.rank" "rank";
+        };
+      };
+      test-undefined-outside-identity-refuses-by-name = {
+        expr = userOf { identity = false; } "rank" [ ];
+        expectedError = {
+          type = "ThrownError";
+          msg = noSeed "schema.user.rank" "rank";
+        };
+      };
+      test-undefined-with-merge-refuses-by-name = {
+        expr = userOf { merge = a: v: a ++ v; } "rank" [ ];
+        expectedError = {
+          type = "ThrownError";
+          msg = noSeed "schema.user.rank" "rank";
+        };
+      };
+      test-merge-reading-the-seed-refuses-by-name = {
+        expr = userOf { merge = a: v: a ++ v; } "rank" [ [ "a" ] ];
+        expectedError = {
+          type = "ThrownError";
+          msg = noSeed "schema.user.rank" "rank";
+        };
+      };
+      test-merge-all-discharged-refuses-by-name = {
+        expr = userOf { merge = a: v: a ++ v; } "rank" [ (genMerge.mkIf false [ "a" ]) ];
+        expectedError = {
+          type = "ThrownError";
+          msg = noSeed "collections.rank" "rank";
+        };
+      };
+      test-all-discharged-refuses-by-name = {
+        expr = userOf { } "rank" [ (genMerge.mkIf false [ "a" ]) ];
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex "gen-merge: option `schema.user.rank' has no definitions after priority resolution";
+        };
+      };
+      test-unequal-definitions-conflict = {
+        expr = userOf { } "rank" [
+          7
+          8
+        ];
+        expectedError = {
+          type = "ThrownError";
+          msg = "^" + escapeRegex "gen-merge: the option `schema.user.rank' has conflicting definitions";
+        };
+      };
+      # gen-merge's untyped fold refuses a shared key whose values differ, where nixpkgs' `//` keeps
+      # the later one without a word
+      test-shared-key-disagreement-refuses-by-name = {
+        expr = userOf { } "rank" [
+          { x = 1; }
+          { x = 2; }
+        ];
+        expectedError = {
+          type = "ThrownError";
+          msg = "^" + escapeRegex "gen-merge: the option `schema.user.rank.x' has conflicting definitions";
+        };
+      };
+      # a default neither a list nor an attrset, with no `merge`, cannot fold a definition
+      test-scalar-default-definition-has-no-merge-strategy = {
+        expr = userOf { default = 5; } "rank" [ 7 ];
+        expectedError = {
+          type = "ThrownError";
+          msg = "^" + escapeRegex "gen-schema: collection 'rank': no merge strategy";
+        };
+      };
+    };
 }

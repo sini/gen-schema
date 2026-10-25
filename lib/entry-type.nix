@@ -1329,10 +1329,29 @@ let
           if collection ? merge then
             merge.mkOptionType {
               name = "schemaCollection";
-              merge = _: prelude.foldl' (acc: d: inferMerge name collection acc d.value) collection.default;
+              # A collection declaring no `default` has no seed: read where no definition of it
+              # survives, or where its `merge` reads the seed, it is refused by name, as an option
+              # with no default, no definition and no empty value is. The refusal is written at each
+              # of its four sites, here, below and in `declaredOf` and `minted`, because a shared
+              # binding costs a thunk on every schema or kind evaluation that never refuses.
+              merge =
+                loc:
+                prelude.foldl' (acc: d: inferMerge name collection acc d.value) (
+                  collection.default
+                    or (throw "gen-schema: `${merge.showOption loc}': collection '${name}' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`")
+                );
               # every definition discharged (`mkIf false`) answers the default, as no definition does
-              emptyValue.value = collection.default;
+              emptyValue.value =
+                collection.default or (throw "gen-schema: `${
+                  merge.showOption [
+                    "collections"
+                    name
+                  ]
+                }': collection '${name}' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`");
             }
+          # declaring neither a shape nor a fold, it is an option declaring no type and no default
+          else if !(collection ? default) then
+            merge.types.unspecified
           else if builtins.isList collection.default then
             merge.mkOptionType {
               name = "list";
@@ -1503,7 +1522,12 @@ let
                 name: collection: stacks:
                 # tested before it is filtered, so a kind that never defines the collection binds nothing
                 if stacks == [ ] && !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs) then
-                  seeds.${name} or collection.default
+                  if collection ? default then
+                    seeds.${name} or collection.default
+                  else
+                    throw "gen-schema: `${
+                      merge.showOption (loc ++ [ name ])
+                    }': collection '${name}' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`"
                 else
                   let
                     merged = merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} (
@@ -1516,7 +1540,7 @@ let
                   in
                   # an explicit collection's type seeds itself; a list or attrset is seeded after the
                   # merge, which equals the left fold because `++` and `//` are associative
-                  if collection ? merge then
+                  if collection ? merge || !(collection ? default) then
                     merged
                   else
                     inferMerge name collection (seeds.${name} or collection.default) merged;
@@ -2099,7 +2123,13 @@ let
                       // builtins.listToAttrs (
                         map (n: {
                           name = n;
-                          value = seeds.${n} or allCollections.${n}.default;
+                          value =
+                            if allCollections.${n} ? default then
+                              seeds.${n} or allCollections.${n}.default
+                            else
+                              throw "gen-schema: `${
+                                merge.showOption (loc ++ [ n ])
+                              }': collection '${n}' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`";
                         }) dropped
                       )
                     )
