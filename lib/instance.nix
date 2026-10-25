@@ -91,6 +91,38 @@ let
           stampRefusal "gen-schema: mkInstanceType" kindValue
         else
           kindValue;
+      # THE INSTANCE TYPE IS MINTED OVER WHAT ITS MODULE SET IS BUILT FROM (den-hoag-dwln8, ADR-0034):
+      # the kind (a member, by its mark, its sealed subjects propagating), `strict` inert, `extraModules`
+      # sealed per component; `specialArgs` and the refused keys enter through gen-merge's own args. Never
+      # over the module list this file constructs from them, which is one sealed function gen-schema wrote
+      # and so minted every instance type, of any kind, one type. The statement is TOTAL over the module
+      # function below: it reads nothing else but library code, and an input added there is owed here.
+      # Two reads in it are not inputs of their own: `refused` is a library constant, and the guard's
+      # `args.specialArgs` read (den-hoag-b7v1h) is the type's own `specialArgs`, which enters the mint
+      # through gen-merge's `specialArgs` arg and only refuses, never changing a value.
+      # A `//` copy of the kind failing the completion stamp enters as a record with no mark, so it never
+      # claims the original's identity; its import is refused below as before.
+      stated = {
+        ctor = "gen-schema.instance";
+        members.kind =
+          if kindValue ? __kindSelf && !(stampOk kindValue) then { staleKind = kindValue; } else kindValue;
+        args = tags: {
+          inherit (tags) kind;
+          inherit strict;
+          # gen-algebra `sealedMarker`, spelled here: a threaded binding is a thunk on every load
+          extraModules = if extraModules == [ ] then [ ] else { sealed = true; };
+        };
+        sealed =
+          if extraModules == [ ] then
+            [ ]
+          else
+            [
+              {
+                path = [ "extraModules" ];
+                value = extraModules;
+              }
+            ];
+      };
     in
     # ★ THE INLET IS ON THE TYPE, NOT THE CONSTRUCTOR, and it is applied UNCONDITIONALLY rather than
     # behind an `if specialArgs == { }` — one path, so every instance gen-schema builds goes through
@@ -112,7 +144,7 @@ let
     if specialArgs ? config then
       throw "gen-schema: mkInstanceType: `specialArgs' cannot supply `config' to kind '${kind}': the instance's own module reads its `config' to bind the kind argument `${kind}' and its identity, so a caller's value would replace the instance's own"
     else
-      (merge.refusingSubmodule refused (
+      (merge.refusingSubmodule stated refused (
         # The stated set, enforced where it protects: the instance's own evaluation, whichever engine runs it
         # and whichever join reached it, including a redeclaration beside a nixpkgs `submoduleWith', whose join
         # is nixpkgs' record and carries no set (den-hoag-b7v1h). The test spells the three keys rather than

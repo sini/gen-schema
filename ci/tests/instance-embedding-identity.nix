@@ -109,20 +109,22 @@ in
         };
       };
     };
+    # re-pinned when the instance type came to mint over its construction, so each kind reads the
+    # embedded kind's mark (den-hoag-dwln8); the control is unmoved
     test-the-embedding-kinds-read-their-pinned-digests = {
       expr = read;
       expected = {
         host = {
-          mark = "schemakind:5bbaf626e6c21baa1d6327d1563329e0373e4711ae498593114c861070915544";
-          id = "host:b30f57cc0ba9f9f42cf57d3c3b2d05b8707c2d80e2b11d6b20cfd0d171ff36b6";
+          mark = "schemakind:addf2cef43e79d5398311bc1adc314f45b703bb8c0fd6fac9d41b752dbbf2bb4";
+          id = "host:fc31f5c0f4fdaa0265a9b3a6a9ed3437e7b623b8a1eda34282ec8f7ed09dd120";
         };
         farm = {
-          mark = "schemakind:870015c6d36e707977cc42aea452d0d26fc9f1b1a66467b6c35e40f064cd20e3";
-          id = "farm:8a41f36ced3ad2c66434b8ae4e684820f8e01496e60d4978dc4f4d1eaf4528c7";
+          mark = "schemakind:573c97354d2bdd02d1d8f72730c5d77bf25bfb7153fa70962bfb9d50cb688e59";
+          id = "farm:e127c49753c985690b3285bacae029397097a05c27e6c2252795da9d95e9d463";
         };
         site = {
-          mark = "schemakind:f0b1740f5a4b1d3ceda2893c909c07761a8c1db374d0e8c5d5ea241d2fe704df";
-          id = "site:e08478092d78383c9bdaaed3df43f0d133fbb00b1d51a72d6fc3d9e669b79058";
+          mark = "schemakind:9e4a3887578f67c238980cd18f86fea23cb0c2785e40480879d3cbcdc286b217";
+          id = "site:e6f7726a5c3c10352b3dd62c62cac769c21114c5670e097ccf82fa3bd51b08cf";
         };
         inherit (before) ctl;
       };

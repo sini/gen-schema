@@ -258,6 +258,7 @@ in
           "__kindWitness"
           "__mint"
           "__moduleKey"
+          "__okAt"
           "__sealed"
           "__witness"
           "keySemantics"

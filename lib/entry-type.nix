@@ -444,6 +444,36 @@ let
         )) p.sealed;
       };
 
+  # The kind steps gen-types' type-identity index over the type records its mark mints over
+  # (den-hoag-dwln8), so a cycle through a kind (an instance type minted over it, embedded in it)
+  # bottoms out at the bound instead of blackholing: gen-types' protocol for a producer that mints over a
+  # member's `__mint` (`identityGuard`). Read off the option plane directly, never through `planeOf`'s
+  # result, whose WHNF forces every component's tag and so re-enters the cycle it guards.
+  kindOkAt =
+    { options, refs }:
+    let
+      optionTypes =
+        opts:
+        prelude.concatMap (
+          n:
+          let
+            o = opts.${n};
+          in
+          if isOptionDecl o then
+            (if (o.type or null) != null then [ o.type ] else [ ])
+          else if builtins.isAttrs o then
+            optionTypes o
+          else
+            [ ]
+        ) (prelude.attrNames opts);
+    in
+    (merge.types.identityGuard (
+      optionTypes options
+      ++ prelude.concatMap (r: if builtins.isAttrs r && r ? type then [ r.type ] else [ ]) (
+        builtins.attrValues (if builtins.isAttrs refs then refs else { })
+      )
+    )).okAt;
+
   markOf =
     {
       kind,
@@ -938,6 +968,9 @@ let
     # last, so a collection of that name is SILENTLY OVERWRITTEN — something vanishes and nothing
     # says so. Kept verbatim from the door's own third clause.
     "__mint"
+    # Written beside `__mint` and refused for the same reason: the type-identity index the kind steps
+    # (gen-types `identityGuard`, den-hoag-dwln8).
+    "__okAt"
     # Written beside `__mint` and refused for the same reason: the sealed subjects `kindEq` reads.
     "__sealed"
     # Written beside `__mint`, both branches, for the same reason: the parents and the witness the
@@ -2466,6 +2499,7 @@ let
                       });
                     };
                     __sealed = builtins.seq identityVerdict plane.sealed;
+                    __okAt = kindOkAt { inherit (introspect) options refs; };
                     __kindImports = resolvedOnly kindParents;
                     __kindCycleParents = cycleParents;
                     __kindWitness = kindWitness;
@@ -2673,6 +2707,7 @@ let
                       minted = ownMark;
                     };
                     __sealed = builtins.seq identityVerdict plane.sealed;
+                    __okAt = kindOkAt { inherit (introspect) options refs; };
                     # the parents as VALUES, read by the ancestor map; the parents as written and the
                     # witness, read by the cycle walk of every kind below
                     __kindImports = resolvedOnly kindParents;
