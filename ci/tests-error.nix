@@ -2806,12 +2806,31 @@ in
               config.h1.addr = "10.0.1.2";
             }
           ]).config.h1;
+        npchain =
+          (lib.evalModules {
+            modules = [
+              { options.h1 = lib.mkOption { type = nsw sa; }; }
+              { options.h1 = lib.mkOption { type = nsw { }; }; }
+              {
+                options.h1 = lib.mkOption {
+                  type = plainTy;
+                  default = { };
+                };
+                config.h1.addr = "10.0.1.2";
+              }
+            ];
+          }).config.h1;
       };
       args = {
         config.config.marker = "CALLER";
         configInst.config = other;
         options.options.marker = "CALLER";
         prefix.prefix.marker = "CALLER";
+        # a forwarded argument set: the caller's set carries its own `specialArgs` (den-hoag-psqwi)
+        fwd = {
+          config = other;
+          specialArgs = { };
+        };
       };
       keyOf = k: if k == "configInst" then "config" else k;
       reason =
@@ -2831,6 +2850,10 @@ in
         exact "gen-schema: an instance of kind 'host' is evaluated with a caller's `${keyOf k}': the instance type states `config', `options' and `prefix' as arguments its own evaluation supplies (`refusingSubmodule'), so a caller's value would replace the instance's own";
       # nixpkgs' relation asks gen's exported `typeMerge`, whose refusal it reads as no merge
       npAlreadyDeclared = exact "The option `h1' in `<unknown-file>' is already declared in `<unknown-file>'.";
+      # the joined record keeps the stated keys, so the second join refuses before the instance is evaluated: gen's
+      # engine names the pair, nixpkgs' the declarations (den-hoag-psqwi)
+      chainRefusal = exact "gen-merge: option `h1' is declared with types that do not merge (`submodule' and `submodule'); declared in <unknown-file>, <unknown-file>, <unknown-file>";
+      npChainAlreadyDeclared = exact "The option `h1' in `<unknown-file>' is already declared in `<unknown-file>' and `<unknown-file>'.";
       # route -> key -> the refusal that names it
       expect = {
         door = {
@@ -2853,7 +2876,8 @@ in
         npforeign = builtins.mapAttrs (k: _: instanceRefusal k) expect.wa;
         npforeignr = builtins.mapAttrs (_: _: npAlreadyDeclared) expect.wa;
         npforeignlift = expect.npforeign;
-        chain = expect.npforeign;
+        chain = builtins.mapAttrs (_: _: chainRefusal) (expect.wa // { fwd = null; });
+        npchain = builtins.mapAttrs (_: _: npChainAlreadyDeclared) expect.chain;
       };
       served =
         sa:
