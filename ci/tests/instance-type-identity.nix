@@ -12,6 +12,7 @@
 {
   genSchema,
   genMerge,
+  genAlgebra,
   ...
 }:
 let
@@ -39,6 +40,12 @@ let
   tG = mkInstanceType { } kA.grp;
   tUns = mkInstanceType { strict = false; } kA.user;
   digest = t: t.__mint.minted;
+  extraA = {
+    options.ply = genMerge.mkOption { default = 1; };
+  };
+  extraB = {
+    options.nap = genMerge.mkOption { default = 2; };
+  };
   hostOf = opt: (evalSchema { } [ { config.schema.host.options.owner = opt; } ]).host;
   direct = ty: genMerge.mkOption { type = ty; };
   shapes = {
@@ -122,7 +129,7 @@ in
       expected = true;
     };
     test-a2-an-instance-type-is-not-the-bare-refusing-submodule = {
-      expr = digest tU != digest (genMerge.refusingSubmodule [ "config" "options" "prefix" ] { });
+      expr = digest tU != digest (genMerge.refusingSubmodule null [ "config" "options" "prefix" ] { });
       expected = true;
     };
     test-a3-twins-of-one-kind-are-one-type = {
@@ -206,6 +213,27 @@ in
           ctor = "gen-schema.instance";
           reason = "a type nests deeper than the type-identity depth bound (128 levels); a self-referential type has no identity";
         };
+      };
+    };
+    # `extraModules` is distinguishing and sealed: an instance type with them is apart from one without
+    # (its mark tags the component), and two differing only in them are refused, never one type
+    test-a11-extra-modules-are-distinguishing-and-sealed = {
+      expr = {
+        withAndWithout = attempt (T.typeEq (mkInstanceType { extraModules = [ extraA ]; } kA.user) tU);
+        twoSets = attempt (
+          T.typeEq (mkInstanceType { extraModules = [ extraA ]; } kA.user) (
+            mkInstanceType { extraModules = [ extraB ]; } kA.user
+          )
+        );
+        tagIsSealedMarker = { sealed = true; } == genAlgebra.sealedMarker;
+      };
+      expected = {
+        withAndWithout = {
+          success = true;
+          value = false;
+        };
+        twoSets.success = false;
+        tagIsSealedMarker = true;
       };
     };
     # THE RESIDUE: the union route states nothing, so the marks collide and kindEq refuses

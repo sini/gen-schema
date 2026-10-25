@@ -134,7 +134,7 @@ let
     if specialArgs ? config then
       throw "gen-schema: mkInstanceType: `specialArgs' cannot supply `config' to kind '${kind}': the instance's own module reads its `config' to bind the kind argument `${kind}' and its identity, so a caller's value would replace the instance's own"
     else
-      (merge.refusingSubmoduleOver stated [ "config" "options" "prefix" ] (
+      (merge.refusingSubmodule stated [ "config" "options" "prefix" ] (
         { name, config, ... }:
         {
           imports = [
