@@ -150,6 +150,134 @@ let
     twin = v;
     markEqualsTwin = true;
   };
+
+  # A tree whose kind `user` writes its own value of most declared collections, and whose one mixin
+  # contributes `mix` to `user` alone; `twin` is the same value as one more definition on `user`.
+  # `only` (with `withOnly`) declares no default and is written by no kind; it is declared only
+  # where it is read, because a computed field that refuses leaves the mark minted without the
+  # computed component. The `computed` hook hands back every collection it is given, under `seen`,
+  # read as the published value is read.
+  summ = {
+    lst = v: v;
+    ats = v: v;
+    nod = v: v;
+    only = v: v;
+    mrg = v: v;
+    opq = v: v;
+    parent = v: v;
+    methods = builtins.attrNames;
+    validators = map (x: x.name);
+  };
+  seenAll = colls: _: {
+    seen = builtins.mapAttrs (n: f: f colls.${n}) (builtins.intersectAttrs colls summ);
+  };
+  collTree =
+    {
+      mix ? null,
+      twin ? null,
+      projected ? false,
+      withOnly ? false,
+      hook ? seenAll,
+    }:
+    (gm.evalModuleTree { } (
+      [
+        {
+          options.schema = genSchema.mkSchemaOption {
+            collections = {
+              lst = L;
+              ats = A;
+              nod = { };
+              mrg = {
+                default = 0;
+                merge = a: b: a + b;
+              };
+            }
+            // lib.optionalAttrs projected {
+              opq = L // {
+                identity = false;
+              };
+            }
+            // lib.optionalAttrs withOnly { only = { }; };
+            computed = hook;
+            baseModule = k: { tag = str k; };
+            mixins = [
+              (genSchema.mkMixin { } (
+                r: if (genAlgebra.record.select "tag" r).default == "user" && mix != null then mix else { }
+              ))
+            ];
+          };
+        }
+        { config.schema.p.options.pa = str "from-p"; }
+        {
+          config.schema.user = {
+            options.ua = str "u";
+            lst = [ "own" ];
+            ats.own = "o";
+            nod = [ "own" ];
+            mrg = 1;
+          }
+          // lib.optionalAttrs projected { opq = [ "own" ]; };
+        }
+      ]
+      ++ lib.optional (twin != null) { config.schema.user = twin; }
+    )).config.schema;
+  contrib = {
+    lst = [ "mx" ];
+    ats.mx = "m";
+    nod = [ "mx" ];
+    only = [ "mx" ];
+    mrg = 2;
+    parent = "p";
+    methods.greet = genSchema.schemaFn {
+      description = "greet";
+      type = gm.types.str;
+      fn = { ua, ... }: "hi ${ua}";
+    };
+    validators = [
+      (genSchema.mkValidator {
+        name = "mxv";
+        pred = _: false;
+        message = "mixin validator";
+      })
+    ];
+  };
+  mintOf = t: t.user.__mint.minted;
+  # collection `c` contributed `v` by the mixin, and written `v` on the kind, read by the published
+  # value and by the `computed` hook
+  poolOf =
+    c: v:
+    let
+      read = t: {
+        published = summ.${c} t.user.${c};
+        computed = t.user.seen.${c};
+      };
+      withOnly = c == "only";
+    in
+    {
+      mixin = read (collTree {
+        inherit withOnly;
+        mix.${c} = v;
+      });
+      twin = read (collTree {
+        inherit withOnly;
+        twin.${c} = v;
+      });
+    };
+  pooledAs = v: {
+    mixin = {
+      published = v;
+      computed = v;
+    };
+    twin = {
+      published = v;
+      computed = v;
+    };
+  };
+  markEqualsTwin =
+    args: c:
+    mintOf (collTree (args // { mix.${c} = contrib.${c}; }))
+    == mintOf (collTree (args // { twin.${c} = contrib.${c}; }));
+  served = v: (builtins.tryEval (builtins.deepSeq v true)).success;
 in
 {
   flake.tests.collection-mixin = {
@@ -285,6 +413,107 @@ in
           { config.schema.user.inherits = [ "p" ]; }
         ]).config.schema.user.inherits;
       expected = [ "p" ];
+    };
+
+    # ── every reader of a collection a mixin contributes reads the one pooled value ─────────────
+    # RED before: the `computed` hook read the kind's own definitions only, so it missed what the
+    # published value held, and the mark (minted over both) parted from the kind-written twin's.
+    # The published clauses are the positive control: they held on both sides.
+    test-mixin-collection-computed-reads-the-pool = {
+      expr = builtins.mapAttrs poolOf contrib;
+      expected = builtins.mapAttrs (_: pooledAs) {
+        lst = [
+          "own"
+          "mx"
+        ];
+        ats = {
+          mx = "m";
+          own = "o";
+        };
+        nod = [
+          "own"
+          "mx"
+        ];
+        # no default and no kind definition: the hook refused here before
+        only = [ "mx" ];
+        mrg = 3;
+        parent = "p";
+        methods = [ "greet" ];
+        validators = [ "mxv" ];
+      };
+    };
+    test-mixin-collection-computed-priority = {
+      expr = poolOf "lst" (gm.mkForce [ "mx" ]);
+      expected = pooledAs [ "mx" ];
+    };
+    test-mixin-collection-mark-equals-twin = {
+      expr = {
+        plain = lib.genAttrs [ "lst" "parent" "methods" ] (markEqualsTwin { });
+        projected.lst = markEqualsTwin { projected = true; } "lst";
+        # attribution: with no hook the marks already agree, so the split was the computed component's
+        noComputed = markEqualsTwin { hook = null; } "lst";
+        # the instrument: two kind-written twins differing in content alone mint apart
+        movesOnContent =
+          mintOf (collTree {
+            twin.lst = [ "mx" ];
+          }) != mintOf (collTree {
+            twin.lst = [ "my" ];
+          });
+        # a mixin whose application throws: the readers of its content still refuse (readers that
+        # do not read it, `kind` and `strict`, serve, as they do beside a throwing function module)
+        throwingMixin =
+          let
+            t = collTree { mix = throw "collection-mixin: the mixin's application refuses"; };
+          in
+          {
+            lst = served t.user.lst;
+            mark = served (mintOf t);
+          };
+      };
+      expected = {
+        plain = {
+          lst = true;
+          parent = true;
+          methods = true;
+        };
+        projected.lst = true;
+        noComputed = true;
+        movesOnContent = true;
+        throwingMixin = {
+          lst = false;
+          mark = false;
+        };
+      };
+    };
+    # an `identity = false` collection is projected out of the mark, and the hook still reads its pool
+    test-mixin-collection-projected-dropped = {
+      expr =
+        let
+          m = collTree {
+            projected = true;
+            mix.opq = [ "mx" ];
+          };
+          k = collTree {
+            projected = true;
+            twin.opq = [ "mx" ];
+          };
+        in
+        {
+          computed = m.user.seen.opq;
+          twin = k.user.seen.opq;
+          markEqualsTwin = mintOf m == mintOf k;
+        };
+      expected = {
+        computed = [
+          "own"
+          "mx"
+        ];
+        twin = [
+          "own"
+          "mx"
+        ];
+        markEqualsTwin = true;
+      };
     };
 
     # ── a property on a mixin's whole value is resolved ─────────────────────────────────────────

@@ -1243,6 +1243,9 @@ config.schema.host.isEntity   # → true (has includes)
 config.schema.conf.isEntity   # → false (empty — shared base only)
 ```
 
+The collections are the kind's published values, a mixin's contribution included, so a computed field and the
+kind value read one value of each collection; `defs` are the kind's own definitions as written.
+
 ### Introspection API
 
 Every schema has flat `_`-prefixed options for programmatic access:
@@ -1271,7 +1274,7 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 ```
 
 **Scope.** That idiom reads collection values on the **default entry-type path**. Two caveats, both
-real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // finalCollections // computedFields`), so the idiom returns the computed value for that key, silently;
+real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // extractedCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
 with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__keyEq`, `__kindAncestors`, `__kindCycleParents`,
 `__kindImports`, `__kindSelf`, `__kindWitness`, `__mint`, `__pureModule`, `__reservedKeys`, `__sealed`, `__witness`, `_class`, `_file`, `_module`, `baseModule`,
