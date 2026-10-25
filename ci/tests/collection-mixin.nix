@@ -13,6 +13,7 @@
   lib,
   genSchema,
   genMerge,
+  genAlgebra,
   ...
 }:
 let
@@ -85,6 +86,70 @@ let
     gen = v;
     nixpkgs = v;
   };
+
+  # A tree whose kinds `p` (option `pa`), `q` (`qa`) and `user` (`ua`) each carry `tag`, their own
+  # name, so the one mixin can give `user` alone the parents `mixInh`: a mixin applies to every kind
+  # of its schema, and an unconditional `inherits = [ "p" ]` would make `p` inherit itself.
+  # `kindInh` is `user`'s own `inherits`; the `computed` hook reads the collection back.
+  str =
+    d:
+    gm.mkOption {
+      type = gm.types.str;
+      default = d;
+    };
+  parentTree =
+    {
+      mixInh ? null,
+      kindInh ? null,
+    }:
+    (gm.evalModuleTree { } [
+      {
+        options.schema = genSchema.mkSchemaOption {
+          baseModule = k: { tag = str k; };
+          computed = colls: _: { seenInherits = colls.inherits; };
+          mixins = [
+            (genSchema.mkMixin { } (
+              r:
+              if (genAlgebra.record.select "tag" r).default == "user" && mixInh != null then
+                { inherits = mixInh; }
+              else
+                { }
+            ))
+          ];
+        };
+      }
+      { config.schema.p.options.pa = str "from-p"; }
+      { config.schema.q.options.qa = str "from-q"; }
+      {
+        config.schema.user = {
+          options.ua = str "u";
+        }
+        // (if kindInh == null then { } else { inherits = kindInh; });
+      }
+    ]).config.schema;
+  # a parent from another tree, so it is foreign to the tree under test
+  foreignP =
+    (gm.evalModuleTree { } [
+      { options.schema = genSchema.mkSchemaOption { }; }
+      { config.schema.fp.options.fa = str "from-fp"; }
+    ]).config.schema.fp;
+  walked = t: {
+    kindImports = map (v: v.kind) t.user.__kindImports;
+    ancestors = map (v: v.kind) (genSchema.ancestorsForKind t.user);
+    options = builtins.attrNames t.user.options;
+    computed = map (v: if builtins.isString v then v else v.kind) t.user.seenInherits;
+  };
+  # the mixin-declared arm and the kind-written twin, read by the same readers
+  againstTwin = arm: twin: {
+    mixin = walked (parentTree arm);
+    twin = walked (parentTree twin);
+    markEqualsTwin = (parentTree arm).user.__mint.minted == (parentTree twin).user.__mint.minted;
+  };
+  sameAsTwin = v: {
+    mixin = v;
+    twin = v;
+    markEqualsTwin = true;
+  };
 in
 {
   flake.tests.collection-mixin = {
@@ -139,6 +204,87 @@ in
         mix = [ [ (l.mkIf true "x") ] ];
       });
       expected = same [ "x" ];
+    };
+
+    # ── a parent a mixin declares is a parent at every reader of `inherits` ─────────────────────
+    # RED before: the walk read the kind's own `inherits` only, so the mixin's parent was published
+    # and edged but never imported, composed, listed among the ancestors or seen by `computed`.
+    test-builtin-inherits-mixin-parent-walked = {
+      expr = againstTwin { mixInh = [ "p" ]; } { kindInh = [ "p" ]; };
+      expected = sameAsTwin {
+        kindImports = [ "p" ];
+        ancestors = [ "p" ];
+        options = [
+          "pa"
+          "tag"
+          "ua"
+        ];
+        computed = [ "p" ];
+      };
+    };
+    test-builtin-inherits-mixin-foreign-value-parent = {
+      expr = againstTwin { mixInh = [ foreignP ]; } { kindInh = [ foreignP ]; };
+      expected = sameAsTwin {
+        kindImports = [ "fp" ];
+        ancestors = [ "fp" ];
+        options = [
+          "fa"
+          "tag"
+          "ua"
+        ];
+        computed = [ "fp" ];
+      };
+    };
+    # the kind's parents and the mixin's meet in one pool, as any other collection's do
+    test-builtin-inherits-pool-mixin-mkdefault-alone = {
+      expr = bothLaws null listT [ ] "inherits" (l: {
+        kind = [ ];
+        mix = [ (l.mkDefault [ "p" ]) ];
+      });
+      expected = same [ "p" ];
+    };
+    test-builtin-inherits-pool-kind-over-mixin-mkdefault = {
+      expr = bothLaws null listT [ ] "inherits" (l: {
+        kind = [ [ "p" ] ];
+        mix = [ (l.mkDefault [ "q" ]) ];
+      });
+      expected = same [ "p" ];
+    };
+    test-builtin-inherits-pool-mixin-mkforce = {
+      expr = bothLaws null listT [ ] "inherits" (l: {
+        kind = [ [ "p" ] ];
+        mix = [ (l.mkForce [ "q" ]) ];
+      });
+      expected = same [ "q" ];
+    };
+    # the walk imports the parent the pool serves (on a tree that declares both)
+    test-builtin-inherits-pool-mixin-mkforce-walked = {
+      expr =
+        map (v: v.kind)
+          (parentTree {
+            kindInh = [ "p" ];
+            mixInh = gm.mkForce [ "q" ];
+          }).user.__kindImports;
+      expected = [ "q" ];
+    };
+    # a priority on a mixin's parents ranks them against the kind's (it was refused before)
+    test-builtin-inherits-mixin-priority-pooled = {
+      expr =
+        (gm.evalModuleTree { } [
+          {
+            options.schema = genSchema.mkSchemaOption {
+              baseModule = { };
+              mixins = [
+                (genSchema.mkMixin { } (_: {
+                  inherits = gm.mkDefault [ "x" ];
+                }))
+              ];
+            };
+          }
+          { config.schema.p = { }; }
+          { config.schema.user.inherits = [ "p" ]; }
+        ]).config.schema.user.inherits;
+      expected = [ "p" ];
     };
 
     # ── a property on a mixin's whole value is resolved ─────────────────────────────────────────

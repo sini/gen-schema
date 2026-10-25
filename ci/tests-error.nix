@@ -5483,6 +5483,39 @@ in
       A = {
         default = { };
       };
+      # kinds `p` and `user`, each tagged with its own name so the mixin gives `user` alone the parents
+      # `mixInh`; `pInh` is `p`'s own `inherits`. Reads the names of `user`'s composed options.
+      optionsWithMixinParent =
+        mixInh: pInh:
+        let
+          str =
+            d:
+            genMerge.mkOption {
+              type = genMerge.types.str;
+              default = d;
+            };
+        in
+        builtins.deepSeq (builtins.attrNames
+          (genMerge.evalModuleTree { } [
+            {
+              options.schema = mkSchemaOption {
+                baseModule = k: { tag = str k; };
+                mixins = [
+                  (mkMixin { } (
+                    r: if (genAlgebra.record.select "tag" r).default == "user" then { inherits = mixInh; } else { }
+                  ))
+                ];
+              };
+            }
+            {
+              config.schema.p = {
+                options.pa = str "from-p";
+              }
+              // (if pInh == null then { } else { inherits = pInh; });
+            }
+            { config.schema.user.options.ua = str "u"; }
+          ]).config.schema.user.options
+        ) null;
     in
     {
       test-shape-list = {
@@ -5533,31 +5566,23 @@ in
             + escapeRegex ''gen-merge: the option `schema.user.classes."[definition 1-entry 1]"' has conflicting definitions'';
         };
       };
-      # the walk reads the kind's own parents only, so a priority on a mixin's `inherits` has no pool
-      # to rank it in, and is refused (it aborted before, and the pool would serve `[ "p" "x" ]`)
-      test-inherits-mixin-priority-refused = {
-        expr =
-          builtins.deepSeq
-            (genMerge.evalModuleTree { } [
-              {
-                options.schema = mkSchemaOption {
-                  baseModule = { };
-                  mixins = [
-                    (mkMixin { } (_: {
-                      inherits = genMerge.mkDefault [ "x" ];
-                    }))
-                  ];
-                };
-              }
-              { config.schema.p = { }; }
-              { config.schema.user.inherits = [ "p" ]; }
-            ]).config.schema.user.inherits
-            null;
+      # a parent a mixin declares is cycle-checked and must be a declared kind, as one the kind
+      # declares is (both were served silently on a plain tree, the mixin's parent never composed)
+      test-inherits-mixin-parent-cycle-refused = {
+        expr = optionsWithMixinParent [ "p" ] [ "user" ];
         expectedError = {
           type = "ThrownError";
           msg =
             "^"
-            + escapeRegex "gen-schema: kind 'user': a mixin's `inherits` carrying a priority (mkForce, mkDefault or mkOverride) is not admitted: the parent walk reads only the kind's own `inherits`";
+            + escapeRegex "gen-schema: kind 'user' reaches a kind with its own content witness through its parents (user -> p -> user)";
+        };
+      };
+      test-inherits-mixin-undeclared-refused = {
+        expr = optionsWithMixinParent [ "nope" ] null;
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^" + escapeRegex "gen-schema: kind 'user' inherits 'nope' which is not a declared kind" + "$";
         };
       };
     };

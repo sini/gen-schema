@@ -1623,7 +1623,20 @@ let
               );
               identityVerdict = builtins.seq lineageStamped inheritsVerdict;
               rendered = v: if builtins.isString v || formOf v == "value" then v else v.kind;
-              declaredRaw = declaredOf "inherits" allCollections.inherits [ ];
+              # The kind's own definitions and each mixin's, in one priority pool (`declaredOf`'s
+              # `stacks`), so every reader below (the walk, the desugar, the ancestor map, the witness)
+              # reads the parents the published `inherits` holds (den-hoag-ppctt). A kind with no mixin
+              # takes the literal `[ ]` arm, so it allocates no stack.
+              declaredRaw =
+                if mixinResult == null then
+                  declaredOf "inherits" allCollections.inherits [ ]
+                else
+                  declaredOf "inherits" allCollections.inherits (
+                    map (value: {
+                      file = "gen-schema/mixin";
+                      inherit value;
+                    }) (mixinResult.collections.inherits or [ ])
+                  );
               declaredRendered = map rendered declaredRaw;
               declaredInherits = builtins.filter builtins.isString declaredRendered;
               declaredValues = builtins.filter (v: !(builtins.isString v)) declaredRendered;
@@ -2165,6 +2178,20 @@ let
                 else
                   baseModule;
 
+              # When mixins are present and baseModule is an inline attrset, apply mixins via the
+              # record algebra and emit through the bridge. Default branch only: the `mkType` caller
+              # receives no mixin pipeline.
+              mixinResult =
+                if mkType == null && mixins != [ ] && resolvedBase != null && builtins.isAttrs resolvedBase then
+                  let
+                    baseRecord = record.fromAttrs resolvedBase;
+                    withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
+                    emitted = emitModule collectionKeys withMixins;
+                  in
+                  emitted
+                else
+                  null;
+
               # ── THE DECLARATION-KEY GUARD (den-hoag-nn4) ──────────────────────────────────────────
               #
               # ★ PLACEMENT, which is what applying it to the merge RESULT buys — not coverage. The
@@ -2446,21 +2473,6 @@ let
                   }
                 else
                   let
-                    # When mixins are present and baseModule is an inline attrset,
-                    # apply mixins via the record algebra and emit through the bridge.
-                    hasMixins = mixins != [ ] && resolvedBase != null && builtins.isAttrs resolvedBase;
-
-                    mixinResult =
-                      if hasMixins then
-                        let
-                          baseRecord = record.fromAttrs resolvedBase;
-                          withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
-                          emitted = emitModule collectionKeys withMixins;
-                        in
-                        emitted
-                      else
-                        null;
-
                     # Effective base module: bridge output when mixins applied, original otherwise
                     effectiveBase = if mixinResult != null then mixinResult.module else resolvedBase;
 
@@ -2482,39 +2494,19 @@ let
 
                     # A collection a mixin contributes to is folded with the kind's own definitions, each
                     # stack entry one definition after them, through the collection's type (`declaredOf`).
-                    # `inherits` keeps the kind's rendered value first and resolves the mixin's after it.
-                    # A priority on a mixin's `inherits` is refused: the walk reads the kind's own parents
-                    # only, so no pool can rank it, and whether a mixin may declare a parent is unruled
-                    # (den-hoag-ppctt).
+                    # `inherits` is pooled where it is declared (`declaredRaw`), so every reader of it
+                    # reads one value, and it is not refolded here.
                     bridgeCollections =
                       if mixinResult != null then
                         prelude.mapAttrs (
                           name: stacks:
-                          let
-                            merged = map (value: {
+                          declaredOf name allCollections.${name} (
+                            map (value: {
                               file = "gen-schema/mixin";
                               inherit value;
-                            }) stacks;
-                          in
-                          if name == "inherits" then
-                            let
-                              ranked =
-                                v:
-                                let
-                                  t = if builtins.isAttrs v then v._type or null else null;
-                                in
-                                t == "override"
-                                || (t == "definition" && (v.value._type or null) == "override")
-                                || (t == "merge" && builtins.any ranked v.contents)
-                                || (t == "if" && v.condition && ranked v.content);
-                            in
-                            if builtins.any ranked stacks then
-                              throw "gen-schema: kind '${kind}': a mixin's `inherits` carrying a priority (mkForce, mkDefault or mkOverride) is not admitted: the parent walk reads only the kind's own `inherits`, so no priority can rank a mixin's parents against the kind's"
-                            else
-                              extractedCollections.inherits ++ merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} merged
-                          else
-                            declaredOf name allCollections.${name} merged
-                        ) (prelude.filterAttrs (n: _: allCollections ? ${n}) mixinResult.collections)
+                            }) stacks
+                          )
+                        ) (prelude.filterAttrs (n: _: allCollections ? ${n} && n != "inherits") mixinResult.collections)
                       else
                         { };
 
