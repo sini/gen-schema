@@ -25,6 +25,7 @@
   declarationForm,
   filterValidators,
   refinedLib,
+  sealedMarker,
 }:
 let
   # OPTIONS FIRST, then the kind (den-hoag-7gp66 P2, rules 2 and 4): `mkInstanceType { extraModules?;
@@ -91,6 +92,34 @@ let
           stampRefusal "gen-schema: mkInstanceType" kindValue
         else
           kindValue;
+      # THE INSTANCE TYPE IS MINTED OVER WHAT ITS MODULE SET IS BUILT FROM (den-hoag-dwln8, ADR-0034):
+      # the kind (a member, by its mark, its sealed subjects propagating), `strict` inert, `extraModules`
+      # sealed per component; `specialArgs` and the refused keys enter through gen-merge's own args. Never
+      # over the module list this file constructs from them, which is one sealed function gen-schema wrote
+      # and so minted every instance type, of any kind, one type. The statement is TOTAL over the module
+      # function below: it reads nothing else but library code, and an input added there is owed here.
+      # A `//` copy of the kind failing the completion stamp enters as a record with no mark, so it never
+      # claims the original's identity; its import is refused below as before.
+      stated = {
+        ctor = "gen-schema.instance";
+        members.kind =
+          if kindValue ? __kindSelf && !(stampOk kindValue) then { staleKind = kindValue; } else kindValue;
+        args = tags: {
+          inherit (tags) kind;
+          inherit strict;
+          extraModules = if extraModules == [ ] then [ ] else sealedMarker;
+        };
+        sealed =
+          if extraModules == [ ] then
+            [ ]
+          else
+            [
+              {
+                path = [ "extraModules" ];
+                value = extraModules;
+              }
+            ];
+      };
     in
     # ★ THE INLET IS ON THE TYPE, NOT THE CONSTRUCTOR, and it is applied UNCONDITIONALLY rather than
     # behind an `if specialArgs == { }` — one path, so every instance gen-schema builds goes through
@@ -105,7 +134,7 @@ let
     if specialArgs ? config then
       throw "gen-schema: mkInstanceType: `specialArgs' cannot supply `config' to kind '${kind}': the instance's own module reads its `config' to bind the kind argument `${kind}' and its identity, so a caller's value would replace the instance's own"
     else
-      (merge.refusingSubmodule [ "config" "options" "prefix" ] (
+      (merge.refusingSubmoduleOver stated [ "config" "options" "prefix" ] (
         { name, config, ... }:
         {
           imports = [

@@ -1173,7 +1173,7 @@ in
         (kindOf { computed = _: _: { options = "COMPUTED"; }; } { options.role = strOpt; }).options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
+        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __okAt, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
       };
     };
 
@@ -1203,7 +1203,7 @@ in
         } { }).refs;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
+        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __okAt, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness$";
       };
     };
   };
@@ -1588,6 +1588,20 @@ in
   # SILENT failure into a LOUD one: with `options` stripped, a declared `config.role` is undeclared
   # and strict mode refuses it on its own. The headline silent arms REQUIRE the lean fixture.
   flake.testsError.collection-key-collision-refusals = {
+    # O8 (den-hoag-dwln8) · `__okAt` is written beside `__mint`, after `// finalCollections`, so a
+    # collection of that name would be silently overwritten by the kind's type-identity index.
+    test-okat-collection-refuses-by-name = {
+      expr =
+        (kindOf {
+          collections.__okAt = {
+            default = { };
+          };
+        } { options.role = strOpt; }).__mint.minted;
+      expectedError = {
+        type = "ThrownError";
+        msg = "^gen-schema: collection '__okAt' is reserved — cannot be used as a collection key$";
+      };
+    };
     # O1 · the shadow at its cheapest plane. LEAN fixture. Before the door this returned
     # `"schemakind:608c5bba…"` against the clean twin's `"schemakind:9b67e15b…"`, with no throw and
     # no warning: `markOf`'s preimage takes `attrNames introspect.options`, and `introspect` is an

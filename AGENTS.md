@@ -314,8 +314,10 @@ defaults to the registry key.
 
 **`__` keys crossing the boundary** (R12 stated contracts; the census that reads these lines takes the
 first line of each). This library also writes gen-types' checker identity fields (`__mint`,
-`__payload`, `__sealed`, `__okAt`) on `refined` through gen-types' `mkIdentity` (`lib/refined.nix`);
-their owner states those contracts.
+`__payload`, `__sealed`, `__okAt`) on `refined` through gen-types' `mkIdentity` (`lib/refined.nix`),
+and `__okAt` on every kind value through gen-types' `identityGuard` (`lib/entry-type.nix`, both
+branches, binding `kindOkAt`; reserved as a collection and computed-field key); their owner states
+those contracts.
 
 - `__sealed` — writer `mkSchemaEntryType` (`lib/entry-type.nix`), reader `kindEq` (same file); read by gen-select (`lib/default.nix`, its kind comparison):
   the sealed subjects of a kind value, a thunk forced only when two kinds are compared: sealed types
