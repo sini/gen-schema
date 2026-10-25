@@ -25,7 +25,6 @@
   declarationForm,
   filterValidators,
   refinedLib,
-  sealedMarker,
 }:
 let
   # OPTIONS FIRST, then the kind (den-hoag-7gp66 P2, rules 2 and 4): `mkInstanceType { extraModules?;
@@ -107,7 +106,8 @@ let
         args = tags: {
           inherit (tags) kind;
           inherit strict;
-          extraModules = if extraModules == [ ] then [ ] else sealedMarker;
+          # gen-algebra `sealedMarker`, spelled here: a threaded binding is a thunk on every load
+          extraModules = if extraModules == [ ] then [ ] else { sealed = true; };
         };
         sealed =
           if extraModules == [ ] then

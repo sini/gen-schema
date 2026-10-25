@@ -76,6 +76,15 @@ let
       }
     )
   ];
+  selfRegS = evalSchema { } [
+    (
+      { config, ... }:
+      {
+        config.schema.host.options.addr = genMerge.mkOption { type = T.str; };
+        config.schema.host.options.peers = mkInstanceRegistry { } config.schema.host;
+      }
+    )
+  ];
   mutS = evalSchema { } [
     (
       { config, ... }:
@@ -184,6 +193,11 @@ in
           "host:94e7bbbbcf8fae27b8d069f841652ecb3a427f2cd2f59b9d4d66be6990195021"
         ];
       };
+    };
+    # a kind embedding a registry over itself mints too
+    test-a8-a-kind-embedding-a-registry-over-itself-mints = {
+      expr = selfRegS.host.__mint.minted;
+      expected = "schemakind:bd1f5487fdab4dd3ded0e0a86bf9f1f8ad9ffc074cf40a00d39fcf1c87b7bd3d";
     };
     test-a8-a-self-referential-instance-type-has-no-identity = {
       expr = (mkInstanceType { } selfS.host).__mint;

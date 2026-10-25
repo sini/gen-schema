@@ -206,7 +206,6 @@ let
   };
   instance = import ./instance.nix {
     inherit prelude merge;
-    inherit (algebra) sealedMarker;
     inherit (entryType) isSchemaKind stampRefusal;
     stampOk = entryType.stampImportOk;
     inherit (strictLib) mkStrictModule;
