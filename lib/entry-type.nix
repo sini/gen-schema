@@ -964,7 +964,7 @@ let
     "options" # `introspect.options`, both branches
     "refs" # `introspect.refs`, both branches
     "refinements" # `extractedRefinements` default branch, `refinementsOfOptions introspect.options` mkType branch
-    # Written AFTER `// finalCollections` and refused for the REVERSE reason: the mark is applied
+    # Written AFTER `// extractedCollections` and refused for the REVERSE reason: the mark is applied
     # last, so a collection of that name is SILENTLY OVERWRITTEN — something vanishes and nothing
     # says so. Kept verbatim from the door's own third clause.
     "__mint"
@@ -998,12 +998,12 @@ let
   #       `collections.config` reverts a declared `config.role = "web"` to its default by the same
   #       route. That is why the set is `declarationKeys ++ kindResultKeys` and not the latter
   #       alone: case (A) is reachable on BOTH branches, unconditionally.
-  #   (B) THE RESULT-SIDE SHADOW. `// finalCollections` splats over the written kind record, so
+  #   (B) THE RESULT-SIDE SHADOW. `// extractedCollections` splats over the written kind record, so
   #       every name in `kindResultKeys` is shadowable.
   #
   # ONE DOOR AT THE SOLE CONSTRUCTOR rather than a filter at each consumer: `mkAllCollections` is
   # the only path into the collection key space (`allCollections` and `_collectionKeys`), so the
-  # colliding set never forms and `strippedDefs`, `finalCollections` and `markOf` each receive a
+  # colliding set never forms and `strippedDefs`, `extractedCollections` and `markOf` each receive a
   # sound input rather than a checked one.
   #
   # The refusal names ONE key and says nothing about WHY it is reserved: the reason is per-name
@@ -1014,7 +1014,7 @@ let
   # below at `formalNamed`): a collection named `computed` would make that top-level key read as a
   # collection, and the ambiguity the door closes would reopen for exactly that name.
   #
-  # ★ UNIFORM ACROSS BOTH BRANCHES, at a stated cost. On the `mkType` branch `finalCollections` is
+  # ★ UNIFORM ACROSS BOTH BRANCHES, at a stated cost. On the `mkType` branch `extractedCollections` is
   # never splatted into the result, so `mixins`, `refs` and `refinements` are inert there and
   # refusing them over-fires by three names. `reservedDeclarationKeysFor` branches on `mkType`
   # because `__functor` is LEGITIMATE on that branch; none of these three is legitimate as a
@@ -1542,12 +1542,24 @@ let
               # Path-based kind declarations pass through as paths — the isAttrs check
               # skips them. If two modules declare the same collection key, they merge
               # according to the collection's merge strategy.
+              # A collection a mixin contributes to is pooled here, each stack entry one definition
+              # after the kind's own, through the collection's type (`declaredOf`), so the published
+              # value, the `computed` hook, the mark and every other reader read one value
+              # (den-hoag-s0lqh). `inherits` is pooled where it is declared (`declaredRaw`). A kind
+              # with no mixin takes the literal `[ ]` arm, so it allocates no stack.
               extractedCollections = prelude.mapAttrs (
                 name: collection:
                 if name == "inherits" then
                   map (e: builtins.seq inheritsVerdict e) (aliasedInherits declaredRendered)
-                else
+                else if mixinResult == null then
                   declaredOf name collection [ ]
+                else
+                  declaredOf name collection (
+                    map (value: {
+                      file = "gen-schema/mixin";
+                      inherit value;
+                    }) (mixinResult.collections.${name} or [ ])
+                  )
               ) allCollections;
 
               # `stacks`: definitions a mixin contributes, after the kind's own, in one priority pool
@@ -2526,26 +2538,6 @@ let
                         )
                       );
 
-                    # A collection a mixin contributes to is folded with the kind's own definitions, each
-                    # stack entry one definition after them, through the collection's type (`declaredOf`).
-                    # `inherits` is pooled where it is declared (`declaredRaw`), so every reader of it
-                    # reads one value, and it is not refolded here.
-                    bridgeCollections =
-                      if mixinResult != null then
-                        prelude.mapAttrs (
-                          name: stacks:
-                          declaredOf name allCollections.${name} (
-                            map (value: {
-                              file = "gen-schema/mixin";
-                              inherit value;
-                            }) stacks
-                          )
-                        ) (prelude.filterAttrs (n: _: allCollections ? ${n} && n != "inherits") mixinResult.collections)
-                      else
-                        { };
-
-                    finalCollections = extractedCollections // bridgeCollections;
-
                     # Inject baseModule + methods module (methods is the only collection
                     # that generates instance-level options via mkMethodsModule)
                     injected =
@@ -2553,9 +2545,9 @@ let
                         file = "gen-schema/base";
                         value = effectiveBase;
                       }
-                      ++ prelude.optional (finalCollections.methods != { }) {
+                      ++ prelude.optional (extractedCollections.methods != { }) {
                         file = "gen-schema/methods";
-                        value = mkMethodsModule kind finalCollections.methods;
+                        value = mkMethodsModule kind extractedCollections.methods;
                       };
 
                     # The defs `merged` imports carry `entryReservation` (den-hoag-8x97u), so a
@@ -2609,7 +2601,7 @@ let
                         projected
                         ;
                       inherit (introspect) options refs;
-                      collections = finalCollections;
+                      collections = extractedCollections;
                       inherit keySemantics;
                       computed = minted;
                       modules = map (d: d.value) strippedDefs ++ [ effectiveBase ];
@@ -2698,7 +2690,7 @@ let
                     inherit (introspect) options refs;
                     refinements = extractedRefinements;
                   }
-                  // finalCollections
+                  // extractedCollections
                   // guardedComputed
                   // {
                     # Applied LAST so the mark cannot be shadowed by a collection or a computed field;
