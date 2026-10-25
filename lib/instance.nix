@@ -102,27 +102,47 @@ let
     # on presence wherever a caller's args join it: this `withArgs`, a returned type's `withArgs`, a
     # derivation's, and a redeclaration's union. The door below refuses `config` first, in this
     # library's own words.
+    let
+      refused = [
+        "config"
+        "options"
+        "prefix"
+      ];
+    in
     if specialArgs ? config then
       throw "gen-schema: mkInstanceType: `specialArgs' cannot supply `config' to kind '${kind}': the instance's own module reads its `config' to bind the kind argument `${kind}' and its identity, so a caller's value would replace the instance's own"
     else
-      (merge.refusingSubmodule [ "config" "options" "prefix" ] (
-        { name, config, ... }:
+      (merge.refusingSubmodule refused (
+        # The stated set, enforced where it protects: the instance's own evaluation, whichever engine runs it
+        # and whichever join reached it, including a redeclaration beside a nixpkgs `submoduleWith', whose join
+        # is nixpkgs' record and carries no set (den-hoag-b7v1h). The test spells the three keys rather than
+        # closing over `refused`, so an instance allocates nothing for it (perf-bench `schemaHosts`); the
+        # list is read only on the refusal's path.
+        { name, config, ... }@args:
         {
-          imports = [
-            (builtins.seq _ importedKind)
-          ]
-          ++ [
-            (
-              if strict then
-                mkStrictModule kind
-              # gen-merge reads `_module` only from `config`, so the non-strict freeform
-              # must live under `config` (a top-level `_module` is dropped).
-              else
-                { config._module.freeformType = merge.types.attrsOf merge.types.anything; }
-            )
-            identityModule
-          ]
-          ++ extraModules;
+          imports =
+            assert
+              !(args.specialArgs ? config || args.specialArgs ? options || args.specialArgs ? prefix)
+              || throw "gen-schema: an instance of kind '${kind}' is evaluated with a caller's ${
+                builtins.concatStringsSep ", " (
+                  map (k: "`${k}'") (builtins.filter (k: args.specialArgs ? ${k}) refused)
+                )
+              }: the instance type states `config', `options' and `prefix' as arguments its own evaluation supplies (`refusingSubmodule'), so a caller's value would replace the instance's own";
+            [
+              (builtins.seq _ importedKind)
+            ]
+            ++ [
+              (
+                if strict then
+                  mkStrictModule kind
+                # gen-merge reads `_module` only from `config`, so the non-strict freeform
+                # must live under `config` (a top-level `_module` is dropped).
+                else
+                  { config._module.freeformType = merge.types.attrsOf merge.types.anything; }
+              )
+              identityModule
+            ]
+            ++ extraModules;
           config._module.args.${kind} = config;
           options.name = merge.mkOption {
             type = merge.types.str;

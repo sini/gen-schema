@@ -2669,8 +2669,12 @@ in
   # route a caller's args join the instance: the type's `withArgs`, a derivation's lifted `withArgs`, and a
   # redeclaration's union in either order. The constructor's door refuses `config` first, in this
   # library's words. `configInst` (another instance's evaluated `config`) is the value a read-site check
-  # cannot tell from the instance's own; presence refuses it as it refuses a marker. Each cell reads the
-  # TEXT; `tryEval` alone passes on any refusal.
+  # cannot tell from the instance's own; presence refuses it as it refuses a marker. Beside a nixpkgs
+  # `submoduleWith` stating the caller's args (den-hoag-b7v1h), gen-merge's foreign join refuses in its union
+  # words where gen's relation decides; where nixpkgs' relation joins over gen's published functor, the
+  # instance's own evaluation refuses in this library's words; nixpkgs' relation asking gen's exported
+  # `typeMerge` reads its refusal as `already declared'. Each cell reads the TEXT; `tryEval` alone passes on
+  # any refusal.
   flake.testsError.instance-caller-config =
     let
       routeHost =
@@ -2716,6 +2720,28 @@ in
             config.h1.addr = "10.0.1.2";
           }
         ]).config.h1;
+      # a nixpkgs `submoduleWith` stating the caller's args, and the same pair under nixpkgs' engine
+      nsw =
+        sa:
+        lib.types.submoduleWith {
+          modules = [ ];
+          specialArgs = sa;
+          shorthandOnlyDefinesConfig = true;
+        };
+      npRedecl =
+        first: second:
+        (lib.evalModules {
+          modules = [
+            { options.h1 = lib.mkOption { type = first; }; }
+            {
+              options.h1 = lib.mkOption {
+                type = second;
+                default = { };
+              };
+              config.h1.addr = "10.0.1.2";
+            }
+          ];
+        }).config.h1;
       # another host's own evaluated `config`
       other =
         (genMerge.evalModuleTree { } [
@@ -2740,6 +2766,32 @@ in
         derive = one ((genMerge.deriveType { } "hostD" plainTy).withArgs sa);
         redecl = redecl plainTy ((genMerge.types.submodule [ ]).withArgs sa);
         redeclr = redecl ((genMerge.types.submodule [ ]).withArgs sa) plainTy;
+        foreign = redecl plainTy (nsw sa);
+        foreignr = redecl (nsw sa) plainTy;
+        npforeign = npRedecl plainTy (nsw sa);
+        npforeignr = npRedecl (nsw sa) plainTy;
+        npforeignlift =
+          (lib.evalModules {
+            modules = [
+              { options.hs = lib.mkOption { type = genMerge.types.attrsOf plainTy; }; }
+              {
+                options.hs = lib.mkOption { type = lib.types.attrsOf (nsw sa); };
+                config.hs.h1.addr = "10.0.1.2";
+              }
+            ];
+          }).config.hs.h1;
+        chain =
+          (genMerge.evalModuleTree { } [
+            { options.h1 = genMerge.mkOption { type = nsw sa; }; }
+            { options.h1 = genMerge.mkOption { type = nsw { }; }; }
+            {
+              options.h1 = genMerge.mkOption {
+                type = plainTy;
+                default = { };
+              };
+              config.h1.addr = "10.0.1.2";
+            }
+          ]).config.h1;
       };
       args = {
         config.config.marker = "CALLER";
@@ -2760,6 +2812,11 @@ in
       unionRefusal =
         k:
         exact "gen-merge: option `h1' is declared with types that do not merge (${reason "a redeclaration" k}); declared in <unknown-file>, <unknown-file>";
+      instanceRefusal =
+        k:
+        exact "gen-schema: an instance of kind 'host' is evaluated with a caller's `${keyOf k}': the instance type states `config', `options' and `prefix' as arguments its own evaluation supplies (`refusingSubmodule'), so a caller's value would replace the instance's own";
+      # nixpkgs' relation asks gen's exported `typeMerge`, whose refusal it reads as no merge
+      npAlreadyDeclared = exact "The option `h1' in `<unknown-file>' is already declared in `<unknown-file>'.";
       # route -> key -> the refusal that names it
       expect = {
         door = {
@@ -2777,6 +2834,12 @@ in
         derive = expect.wa;
         redecl = builtins.mapAttrs (k: _: unionRefusal k) expect.wa;
         redeclr = expect.redecl;
+        foreign = expect.redecl;
+        foreignr = expect.redecl;
+        npforeign = builtins.mapAttrs (k: _: instanceRefusal k) expect.wa;
+        npforeignr = builtins.mapAttrs (_: _: npAlreadyDeclared) expect.wa;
+        npforeignlift = expect.npforeign;
+        chain = expect.npforeign;
       };
       served =
         sa:
