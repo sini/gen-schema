@@ -2630,9 +2630,7 @@ let
                     # record protocol); that engine never reads the record and deduplicates the key
                     # silently.
                     keyed =
-                      if kindParents == [ ] then
-                        { }
-                      else if !mergeReadsKeyEq then
+                      if !mergeReadsKeyEq then
                         throw "gen-schema: kind '${kind}' composes a parent, so it publishes its node key `__moduleKey' and the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read both there (its `moduleSyntax.functorRecord' does not list both `__moduleKey' and `__keyEq'). gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
                       else
                         {
@@ -2642,11 +2640,8 @@ let
                     keyEqRecord = {
                       # gen-merge's node key: the declaration node, read off the record before
                       # composition; the result's `key` (the mark) is what a foreign evaluator reads.
-                      __moduleKey = if kindParents == [ ] then null else "gen-schema-kind:${kind}#${kindWitness}";
+                      __moduleKey = "gen-schema-kind:${kind}#${kindWitness}";
                       __keyEq =
-                        if kindParents == [ ] then
-                          null
-                        else
                           {
                             subject = {
                               name = kind;
