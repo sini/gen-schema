@@ -408,15 +408,14 @@ let
       immediateBindings = prelude.filterAttrs (_: b: !b.isDeferred) bindings;
       deferredBindings = prelude.filterAttrs (_: b: b.isDeferred) bindings;
 
-      # Re-declare the ref field's FULL option (type + default + …) with the coerce
-      # `apply` layered on. gen-merge merges option DECLARATIONS with a shallow `//`
-      # (unlike nixpkgs' deep decl-merge), so a bare `{ apply = … }` here would wipe the
-      # kind's `type`/`default` and break default-valued ref fields ([]/null).
+      # Re-declare the ref field with its bound type and the coerce `apply` only: the kind's
+      # declaration keeps its `default` and `description`, and the engine merges the two
+      # declarations field by field, refusing a field both state (nixpkgs' `bothHave`).
       immediateModules = prelude.mapAttrsToList (
         field: b:
         { ... }:
         {
-          options.${field} = (kindOptions.${field} or { }) // {
+          options.${field} = merge.mkOption {
             type = bindRefType field kind refFields.${field}.type;
             apply = b.coerceChain;
           };
@@ -427,7 +426,7 @@ let
         field: _:
         { ... }:
         {
-          options.${field} = (kindOptions.${field} or { }) // {
+          options.${field} = merge.mkOption {
             type = bindRefType field kind refFields.${field}.type;
           };
         }
