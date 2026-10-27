@@ -2685,15 +2685,15 @@ let
                     constructionToken = _: null;
                     # v1.7: the guard's flag narrowed to THIS kind: it defines a value for a declared collection
                     # the schema keeps in identity (a kind that defines none mints only the schema's defaults)
+                    guardedNames = builtins.filter (c: !(builtins.elem c [ "inherits" "methods" "parent" "validators" ])) kept;
+                    # v1.8: a mixin may supply the collection's value too (read by name off the emitted
+                    # collections, never by value)
                     kindGuarded =
                       guard
-                      && builtins.any (
-                        d:
-                        builtins.isAttrs d.value
-                        && builtins.any (c: d.value ? ${c}) (
-                          builtins.filter (c: !(builtins.elem c [ "inherits" "methods" "parent" "validators" ])) kept
-                        )
-                      ) defs;
+                      && (
+                        builtins.any (d: builtins.isAttrs d.value && builtins.any (c: d.value ? ${c}) guardedNames) defs
+                        || (mixinResult != null && builtins.any (c: (mixinResult.collections or { }) ? ${c}) guardedNames)
+                      );
                     keyEqRecord = {
                       # gen-merge's node key: the declaration node, read off the record before
                       # composition; the result's `key` (the mark) is what a foreign evaluator reads.
