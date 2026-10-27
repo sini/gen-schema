@@ -135,14 +135,13 @@
         guardedLast=$(grep -c "gen-schema: while minting the identity of kind 'host' over its component 'collections.zones'" "$TMPDIR/err" || true)
         [ "$guardedLast" -ge 1 ] || die collection-identity-guard-sorted-last "expected the attribution naming 'collections.zones', counted 0"
 
-        # den-hoag-9zyp7 OQ2 · the residue: an instance read beside another tree's same-named kind
-        # still recurses uncatchably (pinned at its class; the control is a suite cell).
+        # PROTO G1 re-pin (xh14j key spec v1): meeting by declaration node, the instance read beside
+        # another tree's same-named kind composes and reads the other kind's port.
         rc=0
-        inst --argstr arm inheriting-same-name-residue > /dev/null 2> "$TMPDIR/err" || rc=$?
+        residue=$(inst --argstr arm inheriting-same-name-residue 2> "$TMPDIR/err") || rc=$?
         ran=$((ran + 1))
-        [ "$rc" -ne 0 ] || die inheriting-same-name-residue "expected the abort, got exit 0"
-        grep -q 'infinite recursion' "$TMPDIR/err" ||
-          die inheriting-same-name-residue "expected the recursion abort: $(tail -n 3 "$TMPDIR/err")"
+        [ "$rc" -eq 0 ] || die inheriting-same-name-residue "expected 22, got rc $rc: $(tail -n 3 "$TMPDIR/err")"
+        [ "$residue" = "22" ] || die inheriting-same-name-residue "expected 22, got $residue"
 
         # 0/0 is a false pass: the runner must have executed every cell above.
         [ "$ran" = "13" ] || die runner "expected 13 evaluations, ran $ran"
