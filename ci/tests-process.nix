@@ -136,12 +136,12 @@
         [ "$guardedLast" -ge 1 ] || die collection-identity-guard-sorted-last "expected the attribution naming 'collections.zones', counted 0"
 
         # PROTO G1 re-pin (xh14j key spec v1): meeting by declaration node, the instance read beside
-        # another tree's same-named kind composes and reads the other kind's port.
+        # another tree's same-named kind composes and reads the instance's own address.
         rc=0
         residue=$(inst --argstr arm inheriting-same-name-residue 2> "$TMPDIR/err") || rc=$?
         ran=$((ran + 1))
-        [ "$rc" -eq 0 ] || die inheriting-same-name-residue "expected 22, got rc $rc: $(tail -n 3 "$TMPDIR/err")"
-        [ "$residue" = "22" ] || die inheriting-same-name-residue "expected 22, got $residue"
+        [ "$rc" -eq 0 ] || die inheriting-same-name-residue "expected the address, got rc $rc: $(tail -n 3 "$TMPDIR/err")"
+        [ "$residue" = '"10.0.1.1"' ] || die inheriting-same-name-residue "expected \"10.0.1.1\", got $residue"
 
         # 0/0 is a false pass: the runner must have executed every cell above.
         [ "$ran" = "13" ] || die runner "expected 13 evaluations, ran $ran"
