@@ -1330,7 +1330,10 @@ let
                 subject = {
                   name = "baseModule";
                   mark = node;
-                  sealed = { inherit baseModule; };
+                  # a closure allocated once per construction: equal only to itself, so the one
+                  # construction reached through parent and child is one module and two constructions
+                  # (one literal evaluated twice) are two, as a kind's sealed open modules are
+                  sealed.construction = _: baseModule;
                 };
                 decide = sealedCollisionEq "gen-schema: the schema's baseModule is imported twice under one key";
               };
