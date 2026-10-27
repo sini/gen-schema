@@ -2652,8 +2652,8 @@ let
                             # part, so every pair sharing the key meets, whatever their nodes); at a
                             # meeting gen-merge reads the key, where different marks are two
                             # declarations and both compose, and equal marks are decided by `decide`
-                            meeting = "gen-schema-kind:${kind}";
-                            key = "gen-schema-kind:${kind}#${ownMark}";
+                            meeting = "gen-schema-kind:${kind}#${kindWitness}";
+                            key = "gen-schema-kind:${kind}#${kindWitness}#${ownMark}";
                           };
                     };
                   in
