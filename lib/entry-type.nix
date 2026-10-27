@@ -1329,6 +1329,9 @@ let
               node = "gen-schema-base:${
                 identity.hashIdentity "schemabase" [ "pos" ] (l: { pos = witnessPos baseModule; }.${l})
               }";
+              keyedBaseResult = baseModule // {
+                key = "${node}#base";
+              };
             in
             {
               __moduleKey = node;
@@ -1346,7 +1349,7 @@ let
                 decide = sealedCollisionEq "gen-schema: the schema's baseModule is imported twice under one key";
               };
               __functionArgs = { };
-              __functor = _: _: baseModule;
+              __functor = _: _: keyedBaseResult;
             }
           else
             null;
@@ -2672,6 +2675,9 @@ let
                         throw "gen-schema: kind '${kind}' composes a parent, so it publishes its node key `__moduleKey' and the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read both there (its `moduleSyntax.functorRecord' does not list both `__moduleKey' and `__keyEq'). gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
                       else
                         {
+                          # Rkf (v1.4): nixpkgs' dedup key on the result, the record's own reference key; gen reads
+                          # the record's (`__keyEq.key`), so it never forces this one at load
+                          key = "gen-schema-kind:${kind}#${kindWitness}#${ownMark}";
                           config = { };
                         };
                     keyEqRecord = {
