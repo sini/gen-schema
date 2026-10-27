@@ -1313,6 +1313,33 @@ let
       let
         base = merge.types.deferredModule;
 
+        # PROTO K2 (b): a plain base module (an attrset, not a functor, no mixin emission) keyed in
+        # gen's channel only, met by its declaration node, decided by its seal.
+        keyedBase =
+          if builtins.isAttrs baseModule && !(baseModule ? __functor) && mixins == [ ] then
+            let
+              node = "gen-schema-base:${
+                identity.hashIdentity "schemabase" [ "pos" ] (l: { pos = witnessPos baseModule; }.${l})
+              }";
+            in
+            {
+              __moduleKey = node;
+              __keyEq = {
+                meeting = node;
+                key = "${node}#base";
+                subject = {
+                  name = "baseModule";
+                  mark = node;
+                  sealed = { inherit baseModule; };
+                };
+                decide = sealedCollisionEq "gen-schema: the schema's baseModule is imported twice under one key";
+              };
+              __functionArgs = { };
+              __functor = _: _: baseModule;
+            }
+          else
+            null;
+
         # ONE introspection for both arms: the option tree an instance imports and its refs, from
         # gen-merge's declaration stratum (`declaredOptions`) over the module an instance imports: its
         # declared records, without the unmatched-definition check, so a definition its parent kind
@@ -2543,7 +2570,7 @@ let
                     injected =
                       prelude.optional (effectiveBase != null) {
                         file = "gen-schema/base";
-                        value = effectiveBase;
+                        value = if keyedBase != null then keyedBase else effectiveBase;
                       }
                       ++ prelude.optional (extractedCollections.methods != { }) {
                         file = "gen-schema/methods";
