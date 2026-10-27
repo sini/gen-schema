@@ -2682,6 +2682,7 @@ let
                           key = "gen-schema-kind:${kind}#${kindWitness}#${ownMark}";
                           config = { };
                         };
+                    constructionToken = _: null;
                     keyEqRecord = {
                       # gen-merge's node key: the declaration node, read off the record before
                       # composition; the result's `key` (the mark) is what a foreign evaluator reads.
@@ -2692,14 +2693,25 @@ let
                               name = kind;
                               mark = ownMark;
                               inherit (plane) sealed;
+                              # v1.7: this construction's own token, allocated once per kind construction
+                              token = constructionToken;
                             };
-                            # v1.5 lever: one construction iff its seals are one value (marks too, where it seals nothing);
-                            # a distinct construction is refused only where it conflicts: an equal mark
-                            decide = (a: b: let r = builtins.tryEval (a.sealed == b.sealed); in r.success && r.value && (a.sealed != { } || a.mark == b.mark));
+                            # v1.7 (C-3 as a named refusal): where the schema keeps a declared collection in the
+                            # identity (`guard`, the ux9xg guard's own flag), a one-node pair is decided by the
+                            # construction's token and never by its mark or seals, whose pass could read an
+                            # instance under construction; a second construction there is refused BY NAME, naming
+                            # the remedy. Elsewhere the v1.5 lever stands.
+                            decide =
+                              if guard then
+                                (a: b: { t = a.token; } == { t = b.token; })
+                              else
+                                (a: b: let r = builtins.tryEval (a.sealed == b.sealed); in r.success && r.value && (a.sealed != { } || a.mark == b.mark));
                             onDistinct = "refuse-on-conflict";
-                            # an equal mark conflicts; `sealedCollisionEq` then refuses BY NAME, naming the
-                            # sealed components that differ
-                            conflicts = a: b: a.mark == b.mark && !(sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key" a b);
+                            conflicts =
+                              if guard then
+                                (_: _: throw "gen-schema: kind '${kind}' is imported twice under one key: two constructions of '${kind}' from one declaration meet, and this schema keeps a declared collection in the kind's identity, so telling them apart would mint over that collection, which may read an instance under construction. Import one construction of '${kind}', or declare the collection `identity = false` on the schema")
+                              else
+                                (a: b: a.mark == b.mark && !(sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key" a b));
                             # two occurrences of one kind name meet (`meeting`, the key's mark-free
                             # part, so every pair sharing the key meets, whatever their nodes); at a
                             # meeting gen-merge reads the key, where different marks are two
