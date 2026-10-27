@@ -1316,7 +1316,15 @@ let
         # PROTO K2 (b): a plain base module (an attrset, not a functor, no mixin emission) keyed in
         # gen's channel only, met by its declaration node, decided by its seal.
         keyedBase =
-          if builtins.isAttrs baseModule && !(baseModule ? __functor) && mixins == [ ] then
+          # a base with no attribute position has no declaration node (ADR-0034's sealed limb: no
+          # identity, never a shared `typeOf` pseudo-node), so it stays unkeyed
+          if
+            builtins.isAttrs baseModule
+            && !(baseModule ? __functor)
+            && mixins == [ ]
+            && baseModule != { }
+            && builtins.unsafeGetAttrPos (builtins.head (builtins.attrNames baseModule)) baseModule != null
+          then
             let
               node = "gen-schema-base:${
                 identity.hashIdentity "schemabase" [ "pos" ] (l: { pos = witnessPos baseModule; }.${l})
