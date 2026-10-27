@@ -1348,7 +1348,7 @@ let
                 };
                 decide = (a: b: let r = builtins.tryEval (a.sealed == b.sealed); in r.success && r.value && (a.sealed != { } || a.mark == b.mark));
                 onDistinct = "refuse-on-conflict";
-                conflicts = _: _: true;
+                conflicts = a: b: !(sealedCollisionEq "gen-schema: the schema's baseModule is imported twice under one key" a b);
               };
               __functionArgs = { };
               __functor = _: _: keyedBaseResult;
@@ -2697,7 +2697,9 @@ let
                             # a distinct construction is refused only where it conflicts: an equal mark
                             decide = (a: b: let r = builtins.tryEval (a.sealed == b.sealed); in r.success && r.value && (a.sealed != { } || a.mark == b.mark));
                             onDistinct = "refuse-on-conflict";
-                            conflicts = a: b: a.mark == b.mark;
+                            # an equal mark conflicts; `sealedCollisionEq` then refuses BY NAME, naming the
+                            # sealed components that differ
+                            conflicts = a: b: a.mark == b.mark && !(sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key" a b);
                             # two occurrences of one kind name meet (`meeting`, the key's mark-free
                             # part, so every pair sharing the key meets, whatever their nodes); at a
                             # meeting gen-merge reads the key, where different marks are two
