@@ -2634,7 +2634,6 @@ let
                         throw "gen-schema: kind '${kind}' composes a parent, so it publishes its node key `__moduleKey' and the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read both there (its `moduleSyntax.functorRecord' does not list both `__moduleKey' and `__keyEq'). gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
                       else
                         {
-                          key = "gen-schema-kind:${kind}#${ownMark}";
                           config = { };
                         };
                     keyEqRecord = {
@@ -2654,6 +2653,7 @@ let
                             # meeting gen-merge reads the key, where different marks are two
                             # declarations and both compose, and equal marks are decided by `decide`
                             meeting = "gen-schema-kind:${kind}";
+                            key = "gen-schema-kind:${kind}#${ownMark}";
                           };
                     };
                   in
