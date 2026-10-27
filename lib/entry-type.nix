@@ -2683,6 +2683,17 @@ let
                           config = { };
                         };
                     constructionToken = _: null;
+                    # v1.7: the guard's flag narrowed to THIS kind: it defines a value for a declared collection
+                    # the schema keeps in identity (a kind that defines none mints only the schema's defaults)
+                    kindGuarded =
+                      guard
+                      && builtins.any (
+                        d:
+                        builtins.isAttrs d.value
+                        && builtins.any (c: d.value ? ${c}) (
+                          builtins.filter (c: !(builtins.elem c [ "inherits" "methods" "parent" "validators" ])) kept
+                        )
+                      ) defs;
                     keyEqRecord = {
                       # gen-merge's node key: the declaration node, read off the record before
                       # composition; the result's `key` (the mark) is what a foreign evaluator reads.
@@ -2702,13 +2713,13 @@ let
                             # instance under construction; a second construction there is refused BY NAME, naming
                             # the remedy. Elsewhere the v1.5 lever stands.
                             decide =
-                              if guard then
+                              if kindGuarded then
                                 (a: b: { t = a.token; } == { t = b.token; })
                               else
                                 (a: b: let r = builtins.tryEval (a.sealed == b.sealed); in r.success && r.value && (a.sealed != { } || a.mark == b.mark));
                             onDistinct = "refuse-on-conflict";
                             conflicts =
-                              if guard then
+                              if kindGuarded then
                                 (_: _: throw "gen-schema: kind '${kind}' is imported twice under one key: two constructions of '${kind}' from one declaration meet, and this schema keeps a declared collection in the kind's identity, so telling them apart would mint over that collection, which may read an instance under construction. Import one construction of '${kind}', or declare the collection `identity = false` on the schema")
                               else
                                 (a: b: a.mark == b.mark && !(sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key" a b));
