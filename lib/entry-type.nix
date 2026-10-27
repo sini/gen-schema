@@ -1346,7 +1346,9 @@ let
                   # (one literal evaluated twice) are two, as a kind's sealed open modules are
                   sealed = { inherit baseModule; };
                 };
-                decide = sealedCollisionEq "gen-schema: the schema's baseModule is imported twice under one key";
+                decide = (a: b: let r = builtins.tryEval (a.sealed == b.sealed); in r.success && r.value && (a.sealed != { } || a.mark == b.mark));
+                onDistinct = "refuse-on-conflict";
+                conflicts = _: _: true;
               };
               __functionArgs = { };
               __functor = _: _: keyedBaseResult;
@@ -2691,7 +2693,11 @@ let
                               mark = ownMark;
                               inherit (plane) sealed;
                             };
-                            decide = sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key";
+                            # v1.5 lever: one construction iff its seals are one value (marks too, where it seals nothing);
+                            # a distinct construction is refused only where it conflicts: an equal mark
+                            decide = (a: b: let r = builtins.tryEval (a.sealed == b.sealed); in r.success && r.value && (a.sealed != { } || a.mark == b.mark));
+                            onDistinct = "refuse-on-conflict";
+                            conflicts = a: b: a.mark == b.mark;
                             # two occurrences of one kind name meet (`meeting`, the key's mark-free
                             # part, so every pair sharing the key meets, whatever their nodes); at a
                             # meeting gen-merge reads the key, where different marks are two
