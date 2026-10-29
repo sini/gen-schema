@@ -135,8 +135,8 @@
         guardedLast=$(grep -c "gen-schema: while minting the identity of kind 'host' over its component 'collections.zones'" "$TMPDIR/err" || true)
         [ "$guardedLast" -ge 1 ] || die collection-identity-guard-sorted-last "expected the attribution naming 'collections.zones', counted 0"
 
-        # PROTO G1 re-pin (xh14j key spec v1): meeting by declaration node, the instance read beside
-        # another tree's same-named kind composes and reads the instance's own address.
+        # Kinds meet by declaration node, so the instance read beside another tree's same-named kind
+        # composes and reads the instance's own address.
         rc=0
         residue=$(inst --argstr arm inheriting-same-name-residue 2> "$TMPDIR/err") || rc=$?
         ran=$((ran + 1))

@@ -1007,28 +1007,33 @@ it is the same declaration's twin (above). Each
 kind value publishes the two things the walk reads: `__kindCycleParents` (its parents as written,
 before any value is told same-tree from foreign, which forces marks a cycle could not supply) and
 `__kindWitness`. So a cycle through a same-tree value (`a.inherits = [ config.schema.b ]`,
-`b.inherits = [ config.schema.a ]`) is refused by name like any other. A kind that composes a parent is also a module keyed by its MARK, so a diamond
-composes each parent once, and two kinds with different marks both compose: two trees' same-named
-kinds, or one generator applied in two trees with an option's type changed, where gen-merge then
-refuses the declarations that conflict. Two declarations sharing a mark (one generator applied twice,
-differing only in an option default, which enters the mark by path) share the key. Two instances of
-one kind declaration that share a key are compared: **equal** instances are one module; **unequal**
-instances are refused by name. Nothing is dropped silently. The comparison is the one the ancestor
-map makes (`kindEq`'s, through `sealedCollisionEq`), published on the kind value's functor record as
-gen-merge's `__keyEq` (`null` on a kind with no parent) so its key dedup applies it to instances
-imported side by side, in either order; the module the functor returns carries only the key, so a
-nixpkgs `lib.evalModules` mount of the kind value collects nothing it does not know. A sealed
-component compares by its seal, so equal means one construction reached twice: two calls of one
-generator are refused even where their values agree. A declaration may not carry `__keyEq` itself,
-and gen-schema over a gen-merge that does not read `__keyEq` and `__moduleKey` off a functor record
-is refused by name. The record also names the module's graph node, `__moduleKey`, by the kind's
-declaration node (`__kindWitness`, read before composition), and its meeting, `__keyEq.meeting = "gen-schema-kind:<kind>"`: gen-merge reads the mark key only where another occurrence of the kind's
-name meets it, so importing a lone kind demands no mark, and a kind whose identity-bearing collection
-reads an instance of itself composes. Where another tree's kind of the same NAME reaches that import,
-the meeting forces the mark and the read still recurses (an open defect, pinned in
-`ci/tests-process.nix`). gen-merge trusts a stated meeting without forcing the key it should prefix
-(gen-merge README); gen-schema's always prefixes the kind's key, so a module stating that key meets
-the kind and is refused by name.
+`b.inherits = [ config.schema.a ]`) is refused by name like any other. Every kind, parentless or not, is also a module keyed by its DECLARATION NODE, so an ancestor
+reached on two paths (a diamond) composes once, and kinds at two declaration nodes both compose: two
+trees' same-named kinds, or one generator called at two sites, where gen-merge then refuses the
+declarations that conflict. The kind value's functor record names the graph node, `__moduleKey = "gen-schema-kind:<kind>#<witness>"` (`__kindWitness`, read before composition), and publishes
+gen-merge's key comparison `__keyEq`: its `meeting` is the node key, so occurrences meet only at one
+declaration node; its `key`, the reference key `gen-schema-kind:<kind>#<witness>#<mark>`, is read only
+where two occurrences meet, so importing a lone kind demands no mark, and a kind whose identity-bearing
+collection reads an instance of itself composes. At one node, `decide` names the one construction
+reached again by its seals (the mark only where nothing is sealed): it is one module. Two
+constructions at one node are refused by name where their marks are equal (`sealedCollisionEq` names
+the differing sealed component), so nothing is dropped silently; unequal marks both compose. A kind
+whose definitions (its own or a mixin's) set a collection the schema keeps in identity is decided at
+one node by its construction instead, never by its mark or seals, whose minting could read an
+instance under construction: the one construction reached twice is one module, and a second
+construction of it at that node is refused by name, naming the remedy (import one construction, or
+declare the collection `identity = false`). A declaration may not carry `__keyEq` itself, and
+gen-schema over a gen-merge that does not read `__keyEq` and `__moduleKey` off a functor record, or
+`key`, `onDistinct` and `conflicts` off the comparison (`moduleSyntax.keyEqFields`), is refused by
+name. The module the functor returns carries `imports`, `config` and the same reference key, so a
+nixpkgs `lib.evalModules` mount of the kind value dedups one construction reached twice as gen does
+and collects nothing it does not know; at one node it keeps one construction where gen refuses.
+
+**Removing a kind names its computed key.** `disabledModules = [ { key = (k { }).key; } ]` removes
+the kind `k` in gen-merge and in nixpkgs alike. The key embeds two digests (the declaration witness
+and the mark) that are internal addressing, so never write it as a literal string. An item naming a
+kind's earlier key `gen-schema-kind:<kind>#<mark>`, or a parentless kind's earlier positional name
+`<parent>:anon-<i>`, no longer removes the kind in either engine.
 
 **Each kind publishes its transitive ancestors, and a subkind must keep its ancestors' classes.**
 `__kindAncestors` maps each ancestor's mark to the ancestor kind value, read off `__kindImports`.
