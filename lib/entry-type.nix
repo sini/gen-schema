@@ -938,12 +938,19 @@ let
   declarationKeys = prelude.sort (a: b: a < b) merge.moduleSyntax.structured;
 
   # gen-merge reads the key comparison (`__keyEq`) a keyed kind publishes on its functor record
-  # (den-hoag-e5whp) only where its `moduleSyntax.functorRecord` lists it. Over a gen-merge without
-  # it the record is never read, and two constructions sharing a mark would be deduplicated by key
-  # silently, so the pairing is refused by name instead, once, where the key is written.
+  # (den-hoag-e5whp) only where its `moduleSyntax.functorRecord` lists it, and the comparison's
+  # `key`, `onDistinct` and `conflicts` only where its `moduleSyntax.keyEqFields` lists them. Over a
+  # gen-merge without them the record, or those fields, are never read, and two constructions would
+  # be deduplicated or composed silently, so the pairing is refused by name instead, once, where the
+  # key is written.
   mergeReadsKeyEq =
     builtins.elem "__keyEq" (merge.moduleSyntax.functorRecord or [ ])
-    && builtins.elem "__moduleKey" (merge.moduleSyntax.functorRecord or [ ]);
+    && builtins.elem "__moduleKey" (merge.moduleSyntax.functorRecord or [ ])
+    && builtins.all (f: builtins.elem f (merge.moduleSyntax.keyEqFields or [ ])) [
+      "key"
+      "onDistinct"
+      "conflicts"
+    ];
   # The entry reservation rides on a functor's record (den-hoag-r05lc), which only a gen-merge
   # publishing it in `moduleSyntax.functorRecord` reads; any other would drop it silently.
   mergeReadsRecordReservation = builtins.elem "__reservedKeys" (
@@ -1313,8 +1320,10 @@ let
       let
         base = merge.types.deferredModule;
 
-        # PROTO K2 (b): a plain base module (an attrset, not a functor, no mixin emission) keyed in
-        # gen's channel only, met by its declaration node, decided by its seal.
+        # A plain base module (an attrset, not a functor, no mixin emission) is keyed by its declaration
+        # node: gen meets it there and decides it by its VALUE seal (ADR-0034's sealed limb compares the
+        # reified value), so one literal reached through parent and child is one module and two
+        # different values at one node are refused by name; nixpkgs dedups it by its result's `key`.
         keyedBase =
           # a base with no attribute position has no declaration node (ADR-0034's sealed limb: no
           # identity, never a shared `typeOf` pseudo-node), so it stays unkeyed
@@ -1341,14 +1350,20 @@ let
                 subject = {
                   name = "baseModule";
                   mark = node;
-                  # a closure allocated once per construction: equal only to itself, so the one
-                  # construction reached through parent and child is one module and two constructions
-                  # (one literal evaluated twice) are two, as a kind's sealed open modules are
+                  # the base's own value, compared under Nix `==`: one literal is one construction
                   sealed = { inherit baseModule; };
                 };
-                decide = (a: b: let r = builtins.tryEval (a.sealed == b.sealed); in r.success && r.value && (a.sealed != { } || a.mark == b.mark));
+                decide = (
+                  a: b:
+                  let
+                    r = builtins.tryEval (a.sealed == b.sealed);
+                  in
+                  r.success && r.value && (a.sealed != { } || a.mark == b.mark)
+                );
                 onDistinct = "refuse-on-conflict";
-                conflicts = a: b: !(sealedCollisionEq "gen-schema: the schema's baseModule is imported twice under one key" a b);
+                conflicts =
+                  a: b:
+                  !(sealedCollisionEq "gen-schema: the schema's baseModule is imported twice under one key" a b);
               };
               __functionArgs = { };
               __functor = _: _: keyedBaseResult;
@@ -2666,27 +2681,46 @@ let
                     # The comparison rides on the record, never in the result, because the kind value is
                     # a module a foreign evaluator also imports: nixpkgs applies the functor and collects
                     # only its result, where `__keyEq` is an unsupported attribute (den-hoag-e5whp). The
-                    # record is ALWAYS present, null without a parent, so reading the record's names
-                    # never forces `kindParents` ahead of the cycle walk. Residue, stated:
+                    # record is present on every kind, parentless or not, and reads nothing of
+                    # `kindParents`, so reading the record's names never forces the parents ahead of the
+                    # cycle walk. Residue, stated:
                     # `mergeReadsKeyEq` sees only the gen-merge gen-schema is built with, and the engine
                     # evaluating the instance can be another (a consumer whose gen-merge predates the
                     # record protocol); that engine never reads the record and deduplicates the key
                     # silently.
                     keyed =
                       if !mergeReadsKeyEq then
-                        throw "gen-schema: kind '${kind}' composes a parent, so it publishes its node key `__moduleKey' and the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read both there (its `moduleSyntax.functorRecord' does not list both `__moduleKey' and `__keyEq'). gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
+                        throw "gen-schema: kind '${kind}' publishes its node key `__moduleKey' and the key comparison `__keyEq' (with its `key', `onDistinct' and `conflicts') on its record, and the gen-merge it is evaluated with does not read them there (its `moduleSyntax.functorRecord' does not list both `__moduleKey' and `__keyEq', or its `moduleSyntax.keyEqFields' does not list `key', `onDistinct' and `conflicts'). gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
                       else
                         {
-                          # Rkf (v1.4): nixpkgs' dedup key on the result, the record's own reference key; gen reads
-                          # the record's (`__keyEq.key`), so it never forces this one at load
+                          # the reference key, for a foreign evaluator: nixpkgs dedups and removes the kind by
+                          # it; gen reads the record's (`__keyEq.key`), so it never forces this one at load
                           key = "gen-schema-kind:${kind}#${kindWitness}#${ownMark}";
                           config = { };
                         };
-                    constructionToken = _: null;
-                    # v1.7: the guard's flag narrowed to THIS kind: it defines a value for a declared collection
+                    # THIS construction's token, compared as one attrset (`a.token == b.token`): the one
+                    # construction reached twice reads true, two constructions false, on every evaluator.
+                    # Two invariants hold it:
+                    # 1. The lambda stays inline here, one per construction. Hoisted (one lambda shared by
+                    #    every construction), two constructions' tokens compare true and merge silently.
+                    # 2. The token attrset is only ever selected or copied (`//`, `inherit`, passed as a
+                    #    value), never rebuilt: `{ inherit (token) t; }` compares false on Nix and
+                    #    Determinate and true on Lix, so one construction would read as two by evaluator.
+                    constructionToken = {
+                      t = _: null;
+                    };
+                    # the guard's flag narrowed to THIS kind: it defines a value for a declared collection
                     # the schema keeps in identity (a kind that defines none mints only the schema's defaults)
-                    guardedNames = builtins.filter (c: !(builtins.elem c [ "inherits" "methods" "parent" "validators" ])) kept;
-                    # v1.8: a mixin may supply the collection's value too (read by name off the emitted
+                    guardedNames = builtins.filter (
+                      c:
+                      !(builtins.elem c [
+                        "inherits"
+                        "methods"
+                        "parent"
+                        "validators"
+                      ])
+                    ) kept;
+                    # a mixin may supply the collection's value too (read by name off the emitted
                     # collections, never by value)
                     kindGuarded =
                       guard
@@ -2698,52 +2732,59 @@ let
                       # gen-merge's node key: the declaration node, read off the record before
                       # composition; the result's `key` (the mark) is what a foreign evaluator reads.
                       __moduleKey = "gen-schema-kind:${kind}#${kindWitness}";
-                      __keyEq =
-                          {
-                            subject = {
-                              name = kind;
-                              mark = ownMark;
-                              inherit (plane) sealed;
-                              # v1.7: this construction's own token, allocated once per kind construction
-                              token = constructionToken;
-                            };
-                            # v1.7 (C-3 as a named refusal): where the schema keeps a declared collection in the
-                            # identity (`guard`, the ux9xg guard's own flag), a one-node pair is decided by the
-                            # construction's token and never by its mark or seals, whose pass could read an
-                            # instance under construction; a second construction there is refused BY NAME, naming
-                            # the remedy. Elsewhere the v1.5 lever stands.
-                            decide =
-                              if kindGuarded then
-                                (a: b: { t = a.token; } == { t = b.token; })
-                              else
-                                (a: b: let r = builtins.tryEval (a.sealed == b.sealed); in r.success && r.value && (a.sealed != { } || a.mark == b.mark));
-                            onDistinct = "refuse-on-conflict";
-                            conflicts =
-                              if kindGuarded then
-                                (_: _: throw "gen-schema: kind '${kind}' is imported twice under one key: two constructions of '${kind}' from one declaration meet, and this schema keeps a declared collection in the kind's identity, so telling them apart would mint over that collection, which may read an instance under construction. Import one construction of '${kind}', or declare the collection `identity = false` on the schema")
-                              else
-                                (a: b: a.mark == b.mark && !(sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key" a b));
-                            # two occurrences of one kind name meet (`meeting`, the key's mark-free
-                            # part, so every pair sharing the key meets, whatever their nodes); at a
-                            # meeting gen-merge reads the key, where different marks are two
-                            # declarations and both compose, and equal marks are decided by `decide`
-                            meeting = "gen-schema-kind:${kind}#${kindWitness}";
-                            key = "gen-schema-kind:${kind}#${kindWitness}#${ownMark}";
-                          };
+                      __keyEq = {
+                        subject = {
+                          name = kind;
+                          mark = ownMark;
+                          inherit (plane) sealed;
+                          token = constructionToken;
+                          guarded = kindGuarded;
+                        };
+                        # Where either side's kind defines a collection its schema keeps in identity
+                        # (`guarded`), a one-node pair is decided by the construction's token and never by
+                        # its mark or seals, whose mint pass could read an instance under construction, and
+                        # a second construction is refused BY NAME, naming the remedy. The branch reads BOTH
+                        # sides, so a pair of one guarded and one unguarded construction (one declaration
+                        # under two schemas) gets one answer whichever is gen-merge's representative.
+                        # Otherwise the seals decide (the mark only where nothing is sealed), and an equal
+                        # mark with distinct seals is refused by `sealedCollisionEq`'s own named refusal.
+                        decide =
+                          a: b:
+                          if a.guarded || b.guarded then
+                            a.token == b.token
+                          else
+                            let
+                              r = builtins.tryEval (a.sealed == b.sealed);
+                            in
+                            r.success && r.value && (a.sealed != { } || a.mark == b.mark);
+                        onDistinct = "refuse-on-conflict";
+                        conflicts =
+                          a: b:
+                          if a.guarded || b.guarded then
+                            (throw "gen-schema: kind '${kind}' is imported twice under one key: two constructions of '${kind}' from one declaration meet, and this schema keeps a declared collection in the kind's identity, so telling them apart would mint over that collection, which may read an instance under construction. Import one construction of '${kind}', or declare the collection `identity = false` on the schema")
+                          else
+                            a.mark == b.mark
+                            && !(sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key" a b);
+                        # occurrences meet only at one declaration node (`meeting` = the node key), so
+                        # occurrences at distinct nodes both compose and no mark or seal is read; at a
+                        # meeting `decide` names the one construction reached again and `conflicts` the
+                        # second construction gen-merge refuses
+                        meeting = "gen-schema-kind:${kind}#${kindWitness}";
+                        key = "gen-schema-kind:${kind}#${kindWitness}#${ownMark}";
+                      };
                     };
                   in
                   # Precedence: computed overrides collections of the same name.
                   # __functor is reserved — collections/computed must not use it as a key.
                   {
-                    # A kind that composes a parent is a node of gen's module graph by its DECLARATION
-                    # NODE (`__moduleKey`, the content witness through the one mint; den-hoag-9zyp7 OQ2),
-                    # and keyed in every evaluator by the result's `key`, its MARK (ADR-0034, identity
-                    # through the one mint), so a parent reached on two branches (a diamond) is composed
-                    # once. gen-merge reads the key only where two occurrences of one kind name meet
-                    # (`__keyEq.meeting`), so the import of a lone kind demands no mark: equal marks are
-                    # decided by `decide` (one module, or refused by name), and different marks are two
-                    # declarations, which both compose (`keyed`, `keyEqRecord`). Inside a kind the
-                    # ancestor map's fold decides the pair.
+                    # Every kind is a node of gen's module graph by its DECLARATION NODE (`__moduleKey`,
+                    # the content witness through the one mint; den-hoag-9zyp7 OQ2), so an ancestor
+                    # reached on two branches (a diamond) is composed once. gen-merge reads the record's
+                    # reference key only where two occurrences of one node meet (`__keyEq.meeting`), so
+                    # the import of a lone kind demands no mark. The result's `key`,
+                    # `gen-schema-kind:<kind>#<witness>#<mark>`, is read by foreign evaluators only:
+                    # nixpkgs dedups the kind and removes it by that key (`keyed`, `keyEqRecord`).
+                    # Inside a kind the ancestor map's fold decides the pair.
                     __functor =
                       _:
                       { ... }:

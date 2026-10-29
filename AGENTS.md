@@ -84,9 +84,18 @@ cycle on that arm is refused by name (den-hoag-24zdh; cells `cross-tree-cycle-re
 (`mkSchemaEntryType`, tree `null`) refuses a declared parent by name. An inheritance cycle in either
 spelling is refused by ONE walk, `inheritanceCycle`, over the published `__kindCycleParents` compared by
 `__kindWitness`, in `evalSchema`'s wording (8c8pr Q-b arm (i), 2026-09-30; cells
-`plain-inheritance-cycle-refusals` in `ci/tests-error.nix`). A kind that composes a parent is keyed
-`gen-schema-kind:<kind>#<mark>`, the mark bound once per kind (den-hoag-l0y K2, G2; the mint-count
-cost cell is `ci/tests-process.nix`). Each kind publishes its transitive ancestors, `__kindAncestors`:
+`plain-inheritance-cycle-refusals` in `ci/tests-error.nix`). Every kind is keyed
+`gen-schema-kind:<kind>#<kindWitness>#<mark>` in its functor result (foreign evaluators) and on its
+record (`__keyEq.key`, read by gen-merge only at a meeting), its node and meeting being
+`gen-schema-kind:<kind>#<kindWitness>`; the mark is bound once per kind (den-hoag-l0y K2, G2; the
+mint-count cost cell is `ci/tests-process.nix`). One node decides by the seals and refuses a second
+construction of an equal mark; a kind setting a collection its schema keeps in identity decides by a
+per-construction token and refuses a second construction by name, the branch read on either side
+(den-hoag-xh14j, ADR-0034). A plain positioned `baseModule` is keyed `gen-schema-base:<pos>#base` and
+sealed by its value (K2 (b)). A kind is removed by its computed key (`{ key = (k { }).key; }`), never
+a literal: the key's digests are internal addressing (ADR-0016 ruling 5), and the act renamed main's
+`gen-schema-kind:<kind>#<mark>` and a parentless kind's positional `<parent>:anon-<i>` (den-hoag-xh14j
+OQ-V4, alpha). Each kind publishes its transitive ancestors, `__kindAncestors`:
 mark to ancestor kind value, a fold over `__kindImports` that refuses two declarations of one mark
 reached along two paths by name, naming the kind and both paths; the class check refuses a kind whose
 `keySemantics` omits or re-categorises an ancestor's key. Both are read through `resolvedOnly`, after
