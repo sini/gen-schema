@@ -2728,6 +2728,11 @@ let
                         builtins.any (d: builtins.isAttrs d.value && builtins.any (c: d.value ? ${c}) guardedNames) defs
                         || (mixinResult != null && builtins.any (c: (mixinResult.collections or { }) ? ${c}) guardedNames)
                       );
+                    # one result value per kind construction, shared by every application of the functor
+                    kindResult = {
+                      imports = [ merged ];
+                    }
+                    // keyed;
                     keyEqRecord = {
                       # gen-merge's node key: the declaration node, read off the record before
                       # composition; the result's `key` (the mark) is what a foreign evaluator reads.
@@ -2785,13 +2790,7 @@ let
                     # `gen-schema-kind:<kind>#<witness>#<mark>`, is read by foreign evaluators only:
                     # nixpkgs dedups the kind and removes it by that key (`keyed`, `keyEqRecord`).
                     # Inside a kind the ancestor map's fold decides the pair.
-                    __functor =
-                      _:
-                      { ... }:
-                      {
-                        imports = [ merged ];
-                      }
-                      // keyed;
+                    __functor = _: { ... }: kindResult;
                     inherit
                       kind
                       mixins
