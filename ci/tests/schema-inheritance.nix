@@ -891,13 +891,13 @@ in
         alone = "two";
       };
     };
-    # ONE declaration from two declaration sites (`_file`s): its two `a`s share a mark, so a key, under
-    # two declaration nodes (`__moduleKey`). gen-merge meets them by kind name (`__keyEq.meeting`), so
-    # they are compared at the key as two constructions are, and refused in both orders and at any
-    # depth, as when the node was the mark. A plain module stating the key meets it too, and is refused
-    # (only one publishes a comparison). `o_l` is a list, so one module reads one element and two
+    # ONE declaration from two declaration sites (`_file`s): its two `a`s share a mark under two
+    # declaration nodes (`__moduleKey`), so two reference keys, which embed the node. gen-merge meets
+    # occurrences only at one node (`__keyEq.meeting`), so the two compose, in both orders and at any
+    # depth, and the one site imported twice is one module. A plain module stating a kind's key meets
+    # it and is refused (only one publishes a comparison). `o_l` is a list, so one module reads one element and two
     # would read two (a `str` option merges the doubled definition and could not tell them apart).
-    test-two-declaration-sites-of-one-mark-meet-at-the-key =
+    test-two-declaration-sites-of-one-mark-both-compose =
       let
         oL.options.o_l = genMerge.mkOption {
           type = genMerge.types.listOf genMerge.types.str;
@@ -970,20 +970,29 @@ in
           ];
         };
         expected = {
-          oneKey = true;
+          oneKey = false;
           twoNodes = true;
-          f1f2 = "REFUSED";
-          f2f1 = "REFUSED";
-          deepF2 = "REFUSED";
+          f1f2 = [
+            "one"
+            "one"
+          ];
+          f2f1 = [
+            "one"
+            "one"
+          ];
+          deepF2 = [
+            "one"
+            "one"
+          ];
           oneSiteTwice = [ "one" ];
           forgeAfter = "REFUSED";
           forgeBefore = "REFUSED";
         };
       };
-    # A parent-composing kind publishes `__keyEq` on its RECORD, never in the module its functor
-    # returns (den-hoag-e5whp): nixpkgs collects only the result, where `__keyEq` is an unsupported
-    # attribute. The result carries the key and nothing gen-merge alone reads; a parentless kind's
-    # record carries `__keyEq = null`, so the record's names never depend on its parents.
+    # Every kind publishes `__keyEq` on its RECORD, never in the module its functor returns
+    # (den-hoag-e5whp): nixpkgs collects only the result, where `__keyEq` is an unsupported attribute.
+    # The result carries the reference key and nothing gen-merge alone reads; a parentless kind's
+    # record carries the same comparison, so the record's names never depend on its parents.
     test-the-keyed-kind-publishes-key-eq-on-its-record = {
       expr =
         let
@@ -993,12 +1002,15 @@ in
           recordKeyEq = builtins.attrNames rel.derived.__keyEq;
           resultKeyEq = m ? __keyEq;
           resultKeys = builtins.attrNames m;
-          parentless = rel.base.__keyEq;
+          parentless = builtins.attrNames rel.base.__keyEq;
         };
       expected = {
         recordKeyEq = [
+          "conflicts"
           "decide"
+          "key"
           "meeting"
+          "onDistinct"
           "subject"
         ];
         resultKeyEq = false;
@@ -1007,7 +1019,14 @@ in
           "imports"
           "key"
         ];
-        parentless = null;
+        parentless = [
+          "conflicts"
+          "decide"
+          "key"
+          "meeting"
+          "onDistinct"
+          "subject"
+        ];
       };
     };
     test-another-trees-same-named-kind-is-not-a-cycle = {

@@ -1,8 +1,9 @@
 # `evalSchema` EVALUATES THE KIND TREE ONCE, with each declared parent injected from that same
 # evaluation, so a kind is one construction for every reader (ADR-0012: a module however often
 # imported is one node). Each cell reads how often a kind composes, off a list option every kind
-# appends its own name to (`trail`): a second construction of `base` under one key is refused by
-# name, and a second one under no key (a parentless `base`) reads `2`.
+# appends its own name to (`trail`): every kind, parentless or not, is keyed by its declaration
+# node, so `base` reached on two paths composes once, and a second construction of it at that node
+# is refused by name.
 #
 # The readers: a mixed-depth diamond's child, the tree returned mounted beside a child, both
 # deprecated spellings, and a SHALLOWER kind holding a deeper kind of its own tree (an option default,
@@ -274,20 +275,19 @@ in
       };
     };
 
-    # G2: the same with a parentless `base` is admitted. The `2` is a parentless kind's own double
-    # import, which no key refuses; it is not a second construction.
+    # G2: the same with a parentless `base`: keyed by its declaration node too, it composes once.
     test-mixed-depth-diamond-parentless-is-admitted = {
       expr = diamondRead mdParentless;
       expected = {
         default = 0;
         trail = {
-          base = 2;
+          base = 1;
           x = 1;
         };
       };
     };
 
-    # G3: depth 3, every kind once under a parented `base`; admitted under a parentless one.
+    # G3: depth 3, every kind once, under a parented and a parentless `base`.
     test-mixed-depth-3-composes-once = {
       expr = {
         parented = counts [ "base" "x" "y" ] (trailOf (mixedDepth3 true).e);
@@ -300,7 +300,7 @@ in
           y = 1;
         };
         parentless = {
-          base = 2;
+          base = 1;
           x = 1;
           y = 1;
         };
@@ -352,7 +352,7 @@ in
       };
     };
 
-    # G7: two kinds of one shape stay two kinds.
+    # G7: two kinds of one shape stay two kinds, each reached on two paths composing once.
     test-two-same-shape-kinds-stay-two = {
       expr = {
         names = map (k: twoKinds.${k}.kind) [
@@ -367,8 +367,8 @@ in
           "base2"
         ];
         trail = {
-          base = 2;
-          base2 = 2;
+          base = 1;
+          base2 = 1;
           x = 1;
         };
       };
@@ -378,7 +378,7 @@ in
     test-a-foreign-same-name-kind-stays-distinct = {
       expr = counts [ "base" "fbase" "x" ] (trailOf withForeign.d);
       expected = {
-        base = 2;
+        base = 1;
         fbase = 1;
         x = 1;
       };

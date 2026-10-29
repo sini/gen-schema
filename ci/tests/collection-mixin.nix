@@ -97,20 +97,37 @@ let
       type = gm.types.str;
       default = d;
     };
+  # The kind-dependent base keys the kind on `defaultText`, a field outside the four two declarations
+  # may not both state: the base module is applied once per kind, so `user` and its parent `p` both
+  # declare `tag`, and with a `default` on each that pair is refused (`guarded`, its own cell below).
   parentTree =
     {
       mixInh ? null,
       kindInh ? null,
+      guarded ? false,
     }:
     (gm.evalModuleTree { } [
       {
         options.schema = genSchema.mkSchemaOption {
-          baseModule = k: { tag = str k; };
+          baseModule =
+            k:
+            if guarded then
+              { tag = str k; }
+            else
+              {
+                tag = gm.mkOption {
+                  type = gm.types.str;
+                  defaultText = k;
+                };
+              };
           computed = colls: _: { seenInherits = colls.inherits; };
           mixins = [
             (genSchema.mkMixin { } (
               r:
-              if (genAlgebra.record.select "tag" r).default == "user" && mixInh != null then
+              let
+                t = genAlgebra.record.select "tag" r;
+              in
+              if (if guarded then t.default else t.defaultText) == "user" && mixInh != null then
                 { inherits = mixInh; }
               else
                 { }
@@ -349,6 +366,20 @@ in
         ];
         computed = [ "p" ];
       };
+    };
+    # the kind-dependent base stating `default`, reached through the kind and its parent: two
+    # declarations of `tag` both state it, refused as nixpkgs refuses them (`bothHave`)
+    test-builtin-inherits-kind-dependent-default-through-a-parent-is-refused = {
+      expr =
+        (builtins.tryEval (
+          builtins.deepSeq
+            (parentTree {
+              kindInh = [ "p" ];
+              guarded = true;
+            }).user.options.tag.default
+            true
+        )).success;
+      expected = false;
     };
     test-builtin-inherits-mixin-foreign-value-parent = {
       expr = againstTwin { mixInh = [ foreignP ]; } { kindInh = [ foreignP ]; };
