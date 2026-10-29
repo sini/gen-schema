@@ -2017,8 +2017,8 @@ let
               # THE CONTENT WITNESS: the kind's name, each def's file and first-attribute position, its
               # parents' names and its declared option names, read before composition. Its one reader
               # is the inheritance-cycle walk, which runs before composition and so cannot read a mark;
-              # its other reader is gen's engine: it is the declaration node gen-merge keys a kind that
-              # composes a parent by (`__moduleKey`, below). Published as `__kindWitness`.
+              # its other reader is gen's engine: it is the declaration node gen-merge keys every kind by
+              # (`__moduleKey`, below). Published as `__kindWitness`.
               kindWitness = identity.hashIdentity "schemawitness" [ "defs" "kind" "options" "parents" ] (
                 l:
                 {
@@ -2402,7 +2402,7 @@ let
                 else if reservedNamed != [ ] then
                   throw (
                     if builtins.head reservedNamed == "__keyEq" then
-                      "gen-schema: kind '${kind}': declaration key '__keyEq' is reserved — gen-schema publishes the key comparison of every kind that composes a parent, beside the key it derives from the kind's mark, and a declaration does not choose it"
+                      "gen-schema: kind '${kind}': declaration key '__keyEq' is reserved — gen-schema publishes the key comparison of every kind, beside the key it derives from the kind's mark, and a declaration does not choose it"
                     else
                       "gen-schema: kind '${kind}': declaration key '${builtins.head reservedNamed}' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread"
                   )

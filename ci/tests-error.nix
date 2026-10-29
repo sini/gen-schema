@@ -3873,7 +3873,7 @@ in
       };
       reserved = {
         type = "ThrownError";
-        msg = "^gen-schema: kind 'a': declaration key '__keyEq' is reserved — gen-schema publishes the key comparison of every kind that composes a parent, beside the key it derives from the kind's mark, and a declaration does not choose it$";
+        msg = "^gen-schema: kind 'a': declaration key '__keyEq' is reserved — gen-schema publishes the key comparison of every kind, beside the key it derives from the kind's mark, and a declaration does not choose it$";
       };
       smuggled = {
         __keyEq = {
@@ -3881,12 +3881,27 @@ in
           decide = _: _: true;
         };
       };
+      protocolRefusal = "^gen-schema: kind 'a' publishes its node key `__moduleKey' and the key comparison `__keyEq' \\(with its `key', `onDistinct' and `conflicts'\\) on its record, and the gen-merge it is evaluated with does not read them there \\(its `moduleSyntax\\.functorRecord' does not list both `__moduleKey' and `__keyEq', or its `moduleSyntax\\.keyEqFields' does not list `key', `onDistinct' and `conflicts'\\)\\. gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; .*$";
       # gen-schema over a gen-merge whose functor-record list does not carry `__keyEq`: the pairing
       # an older gen-merge makes (den-hoag-e5whp).
       withoutProtocol = genMerge // {
         moduleSyntax = genMerge.moduleSyntax // {
           functorRecord = builtins.filter (k: k != "__keyEq") genMerge.moduleSyntax.functorRecord;
         };
+      };
+      # ... and one whose key-comparison field list does not carry `onDistinct`: an engine that would
+      # read the record but never the fold it opts into.
+      withoutFields = genMerge // {
+        moduleSyntax = genMerge.moduleSyntax // {
+          keyEqFields = builtins.filter (k: k != "onDistinct") genMerge.moduleSyntax.keyEqFields;
+        };
+      };
+      fieldsSchema = import ../lib {
+        inherit prelude;
+        graph = genGraph;
+        merge = withoutFields;
+        algebra = genAlgebra;
+        identity = genIdentity;
       };
       oldSchema = import ../lib {
         inherit prelude;
@@ -3939,7 +3954,7 @@ in
           o_a [ (generatorOver (mkSchemaOption { }) (smuggled // { key = "mine"; }) "one") ];
         expectedError = reserved;
       };
-      # Over a gen-merge that does not read `__keyEq` off a functor record, a kind composing a parent
+      # Over a gen-merge that does not read `__keyEq` off a functor record, a kind
       # is refused by name, naming the protocol it requires, where the comparison would otherwise go
       # unread and a shared key be deduplicated silently.
       test-gen-merge-without-the-protocol-refused-by-name = {
@@ -3948,7 +3963,17 @@ in
           o_a [ (generatorOver (oldSchema.mkSchemaOption { }) { } "one") ];
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: kind 'a' composes a parent, so it publishes its node key `__moduleKey' and the key comparison `__keyEq' on its record, and the gen-merge it is evaluated with does not read both there \\(its `moduleSyntax\\.functorRecord' does not list both `__moduleKey' and `__keyEq'\\)\\. gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; .*$";
+          msg = protocolRefusal;
+        };
+      };
+      # The same over a gen-merge that reads the record and not the comparison's `onDistinct`.
+      test-gen-merge-without-the-key-eq-fields-refused-by-name = {
+        expr =
+          assert controls;
+          o_a [ (generatorOver (fieldsSchema.mkSchemaOption { }) { } "one") ];
+        expectedError = {
+          type = "ThrownError";
+          msg = protocolRefusal;
         };
       };
     };
@@ -5829,4 +5854,78 @@ in
         };
       };
     };
+
+  # A ONE-NODE PAIR WHERE EITHER SIDE IS GUARDED IS DECIDED BY THE CONSTRUCTION TOKEN, NAMED. One
+  # declaration under a schema keeping `collections.excludes` in identity (`guarded`) and under one
+  # declaring it `identity = false` (`plain`) gives two constructions at one node. Both nesting orders
+  # (which construction is gen-merge's representative), the inner construction reached once to three
+  # times (N = 2..4), a collection that reads the instance and one that does not, both parentages:
+  # every cell reads the named refusal, never a recursion through the mint and never another refusal.
+  # The live control (no second construction) is `ci/tests/key-construction-parity.nix`.
+  flake.testsError.key-guarded-pair-refusals =
+    let
+      pairs = [
+        [
+          "guarded"
+          "plain"
+        ]
+        [
+          "plain"
+          "guarded"
+        ]
+        [
+          "guarded"
+          "guarded"
+        ]
+      ];
+    in
+    builtins.listToAttrs (
+      lib.concatMap (
+        pair:
+        lib.concatMap
+          (
+            copies:
+            lib.concatMap
+              (
+                self:
+                map
+                  (read: {
+                    name = "test-${builtins.elemAt pair 0}-over-${builtins.elemAt pair 1}-n${toString (copies + 1)}-${self}-${read}";
+                    value = {
+                      expr = import ./test-fixtures/mixed-guard.nix {
+                        inherit
+                          genSchema
+                          genMerge
+                          copies
+                          self
+                          read
+                          ;
+                        outer = builtins.elemAt pair 0;
+                        inner = builtins.elemAt pair 1;
+                      };
+                      expectedError = {
+                        type = "ThrownError";
+                        msg =
+                          "^"
+                          + escapeRegex "gen-schema: kind 'host' is imported twice under one key: two constructions of 'host' from one declaration meet, and this schema keeps a declared collection in the kind's identity";
+                      };
+                    };
+                  })
+                  [
+                    "instance"
+                    "const"
+                  ]
+              )
+              [
+                "parented"
+                "parentless"
+              ]
+          )
+          [
+            1
+            2
+            3
+          ]
+      ) pairs
+    );
 }
