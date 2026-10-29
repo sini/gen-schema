@@ -37,7 +37,9 @@ let
 in
 {
   flake.tests.schema-option-redeclaration = {
-    test-one-construction-reads-as-declared-once = {
+    # The schema option states its `default`, so declaring it twice, one construction or two, is
+    # refused at the declarations, as nixpkgs refuses two declarations both stating it (`bothHave`).
+    test-one-construction-declared-twice-is-refused = {
       expr = {
         once = read once "_kindNames";
         oneValue = read oneValue "_kindNames";
@@ -47,13 +49,10 @@ in
       };
       expected = {
         once = [ "k" ];
-        oneValue = [ "k" ];
-        twoCalls = [ "k" ];
-        oneValueTopology.k = {
-          parent = null;
-          children = [ ];
-        };
-        oneValueCollectionKeys = true;
+        oneValue = "REFUSED";
+        twoCalls = "REFUSED";
+        oneValueTopology = "REFUSED";
+        oneValueCollectionKeys = false;
       };
     };
     test-two-constructions-refuse = {

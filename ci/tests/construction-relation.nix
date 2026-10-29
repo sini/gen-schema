@@ -116,7 +116,9 @@ in
     };
 
     # ── schemaKindEntry, per `mkSchemaOption` call: its `schema` type carries the entry's relation ──
-    test-schema-option-redeclared-reads-its-kinds = {
+    # The schema option states its `default`, so two declarations of it are refused at their
+    # declarations, as nixpkgs refuses them (`bothHave`), before the relation is read.
+    test-schema-option-redeclared-is-refused = {
       expr =
         let
           o = mkSchemaOption { mkType = { kind, ... }: { inherit kind; }; };
@@ -136,8 +138,8 @@ in
           ];
         };
       expected = {
-        oneValue = "MERGED";
-        twoCalls = "MERGED";
+        oneValue = "REFUSED";
+        twoCalls = "REFUSED";
         differing = "REFUSED";
       };
     };
