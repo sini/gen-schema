@@ -168,6 +168,79 @@ let
   # defaulted, reversible.
   comparedTyped = records: v: merge.closuresFirst records v;
 
+  # ★ THE OWN OPTIONS (den-hoag-a7c9r). The tree is the MERGED one, evaluated with the parents present
+  # as every instance evaluates it, so a declaration reading its parent (`options.x.type`,
+  # `config.flag`) is as total as the published plane. An option a parent publishes at the same
+  # path with a type of the same mark is that parent's, carried by its mark (`planeOf`'s `parents`), and
+  # is not tagged again; every other option, a parent's option re-typed here included, is.
+  optionAt =
+    p: t:
+    builtins.foldl' (
+      acc: n: if acc != null && builtins.isAttrs acc && acc ? ${n} then acc.${n} else null
+    ) t p;
+  # A type's mark identifies it only where it seals nothing: a mark beside sealed subjects (a
+  # submodule's modules) is blind to them, and `componentsPreimage` propagates them, so such a
+  # type is tagged here even when a parent publishes one of the same mark.
+  exactTypeMark =
+    t:
+    if
+      builtins.isAttrs t
+      && t ? __mint
+      && builtins.isAttrs t.__mint
+      && (!builtins.isAttrs (t.__sealed or null) || t.__sealed == { })
+    then
+      t.__mint.minted or null
+    else
+      null;
+  inheritedOption =
+    parents: p: o:
+    let
+      t = o.type or null;
+      m = exactTypeMark t;
+    in
+    builtins.any (
+      v:
+      let
+        q = optionAt p (v.options or { });
+      in
+      q != null
+      && isOptionDecl q
+      && (
+        if t == null then
+          (q.type or null) == null
+        else
+          m != null && !(isSealedType t) && exactTypeMark (q.type or null) == m
+      )
+    ) parents;
+
+  # A kind's OWN defs (den-hoag-a7c9r), for its plane's `modules`: the first `n` of `strippedDefs` (its
+  # declared defs; the desugared parents follow them) less every parent `evalSchema` injected (decided by
+  # `file` alone, as the `mkType` arm's nesting decides them), and less every kind VALUE the deprecated
+  # spelling imports inline (`kindImports`, through the attrset modules `declListOf` walks), so both
+  # spellings read one plane. A parent enters the plane by its mark. ★ A kind value reached only through
+  # an imported FILE stays in the file, sealed there: finer, never coarser. At library scope, so a kind
+  # with no parent allocates nothing for it.
+  ownDefsOf =
+    kind: kindImports: n: strippedDefs:
+    let
+      ownOf =
+        v:
+        if builtins.isAttrs v && !(v ? __functor) then
+          let
+            keep =
+              l: map ownOf (builtins.filter (m: !(isSchemaKind m)) (if builtins.isList l then l else [ l ]));
+          in
+          v
+          // prelude.optionalAttrs (v ? imports) { imports = keep v.imports; }
+          // prelude.optionalAttrs (v ? require && !(isStructuredDecl v)) { require = keep v.require; }
+        else
+          v;
+      unresolved = builtins.filter (
+        d: !(prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")))
+      ) (builtins.genList (builtins.elemAt strippedDefs) n);
+    in
+    if kindImports == [ ] then unresolved else map (d: d // { value = ownOf d.value; }) unresolved;
+
   planeOf =
     {
       kind,
@@ -184,51 +257,6 @@ let
       parents ? [ ],
     }:
     let
-      # ★ THE OWN OPTIONS (den-hoag-a7c9r). The tree is the MERGED one, evaluated with the parents present
-      # as every instance evaluates it, so a declaration reading its parent (`options.x.type`,
-      # `config.flag`) is as total as the published plane. An option a parent publishes at the same
-      # path with a type of the same mark is that parent's, carried by its mark (`parents` below), and
-      # is not tagged again; every other option, a parent's option re-typed here included, is.
-      parentOptions = map (v: v.options or { }) parents;
-      at =
-        p: t:
-        builtins.foldl' (
-          acc: n: if acc != null && builtins.isAttrs acc && acc ? ${n} then acc.${n} else null
-        ) t p;
-      # A type's mark identifies it only where it seals nothing: a mark beside sealed subjects (a
-      # submodule's modules) is blind to them, and `componentsPreimage` propagates them, so such a
-      # type is tagged here even when a parent publishes one of the same mark.
-      markOfType =
-        t:
-        if
-          builtins.isAttrs t
-          && t ? __mint
-          && builtins.isAttrs t.__mint
-          && (!builtins.isAttrs (t.__sealed or null) || t.__sealed == { })
-        then
-          t.__mint.minted or null
-        else
-          null;
-      inherited =
-        p: o:
-        let
-          t = o.type or null;
-          m = markOfType t;
-        in
-        builtins.any (
-          tree:
-          let
-            q = at p tree;
-          in
-          q != null
-          && isOptionDecl q
-          && (
-            if t == null then
-              (q.type or null) == null
-            else
-              m != null && !(isSealedType t) && markOfType (q.type or null) == m
-          )
-        ) parentOptions;
       optionComponents =
         prefix: opts:
         prelude.concatMap (
@@ -237,7 +265,7 @@ let
             o = opts.${n};
             p = prefix ++ [ n ];
           in
-          if isOptionDecl o && parents != [ ] && inherited p o then
+          if parents != [ ] && isOptionDecl o && inheritedOption parents p o then
             [ ]
           # An option with no `type` still enters, as `null`, so the option set stays in the mark.
           else if isOptionDecl o then
@@ -2273,40 +2301,15 @@ let
               # Strip all collection keys before deferredModule merge. The desugared parents join here,
               # where `evalSchema`'s injected defs arrive: the default branch composes this list and both
               # planes read it, while the `mkType` caller receives the parents nested (at `custom`).
-              strippedRaw = map (
-                d:
-                if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
-                  d // { value = builtins.removeAttrs d.value collectionKeys; }
-                else
-                  d
-              ) defs;
-              strippedDefs = strippedRaw ++ desugaredDefs;
-              # The kind's OWN defs, the plane's (den-hoag-a7c9r): `strippedDefs` less every composed
-              # parent, the desugared ones and the ones `evalSchema` injected (decided by `file` alone,
-              # as the `mkType` arm's nesting decides them), and less every kind VALUE the deprecated
-              # spelling imports inline (`kindImports`, through the attrset modules `declListOf` walks),
-              # so both spellings read one plane. A parent enters the plane by its mark. ★ A kind value
-              # reached only through an imported FILE stays in the file, so that spelling's plane also
-              # reads the parent's options and the file sealed: finer, never coarser.
-              ownDefs =
-                let
-                  ownOf =
-                    v:
-                    if builtins.isAttrs v && !(v ? __functor) then
-                      let
-                        keep =
-                          l: map ownOf (builtins.filter (m: !(isSchemaKind m)) (if builtins.isList l then l else [ l ]));
-                      in
-                      v
-                      // prelude.optionalAttrs (v ? imports) { imports = keep v.imports; }
-                      // prelude.optionalAttrs (v ? require && !(isStructuredDecl v)) { require = keep v.require; }
-                    else
-                      v;
-                  unresolved = builtins.filter (
-                    d: !(prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")))
-                  ) strippedRaw;
-                in
-                if kindImports == [ ] then unresolved else map (d: d // { value = ownOf d.value; }) unresolved;
+              strippedDefs =
+                map (
+                  d:
+                  if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
+                    d // { value = builtins.removeAttrs d.value collectionKeys; }
+                  else
+                    d
+                ) defs
+                ++ desugaredDefs;
 
               # Resolve baseModule value (may be a function of kind name)
               resolvedBase =
@@ -2553,9 +2556,16 @@ let
                       collections = extractedCollections;
                       inherit keySemantics;
                       computed = minted;
-                      modules = map (d: d.value) (if kindParents == [ ] then strippedDefs else ownDefs) ++ [
-                        resolvedBase
-                      ];
+                      modules =
+                        (
+                          if kindParents == [ ] then
+                            map (d: d.value) strippedDefs
+                          else
+                            map (d: d.value) (ownDefsOf kind kindImports (builtins.length defs) strippedDefs)
+                        )
+                        ++ [
+                          resolvedBase
+                        ];
                       functions = { inherit mkType computed; };
                       parents = kindParents;
                     };
@@ -2705,9 +2715,16 @@ let
                       collections = extractedCollections;
                       inherit keySemantics;
                       computed = minted;
-                      modules = map (d: d.value) (if kindParents == [ ] then strippedDefs else ownDefs) ++ [
-                        effectiveBase
-                      ];
+                      modules =
+                        (
+                          if kindParents == [ ] then
+                            map (d: d.value) strippedDefs
+                          else
+                            map (d: d.value) (ownDefsOf kind kindImports (builtins.length defs) strippedDefs)
+                        )
+                        ++ [
+                          effectiveBase
+                        ];
                       functions = { inherit mkType computed; };
                       parents = kindParents;
                     };
