@@ -29,6 +29,9 @@
 let
   # `builtins.warn` where the evaluator has it (it honours `abort-on-warn`), a trace otherwise.
   warn = builtins.warn or (msg: v: builtins.trace "evaluation warning: ${msg}" v);
+  # One partial application for every kind, so the constant tags it mints are minted once per
+  # evaluation, not once per kind (den-hoag-a7c9r).
+  preimageOf = componentsPreimage identity.hashIdentity;
   # ★ THE PROVENANCE MARK (ADR-0034), minted at the ONE site every kind value reaches — both
   # declaration shapes arrive at `mkSchemaEntryType`'s merge, `mkSchemaOption` directly and
   # gen-aspects through `genSchema.mkSchemaOption`. It is what makes "this value came out of a
@@ -352,7 +355,7 @@ let
           (((m.config or { })._module or { }).freeformType or null)
         ]) open
       );
-      p = componentsPreimage identity.hashIdentity (
+      p = preimageOf (
         optionComponents [ ] options
         ++ openComponents
         ++ [
