@@ -349,6 +349,83 @@ let
   poslessPlain = builtins.fromJSON ''{"config":{}}'' // {
     options.tag = str "x";
   };
+  # ONE kind declaration (one definition value, so one witness) constructed by two schemas that differ only in a
+  # schema collection: two constructions at one declaration node whose marks differ. gen composes both (unequal
+  # marks); nixpkgs keeps both because the mark is in the result key. A result key without the mark would let
+  # nixpkgs keep one silently.
+  twoSchemaConstructions =
+    parented:
+    let
+      decl = {
+        options.trail = trailOpt;
+        config.trail = [ "k" ];
+      };
+      schemaWith =
+        cols:
+        (genMerge.evalModuleTree { } [
+          { options.schema = genSchema.mkSchemaOption cols; }
+          (
+            { config, ... }:
+            {
+              config.schema = {
+                r = { };
+                k = decl // (if parented then { inherits = [ config.schema.r ]; } else { });
+              };
+            }
+          )
+        ]).config.schema;
+      a = schemaWith { };
+      b = schemaWith {
+        collections.tags = {
+          default = [ "x" ];
+          merge = acc: v: acc ++ v;
+        };
+      };
+    in
+    {
+      witnessEqual = a.k.__kindWitness == b.k.__kindWitness;
+      marksDiffer = a.k.__mint.minted != b.k.__mint.minted;
+      ab = both "trail" [
+        a.k
+        b.k
+      ];
+      ba = both "trail" [
+        b.k
+        a.k
+      ];
+      aa = both "trail" [
+        a.k
+        a.k
+      ];
+    };
+  twoSchemaExpected = {
+    witnessEqual = true;
+    marksDiffer = true;
+    ab = {
+      gen = [
+        "k"
+        "k"
+      ];
+      nixpkgs = [
+        "k"
+        "k"
+      ];
+    };
+    ba = {
+      gen = [
+        "k"
+        "k"
+      ];
+      nixpkgs = [
+        "k"
+        "k"
+      ];
+    };
+    aa = {
+      gen = [ "k" ];
+      nixpkgs = [ "k" ];
+    };
+  };
   mixedGuard =
     args:
     try (
@@ -370,6 +447,17 @@ in
   # the mixed-guard fixture's live control: no second construction reached, so the instance reads its
   # address under either schema, whichever reads the instance (its refusals: ci/tests-error.nix,
   # `key-guarded-pair-refusals`)
+  flake.tests.key-two-constructions-one-node = {
+    test-parentless-two-schemas-one-declaration-keep-both-in-both-engines = {
+      expr = twoSchemaConstructions false;
+      expected = twoSchemaExpected;
+    };
+    test-parented-two-schemas-one-declaration-keep-both-in-both-engines = {
+      expr = twoSchemaConstructions true;
+      expected = twoSchemaExpected;
+    };
+  };
+
   flake.tests.key-guarded-pair-control = {
     test-one-construction-under-either-schema-serves = {
       expr =
