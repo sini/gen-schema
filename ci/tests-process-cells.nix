@@ -48,11 +48,48 @@ let
         tag:
         if tag == "schemakind" then
           l: f: builtins.trace label (identity.hashIdentity tag l f)
+        # a second label for component mints, which the runner counts apart from the kind mints
+        else if tag == "component" then
+          l: f: builtins.trace "${label}-component" (identity.hashIdentity tag l f)
         else
           identity.hashIdentity tag;
     };
   };
 
+  # den-hoag-a7c9r U1 · `n` parentless kinds of four `str` options and no collection: every inert
+  # component that is `null` or `[ ]` enters by one tag minted once per evaluation, so the component
+  # mints are one per kind (its option types) plus the two constants.
+  componentKinds =
+    n:
+    let
+      s =
+        (merge.evalModuleTree { } [
+          { options.schema = S.mkSchemaOption { }; }
+          {
+            config.schema = builtins.listToAttrs (
+              builtins.genList (i: {
+                name = "k${toString i}";
+                value.options = builtins.listToAttrs (
+                  map
+                    (o: {
+                      name = o;
+                      value = merge.mkOption { type = merge.types.str; };
+                    })
+                    [
+                      "a"
+                      "b"
+                      "c"
+                      "d"
+                    ]
+                );
+              }) n
+            );
+          }
+        ]).config.schema;
+    in
+    builtins.foldl' (a: k: builtins.seq s.${k}.__mint.minted (a + 1)) 0 (
+      builtins.genList (i: "k${toString i}") n
+    );
   intOpt = merge.mkOption {
     type = merge.types.int;
     default = 1;
@@ -125,6 +162,8 @@ in
   mints-eight-kinds = builtins.foldl' (a: i: builtins.seq (treeOf i).sub.__mint.minted (a + 1)) 0 (
     builtins.genList (i: i) 8
   );
+  component-mints-one-kind = componentKinds 1;
+  component-mints-four-kinds = componentKinds 4;
   # One application per demanded value: the type decides its own refinements, and the kind pass
   # does not re-check them.
   refined-cost-in-kind = inKindRead (S.refined T.int spyPos);
