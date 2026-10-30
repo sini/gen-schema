@@ -209,7 +209,9 @@ in
       expected = true;
     };
 
-    # G7: the internal map is unchanged by the accessor (marks pinned as evaluated at d910c2c)
+    # G7: the internal map is unchanged by the accessor (marks pinned as evaluated at d910c2c; the
+    # parented ones re-pinned when a parent entered its child's mark by its own, den-hoag-a7c9r: the
+    # parentless `a` and `p` are the d910c2c literals still)
     test-internal-map-unchanged = {
       expr = {
         chain = mapOf chain.c;
@@ -218,18 +220,18 @@ in
       };
       expected = {
         chain = {
-          "schemakind:c85b61f3b9d5cf659ab547fce743940741b3c1d958575b96b0f6c0474ba8a852" = "b";
+          "schemakind:42567102824bdbf49c7b15301297c887d43699879136574e87e1d4cbdb02e2f5" = "b";
           "schemakind:ff1105f30503ae8e687e3a3e3982d9d6e6f31cf4fda602114a0754ef03f5b06b" = "a";
         };
         diamond = {
-          "schemakind:c044b91553d7859f8fe9cb357bd3b75c9cccabcaba738e6cc97f9e36878845eb" = "c";
-          "schemakind:c85b61f3b9d5cf659ab547fce743940741b3c1d958575b96b0f6c0474ba8a852" = "b";
+          "schemakind:3797d0918e49b7635ec9e1330dfbe47d63c036788452b4f5941a4d943fed867a" = "c";
+          "schemakind:42567102824bdbf49c7b15301297c887d43699879136574e87e1d4cbdb02e2f5" = "b";
           "schemakind:ff1105f30503ae8e687e3a3e3982d9d6e6f31cf4fda602114a0754ef03f5b06b" = "a";
         };
         foreign = {
           "schemakind:193ef77bc6cf63adb8f5105b50810ded9407ed3dc8ee9b6641bdd13905dcd472" = "p";
-          "schemakind:22b08bd0fa038e3c05e8ee0e051cae31c2ead9d23e9686ee98fd53ce818c3956" = "x";
-          "schemakind:c0c5d615f3e683474694041f953206c7fd9478f74ca7fce313de2279a985ab71" = "y";
+          "schemakind:550c3a0f225af7a6ce75efa02ef96e23c5e3641d701a2ca6058f9f12cf655cb4" = "x";
+          "schemakind:1817fd5676cf7665b77048c5ea92de954b3fd1d57d0da713c10d91def6db5065" = "y";
         };
       };
     };
