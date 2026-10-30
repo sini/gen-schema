@@ -2601,7 +2601,8 @@ let
                     # write closes — `kind` is refused as a computed-field name below regardless.
                     # The mark reads `plane`, the one plane the arm publishes as `options` and `refs`
                     # (den-hoag-mx07b §4 Q1 ruled). `ci/tests/mktype-refinements.nix` pins that the mark
-                    # reads it.
+                    # reads it. An option a parent publishes with an exact mark enters by that parent's
+                    # mark rather than again (den-hoag-a7c9r): the same plane, factored.
                     inherit kind;
                     __mint = {
                       minted = builtins.seq identityVerdict (markOf {
