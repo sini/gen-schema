@@ -77,6 +77,18 @@
 
         control=$n
 
+        # den-hoag-a7c9r U1 · the constant component tags are minted once per evaluation: one component
+        # mint per parentless kind beside them, so four kinds mint three more than one kind does.
+        evalArm component-mints-one-kind
+        [ "$val" = "1" ] || die component-mints-one-kind "expected value 1, got '$val'"
+        c1=$(grep -c "trace: $label-component\$" "$TMPDIR/err" || true)
+        evalArm component-mints-four-kinds
+        [ "$val" = "4" ] || die component-mints-four-kinds "expected value 4, got '$val'"
+        c4=$(grep -c "trace: $label-component\$" "$TMPDIR/err" || true)
+        [ "$c1" -ge 1 ] || die component-mints-one-kind "the spy counted no component mint at all"
+        [ "$c1" = "3" ] && [ "$c4" = "6" ] ||
+          die component-mints-four-kinds "expected 3 component mints for 1 kind and 6 for 4 (one per kind and the two constants once), counted $c1 and $c4"
+
         # den-hoag-refined-outside-kind-silent-1jlsq · a refined type applies each predicate once per
         # demanded value, inside a kind (strict or lazy) and outside one.
         for c in refined-cost-in-kind:5:1 refined-cost-in-kind-lazy:5:1 refined-cost-outside:5:1 \
@@ -145,8 +157,8 @@
           die inheriting-same-name-residue "expected the recursion abort: $(tail -n 3 "$TMPDIR/err")"
 
         # 0/0 is a false pass: the runner must have executed every cell above.
-        [ "$ran" = "13" ] || die runner "expected 13 evaluations, ran $ran"
-        echo "tests-process: 13 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst"
+        [ "$ran" = "15" ] || die runner "expected 15 evaluations, ran $ran"
+        echo "tests-process: 15 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst"
       '';
     };
 }
