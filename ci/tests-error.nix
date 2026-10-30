@@ -3701,7 +3701,7 @@ in
           k2eq.d.options.b.default;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: kind 'd' reaches 'base' along d -> sub -> base and along d -> x -> base: two declarations of 'base' mint one identity and are unequal only at sealed component\\(s\\) 'modules', 'open.options.b.default': ";
+          msg = "^gen-schema: kind 'd' reaches 'base' along d -> sub -> base and along d -> x -> base: two declarations of 'base' mint one identity and are unequal only at sealed component\\(s\\) 'open.options.b.default': ";
         };
       };
       # An ancestor named as the kind is named as the foreign kind value, at the class check and at
@@ -3722,7 +3722,7 @@ in
           (selfDiamond (viaBoth 443).x).options.b.default;
         expectedError = {
           type = "ThrownError";
-          msg = "^gen-schema: kind 'base' reaches the foreign kind value 'base' along base -> sub -> base and along base -> x -> base: two declarations of 'base' mint one identity and are unequal only at sealed component\\(s\\) 'modules', 'open.options.b.default': ";
+          msg = "^gen-schema: kind 'base' reaches the foreign kind value 'base' along base -> sub -> base and along base -> x -> base: two declarations of 'base' mint one identity and are unequal only at sealed component\\(s\\) 'open.options.b.default': ";
         };
       };
     };
@@ -3869,7 +3869,7 @@ in
       controls = (forced (o_a [ (oneGenerator "two") ])).value == "two";
       collision = {
         type = "ThrownError";
-        msg = "^gen-schema: kind 'a' is imported twice under one key: two declarations of 'a' mint one identity and are unequal only at sealed component\\(s\\) 'modules', 'open\\.options\\.o_a\\.default': ";
+        msg = "^gen-schema: kind 'a' is imported twice under one key: two declarations of 'a' mint one identity and are unequal only at sealed component\\(s\\) 'open\\.options\\.o_a\\.default', 'parents\\.0': ";
       };
       reserved = {
         type = "ThrownError";
