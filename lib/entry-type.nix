@@ -444,20 +444,23 @@ let
         ++ spread [ "computed" ] (_: [ ]) computed
         ++ [
           # ★ A FUNCTION MODULE IS OPEN CONTENT, SO ITS SUBJECT IS ALLOCATED BY THIS CALL (den-hoag-a7c9r).
-          # What a function module contributes lives in its body, which the plane cannot see
+          # A function module is a lambda or a functor, as nixpkgs' `lib.isFunction` reads it. What it
+          # contributes lives in its body, which the plane cannot see
           # into (den-hoag-egei0): the module is the sealed component standing for that content, as an
           # `openComponents` path is. So its subject is `_: m`, a closure this construction allocates,
           # never equal to another construction's on any evaluator. `==` over the function itself is
           # value-slot identity on Nix and Determinate and closure identity on Lix, and one function
           # reached through `import`, a selection or a module argument is one closure on Lix and two
           # slots elsewhere, so a subject holding it decided one shared module twin `true` on Lix alone.
-          # A path, string or functor module is compared as itself: a path by value, a functor attrset by
-          # its attributes' slots, which `import`, selection and `//` all carry, so those agree on all
-          # three. One construction with itself is still one value (the dedup gate). The tag is
-          # unchanged: a list holding a lambda is sealed whichever lambda it holds.
+          # A functor's `__functor` is such a lambda, compared the same split way, so a functor is wrapped
+          # too. A path or string module is compared as itself, by value, the same on all three. One
+          # construction with itself is still one value (the dedup gate). The tag is unchanged: a list
+          # holding a lambda is sealed whichever lambda it holds.
           {
             path = [ "modules" ];
-            value = map (m: if builtins.isFunction m then _: m else m) (builtins.catAttrs "opaque" walked);
+            value = map (m: if builtins.isFunction m || m ? __functor then _: m else m) (
+              builtins.catAttrs "opaque" walked
+            );
           }
           (
             if builtins.any isSealedType freeforms then
