@@ -984,6 +984,7 @@ let
     "__kindCycleParents"
     "__kindSelf"
     "__witness"
+    "__kindContextFree"
   ];
 
   # ★ THE COLLECTION KEY SPACE'S RESERVED SET (den-hoag-6vgwm). A caller-supplied collection NAME
@@ -2204,15 +2205,14 @@ let
               # Strip all collection keys before deferredModule merge. The desugared parents join here,
               # where `evalSchema`'s injected defs arrive: the default branch composes this list and both
               # planes read it, while the `mkType` caller receives the parents nested (at `custom`).
-              strippedDefs =
-                map (
-                  d:
-                  if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
-                    d // { value = builtins.removeAttrs d.value collectionKeys; }
-                  else
-                    d
-                ) defs
-                ++ desugaredDefs;
+              strippedOwn = map (
+                d:
+                if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
+                  d // { value = builtins.removeAttrs d.value collectionKeys; }
+                else
+                  d
+              ) defs;
+              strippedDefs = strippedOwn ++ desugaredDefs;
 
               # Resolve baseModule value (may be a function of kind name)
               resolvedBase =
@@ -2531,12 +2531,15 @@ let
                     # Lazy: forced only when `refinements` is, and that must stay so.
                     # Stored on the kind result so mkInstanceRegistry can consume them automatically.
                     extractedRefinements =
-                      (if mixinResult != null then mixinResult.refinements else { })
-                      // prelude.filterAttrs (_: v: v != [ ]) (
-                        prelude.mapAttrs (_: o: getRefinements o.type) (
-                          prelude.filterAttrs (_: o: isOptionDecl o && o ? type) introspect.options
-                        )
-                      );
+                      if layered then
+                        builtins.foldl' (a: c: c.refinements // a) (refinementsOfOptions ownIntrospect.options) parentCons
+                      else
+                        (if mixinResult != null then mixinResult.refinements else { })
+                        // prelude.filterAttrs (_: v: v != [ ]) (
+                          prelude.mapAttrs (_: o: getRefinements o.type) (
+                            prelude.filterAttrs (_: o: isOptionDecl o && o ? type) introspect.options
+                          )
+                        );
 
                     # Inject baseModule + methods module (methods is the only collection
                     # that generates instance-level options via mkMethodsModule)
@@ -2592,7 +2595,71 @@ let
                       )
                     );
 
-                    introspect = introspectOf merged;
+                    fullIntrospect = introspectOf merged;
+                    # f1iza prototype: THE LAYERED INTROSPECTION. A kind whose own defs are plain
+                    # attrset modules (no function, path, functor, imports, disabledModules) and whose
+                    # injected base is empty declares nothing that reads its evaluation, so its
+                    # declarations are its own tree's alone; layered over each parent construction's
+                    # published plane (itself layered), disjoint at every leaf, it is the full tree's
+                    # evaluation. A leaf two sources declare falls back to the full evaluation.
+                    ownDefsL = builtins.filter (
+                      d: !(prelude.hasPrefix (inheritsResolvedPrefix kind) (d.file or ""))
+                    ) strippedOwn;
+                    plainDecl =
+                      v:
+                      builtins.isAttrs v
+                      && !(v ? __functor)
+                      && !(v ? imports)
+                      && !(v ? require)
+                      && !(v ? disabledModules)
+                      && !(v ? _module);
+                    contextFree =
+                      injected == [ ]
+                      && builtins.all (d: plainDecl d.value) ownDefsL
+                      && builtins.all (p: p.__kindContextFree or false) kindParents;
+                    parentCons = map (p: p.__kindSelf null) kindParents;
+                    unionDisjoint =
+                      a: b:
+                      if a == null || b == null then
+                        null
+                      else
+                        let
+                          common = builtins.attrNames (builtins.intersectAttrs a b);
+                          subs = map (n: {
+                            name = n;
+                            value =
+                              if
+                                isOptionDecl a.${n}
+                                || isOptionDecl b.${n}
+                                || !(builtins.isAttrs a.${n})
+                                || !(builtins.isAttrs b.${n})
+                              then
+                                null
+                              else
+                                unionDisjoint a.${n} b.${n};
+                          }) common;
+                        in
+                        if common == [ ] then
+                          a // b
+                        else if builtins.any (x: x.value == null) subs then
+                          null
+                        else
+                          a // b // builtins.listToAttrs subs;
+                    ownIntrospect = introspectOf (resolvedOnly (base.merge loc ownDefsL));
+                    layeredOptions =
+                      if !contextFree || kindParents == [ ] then
+                        null
+                      else
+                        builtins.foldl' unionDisjoint ownIntrospect.options (map (c: c.options) parentCons);
+                    layered = layeredOptions != null;
+                    introspect =
+                      if !layered then
+                        fullIntrospect
+                      else
+                        {
+                          options = resolvedOnly layeredOptions;
+                          refs = resolvedOnly (builtins.foldl' (a: c: c.refs // a) ownIntrospect.refs parentCons);
+                        };
                     plane = planeOf {
                       inherit
                         kind
@@ -2706,6 +2773,7 @@ let
                     __kindCycleParents = cycleParents;
                     __kindWitness = kindWitness;
                     __kindAncestors = resolvedOnly kindAncestorsByMark;
+                    __kindContextFree = contextFree;
                   }
                   // keyEqRecord
               )
