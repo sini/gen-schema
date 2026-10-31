@@ -2230,9 +2230,9 @@ let
               # is the inheritance-cycle walk, which runs before composition and so cannot read a mark;
               # its other reader is gen's engine: it is the declaration node gen-merge keys every kind by
               # (`__moduleKey`, below). Published as `__kindWitness`.
-              kindWitness = identity.hashIdentity "schemawitness" [ "defs" "kind" "options" "parents" ] (
-                l:
-                {
+              kindWitness =
+                "w:"
+                + builtins.toJSON ({
                   inherit kind;
                   defs = map (d: {
                     file = builtins.unsafeDiscardStringContext (toString (d.file or "?"));
@@ -2246,9 +2246,7 @@ let
                     else
                       [ ]
                   ) defs;
-                }
-                .${l}
-              );
+                });
 
               # THE ONE INHERITANCE-CYCLE WALK (8c8pr Q-b arm (i), 2026-09-30), for both spellings: a
               # kind that reaches its own witness through its parents' `__kindCycleParents` would import
