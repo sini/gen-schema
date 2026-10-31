@@ -761,12 +761,13 @@ let
     };
   # THE CONTENT STAMP (den-hoag-9zyp7, den-hoag-c2836): every cell but the three identity cells, the
   # mark (`__mint`), the sealed subjects (`__sealed`) and the ancestor map (`__kindAncestors`, keyed by
-  # marks), and the three DERIVED cells, `options`, `refs` and `refinements` (den-hoag-a7c9r, the depth
-  # unit). A derived cell is an introspection of the kind's whole tree, which no composing door reads (it
-  # composes `__functor`), and comparing it forced one introspection per ancestor of every kind read, each
-  # over that ancestor's own chain: quadratic in inheritance depth. A copy replacing a derived cell alone
-  # composes the construction it was taken from, and an identity answer still holds the whole stamp
-  # (`stampOk`, one `==` an honest value answers by sharing, forcing nothing).
+  # marks). Taken whole by the door that imports THIS kind (`mkInstanceType`'s import): one introspection of
+  # its own tree. At an ANCESTOR (`sameConstruction`, the lineage walk) the stamp is `stampLineageOk`, which
+  # also leaves out the three DERIVED cells, `options`, `refs` and `refinements` (den-hoag-a7c9r, the depth
+  # unit): a derived cell is an introspection of that ancestor's whole tree, no descendant composes one (it
+  # composes `__functor`), and comparing it at every ancestor of every kind read was quadratic in depth. The
+  # one descendant read of an ancestor's derived cell, a child's mark reading its parents' `options`
+  # (`inheritedOption`), is an identity answer and holds the whole stamp (`stampOk`).
   # A door that composes reads the content cells and no identity, so it never demands one: on
   # Nix and Determinate `==` forces each cell, and an identity cell's value is minted over the
   # collections, which may read the instance being built. Its readers answer no identity:
@@ -775,6 +776,23 @@ let
   # from and is refused where an identity is answered (`id_hash`, `identityHashForKind`, and a child's
   # mark, `__sealed`, `inherits` and `__kindAncestors`, which force `identityVerdict`), by `stampOk`.
   stampImportOk =
+    k:
+    builtins.isFunction k.__kindSelf
+    &&
+      stampAgrees
+        (builtins.removeAttrs (k.__kindSelf null) [
+          "__mint"
+          "__sealed"
+          "__kindAncestors"
+        ])
+        (
+          builtins.removeAttrs k [
+            "__mint"
+            "__sealed"
+            "__kindAncestors"
+          ]
+        );
+  stampLineageOk =
     k:
     builtins.isFunction k.__kindSelf
     &&
@@ -807,7 +825,7 @@ let
     && b ? __kindSelf
     &&
       builtins.intersectAttrs { __kindSelf = null; } a == builtins.intersectAttrs { __kindSelf = null; } b
-    && stampImportOk b;
+    && stampLineageOk b;
 
   stampRefusal =
     site: k:
@@ -2076,7 +2094,7 @@ let
                     # inside a FUNCTION module, and `types.submodule k`. Neither reaches this fold; both
                     # apply the kind's `__functor`, which ignores its `self`. ADR-0025's cxlc0 rider;
                     # pinned by `kind-value-swap.test-*-composes-unread`, closed under den-hoag-jrbis.
-                    else if p ? __kindSelf && !(stampImportOk p) then
+                    else if p ? __kindSelf && !(stampLineageOk p) then
                       stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${arrow here}" p
                     else
                       builtins.foldl' (step here) (
