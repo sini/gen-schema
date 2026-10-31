@@ -1530,6 +1530,36 @@ let
       }:
       let
         base = merge.types.deferredModule;
+        schemaDigest =
+          let
+            inertOr =
+              v:
+              let
+                r = builtins.tryEval (identity.hashIdentity "component" [ "value" ] (_: v));
+              in
+              if r.success then r.value else "sealed";
+          in
+          identity.hashIdentity "schemaconstruction" [ "collections" "flags" "keySemantics" ] (
+            l:
+            {
+              collections = builtins.mapAttrs (
+                _: c:
+                if builtins.isAttrs c then
+                  inertOr (builtins.removeAttrs c [ "merge" ] // { merge = c ? merge; })
+                else
+                  inertOr c
+              ) collections;
+              keySemantics = inertOr keySemantics;
+              flags = {
+                mkType = mkType != null;
+                computed = computed != null;
+                baseModule = if baseModule == null then "none" else witnessPos baseModule;
+                mixins = builtins.length mixins;
+                inherit strict;
+              };
+            }
+            .${l}
+          );
 
         # A plain base module (an attrset, not a functor, no mixin emission) is keyed by its declaration
         # node: gen meets it there and decides it by its VALUE seal (ADR-0034's sealed limb compares the
@@ -2230,9 +2260,9 @@ let
               # is the inheritance-cycle walk, which runs before composition and so cannot read a mark;
               # its other reader is gen's engine: it is the declaration node gen-merge keys every kind by
               # (`__moduleKey`, below). Published as `__kindWitness`.
-              kindWitness = identity.hashIdentity "schemawitness" [ "defs" "kind" "options" "parents" ] (
-                l:
-                {
+              kindWitness =
+                "w:"
+                + builtins.toJSON ({
                   inherit kind;
                   defs = map (d: {
                     file = builtins.unsafeDiscardStringContext (toString (d.file or "?"));
@@ -2246,9 +2276,7 @@ let
                     else
                       [ ]
                   ) defs;
-                }
-                .${l}
-              );
+                });
 
               # THE ONE INHERITANCE-CYCLE WALK (8c8pr Q-b arm (i), 2026-09-30), for both spellings: a
               # kind that reaches its own witness through its parents' `__kindCycleParents` would import
@@ -2947,7 +2975,7 @@ let
                         {
                           # the reference key, for a foreign evaluator: nixpkgs dedups and removes the kind by
                           # it; gen reads the record's (`__keyEq.key`), so it never forces this one at load
-                          key = "gen-schema-kind:${kind}#${kindWitness}#${ownMark}";
+                          key = "gen-schema-kind:${kind}#${kindWitness}#${schemaDigest}";
                           config = { };
                         };
                     # THIS construction's token, compared as one attrset (`a.token == b.token`): the one
