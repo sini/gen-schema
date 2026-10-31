@@ -761,7 +761,13 @@ let
     };
   # THE CONTENT STAMP (den-hoag-9zyp7, den-hoag-c2836): every cell but the three identity cells, the
   # mark (`__mint`), the sealed subjects (`__sealed`) and the ancestor map (`__kindAncestors`, keyed by
-  # marks). A door that composes reads the content cells and no identity, so it never demands one: on
+  # marks), and the three DERIVED cells, `options`, `refs` and `refinements` (den-hoag-a7c9r, the depth
+  # unit). A derived cell is an introspection of the kind's whole tree, which no composing door reads (it
+  # composes `__functor`), and comparing it forced one introspection per ancestor of every kind read, each
+  # over that ancestor's own chain: quadratic in inheritance depth. A copy replacing a derived cell alone
+  # composes the construction it was taken from, and an identity answer still holds the whole stamp
+  # (`stampOk`, one `==` an honest value answers by sharing, forcing nothing).
+  # A door that composes reads the content cells and no identity, so it never demands one: on
   # Nix and Determinate `==` forces each cell, and an identity cell's value is minted over the
   # collections, which may read the instance being built. Its readers answer no identity:
   # `mkInstanceType`'s import, and `sameConstruction` in `formOf`'s composing arm, the fold's meeting
@@ -777,12 +783,18 @@ let
           "__mint"
           "__sealed"
           "__kindAncestors"
+          "options"
+          "refs"
+          "refinements"
         ])
         (
           builtins.removeAttrs k [
             "__mint"
             "__sealed"
             "__kindAncestors"
+            "options"
+            "refs"
+            "refinements"
           ]
         );
 
