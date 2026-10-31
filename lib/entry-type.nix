@@ -206,10 +206,7 @@ let
       q != null
       && isOptionDecl q
       && (
-        if t == null then
-          (q.type or null) == null
-        else
-          m != null && !(isSealedType t) && exactTypeMark (q.type or null) == m
+        if t == null then (q.type or null) == null else m != null && exactTypeMark (q.type or null) == m
       )
     ) parents;
 
@@ -446,9 +443,21 @@ let
         ++ spread [ "refs" ] (e: [ e.type ]) refs
         ++ spread [ "computed" ] (_: [ ]) computed
         ++ [
+          # ★ A FUNCTION MODULE IS OPEN CONTENT, SO ITS SUBJECT IS ALLOCATED BY THIS CALL (den-hoag-a7c9r).
+          # What a function module contributes lives in its body, which the plane cannot see
+          # into (den-hoag-egei0): the module is the sealed component standing for that content, as an
+          # `openComponents` path is. So its subject is `_: m`, a closure this construction allocates,
+          # never equal to another construction's on any evaluator. `==` over the function itself is
+          # value-slot identity on Nix and Determinate and closure identity on Lix, and one function
+          # reached through `import`, a selection or a module argument is one closure on Lix and two
+          # slots elsewhere, so a subject holding it decided one shared module twin `true` on Lix alone.
+          # A path, string or functor module is compared as itself: a path by value, a functor attrset by
+          # its attributes' slots, which `import`, selection and `//` all carry, so those agree on all
+          # three. One construction with itself is still one value (the dedup gate). The tag is
+          # unchanged: a list holding a lambda is sealed whichever lambda it holds.
           {
             path = [ "modules" ];
-            value = map (m: m.opaque) (builtins.filter (m: m ? opaque) walked);
+            value = map (m: if builtins.isFunction m then _: m else m) (builtins.catAttrs "opaque" walked);
           }
           (
             if builtins.any isSealedType freeforms then
