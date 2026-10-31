@@ -3,8 +3,11 @@
 # same function decide by NO closure identity, so every route that reaches one function refuses on all
 # three evaluators. Before, `==` over the function decided: value-slot identity on Nix and Determinate,
 # closure identity on Lix, so the shared, `import`ed, selected and module-argument routes read `true` on
-# Lix alone. A path module compares as itself, and so does a functor attrset (its attributes' slots
-# travel through `import`, selection and `//`); one construction with itself is one value. Each row reads
+# Lix alone. A functor module is a function module (nixpkgs' `lib.isFunction` reads a functor as one), so
+# a shared functor value, a functor file imported twice, a functor written around one let-bound lambda,
+# one selected at each site or one passed as a module argument, all refuse too: before, the selected and
+# argument routes were split the same way. A path module compares as itself; one construction with itself
+# is one value. Each row reads
 # `[ marksEqual kindEq ]` over two constructions in two schemas, on both entry arms.
 {
   lib,
@@ -46,6 +49,11 @@ let
   fnctFile = builtins.toFile "fm-functor.nix" ''{ __functor = _: { ... }: { options.f = { _type = "option"; }; }; }'';
   holder = {
     m = lam;
+    f = fct;
+  };
+  fct = _: { ... }: { options.f = opt T.str; };
+  F = {
+    __functor = fct;
   };
   A = {
     options.x = opt T.str;
@@ -107,6 +115,40 @@ let
       );
       pathShared = read (pl pathMod) (pl pathMod);
       functorEach = read (pl (import fnctFile)) (pl (import fnctFile));
+      functorShared = read (pl F) (pl F);
+      functorLetEach = read (pl { __functor = fct; }) (pl {
+        __functor = fct;
+      });
+      functorSelectEach = read (pl { __functor = holder.f; }) (pl {
+        __functor = holder.f;
+      });
+      functorSelectParent = read (pd { __functor = holder.f; }) (pd {
+        __functor = holder.f;
+      });
+      functorArgument =
+        let
+          via =
+            (genMerge.evalModuleTree { } [
+              { options.schema = genSchema.mkSchemaOption args; }
+              { _module.args.g = fct; }
+              ({ g, ... }: {
+                config.schema.a = A // {
+                  imports = [ { __functor = g; } ];
+                };
+              })
+            ]).config.schema.a;
+        in
+        read via (
+          (genMerge.evalModuleTree { } [
+            { options.schema = genSchema.mkSchemaOption args; }
+            { _module.args.g = fct; }
+            ({ g, ... }: {
+              config.schema.a = A // {
+                imports = [ { __functor = g; } ];
+              };
+            })
+          ]).config.schema.a
+        );
       self = read one one;
     };
   refused = [
@@ -124,7 +166,12 @@ let
     selectEach = refused;
     moduleArgument = refused;
     pathShared = same;
-    functorEach = same;
+    functorEach = refused;
+    functorShared = refused;
+    functorLetEach = refused;
+    functorSelectEach = refused;
+    functorSelectParent = refused;
+    functorArgument = refused;
     self = same;
   };
 in
