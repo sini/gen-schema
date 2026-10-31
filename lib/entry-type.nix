@@ -715,6 +715,7 @@ let
       sealed,
       token,
       guarded,
+      foreignKey ? null,
     }:
     {
       __moduleKey = "gen-schema-kind:${kind}#${kindWitness}";
@@ -756,7 +757,7 @@ let
         # distinct nodes both compose and no mark or seal is read; at a meeting `decide` names the one
         # construction reached again and `conflicts` the second construction gen-merge refuses
         meeting = "gen-schema-kind:${kind}#${kindWitness}";
-        key = "gen-schema-kind:${kind}#${kindWitness}#${mark}";
+        key = if foreignKey != null then foreignKey else "gen-schema-kind:${kind}#${kindWitness}#${mark}";
       };
     };
   # THE CONTENT STAMP (den-hoag-9zyp7, den-hoag-c2836): every cell but the three identity cells, the
@@ -1500,6 +1501,36 @@ let
       }:
       let
         base = merge.types.deferredModule;
+        schemaDigest =
+          let
+            inertOr =
+              v:
+              let
+                r = builtins.tryEval (identity.hashIdentity "component" [ "value" ] (_: v));
+              in
+              if r.success then r.value else "sealed";
+          in
+          identity.hashIdentity "schemaconstruction" [ "collections" "flags" "keySemantics" ] (
+            l:
+            {
+              collections = builtins.mapAttrs (
+                _: c:
+                if builtins.isAttrs c then
+                  inertOr (builtins.removeAttrs c [ "merge" ] // { merge = c ? merge; })
+                else
+                  inertOr c
+              ) collections;
+              keySemantics = inertOr keySemantics;
+              flags = {
+                mkType = mkType != null;
+                computed = computed != null;
+                baseModule = if baseModule == null then "none" else witnessPos baseModule;
+                mixins = builtins.length mixins;
+                inherit strict;
+              };
+            }
+            .${l}
+          );
 
         # A plain base module (an attrset, not a functor, no mixin emission) is keyed by its declaration
         # node: gen meets it there and decides it by its VALUE seal (ADR-0034's sealed limb compares the
@@ -2200,9 +2231,9 @@ let
               # is the inheritance-cycle walk, which runs before composition and so cannot read a mark;
               # its other reader is gen's engine: it is the declaration node gen-merge keys every kind by
               # (`__moduleKey`, below). Published as `__kindWitness`.
-              kindWitness = identity.hashIdentity "schemawitness" [ "defs" "kind" "options" "parents" ] (
-                l:
-                {
+              kindWitness =
+                "w:"
+                + builtins.toJSON ({
                   inherit kind;
                   defs = map (d: {
                     file = builtins.unsafeDiscardStringContext (toString (d.file or "?"));
@@ -2216,9 +2247,7 @@ let
                     else
                       [ ]
                   ) defs;
-                }
-                .${l}
-              );
+                });
 
               # THE ONE INHERITANCE-CYCLE WALK (8c8pr Q-b arm (i), 2026-09-30), for both spellings: a
               # kind that reaches its own witness through its parents' `__kindCycleParents` would import
@@ -2917,7 +2946,51 @@ let
                         {
                           # the reference key, for a foreign evaluator: nixpkgs dedups and removes the kind by
                           # it; gen reads the record's (`__keyEq.key`), so it never forces this one at load
-                          key = "gen-schema-kind:${kind}#${kindWitness}#${ownMark}";
+                          key =
+                            let
+                              markOrQ =
+                                t:
+                                if builtins.isAttrs t && t ? __mint && builtins.isAttrs t.__mint && t.__mint ? minted then
+                                  t.__mint.minted
+                                else
+                                  "?";
+                              optsKey =
+                                pre: os:
+                                prelude.concatMap (
+                                  n:
+                                  let
+                                    o = os.${n};
+                                  in
+                                  if isOptionDecl o then
+                                    [ "${pre}${n}=${markOrQ (o.type or null)}" ]
+                                  else if builtins.isAttrs o then
+                                    optsKey "${pre}${n}." o
+                                  else
+                                    [ "${pre}${n}=?" ]
+                                ) (builtins.attrNames os);
+                              defKey = builtins.concatStringsSep ";" (
+                                prelude.concatMap (
+                                  d:
+                                  if builtins.isAttrs d.value && builtins.isAttrs (d.value.options or null) then
+                                    optsKey "" d.value.options
+                                  else
+                                    [ "?" ]
+                                ) strippedDefs
+                              );
+                              colKey = builtins.concatStringsSep ";" (
+                                map (
+                                  c:
+                                  let
+                                    r = builtins.tryEval (builtins.toJSON extractedCollections.${c});
+                                  in
+                                  "${c}=${if r.success then r.value else "?"}"
+                                ) (builtins.filter (c: extractedCollections ? ${c}) kept)
+                              );
+                              parentsKey = builtins.concatStringsSep "|" (map (p: (p.__functor p { }).key or "?") kindParents);
+                            in
+                            "gen-schema-kind:${kind}#${kindWitness}#${
+                              builtins.replaceStrings [ "#" ] [ "%23" ] "${schemaDigest}/${defKey}/${colKey}/${parentsKey}"
+                            }";
                           config = { };
                         };
                     # THIS construction's token, compared as one attrset (`a.token == b.token`): the one
@@ -2953,6 +3026,7 @@ let
                       inherit (plane) sealed;
                       token = constructionToken;
                       guarded = kindGuarded;
+                      foreignKey = keyed.key;
                     };
                   in
                   # Precedence: computed overrides collections of the same name.
