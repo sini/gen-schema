@@ -12,9 +12,9 @@
 # function module twin, the child's own kind-level `config` differing, and a sealed `mkOptionType` at
 # the inherited path differing. Never coarser (false on base and head): option type, `inherits` order,
 # one option by two paths vs one, a schema collection, a re-declaration adding a `default`, and a
-# re-declaration re-typing the inherited path. The exact-mark guard's two halves each have a row that
-# a mutant removing it reddens: the comparison (`retypedAtInheritedPath`) and the sealed-subjects
-# condition (`subChildHalfDiffers`).
+# re-declaration re-typing the inherited path. Each part of the exact-mark guard has a row a mutant
+# removing it reddens: the mark comparison (`enumMergedAtInheritedPath`), `m != null` together with it
+# (`retypedAtInheritedPath`), and the sealed-subjects condition (`subChildHalfDiffers`).
 {
   lib,
   genSchema,
@@ -184,14 +184,24 @@ let
           (two [ "b" ]).d;
       schemaCollection = read (coll [ ]).b (coll [ "t" ]).b;
       redeclWithDefault = pair A { options.x = optd T.str "d"; } A { };
-      # the child re-declares the parent's `str` option with a rewritten `check`: the merged type at
-      # the inherited path is not the parent's, so it is tagged; the guard's comparison half (an
-      # inherited path is dropped only on an equal mark) is what keeps this pair apart
+      # the child re-declares the parent's `enum "e" [ "a" ]` as `enum "e" [ "b" ]`: the two merge, so the
+      # child's type at the inherited path is minted, exact and NOT the parent's; only the guard's mark
+      # comparison keeps it tagged (dropped, the pair reads equal marks against the undeclared child)
+      enumMergedAtInheritedPath = pair { options.x = opt (T.enum "e" [ "a" ]); } {
+        options.x = opt (T.enum "e" [ "b" ]);
+      } { options.x = opt (T.enum "e" [ "a" ]); } { };
+      # the child re-declares the parent's `str` option with a rewritten `check`: that type is not a
+      # gen record with a mark, so the path is tagged by the guard's `m != null` half; with the whole
+      # guard dropped the pair reads equal marks
       retypedAtInheritedPath = pair A {
         options.x = opt (T.str // { check = builtins.isString; });
       } A { };
     };
   expected = {
+    enumMergedAtInheritedPath = [
+      false
+      false
+    ];
     retypedAtInheritedPath = [
       false
       false
