@@ -11,7 +11,10 @@
 # Unmoved (refused on base and head): the child's half of a shared submodule option differing, a parent
 # function module twin, the child's own kind-level `config` differing, and a sealed `mkOptionType` at
 # the inherited path differing. Never coarser (false on base and head): option type, `inherits` order,
-# one option by two paths vs one, a schema collection, and a re-declaration adding a `default`.
+# one option by two paths vs one, a schema collection, a re-declaration adding a `default`, and a
+# re-declaration re-typing the inherited path. The exact-mark guard's two halves each have a row that
+# a mutant removing it reddens: the comparison (`retypedAtInheritedPath`) and the sealed-subjects
+# condition (`subChildHalfDiffers`).
 {
   lib,
   genSchema,
@@ -181,8 +184,18 @@ let
           (two [ "b" ]).d;
       schemaCollection = read (coll [ ]).b (coll [ "t" ]).b;
       redeclWithDefault = pair A { options.x = optd T.str "d"; } A { };
+      # the child re-declares the parent's `str` option with a rewritten `check`: the merged type at
+      # the inherited path is not the parent's, so it is tagged; the guard's comparison half (an
+      # inherited path is dropped only on an equal mark) is what keeps this pair apart
+      retypedAtInheritedPath = pair A {
+        options.x = opt (T.str // { check = builtins.isString; });
+      } A { };
     };
   expected = {
+    retypedAtInheritedPath = [
+      false
+      false
+    ];
     twinParented = [
       true
       true
