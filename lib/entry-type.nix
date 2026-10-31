@@ -985,6 +985,7 @@ let
     "__kindSelf"
     "__witness"
     "__kindContextFree"
+    "__kindLineage"
   ];
 
   # ★ THE COLLECTION KEY SPACE'S RESERVED SET (den-hoag-6vgwm). A caller-supplied collection NAME
@@ -1783,85 +1784,87 @@ let
               # parents, so the walk stops at it. Published as `__kindAncestors`. Each side's subject
               # is `kindSubject`'s, so a diamond reaching a `//` copy of an ancestor refuses by the
               # stamp, and an ancestor short of sealed subjects or a stamp is refused naming what it lacks.
+              # f1iza prototype B: THE ANCESTOR MAP, COMPOSED FROM THE PARENTS' (each parent's own fold
+              # decided and stamped its ancestors, behind its `resolvedOnly`): this kind stamps its
+              # direct parents on entry and merges each parent construction's published `__kindLineage`,
+              # deciding only the names two sources share. A chain shares none, so a kind pays its
+              # parents, not its ancestry.
               kindAncestors =
                 let
-                  arrow = prelude.concatStringsSep " -> ";
                   subjectOf = kindSubject "gen-schema: kind '${kind}' inherits";
-                  step =
-                    path: acc: p:
+                  addOne =
+                    acc: x:
                     let
-                      n = p.kind;
-                      here = path ++ [ p.kind ];
-                      held = acc.byName.${n} or [ ];
-                      same = builtins.filter (e: sameConstruction e.value p) held;
-                      met =
-                        if same != [ ] then same else builtins.filter (e: e.value.__mint.minted == p.__mint.minted) held;
+                      n = x.value.kind;
+                      p = x.value;
+                      held = acc.${n} or [ ];
+                      same = builtins.filter (e: sameConstruction e p) held;
+                      met = if same != [ ] then same else builtins.filter (e: e.__mint.minted == p.__mint.minted) held;
                       e = builtins.head met;
-                      entry = {
-                        value = p;
-                        path = here;
-                      };
-                      seen = acc // {
-                        order = acc.order ++ [ entry ];
-                      };
                     in
                     if held != [ ] && met != [ ] then
                       if
                         same != [ ]
                         ||
                           sealedCollisionEq
-                            "gen-schema: kind '${kind}' reaches ${ancestorName p.kind} along ${arrow e.path} and along ${arrow here}"
-                            (subjectOf e.value)
+                            "gen-schema: kind '${kind}' reaches ${ancestorName p.kind} along two parents (${x.via})"
+                            (subjectOf e)
                             (subjectOf p)
                       then
-                        seen
+                        acc
                       else
-                        throw "gen-schema: kind '${kind}' reaches two kinds named '${p.kind}' that share one mark, along ${arrow e.path} and along ${arrow here}: they differ only at a declared subject (a registered construction), which the mark is blind to, and the ancestor map is keyed by the mark, so it cannot hold both; give the two kinds different names or one construction"
-                    # Every ancestor's stamp is read on entry, not only at a diamond: a kind reached
-                    # through the `imports` spelling, at any depth, meets no `formOf`, and a `//` copy
-                    # there would compose the original while this map published the copy (an
-                    # `inherits` parent's own `formOf` already refuses what it reaches). Guarded as
-                    # `formOf` is, so a stamp-less kind-shaped value is walked as before. ★ TWO DOORS
-                    # STILL COMPOSE A `//` COPY UNREAD, enumerated, not closed: a kind value imported
-                    # inside a FUNCTION module, and `types.submodule k`. Neither reaches this fold; both
-                    # apply the kind's `__functor`, which ignores its `self`. ADR-0025's cxlc0 rider;
-                    # pinned by `kind-value-swap.test-*-composes-unread`, closed under den-hoag-jrbis.
-                    else if p ? __kindSelf && !(stampImportOk p) then
-                      stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${arrow here}" p
+                        throw "gen-schema: kind '${kind}' reaches two kinds named '${p.kind}' that share one mark, along two parents (${x.via}): they differ only at a declared subject (a registered construction), which the mark is blind to, and the ancestor map is keyed by the mark, so it cannot hold both; give the two kinds different names or one construction"
                     else
-                      builtins.foldl' (step here) (
-                        seen
-                        // {
-                          byName = acc.byName // {
-                            ${n} = held ++ [ entry ];
-                          };
-                        }
-                      ) (p.__kindImports or [ ]);
+                      acc // { ${n} = held ++ [ p ]; };
+                  lineageOf =
+                    p: if p ? __kindSelf && (p.__kindSelf null) ? __kindLineage then (p.__kindSelf null).__kindLineage else { };
+                  stepParent =
+                    acc: p:
+                    if p ? __kindSelf && !(stampImportOk p) then
+                      stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${kind} -> ${p.kind}" p
+                    else
+                      let
+                        lp = lineageOf p;
+                        withP = addOne lp {
+                          value = p;
+                          via = p.kind;
+                        };
+                        common = builtins.attrNames (builtins.intersectAttrs acc withP);
+                      in
+                      if acc == { } then
+                        withP
+                      else
+                        builtins.foldl' addOne (acc // builtins.removeAttrs withP common) (
+                          prelude.concatMap (
+                            n:
+                            map (v: {
+                              value = v;
+                              via = p.kind;
+                            }) withP.${n}
+                          ) common
+                        );
                 in
-                builtins.foldl' (step [ kind ]) {
-                  byName = { };
-                  order = [ ];
-                } kindParents;
-              kindAncestorValues = map (e: e.value) (
-                builtins.concatLists (builtins.attrValues kindAncestors.byName)
-              );
-              # THE IDENTITY HALF OF THE FOLD: every ancestor reached, in walk order, holds its whole stamp,
-              # in the fold's own words, before any identity this kind answers reads it.
+                builtins.foldl' stepParent { } kindParents;
+              # THE IDENTITY HALF: each parent holds its whole stamp, after its own identity verdict
+              # (which holds its parents', so by induction every ancestor's).
               lineageStamped = builtins.foldl' (
-                acc: e:
-                # each ancestor's own identity verdict first, so a refusal names the walk that owns it
-                if builtins.seq (e.value.__kindAncestors or null) (e.value ? __kindSelf && !(stampOk e.value)) then
-                  stampRefusal "gen-schema: kind '${kind}' reaches '${e.value.kind}' along ${prelude.concatStringsSep " -> " e.path}" e.value
+                acc: p:
+                if builtins.seq (p.__kindAncestors or null) (p ? __kindSelf && !(stampOk p)) then
+                  stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${kind} -> ${p.kind}" p
                 else
                   acc
-              ) true kindAncestors.order;
-              # the published map, keyed by mark (an identity read)
+              ) true kindParents;
+              # the published map, keyed by mark (an identity read): the parents' maps and the parents,
+              # the earlier parent's entry kept
               kindAncestorsByMark = builtins.seq identityVerdict (
-                builtins.listToAttrs (
-                  map (a: {
-                    name = a.__mint.minted;
-                    value = a;
-                  }) kindAncestorValues
+                builtins.seq kindAncestors (
+                  builtins.foldl' (
+                    acc: p:
+                    acc
+                    // builtins.removeAttrs ((p.__kindAncestors or { }) // { ${p.__mint.minted} = p; }) (
+                      builtins.attrNames acc
+                    )
+                  ) { } kindParents
                 )
               );
 
@@ -1876,7 +1879,7 @@ let
                     map (a: {
                       inherit a;
                       ds = classDefectsOf a;
-                    }) kindAncestorValues
+                    }) kindParents
                   );
                 in
                 prelude.concatMap (x: x.ds) (
@@ -2516,6 +2519,7 @@ let
                     __kindCycleParents = cycleParents;
                     __kindWitness = kindWitness;
                     __kindAncestors = resolvedOnly kindAncestorsByMark;
+                    __kindLineage = resolvedOnly kindAncestors;
                   }
                 else
                   let
@@ -2774,6 +2778,7 @@ let
                     __kindWitness = kindWitness;
                     __kindAncestors = resolvedOnly kindAncestorsByMark;
                     __kindContextFree = contextFree;
+                    __kindLineage = resolvedOnly kindAncestors;
                   }
                   // keyEqRecord
               )
