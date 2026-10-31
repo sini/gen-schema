@@ -2964,7 +2964,10 @@ let
                         guard
                         projected
                         ;
-                      inherit (introspect) options refs;
+                      # f1iza prototype C: a layered kind's plane walks its own layer only; every path
+                      # a parent publishes is that parent's record, determined by the parent's mark
+                      options = if layered then resolvedOnly ownIntrospect.options else introspect.options;
+                      refs = if layered then resolvedOnly ownIntrospect.refs else introspect.refs;
                       collections = extractedCollections;
                       inherit keySemantics;
                       computed = minted;
