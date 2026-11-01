@@ -1287,8 +1287,8 @@ prelude.genAttrs config.schema._collectionKeys (k: config.schema.host.${k})
 **Scope.** That idiom reads collection values on the **default entry-type path**. Two caveats, both
 real: a `computed` field sharing a collection's name **wins** on the kind result (`{ ... } // extractedCollections // computedFields`), so the idiom returns the computed value for that key, silently;
 and a caller-supplied `mkType` that does not spread `collections` onto its result makes the read fail
-with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__keyEq`, `__kindAncestors`, `__kindCycleParents`,
-`__kindImports`, `__kindSelf`, `__kindWitness`, `__mint`, `__pureModule`, `__reservedKeys`, `__sealed`, `__witness`, `_class`, `_file`, `_module`, `baseModule`,
+with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`, `__keyEq`, `__kindAncestors`, `__kindContextFree`, `__kindCycleParents`,
+`__kindImports`, `__kindLineage`, `__kindSelf`, `__kindWitness`, `__mint`, `__pureModule`, `__reservedKeys`, `__sealed`, `__witness`, `_class`, `_file`, `_module`, `baseModule`,
 `collections`, `computed`, `config`, `disabledModules`, `freeformType`, `imports`, `key`,
 `keySemantics`, `kind`, `meta`, `mixins`, `mkType`, `options`, `refinements`, `refs`, `require`,
 `specialArgs`, `strict` — `schema._reservedCollectionKeys`, 34 names: gen-merge's published

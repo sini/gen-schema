@@ -1,0 +1,4655 @@
+{
+  "chain": {
+    "gen": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "host": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "kinds": {
+      "k1": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k2": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k3": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k4": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k5": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k5o1": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o2": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o3": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o4": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      }
+    }
+  },
+  "diamond": {
+    "gen": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "host": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "kinds": {
+      "k1": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k2": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k3": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k4": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k5": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k5o1": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o2": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o3": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o4": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      }
+    }
+  },
+  "fan-disjoint": {
+    "2": {
+      "12": {
+        "anc": [
+          "b1",
+          "b2"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "dO"
+        ]
+      },
+      "21": {
+        "anc": [
+          "b2",
+          "b1"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "dO"
+        ]
+      }
+    },
+    "3": {
+      "123": {
+        "anc": [
+          "b1",
+          "b2",
+          "b3"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      },
+      "132": {
+        "anc": [
+          "b1",
+          "b3",
+          "b2"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      },
+      "213": {
+        "anc": [
+          "b2",
+          "b1",
+          "b3"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      },
+      "231": {
+        "anc": [
+          "b2",
+          "b3",
+          "b1"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      },
+      "312": {
+        "anc": [
+          "b3",
+          "b1",
+          "b2"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      },
+      "321": {
+        "anc": [
+          "b3",
+          "b2",
+          "b1"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      }
+    },
+    "4": {
+      "1234": {
+        "anc": [
+          "b1",
+          "b2",
+          "b3",
+          "b4"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "1243": {
+        "anc": [
+          "b1",
+          "b2",
+          "b4",
+          "b3"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "1324": {
+        "anc": [
+          "b1",
+          "b3",
+          "b2",
+          "b4"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "1342": {
+        "anc": [
+          "b1",
+          "b3",
+          "b4",
+          "b2"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "1423": {
+        "anc": [
+          "b1",
+          "b4",
+          "b2",
+          "b3"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "1432": {
+        "anc": [
+          "b1",
+          "b4",
+          "b3",
+          "b2"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2134": {
+        "anc": [
+          "b2",
+          "b1",
+          "b3",
+          "b4"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2143": {
+        "anc": [
+          "b2",
+          "b1",
+          "b4",
+          "b3"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2314": {
+        "anc": [
+          "b2",
+          "b3",
+          "b1",
+          "b4"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2341": {
+        "anc": [
+          "b2",
+          "b3",
+          "b4",
+          "b1"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2413": {
+        "anc": [
+          "b2",
+          "b4",
+          "b1",
+          "b3"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2431": {
+        "anc": [
+          "b2",
+          "b4",
+          "b3",
+          "b1"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3124": {
+        "anc": [
+          "b3",
+          "b1",
+          "b2",
+          "b4"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3142": {
+        "anc": [
+          "b3",
+          "b1",
+          "b4",
+          "b2"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3214": {
+        "anc": [
+          "b3",
+          "b2",
+          "b1",
+          "b4"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3241": {
+        "anc": [
+          "b3",
+          "b2",
+          "b4",
+          "b1"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3412": {
+        "anc": [
+          "b3",
+          "b4",
+          "b1",
+          "b2"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3421": {
+        "anc": [
+          "b3",
+          "b4",
+          "b2",
+          "b1"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4123": {
+        "anc": [
+          "b4",
+          "b1",
+          "b2",
+          "b3"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4132": {
+        "anc": [
+          "b4",
+          "b1",
+          "b3",
+          "b2"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4213": {
+        "anc": [
+          "b4",
+          "b2",
+          "b1",
+          "b3"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4231": {
+        "anc": [
+          "b4",
+          "b2",
+          "b3",
+          "b1"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4312": {
+        "anc": [
+          "b4",
+          "b3",
+          "b1",
+          "b2"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4321": {
+        "anc": [
+          "b4",
+          "b3",
+          "b2",
+          "b1"
+        ],
+        "gen": [
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      }
+    }
+  },
+  "fan-shared": {
+    "2": {
+      "12": {
+        "anc": [
+          "b1",
+          "b2",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "dO"
+        ]
+      },
+      "21": {
+        "anc": [
+          "b2",
+          "b1",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "dO"
+        ]
+      }
+    },
+    "3": {
+      "123": {
+        "anc": [
+          "b1",
+          "b2",
+          "b3",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      },
+      "132": {
+        "anc": [
+          "b1",
+          "b3",
+          "b2",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      },
+      "213": {
+        "anc": [
+          "b2",
+          "b1",
+          "b3",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      },
+      "231": {
+        "anc": [
+          "b2",
+          "b3",
+          "b1",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      },
+      "312": {
+        "anc": [
+          "b3",
+          "b1",
+          "b2",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      },
+      "321": {
+        "anc": [
+          "b3",
+          "b2",
+          "b1",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "dO"
+        ]
+      }
+    },
+    "4": {
+      "1234": {
+        "anc": [
+          "b1",
+          "b2",
+          "b3",
+          "b4",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "1243": {
+        "anc": [
+          "b1",
+          "b2",
+          "b4",
+          "b3",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "1324": {
+        "anc": [
+          "b1",
+          "b3",
+          "b2",
+          "b4",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "1342": {
+        "anc": [
+          "b1",
+          "b3",
+          "b4",
+          "b2",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "1423": {
+        "anc": [
+          "b1",
+          "b4",
+          "b2",
+          "b3",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "1432": {
+        "anc": [
+          "b1",
+          "b4",
+          "b3",
+          "b2",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2134": {
+        "anc": [
+          "b2",
+          "b1",
+          "b3",
+          "b4",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2143": {
+        "anc": [
+          "b2",
+          "b1",
+          "b4",
+          "b3",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2314": {
+        "anc": [
+          "b2",
+          "b3",
+          "b1",
+          "b4",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2341": {
+        "anc": [
+          "b2",
+          "b3",
+          "b4",
+          "b1",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2413": {
+        "anc": [
+          "b2",
+          "b4",
+          "b1",
+          "b3",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "2431": {
+        "anc": [
+          "b2",
+          "b4",
+          "b3",
+          "b1",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3124": {
+        "anc": [
+          "b3",
+          "b1",
+          "b2",
+          "b4",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3142": {
+        "anc": [
+          "b3",
+          "b1",
+          "b4",
+          "b2",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3214": {
+        "anc": [
+          "b3",
+          "b2",
+          "b1",
+          "b4",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3241": {
+        "anc": [
+          "b3",
+          "b2",
+          "b4",
+          "b1",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3412": {
+        "anc": [
+          "b3",
+          "b4",
+          "b1",
+          "b2",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "3421": {
+        "anc": [
+          "b3",
+          "b4",
+          "b2",
+          "b1",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4123": {
+        "anc": [
+          "b4",
+          "b1",
+          "b2",
+          "b3",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4132": {
+        "anc": [
+          "b4",
+          "b1",
+          "b3",
+          "b2",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4213": {
+        "anc": [
+          "b4",
+          "b2",
+          "b1",
+          "b3",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4231": {
+        "anc": [
+          "b4",
+          "b2",
+          "b3",
+          "b1",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4312": {
+        "anc": [
+          "b4",
+          "b3",
+          "b1",
+          "b2",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      },
+      "4321": {
+        "anc": [
+          "b4",
+          "b3",
+          "b2",
+          "b1",
+          "a"
+        ],
+        "gen": [
+          "ao-v",
+          "b1o-v",
+          "b2o-v",
+          "b3o-v",
+          "b4o-v",
+          "dO-v"
+        ],
+        "opts": [
+          "ao",
+          "b1o",
+          "b2o",
+          "b3o",
+          "b4o",
+          "dO"
+        ]
+      }
+    }
+  },
+  "fn": {
+    "gen": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "host": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "kinds": {
+      "k1": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k2": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k3": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k4": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k5": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k5o1": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o2": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o3": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o4": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      }
+    }
+  },
+  "fnParent": {
+    "opts": [
+      "x",
+      "y"
+    ],
+    "y": "cx"
+  },
+  "forged": {
+    "inst": "3",
+    "k2": [
+      "a",
+      "b",
+      "extra"
+    ],
+    "k3": [
+      "a",
+      "b",
+      "c",
+      "extra"
+    ]
+  },
+  "forged-control": {
+    "inst": "3",
+    "k2": [
+      "a",
+      "b",
+      "extra"
+    ],
+    "k3": [
+      "a",
+      "b",
+      "c",
+      "extra"
+    ]
+  },
+  "honest": [
+    [
+      "_module",
+      "port",
+      "x"
+    ],
+    "REFUSED",
+    "REFUSED",
+    "REFUSED",
+    "REFUSED"
+  ],
+  "key": [
+    "b"
+  ],
+  "libstr": {
+    "gen": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "host": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "kinds": {
+      "k1": {
+        "opts": {
+          "k1np": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "str"
+          },
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k2": {
+        "opts": {
+          "k1np": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "str"
+          },
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k3": {
+        "opts": {
+          "k1np": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "str"
+          },
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k4": {
+        "opts": {
+          "k1np": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "str"
+          },
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k5": {
+        "opts": {
+          "k1np": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "str"
+          },
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k5o1": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o2": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o3": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o4": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      }
+    }
+  },
+  "methods": {
+    "label": "c:2",
+    "opts": [
+      "a",
+      "b",
+      "label"
+    ]
+  },
+  "mixed": {
+    "gen": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "host": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "kinds": {
+      "k1": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k2": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k3": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k4": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k5": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k5o1": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o2": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o3": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o4": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      }
+    }
+  },
+  "redeclare": {
+    "gen": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "host": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "kinds": {
+      "k1": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k2": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1",
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k3": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1",
+              "<unknown-file>, via option schema.k2",
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k4": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1",
+              "<unknown-file>, via option schema.k2",
+              "<unknown-file>, via option schema.k3",
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k5": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1",
+              "<unknown-file>, via option schema.k2",
+              "<unknown-file>, via option schema.k3",
+              "<unknown-file>, via option schema.k4",
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k5o1": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o2": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o3": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o4": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      }
+    }
+  },
+  "sealed": {
+    "gen": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "host": [
+      "k1o1-v",
+      "k1o2-v",
+      "k1o3-v",
+      "k1o4-v",
+      "k2o1-v",
+      "k2o2-v",
+      "k2o3-v",
+      "k2o4-v",
+      "k3o1-v",
+      "k3o2-v",
+      "k3o3-v",
+      "k3o4-v",
+      "k4o1-v",
+      "k4o2-v",
+      "k4o3-v",
+      "k4o4-v",
+      "k5o1-v",
+      "k5o2-v",
+      "k5o3-v",
+      "k5o4-v"
+    ],
+    "kinds": {
+      "k1": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1sub": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "submodule"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k2": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1sub": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "submodule"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k3": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1sub": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "submodule"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k4": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1sub": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "submodule"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      },
+      "k5": {
+        "opts": {
+          "k1o1": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o2": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o3": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1o4": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "string"
+          },
+          "k1sub": {
+            "d": [
+              "<unknown-file>, via option schema.k1"
+            ],
+            "t": "submodule"
+          },
+          "k2o1": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o2": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o3": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k2o4": {
+            "d": [
+              "<unknown-file>, via option schema.k2"
+            ],
+            "t": "string"
+          },
+          "k3o1": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o2": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o3": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k3o4": {
+            "d": [
+              "<unknown-file>, via option schema.k3"
+            ],
+            "t": "string"
+          },
+          "k4o1": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o2": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o3": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k4o4": {
+            "d": [
+              "<unknown-file>, via option schema.k4"
+            ],
+            "t": "string"
+          },
+          "k5o1": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o2": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o3": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          },
+          "k5o4": {
+            "d": [
+              "<unknown-file>, via option schema.k5"
+            ],
+            "t": "string"
+          }
+        },
+        "refinements": [],
+        "refs": []
+      }
+    }
+  }
+}

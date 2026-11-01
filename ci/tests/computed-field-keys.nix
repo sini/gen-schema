@@ -52,8 +52,10 @@ let
   refused = [
     "__functor"
     "__kindAncestors"
+    "__kindContextFree"
     "__kindCycleParents"
     "__kindImports"
+    "__kindLineage"
     "__kindSelf"
     "__kindWitness"
     "__mint"

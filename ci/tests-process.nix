@@ -161,9 +161,43 @@
         [ "$rc" -eq 0 ] || die inheriting-same-name-residue "expected the address, got rc $rc: $(tail -n 3 "$TMPDIR/err")"
         [ "$residue" = '"10.0.1.1"' ] || die inheriting-same-name-residue "expected \"10.0.1.1\", got $residue"
 
+        # den-hoag-f1iza G1 · a kind chain's cost is linear in its depth: one host of the deepest kind of
+        # a 16-, 32- and 64-deep chain (values and `id_hash`), the per-level slope from 32 to 64 over the
+        # slope from 16 to 32 at most 1.30. A cost quadratic in depth doubles the slope per doubling (the
+        # bundle without the layering reads 1.82, main 1.84); the layered chain reads 1.11 on Nix,
+        # Determinate and Lix. The value, not the counts, is pinned: counts differ by evaluator. Scope:
+        # single-parent chains of plain attrset kinds at k <= 64; the inheritance-cycle walk's own
+        # quadratic term is present and within the bound (den-hoag-f1iza OQ-2).
+        thunks=""
+        cellThunks() {
+          rm -f "$TMPDIR/stats"
+          rc=0
+          export NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$TMPDIR/stats"
+          val=$(inst --argstr arm "$1" 2> "$TMPDIR/err") || rc=$?
+          unset NIX_SHOW_STATS NIX_SHOW_STATS_PATH
+          ran=$((ran + 1))
+          [ "$rc" -eq 0 ] || die "$1" "expected exit 0, got $rc: $(tail -n 3 "$TMPDIR/err")"
+          thunks=$(tr -d ' \n' < "$TMPDIR/stats" | grep -o '"nrThunks":[0-9]*' | cut -d: -f2 || true)
+          [ -n "$thunks" ] || die "$1" "the evaluator wrote no nrThunks to $TMPDIR/stats: cannot measure"
+        }
+        cellThunks depth-host-16
+        [ "$val" = "64" ] || die depth-host-16 "expected value 64, got '$val'"
+        d16=$thunks
+        cellThunks depth-host-32
+        [ "$val" = "128" ] || die depth-host-32 "expected value 128, got '$val'"
+        d32=$thunks
+        cellThunks depth-host-64
+        [ "$val" = "256" ] || die depth-host-64 "expected value 256, got '$val'"
+        d64=$thunks
+        s1=$(((d32 - d16) / 16))
+        s2=$(((d64 - d32) / 32))
+        [ "$s1" -gt 0 ] || die depth-host-32 "the slope from 16 to 32 is $s1 thunks per level: cannot measure"
+        [ $((s2 * 100)) -le $((s1 * 130)) ] ||
+          die depth-host-64 "a kind chain's cost is superlinear in depth: $s1 thunks per level from 16 to 32, $s2 from 32 to 64, a ratio over 1.30"
+
         # 0/0 is a false pass: the runner must have executed every cell above.
-        [ "$ran" = "16" ] || die runner "expected 16 evaluations, ran $ran"
-        echo "tests-process: 16 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst"
+        [ "$ran" = "19" ] || die runner "expected 19 evaluations, ran $ran"
+        echo "tests-process: 19 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth slopes $s1 / $s2 thunks per level"
       '';
     };
 }

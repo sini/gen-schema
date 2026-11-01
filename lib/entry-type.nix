@@ -210,6 +210,79 @@ let
       )
     ) parents;
 
+  # THE LAYERED INTROSPECTION (den-hoag-f1iza M1). A def declares from its own text alone when it is an
+  # attrset carrying none of the keys gen-merge's closure reads (`moduleSyntax.closure`: it imports, keys,
+  # requires or removes no other module), applies nothing (`__functor`) and sets no module argument
+  # (`_module`): no `options`, `config` or argument is in scope for it, so it meets no sibling. The
+  # closure's keys are read off gen-merge, never restated (den-hoag-1n12c).
+  layerRefusedKeys = builtins.listToAttrs (
+    map
+      (name: {
+        inherit name;
+        value = null;
+      })
+      (
+        merge.moduleSyntax.closure
+        ++ [
+          "__functor"
+          "_module"
+        ]
+      )
+  );
+  plainLayerDecl = v: builtins.isAttrs v && builtins.intersectAttrs layerRefusedKeys v == { };
+  # Two published option trees as one, or `null` where both declare a leaf (or one a leaf and the other
+  # a group there): a declaration record depends on its own module alone, so the union of disjoint
+  # evaluations is the evaluation of the union; a shared leaf is gen-merge's to merge, by the full one.
+  unionDisjoint =
+    a: b:
+    if a == null || b == null then
+      null
+    else
+      let
+        common = builtins.attrNames (builtins.intersectAttrs a b);
+        subs = map (n: {
+          name = n;
+          value =
+            if
+              isOptionDecl a.${n}
+              || isOptionDecl b.${n}
+              || !(builtins.isAttrs a.${n})
+              || !(builtins.isAttrs b.${n})
+            then
+              null
+            else
+              unionDisjoint a.${n} b.${n};
+        }) common;
+      in
+      if common == [ ] then
+        a // b
+      else if builtins.any (x: x.value == null) subs then
+        null
+      else
+        a // b // builtins.listToAttrs subs;
+  # A layered kind's published tree: its parents' constructions' published planes first, so a collision
+  # between two parents (a diamond, a redeclared ancestor leaf) falls back before this kind's own layer
+  # is evaluated, then `own`, this kind's own defs evaluated alone (den-hoag-f1iza C3). `null` selects
+  # the full evaluation. Positional, so the call allocates no argument record.
+  layeredIntrospection =
+    resolvedOnly: own: parentCons:
+    let
+      options = unionDisjoint (builtins.foldl' unionDisjoint (builtins.head parentCons).options (
+        map (c: c.options) (builtins.tail parentCons)
+      )) own.options;
+    in
+    if options == null then
+      null
+    else
+      {
+        options = resolvedOnly options;
+        refs = resolvedOnly (builtins.foldl' (a: c: c.refs // a) own.refs parentCons);
+        refinements = builtins.foldl' (
+          a: c: c.refinements // a
+        ) (refinementsOfOptions own.options) parentCons;
+        inherit own;
+      };
+
   # A kind's OWN defs (den-hoag-a7c9r), for its plane's `modules`: the first `n` of `strippedDefs` (its
   # declared defs; the desugared parents follow them) less every parent `evalSchema` injected (decided by
   # `file` alone, as the `mkType` arm's nesting decides them), and less every kind VALUE the deprecated
@@ -933,6 +1006,17 @@ let
   # Every parent `evalSchema` resolved for `kind` carries this prefix, so a def is recognised as a
   # resolved parent from its `file` alone, without reading which parents `kind` declares.
   inheritsResolvedPrefix = kind: "<gen-schema evalSchema: kind '${kind}' inherits '";
+  # `_file` is writable by any module (den-hoag-5n8ey), so the provenance counts only on a def with the
+  # resolver's value, which `injectFor` writes as exactly `{ imports = [ <one module> ]; }`. A def
+  # carrying the string with any other value is an ordinary def: its parent still composes, and nothing
+  # is skipped. Read by the unresolved check and by the layered introspection's own defs (den-hoag-f1iza).
+  resolvedBy =
+    kind: p: d:
+    (d.file or null) == inheritsResolvedFile kind p
+    && builtins.isAttrs d.value
+    && builtins.attrNames d.value == [ "imports" ]
+    && builtins.isList d.value.imports
+    && builtins.length d.value.imports == 1;
   inheritsDesugaredFile = kind: parent: "<gen-schema: kind '${kind}' inherits '${parent}'>";
 
   # Where a def was written, for a kind's content witness: its first attribute's source position, or
@@ -1960,22 +2044,8 @@ let
                 if declaredInherits == [ ] then
                   [ ]
                 else
-                  let
-                    # `_file` is writable by any module (den-hoag-5n8ey), so the provenance counts only
-                    # on a def with the resolver's value, which `injectFor` writes as exactly
-                    # `{ imports = [ <one module> ]; }`. A def carrying the string with any other
-                    # value is an ordinary def: its parent still composes, and nothing is skipped.
-                    resolverShaped =
-                      v:
-                      builtins.isAttrs v
-                      && builtins.attrNames v == [ "imports" ]
-                      && builtins.isList v.imports
-                      && builtins.length v.imports == 1;
-                    resolvedBy = p: d: (d.file or null) == inheritsResolvedFile kind p && resolverShaped d.value;
-                    spelled = spelledNames;
-                  in
                   builtins.filter (
-                    p: !(builtins.any (resolvedBy p) defs) && !(builtins.elem p spelled)
+                    p: !(builtins.any (resolvedBy kind p) defs) && !(builtins.elem p spelledNames)
                   ) declaredInherits;
               # Sited on the COMPOSED value (`merged`, `treeModule`), never the kind's WHNF: `evalSchema`
               # reads `inherits` off its names read, where no parent is injected, and the collections, `kind`
@@ -2050,65 +2120,98 @@ let
               # parents, so the walk stops at it. Published as `__kindAncestors`. Each side's subject
               # is `kindSubject`'s, so a diamond reaching a `//` copy of an ancestor refuses by the
               # stamp, and an ancestor short of sealed subjects or a stamp is refused naming what it lacks.
-              # f1iza prototype B: THE ANCESTOR MAP, COMPOSED FROM THE PARENTS' (each parent's own fold
-              # decided and stamped its ancestors, behind its `resolvedOnly`): this kind stamps its
-              # direct parents on entry and merges each parent construction's published `__kindLineage`,
-              # deciding only the names two sources share. A chain shares none, so a kind pays its
-              # parents, not its ancestry.
+              # COMPOSED FROM THE PARENTS' (den-hoag-f1iza M2, a7c9r V1-c): each parent's own construction
+              # decided and stamped its ancestors behind its `resolvedOnly`, and publishes them by name
+              # (`__kindLineage`), so this kind stamps its direct parents on entry and merges each one's
+              # lineage, deciding only at a name two sources hold. A chain holds none, so a kind pays its
+              # parents, not its ancestry. A refusal names both routes from this kind, in the walk's order
+              # (parents first, each before its own): the first route to each construction, read only
+              # inside the refusal's text.
               kindAncestors =
                 let
+                  arrow = prelude.concatStringsSep " -> ";
                   subjectOf = kindSubject "gen-schema: kind '${kind}' inherits";
-                  addOne =
-                    acc: x:
-                    let
-                      n = x.value.kind;
-                      p = x.value;
-                      held = acc.${n} or [ ];
-                      same = builtins.filter (e: sameConstruction e p) held;
-                      met = if same != [ ] then same else builtins.filter (e: e.__mint.minted == p.__mint.minted) held;
-                      e = builtins.head met;
-                    in
-                    if held != [ ] && met != [ ] then
-                      if
-                        same != [ ]
-                        ||
-                          sealedCollisionEq
-                            "gen-schema: kind '${kind}' reaches ${ancestorName p.kind} along two parents (${x.via})"
-                            (subjectOf e)
-                            (subjectOf p)
-                      then
-                        acc
+                  firstRoute =
+                    v: ps:
+                    builtins.foldl' (
+                      r: q:
+                      if r != null then
+                        r
+                      else if sameConstruction q v then
+                        [ q.kind ]
                       else
-                        throw "gen-schema: kind '${kind}' reaches two kinds named '${p.kind}' that share one mark, along two parents (${x.via}): they differ only at a declared subject (a registered construction), which the mark is blind to, and the ancestor map is keyed by the mark, so it cannot hold both; give the two kinds different names or one construction"
+                        let
+                          t = firstRoute v (q.__kindImports or [ ]);
+                        in
+                        if t == null then null else [ q.kind ] ++ t
+                    ) null ps;
+                  routeOf =
+                    ps: v:
+                    let
+                      r = firstRoute v ps;
+                    in
+                    arrow ([ kind ] ++ (if r == null then [ v.kind ] else r));
+                  # `held`, the values one side holds under a name, absorbs `v`, reached through the
+                  # parents `ps`: the one construction reached again, or an equal mark whose subjects
+                  # agree, is the value already held; an equal mark whose subjects differ is refused; a
+                  # different mark is a second entry
+                  absorb =
+                    ps: held: v:
+                    let
+                      same = builtins.filter (x: sameConstruction x v) held;
+                      met = if same != [ ] then same else builtins.filter (x: x.__mint.minted == v.__mint.minted) held;
+                      x = builtins.head met;
+                    in
+                    if met == [ ] then
+                      held ++ [ v ]
+                    else if
+                      same != [ ]
+                      ||
+                        sealedCollisionEq
+                          "gen-schema: kind '${kind}' reaches ${ancestorName v.kind} along ${routeOf kindParents x} and along ${routeOf ps v}"
+                          (subjectOf x)
+                          (subjectOf v)
+                    then
+                      held
                     else
-                      acc // { ${n} = held ++ [ p ]; };
-                  lineageOf =
-                    p: if p ? __kindSelf && (p.__kindSelf null) ? __kindLineage then (p.__kindSelf null).__kindLineage else { };
+                      throw "gen-schema: kind '${kind}' reaches two kinds named '${v.kind}' that share one mark, along ${routeOf kindParents x} and along ${routeOf ps v}: they differ only at a declared subject (a registered construction), which the mark is blind to, and the ancestor map is keyed by the mark, so it cannot hold both; give the two kinds different names or one construction";
+                  # forced at every name both sides hold, so a refusal fires at this kind's composed read
+                  merge =
+                    ps: a: b:
+                    let
+                      met = builtins.mapAttrs (n: held: builtins.foldl' (absorb ps) held b.${n}) (
+                        builtins.intersectAttrs b a
+                      );
+                    in
+                    if met == { } then
+                      a // b
+                    else
+                      builtins.foldl' (u: n: builtins.seq met.${n} u) (a // b // met) (builtins.attrNames met);
+                  # a parent whose name is held at an equal mark or as one construction is decided
+                  # there (its lineage is the held one's, so it is not merged again); any other parent
+                  # holds its whole stamp on entry and brings its own lineage
                   stepParent =
                     acc: p:
-                    if p ? __kindSelf && !(stampImportOk p) then
-                      stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${kind} -> ${p.kind}" p
+                    let
+                      held = acc.${p.kind} or [ ];
+                    in
+                    if
+                      held != [ ] && builtins.any (x: sameConstruction x p || x.__mint.minted == p.__mint.minted) held
+                    then
+                      merge [ p ] acc { ${p.kind} = [ p ]; }
+                    else if p ? __kindSelf && !(stampImportOk p) then
+                      stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${
+                        arrow [
+                          kind
+                          p.kind
+                        ]
+                      }" p
                     else
-                      let
-                        lp = lineageOf p;
-                        withP = addOne lp {
-                          value = p;
-                          via = p.kind;
-                        };
-                        common = builtins.attrNames (builtins.intersectAttrs acc withP);
-                      in
-                      if acc == { } then
-                        withP
-                      else
-                        builtins.foldl' addOne (acc // builtins.removeAttrs withP common) (
-                          prelude.concatMap (
-                            n:
-                            map (v: {
-                              value = v;
-                              via = p.kind;
-                            }) withP.${n}
-                          ) common
-                        );
+                      merge [ p ] acc (
+                        merge [ p ] { ${p.kind} = [ p ]; } (
+                          if p ? __kindSelf then (p.__kindSelf null).__kindLineage or { } else { }
+                        )
+                      );
                 in
                 builtins.foldl' stepParent { } kindParents;
               # THE IDENTITY HALF: each parent holds its whole stamp, after its own identity verdict
@@ -2826,8 +2929,8 @@ let
                     # Lazy: forced only when `refinements` is, and that must stay so.
                     # Stored on the kind result so mkInstanceRegistry can consume them automatically.
                     extractedRefinements =
-                      if layered then
-                        builtins.foldl' (a: c: c.refinements // a) (refinementsOfOptions ownIntrospect.options) parentCons
+                      if layer != null then
+                        layer.refinements
                       else
                         (if mixinResult != null then mixinResult.refinements else { })
                         // prelude.filterAttrs (_: v: v != [ ]) (
@@ -2890,76 +2993,36 @@ let
                       )
                     );
 
-                    fullIntrospect = introspectOf merged;
-                    # The plane reads the published tree; an option a parent publishes enters by that
-                    # parent's mark (`planeOf`'s own options, den-hoag-a7c9r).
-                    # f1iza prototype: THE LAYERED INTROSPECTION. A kind whose own defs are plain
-                    # attrset modules (no function, path, functor, imports, disabledModules) and whose
-                    # injected base is empty declares nothing that reads its evaluation, so its
-                    # declarations are its own tree's alone; layered over each parent construction's
-                    # published plane (itself layered), disjoint at every leaf, it is the full tree's
-                    # evaluation. A leaf two sources declare falls back to the full evaluation.
+                    # THE LAYERED INTROSPECTION (den-hoag-f1iza M1). A parented kind whose own defs
+                    # each declare from their own text (`plainLayerDecl`), with no injected base or
+                    # methods module and only context-free parents, is evaluated over its own defs
+                    # alone and unioned with each parent construction's published plane (itself
+                    # layered or full); a leaf two sources declare falls back to the full evaluation.
+                    # The cycle verdict is read before any parent: on an inheritance cycle a parent's
+                    # flag is this kind's own, in flight, and the cycle walk (witnesses only) refuses
+                    # it by name at `resolvedOnly`. The defs `evalSchema` injected are left out by
+                    # the resolver's exact test (`resolvedBy`); any other def carrying the resolver's
+                    # file prefix is not context-free, so it takes the full evaluation.
                     ownDefsL = builtins.filter (
-                      d: !(prelude.hasPrefix (inheritsResolvedPrefix kind) (d.file or ""))
+                      d: !(builtins.any (p: resolvedBy kind p d) declaredInherits)
                     ) strippedOwn;
-                    plainDecl =
-                      v:
-                      builtins.isAttrs v
-                      && !(v ? __functor)
-                      && !(v ? imports)
-                      && !(v ? require)
-                      && !(v ? disabledModules)
-                      && !(v ? _module);
-                    # read before any parent: on an inheritance cycle a parent's flag is this kind's own, in
-                    # flight, and the cycle walk (witnesses only) refuses it by name at `resolvedOnly`
                     contextFree =
                       inheritanceCycle == null
                       && injected == [ ]
-                      && builtins.all (d: plainDecl d.value) ownDefsL
-                      && builtins.all (p: p.__kindContextFree or false) kindParents;
-                    parentCons = map (p: p.__kindSelf null) kindParents;
-                    unionDisjoint =
-                      a: b:
-                      if a == null || b == null then
+                      && builtins.all (
+                        d:
+                        plainLayerDecl d.value
+                        && !(prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")))
+                      ) ownDefsL
+                      && builtins.all (p: p ? __kindSelf && (p.__kindSelf null).__kindContextFree or false) kindParents;
+                    layer =
+                      if kindParents == [ ] || !contextFree then
                         null
                       else
-                        let
-                          common = builtins.attrNames (builtins.intersectAttrs a b);
-                          subs = map (n: {
-                            name = n;
-                            value =
-                              if
-                                isOptionDecl a.${n}
-                                || isOptionDecl b.${n}
-                                || !(builtins.isAttrs a.${n})
-                                || !(builtins.isAttrs b.${n})
-                              then
-                                null
-                              else
-                                unionDisjoint a.${n} b.${n};
-                          }) common;
-                        in
-                        if common == [ ] then
-                          a // b
-                        else if builtins.any (x: x.value == null) subs then
-                          null
-                        else
-                          a // b // builtins.listToAttrs subs;
-                    ownIntrospect = introspectOf (resolvedOnly (base.merge loc ownDefsL));
-                    layeredOptions =
-                      if !contextFree || kindParents == [ ] then
-                        null
-                      else
-                        builtins.foldl' unionDisjoint ownIntrospect.options (map (c: c.options) parentCons);
-                    layered = layeredOptions != null;
-                    introspect =
-                      if !layered then
-                        fullIntrospect
-                      else
-                        {
-                          options = resolvedOnly layeredOptions;
-                          refs = resolvedOnly (builtins.foldl' (a: c: c.refs // a) ownIntrospect.refs parentCons);
-                        };
+                        layeredIntrospection resolvedOnly (introspectOf (resolvedOnly (base.merge loc ownDefsL))) (
+                          map (p: p.__kindSelf null) kindParents
+                        );
+                    introspect = if layer == null then introspectOf merged else layer;
                     plane = planeOf {
                       inherit
                         kind
@@ -2967,10 +3030,10 @@ let
                         guard
                         projected
                         ;
-                      # f1iza prototype C: a layered kind's plane walks its own layer only; every path
-                      # a parent publishes is that parent's record, determined by the parent's mark
-                      options = if layered then resolvedOnly ownIntrospect.options else introspect.options;
-                      refs = if layered then resolvedOnly ownIntrospect.refs else introspect.refs;
+                      # A layered kind's plane walks its own layer only (den-hoag-f1iza M3): every path
+                      # a parent publishes is that parent's record, entering by the parent's mark.
+                      options = if layer == null then introspect.options else resolvedOnly layer.own.options;
+                      refs = if layer == null then introspect.refs else resolvedOnly layer.own.refs;
                       collections = extractedCollections;
                       inherit keySemantics;
                       computed = minted;

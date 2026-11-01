@@ -126,6 +126,55 @@ let
         ]).config.hosts;
     in
     builtins.deepSeq (builtins.seq t.sub.__mint.minted (builtins.mapAttrs (_: h: h.b + h.s0) reg)) n;
+  # den-hoag-f1iza G1 · ONE HOST of the deepest kind of a `k`-deep chain (k_i inherits k_{i-1}, four `str`
+  # options each): an instance in gen's engine, every option value and its `id_hash` read (an identity read,
+  # which demands the kind's mark and so every ancestor's). The value is the count of options served their
+  # definition, `4 k`; the runner reads the cost as the process's thunks.
+  depthHost =
+    k:
+    let
+      ks = builtins.genList (i: "k${toString (i + 1)}") k;
+      optsOf =
+        kn:
+        builtins.listToAttrs (
+          builtins.genList (o: {
+            name = "${kn}o${toString (o + 1)}";
+            value = merge.mkOption { type = merge.types.str; };
+          }) 4
+        );
+      sch =
+        (merge.evalModuleTree { } [
+          { options.schema = S.mkSchemaOption { }; }
+          (
+            { config, ... }:
+            {
+              config.schema = builtins.listToAttrs (
+                builtins.genList (i: {
+                  name = "k${toString (i + 1)}";
+                  value = {
+                    options = optsOf "k${toString (i + 1)}";
+                  }
+                  // (if i > 0 then { inherits = [ config.schema."k${toString i}" ]; } else { });
+                }) k
+              );
+            }
+          )
+        ]).config.schema;
+      allOpts = builtins.concatMap (kn: builtins.attrNames (optsOf kn)) ks;
+      h =
+        (merge.evalModuleTree { } [
+          { options.h = merge.mkOption { type = S.mkInstanceType { } sch."k${toString k}"; }; }
+          {
+            config.h = builtins.listToAttrs (
+              map (o: {
+                name = o;
+                value = "${o}-v";
+              }) allOpts
+            );
+          }
+        ]).config.h;
+    in
+    builtins.seq h.id_hash (builtins.length (builtins.filter (o: h.${o} == "${o}-v") allOpts));
   # A refined type's predicate applications (den-hoag-refined-outside-kind-silent-1jlsq): the spy
   # refinement traces `label` once per application, so the label's count is the cost.
   T = merge.types;
@@ -377,6 +426,9 @@ in
         }
       )
     ]).config.hosts.igloo.id_hash;
+  depth-host-16 = depthHost 16;
+  depth-host-32 = depthHost 32;
+  depth-host-64 = depthHost 64;
   # A predicate ill-typed over its base aborts uncatchably; the abort names the refinement.
   refined-attribution = outsideRead (S.refined T.str {
     check = v: v > 0;
