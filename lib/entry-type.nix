@@ -2577,14 +2577,15 @@ let
               # Strip all collection keys before deferredModule merge. The desugared parents join here,
               # where `evalSchema`'s injected defs arrive: the default branch composes this list and both
               # planes read it, while the `mkType` caller receives the parents nested (at `custom`).
-              strippedOwn = map (
-                d:
-                if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
-                  d // { value = builtins.removeAttrs d.value collectionKeys; }
-                else
-                  d
-              ) defs;
-              strippedDefs = strippedOwn ++ desugaredDefs;
+              strippedDefs =
+                map (
+                  d:
+                  if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
+                    d // { value = builtins.removeAttrs d.value collectionKeys; }
+                  else
+                    d
+                ) defs
+                ++ desugaredDefs;
 
               # Resolve baseModule value (may be a function of kind name)
               resolvedBase =
@@ -3000,28 +3001,33 @@ let
                     # layered or full); a leaf two sources declare falls back to the full evaluation.
                     # The cycle verdict is read before any parent: on an inheritance cycle a parent's
                     # flag is this kind's own, in flight, and the cycle walk (witnesses only) refuses
-                    # it by name at `resolvedOnly`. The defs `evalSchema` injected are left out by
-                    # the resolver's exact test (`resolvedBy`); any other def carrying the resolver's
-                    # file prefix is not context-free, so it takes the full evaluation.
-                    ownDefsL = builtins.filter (
-                      d: !(builtins.any (p: resolvedBy kind p d) declaredInherits)
-                    ) strippedOwn;
+                    # it by name at `resolvedOnly`. A def carrying the resolver's file prefix is
+                    # context-free only where it is the resolver's own (`resolvedBy`, the exact file
+                    # and value), so the layer leaves out every prefixed def and drops nothing else.
                     contextFree =
                       inheritanceCycle == null
                       && injected == [ ]
                       && builtins.all (
                         d:
-                        plainLayerDecl d.value
-                        && !(prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")))
-                      ) ownDefsL
+                        if prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")) then
+                          builtins.any (p: resolvedBy kind p d) declaredInherits
+                        else
+                          plainLayerDecl d.value
+                      ) defs
                       && builtins.all (p: p ? __kindSelf && (p.__kindSelf null).__kindContextFree or false) kindParents;
                     layer =
                       if kindParents == [ ] || !contextFree then
                         null
                       else
-                        layeredIntrospection resolvedOnly (introspectOf (resolvedOnly (base.merge loc ownDefsL))) (
-                          map (p: p.__kindSelf null) kindParents
-                        );
+                        layeredIntrospection resolvedOnly (introspectOf (
+                          resolvedOnly (
+                            base.merge loc (
+                              builtins.filter (d: !(prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")))) (
+                                builtins.genList (builtins.elemAt strippedDefs) (builtins.length defs)
+                              )
+                            )
+                          )
+                        )) (map (p: p.__kindSelf null) kindParents);
                     introspect = if layer == null then introspectOf merged else layer;
                     plane = planeOf {
                       inherit
