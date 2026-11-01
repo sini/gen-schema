@@ -2617,8 +2617,11 @@ let
                       && !(v ? require)
                       && !(v ? disabledModules)
                       && !(v ? _module);
+                    # read before any parent: on an inheritance cycle a parent's flag is this kind's own, in
+                    # flight, and the cycle walk (witnesses only) refuses it by name at `resolvedOnly`
                     contextFree =
-                      injected == [ ]
+                      inheritanceCycle == null
+                      && injected == [ ]
                       && builtins.all (d: plainDecl d.value) ownDefsL
                       && builtins.all (p: p.__kindContextFree or false) kindParents;
                     parentCons = map (p: p.__kindSelf null) kindParents;
