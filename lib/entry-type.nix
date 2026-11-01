@@ -697,7 +697,8 @@ let
   # refused by name, in either order. `inheritedModule` copies both onto the parent a child imports, so an
   # ancestor reached through two children (a diamond) is one node on either arm. `token` is the caller's
   # construction token, bound inline once per construction (never here: a token this function built would
-  # be one per call, and the caller calls it once per construction only by its own let).
+  # be one per call, and the caller calls it once per construction only by its own let). It takes `plane`
+  # and the default arm's `keyed` whole, so the call allocates no thunk the inline record did not.
   # the kept collections a kind's own definition can make `guarded` (a built-in holds no instance read)
   kindGuardedNames = builtins.filter (
     c:
@@ -713,19 +714,19 @@ let
       kind,
       kindWitness,
       mark,
-      sealed,
+      plane,
       token,
       guarded,
-      foreignKey ? null,
+      keyed ? null,
     }:
     {
       __moduleKey = "gen-schema-kind:${kind}#${kindWitness}";
       __keyEq = {
         subject = {
           name = kind;
+          inherit (plane) sealed;
           inherit
             mark
-            sealed
             token
             guarded
             ;
@@ -758,7 +759,7 @@ let
         # distinct nodes both compose and no mark or seal is read; at a meeting `decide` names the one
         # construction reached again and `conflicts` the second construction gen-merge refuses
         meeting = "gen-schema-kind:${kind}#${kindWitness}";
-        key = if foreignKey != null then foreignKey else "gen-schema-kind:${kind}#${kindWitness}#${mark}";
+        key = if keyed != null then keyed.key else "gen-schema-kind:${kind}#${kindWitness}#${mark}";
       };
     };
   # THE CONTENT STAMP (den-hoag-9zyp7, den-hoag-c2836): every cell but the three identity cells, the
@@ -2812,7 +2813,7 @@ let
                   // kindNodeRecord {
                     inherit kind kindWitness;
                     mark = mkTypeMark;
-                    inherit (plane) sealed;
+                    inherit plane;
                     token = mkTypeConstructionToken;
                     guarded =
                       guard
@@ -3100,10 +3101,9 @@ let
                     keyEqRecord = kindNodeRecord {
                       inherit kind kindWitness;
                       mark = ownMark;
-                      inherit (plane) sealed;
+                      inherit plane keyed;
                       token = constructionToken;
                       guarded = kindGuarded;
-                      foreignKey = keyed.key;
                     };
                   in
                   # Precedence: computed overrides collections of the same name.
