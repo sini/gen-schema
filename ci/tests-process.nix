@@ -162,8 +162,8 @@
         [ "$residue" = '"10.0.1.1"' ] || die inheriting-same-name-residue "expected \"10.0.1.1\", got $residue"
 
         # 0/0 is a false pass: the runner must have executed every cell above.
-        [ "$ran" = "15" ] || die runner "expected 15 evaluations, ran $ran"
-        echo "tests-process: 15 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst"
+        [ "$ran" = "16" ] || die runner "expected 16 evaluations, ran $ran"
+        echo "tests-process: 16 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType diamond mints 4; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst"
       '';
     };
 }
