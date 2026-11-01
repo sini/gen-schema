@@ -426,6 +426,108 @@ let
       nixpkgs = [ "k" ];
     };
   };
+  # ONE declaration POSITION built by a function of a closure value `tag`, under two schemas with equal
+  # parameters: the two constructions differ only in an option type (`enum [ tag "k" ]`), so the marks
+  # differ and nothing the schema states does. Each shape puts that type where a key reading less than
+  # the mark would miss it: top level, one level down, in a module the def imports, and in a def that
+  # is a function module (no syntactic reader sees its declarations, so the key is the mark there).
+  closureShapes = {
+    top = tag: {
+      options.trail = genMerge.mkOption {
+        type = T.listOf (
+          T.enum "e" [
+            tag
+            "k"
+          ]
+        );
+      };
+      config.trail = [ "k" ];
+    };
+    nested = tag: {
+      options.n.trail = genMerge.mkOption {
+        type = T.listOf (
+          T.enum "e" [
+            tag
+            "k"
+          ]
+        );
+      };
+      config.n.trail = [ "k" ];
+    };
+    imported = tag: {
+      imports = [
+        {
+          options.trail = genMerge.mkOption {
+            type = T.listOf (
+              T.enum "e" [
+                tag
+                "k"
+              ]
+            );
+          };
+        }
+      ];
+      config.trail = [ "k" ];
+    };
+    functionModule =
+      tag:
+      { ... }:
+      {
+        options.trail = genMerge.mkOption {
+          type = T.listOf (
+            T.enum "e" [
+              tag
+              "k"
+            ]
+          );
+        };
+        config.trail = [ "k" ];
+      };
+  };
+  closureConstructions =
+    declOf: read: parented:
+    let
+      schemaWith =
+        tag:
+        (genMerge.evalModuleTree { } [
+          { options.schema = genSchema.mkSchemaOption { }; }
+          (
+            { config, ... }:
+            {
+              config.schema = {
+                r = { };
+                k = if parented then declOf tag // { inherits = [ config.schema.r ]; } else declOf tag;
+              };
+            }
+          )
+        ]).config.schema;
+      a = schemaWith "a";
+      b = schemaWith "b";
+    in
+    {
+      witnessEqual = a.k.__kindWitness == b.k.__kindWitness;
+      marksDiffer = a.k.__mint.minted != b.k.__mint.minted;
+      ab = both read [
+        a.k
+        b.k
+      ];
+      ba = both read [
+        b.k
+        a.k
+      ];
+      aa = both read [
+        a.k
+        a.k
+      ];
+    };
+  # the nested shape reads `n`, whose `trail` holds the two "k"s
+  nestedExpected = {
+    witnessEqual = true;
+    marksDiffer = true;
+    ab = lib.mapAttrs (_: v: { trail = v; }) twoSchemaExpected.ab;
+    ba = lib.mapAttrs (_: v: { trail = v; }) twoSchemaExpected.ba;
+    aa = lib.mapAttrs (_: v: { trail = v; }) twoSchemaExpected.aa;
+  };
   mixedGuard =
     args:
     try (
@@ -454,6 +556,34 @@ in
     };
     test-parented-two-schemas-one-declaration-keep-both-in-both-engines = {
       expr = twoSchemaConstructions true;
+      expected = twoSchemaExpected;
+    };
+    test-parentless-closure-type-at-top-keeps-both = {
+      expr = closureConstructions closureShapes.top "trail" false;
+      expected = twoSchemaExpected;
+    };
+    test-parented-closure-type-at-top-keeps-both = {
+      expr = closureConstructions closureShapes.top "trail" true;
+      expected = twoSchemaExpected;
+    };
+    test-parentless-closure-type-nested-keeps-both = {
+      expr = closureConstructions closureShapes.nested "n" false;
+      expected = nestedExpected;
+    };
+    test-parented-closure-type-nested-keeps-both = {
+      expr = closureConstructions closureShapes.nested "n" true;
+      expected = nestedExpected;
+    };
+    test-parentless-closure-type-in-an-imported-module-keeps-both = {
+      expr = closureConstructions closureShapes.imported "trail" false;
+      expected = twoSchemaExpected;
+    };
+    test-parented-closure-type-in-an-imported-module-keeps-both = {
+      expr = closureConstructions closureShapes.imported "trail" true;
+      expected = twoSchemaExpected;
+    };
+    test-parentless-closure-type-in-a-function-module-def-keeps-both = {
+      expr = closureConstructions closureShapes.functionModule "trail" false;
       expected = twoSchemaExpected;
     };
   };

@@ -89,6 +89,12 @@
         [ "$c1" = "3" ] && [ "$c4" = "6" ] ||
           die component-mints-four-kinds "expected 3 component mints for 1 kind and 6 for 4 (one per kind and the two constants once), counted $c1 and $c4"
 
+        # den-hoag-a7c9r V1-a C2 · an `mkType`-arm kind's mark is bound once, read by `__mint` and by
+        # the node record gen-merge reads at a meeting: a diamond of four kinds mints four marks.
+        evalArm mktype-diamond-mints
+        [ "$val" = "4" ] || die mktype-diamond-mints "expected value 4, got '$val'"
+        [ "$n" = "4" ] || die mktype-diamond-mints "expected 4 kind mints (one per kind), counted $n"
+
         # den-hoag-refined-outside-kind-silent-1jlsq · a refined type applies each predicate once per
         # demanded value, inside a kind (strict or lazy) and outside one.
         for c in refined-cost-in-kind:5:1 refined-cost-in-kind-lazy:5:1 refined-cost-outside:5:1 \
