@@ -164,6 +164,73 @@ in
   );
   component-mints-one-kind = componentKinds 1;
   component-mints-four-kinds = componentKinds 4;
+  # den-hoag-a7c9r V1-a C2 · one `mkType`-arm diamond (`d` inherits `b` and `c`, both inherit `a`, whose
+  # `x` states a default), every kind's mark read and `d` imported into gen's engine, so `a` meets at
+  # its node and gen-merge reads its record's key and mark there: each kind's mark is minted once.
+  mktype-diamond-mints =
+    let
+      opt = merge.mkOption { type = merge.types.str; };
+      s =
+        (merge.evalModuleTree { } [
+          {
+            options.schema = S.mkSchemaOption {
+              mkType =
+                { defs, ... }:
+                {
+                  __functor =
+                    _:
+                    { ... }:
+                    {
+                      imports = map (d: d.value) defs;
+                    };
+                };
+            };
+          }
+          {
+            config.schema = {
+              a.options.x = merge.mkOption {
+                type = merge.types.str;
+                default = "d";
+              };
+              b = {
+                options.y = opt;
+                inherits = [ "a" ];
+              };
+              c = {
+                options.z = opt;
+                inherits = [ "a" ];
+              };
+              d = {
+                options.w = opt;
+                inherits = [
+                  "b"
+                  "c"
+                ];
+              };
+            };
+          }
+        ]).config.schema;
+      kinds = [
+        "a"
+        "b"
+        "c"
+        "d"
+      ];
+      x =
+        (merge.evalModuleTree { } [
+          s.d
+          {
+            config = {
+              w = "w";
+              y = "y";
+              z = "z";
+            };
+          }
+        ]).config.x;
+    in
+    builtins.deepSeq (map (k: s.${k}.__mint.minted) kinds) (
+      if x == "d" then builtins.length kinds else throw "mktype-diamond-mints: config.x is ${x}"
+    );
   # One application per demanded value: the type decides its own refinements, and the kind pass
   # does not re-check them.
   refined-cost-in-kind = inKindRead (S.refined T.int spyPos);
