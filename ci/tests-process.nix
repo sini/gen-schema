@@ -90,10 +90,10 @@
           die component-mints-four-kinds "expected 3 component mints for 1 kind and 6 for 4 (one per kind and the two constants once), counted $c1 and $c4"
 
         # den-hoag-a7c9r V1-a C2 · an `mkType`-arm kind's mark is bound once, read by `__mint` and by
-        # the node record gen-merge reads at a meeting: a diamond of four kinds mints four marks.
-        evalArm mktype-diamond-mints
-        [ "$val" = "4" ] || die mktype-diamond-mints "expected value 4, got '$val'"
-        [ "$n" = "4" ] || die mktype-diamond-mints "expected 4 kind mints (one per kind), counted $n"
+        # the node record gen-merge reads where two constructions meet: two constructions mint two marks.
+        evalArm mktype-two-constructions-mints
+        [ "$val" = "2" ] || die mktype-two-constructions-mints "expected value 2, got '$val'"
+        [ "$n" = "2" ] || die mktype-two-constructions-mints "expected 2 kind mints (one per construction), counted $n"
 
         # den-hoag-refined-outside-kind-silent-1jlsq · a refined type applies each predicate once per
         # demanded value, inside a kind (strict or lazy) and outside one.
@@ -163,7 +163,7 @@
 
         # 0/0 is a false pass: the runner must have executed every cell above.
         [ "$ran" = "16" ] || die runner "expected 16 evaluations, ran $ran"
-        echo "tests-process: 16 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType diamond mints 4; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst"
+        echo "tests-process: 16 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst"
       '';
     };
 }

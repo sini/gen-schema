@@ -164,13 +164,20 @@ in
   );
   component-mints-one-kind = componentKinds 1;
   component-mints-four-kinds = componentKinds 4;
-  # den-hoag-a7c9r V1-a C2 · one `mkType`-arm diamond (`d` inherits `b` and `c`, both inherit `a`, whose
-  # `x` states a default), every kind's mark read and `d` imported into gen's engine, so `a` meets at
-  # its node and gen-merge reads its record's key and mark there: each kind's mark is minted once.
-  mktype-diamond-mints =
+  # den-hoag-a7c9r V1-a C2 · two constructions of one `mkType`-arm declaration (two schema evaluations),
+  # each construction's mark read, then both imported into gen's engine: they meet at the declaration's
+  # node, `decide` tells them apart, and gen-merge reads each record's key and mark to refuse the second
+  # by name. Each construction's mark is minted once, whether `__mint` or the record reads it. (One
+  # construction reached twice, a diamond, is decided by its seals and reads no key or mark, so it
+  # cannot show a second mint.)
+  mktype-two-constructions-mints =
     let
-      opt = merge.mkOption { type = merge.types.str; };
-      s =
+      # one declaration (one literal, so one declaration node) under two schema evaluations
+      decl = {
+        options.trail = merge.mkOption { type = merge.types.listOf merge.types.str; };
+        config.trail = [ "k" ];
+      };
+      kindOf =
         (merge.evalModuleTree { } [
           {
             options.schema = S.mkSchemaOption {
@@ -186,50 +193,41 @@ in
                 };
             };
           }
-          {
-            config.schema = {
-              a.options.x = merge.mkOption {
-                type = merge.types.str;
-                default = "d";
-              };
-              b = {
-                options.y = opt;
-                inherits = [ "a" ];
-              };
-              c = {
-                options.z = opt;
-                inherits = [ "a" ];
-              };
-              d = {
-                options.w = opt;
-                inherits = [
-                  "b"
-                  "c"
-                ];
-              };
-            };
-          }
-        ]).config.schema;
-      kinds = [
-        "a"
-        "b"
-        "c"
-        "d"
-      ];
-      x =
+          { config.schema.k = decl; }
+        ]).config.schema.k;
+      a = kindOf;
+      b =
         (merge.evalModuleTree { } [
-          s.d
           {
-            config = {
-              w = "w";
-              y = "y";
-              z = "z";
+            options.schema = S.mkSchemaOption {
+              mkType =
+                { defs, ... }:
+                {
+                  __functor =
+                    _:
+                    { ... }:
+                    {
+                      imports = map (d: d.value) defs;
+                    };
+                };
             };
           }
-        ]).config.x;
+          { config.schema.k = decl; }
+        ]).config.schema.k;
+      r = builtins.tryEval (
+        builtins.deepSeq
+          (merge.evalModuleTree { } [
+            a
+            b
+          ]).config.trail
+          true
+      );
     in
-    builtins.deepSeq (map (k: s.${k}.__mint.minted) kinds) (
-      if x == "d" then builtins.length kinds else throw "mktype-diamond-mints: config.x is ${x}"
+    builtins.deepSeq [ a.__mint.minted b.__mint.minted ] (
+      if r.success then
+        throw "mktype-two-constructions-mints: the two constructions were not refused"
+      else
+        2
     );
   # One application per demanded value: the type decides its own refinements, and the kind pass
   # does not re-check them.
