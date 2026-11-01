@@ -697,8 +697,10 @@ let
   # refused by name, in either order. `inheritedModule` copies both onto the parent a child imports, so an
   # ancestor reached through two children (a diamond) is one node on either arm. `token` is the caller's
   # construction token, bound inline once per construction (never here: a token this function built would
-  # be one per call, and the caller calls it once per construction only by its own let). It takes `plane`
-  # and the default arm's `keyed` whole, so the call allocates no thunk the inline record did not.
+  # be one per call, and the caller calls it once per construction only by its own let). Its arguments are
+  # positional, `kind kindWitness mark plane token guarded keyed` (`keyed` the default arm's foreign-key
+  # record, `null` on the `mkType` arm), so a call passing bare names allocates no argument thunk: an
+  # attrset argument is one thunk per call, which the inline record it replaces did not pay.
   # the kept collections a kind's own definition can make `guarded` (a built-in holds no instance read)
   kindGuardedNames = builtins.filter (
     c:
@@ -709,59 +711,49 @@ let
       "validators"
     ])
   );
-  kindNodeRecord =
-    {
-      kind,
-      kindWitness,
-      mark,
-      plane,
-      token,
-      guarded,
-      keyed ? null,
-    }:
-    {
-      __moduleKey = "gen-schema-kind:${kind}#${kindWitness}";
-      __keyEq = {
-        subject = {
-          name = kind;
-          inherit (plane) sealed;
-          inherit
-            mark
-            token
-            guarded
-            ;
-        };
-        # Where either side's kind defines a collection its schema keeps in identity (`guarded`), a
-        # one-node pair is decided by the construction's token and never by its mark or seals, whose mint
-        # pass could read an instance under construction, and a second construction is refused BY NAME,
-        # naming the remedy. The branch reads BOTH sides, so a pair of one guarded and one unguarded
-        # construction (one declaration under two schemas) gets one answer whichever is gen-merge's
-        # representative. Otherwise the seals decide (the mark only where nothing is sealed), and an equal
-        # mark with distinct seals is refused by `sealedCollisionEq`'s own named refusal.
-        decide =
-          a: b:
-          if a.guarded || b.guarded then
-            a.token == b.token
-          else
-            let
-              r = builtins.tryEval (a.sealed == b.sealed);
-            in
-            r.success && r.value && (a.sealed != { } || a.mark == b.mark);
-        onDistinct = "refuse-on-conflict";
-        conflicts =
-          a: b:
-          if a.guarded || b.guarded then
-            (throw "gen-schema: kind '${kind}' is imported twice under one key: two constructions of '${kind}' from one declaration meet, and this schema keeps a declared collection in the kind's identity, so telling them apart would mint over that collection, which may read an instance under construction. Import one construction of '${kind}', or declare the collection `identity = false` on the schema")
-          else
-            a.mark == b.mark
-            && !(sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key" a b);
-        # occurrences meet only at one declaration node (`meeting` = the node key), so occurrences at
-        # distinct nodes both compose and no mark or seal is read; at a meeting `decide` names the one
-        # construction reached again and `conflicts` the second construction gen-merge refuses
-        meeting = "gen-schema-kind:${kind}#${kindWitness}";
-        key = if keyed != null then keyed.key else "gen-schema-kind:${kind}#${kindWitness}#${mark}";
+  kindNodeRecord = kind: kindWitness: mark: plane: token: guarded: keyed: {
+    __moduleKey = "gen-schema-kind:${kind}#${kindWitness}";
+    __keyEq = {
+      subject = {
+        name = kind;
+        inherit (plane) sealed;
+        inherit
+          mark
+          token
+          guarded
+          ;
       };
+      # Where either side's kind defines a collection its schema keeps in identity (`guarded`), a
+      # one-node pair is decided by the construction's token and never by its mark or seals, whose mint
+      # pass could read an instance under construction, and a second construction is refused BY NAME,
+      # naming the remedy. The branch reads BOTH sides, so a pair of one guarded and one unguarded
+      # construction (one declaration under two schemas) gets one answer whichever is gen-merge's
+      # representative. Otherwise the seals decide (the mark only where nothing is sealed), and an equal
+      # mark with distinct seals is refused by `sealedCollisionEq`'s own named refusal.
+      decide =
+        a: b:
+        if a.guarded || b.guarded then
+          a.token == b.token
+        else
+          let
+            r = builtins.tryEval (a.sealed == b.sealed);
+          in
+          r.success && r.value && (a.sealed != { } || a.mark == b.mark);
+      onDistinct = "refuse-on-conflict";
+      conflicts =
+        a: b:
+        if a.guarded || b.guarded then
+          (throw "gen-schema: kind '${kind}' is imported twice under one key: two constructions of '${kind}' from one declaration meet, and this schema keeps a declared collection in the kind's identity, so telling them apart would mint over that collection, which may read an instance under construction. Import one construction of '${kind}', or declare the collection `identity = false` on the schema")
+        else
+          a.mark == b.mark
+          && !(sealedCollisionEq "gen-schema: kind '${kind}' is imported twice under one key" a b);
+      # occurrences meet only at one declaration node (`meeting` = the node key), so occurrences at
+      # distinct nodes both compose and no mark or seal is read; at a meeting `decide` names the one
+      # construction reached again and `conflicts` the second construction gen-merge refuses
+      meeting = "gen-schema-kind:${kind}#${kindWitness}";
+      key = if keyed != null then keyed.key else "gen-schema-kind:${kind}#${kindWitness}#${mark}";
     };
+  };
   # THE CONTENT STAMP (den-hoag-9zyp7, den-hoag-c2836): every cell but the three identity cells, the
   # mark (`__mint`), the sealed subjects (`__sealed`) and the ancestor map (`__kindAncestors`, keyed by
   # marks). A door that composes reads the content cells and no identity, so it never demands one: on
@@ -2810,17 +2802,12 @@ let
                     __kindWitness = kindWitness;
                     __kindAncestors = resolvedOnly kindAncestorsByMark;
                   }
-                  // kindNodeRecord {
-                    inherit kind kindWitness;
-                    mark = mkTypeMark;
-                    inherit plane;
-                    token = mkTypeConstructionToken;
-                    guarded =
-                      guard
-                      && builtins.any (
-                        d: builtins.isAttrs d.value && builtins.any (c: d.value ? ${c}) (kindGuardedNames kept)
-                      ) defs;
-                  }
+                  // kindNodeRecord kind kindWitness mkTypeMark plane mkTypeConstructionToken (
+                    guard
+                    && builtins.any (
+                      d: builtins.isAttrs d.value && builtins.any (c: d.value ? ${c}) (kindGuardedNames kept)
+                    ) defs
+                  ) null
                 else
                   let
                     # Effective base module: bridge output when mixins applied, original otherwise
@@ -3098,13 +3085,7 @@ let
                       imports = [ merged ];
                     }
                     // keyed;
-                    keyEqRecord = kindNodeRecord {
-                      inherit kind kindWitness;
-                      mark = ownMark;
-                      inherit plane keyed;
-                      token = constructionToken;
-                      guarded = kindGuarded;
-                    };
+                    keyEqRecord = kindNodeRecord kind kindWitness ownMark plane constructionToken kindGuarded keyed;
                   in
                   # Precedence: computed overrides collections of the same name.
                   # __functor is reserved — collections/computed must not use it as a key.
