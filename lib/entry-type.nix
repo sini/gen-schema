@@ -444,7 +444,8 @@ let
         ++ spread [ "computed" ] (_: [ ]) computed
         ++ [
           # ★ A FUNCTION MODULE IS OPEN CONTENT, SO ITS SUBJECT IS ALLOCATED BY THIS CALL (den-hoag-a7c9r).
-          # A function module is a lambda or a functor, as nixpkgs' `lib.isFunction` reads it. What it
+          # A function module is a lambda or any attrset carrying `__functor`: a SUPERSET of nixpkgs'
+          # `lib.isFunction`, which also asks the `__functor` to be callable. What it
           # contributes lives in its body, which the plane cannot see
           # into (den-hoag-egei0): the module is the sealed component standing for that content, as an
           # `openComponents` path is. So its subject is `_: m`, a closure this construction allocates,
@@ -2748,6 +2749,11 @@ let
                       functions = { inherit mkType computed; };
                       parents = kindParents;
                     };
+                    # minted once, read by `__mint` and the node record (gen-merge forces `__keyEq.key` at a
+                    # meeting, so two calls would mint twice)
+                    mkTypeMark = builtins.seq identityVerdict (markOf {
+                      inherit kind strict plane;
+                    });
                   in
                   # Every field the caller's `mkType` built is read THROUGH the guard (den-hoag-8c8pr): the
                   # result is the caller's key space (`__defsModule`, or anything else built from `defs`),
@@ -2794,9 +2800,7 @@ let
                     # mark rather than again (den-hoag-a7c9r): the same plane, factored.
                     inherit kind;
                     __mint = {
-                      minted = builtins.seq identityVerdict (markOf {
-                        inherit kind strict plane;
-                      });
+                      minted = mkTypeMark;
                     };
                     __sealed = builtins.seq identityVerdict plane.sealed;
                     __okAt = kindOkAt { inherit (introspect) options refs; };
@@ -2807,9 +2811,7 @@ let
                   }
                   // kindNodeRecord {
                     inherit kind kindWitness;
-                    mark = builtins.seq identityVerdict (markOf {
-                      inherit kind strict plane;
-                    });
+                    mark = mkTypeMark;
                     inherit (plane) sealed;
                     token = mkTypeConstructionToken;
                     guarded =
@@ -3108,11 +3110,12 @@ let
                   # __functor is reserved — collections/computed must not use it as a key.
                   {
                     # Every kind is a node of gen's module graph by its DECLARATION NODE (`__moduleKey`,
-                    # the content witness through the one mint; den-hoag-9zyp7 OQ2), so an ancestor
+                    # the content witness as its held string; den-hoag-9zyp7 OQ2), so an ancestor
                     # reached on two branches (a diamond) is composed once. gen-merge reads the record's
                     # reference key only where two occurrences of one node meet (`__keyEq.meeting`), so
                     # the import of a lone kind demands no mark. The result's `key`,
-                    # `gen-schema-kind:<kind>#<witness>#<mark>`, is read by foreign evaluators only:
+                    # `gen-schema-kind:<kind>#<witness>#<separation>` (the separation key, `keyed`), is
+                    # read by foreign evaluators and at a meeting:
                     # nixpkgs dedups the kind and removes it by that key (`keyed`, `keyEqRecord`).
                     # Inside a kind the ancestor map's fold decides the pair.
                     __functor = _: { ... }: kindResult;

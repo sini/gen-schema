@@ -1012,7 +1012,7 @@ reached on two paths (a diamond) composes once, and kinds at two declaration nod
 trees' same-named kinds, or one generator called at two sites, where gen-merge then refuses the
 declarations that conflict. The kind value's functor record names the graph node, `__moduleKey = "gen-schema-kind:<kind>#<witness>"` (`__kindWitness`, read before composition), and publishes
 gen-merge's key comparison `__keyEq`: its `meeting` is the node key, so occurrences meet only at one
-declaration node; its `key`, the reference key `gen-schema-kind:<kind>#<witness>#<mark>`, is read only
+declaration node; its `key`, the reference key `gen-schema-kind:<kind>#<witness>#<separation>`, is read only
 where two occurrences meet, so importing a lone kind demands no mark, and a kind whose identity-bearing
 collection reads an instance of itself composes. At one node, `decide` names the one construction
 reached again by its seals (the mark only where nothing is sealed): it is one module. Two
@@ -1025,7 +1025,13 @@ construction of it at that node is refused by name, naming the remedy (import on
 declare the collection `identity = false`). A declaration may not carry `__keyEq` itself, and
 gen-schema over a gen-merge that does not read `__keyEq` and `__moduleKey` off a functor record, or
 `key`, `onDistinct` and `conflicts` off the comparison (`moduleSyntax.keyEqFields`), is refused by
-name. The module the functor returns carries `imports`, `config` and the same reference key, so a
+name. The separation part is a reading of what the mark mints, taken off the definitions without
+minting: the schema's construction parameters, each definition's declared option paths with their
+types' marks, the kept collections that differ from their defaults, the computed field and freeform
+types, and the parents' own keys. Where a definition reaches a function or path module, whose
+declarations no such reading sees, the separation part is the mark itself. Either way the key splits
+exactly where the mark does, and a cell over every one-node shape holds that. The module the functor
+returns carries `imports`, `config` and the same reference key, so a
 nixpkgs `lib.evalModules` mount of the kind value dedups one construction reached twice as gen does
 and collects nothing it does not know; at one node it keeps one construction where gen refuses.
 
