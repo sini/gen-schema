@@ -229,7 +229,6 @@ let
         ]
       )
   );
-  plainLayerDecl = v: builtins.isAttrs v && builtins.intersectAttrs layerRefusedKeys v == { };
   # Two published option trees as one, or `null` where both declare a leaf (or one a leaf and the other
   # a group there): a declaration record depends on its own module alone, so the union of disjoint
   # evaluations is the evaluation of the union; a shared leaf is gen-merge's to merge, by the full one.
@@ -260,40 +259,6 @@ let
         null
       else
         a // b // builtins.listToAttrs subs;
-  # A layered kind's published tree: its parents' constructions' published planes first, so a collision
-  # between two parents (a diamond, a redeclared ancestor leaf) falls back before this kind's own layer
-  # is evaluated; then the own defs' declared top-level option names (`ownDecls`, each def's `options`
-  # as written: a context-free def is an attrset read without evaluation) against the parents' plane, so
-  # an own leaf redeclaring a parent's falls back unevaluated too; then `own`, this kind's own defs
-  # evaluated alone (den-hoag-f1iza C3, CF-1). `null` selects the full evaluation. Positional, so the
-  # call allocates no argument record.
-  layeredIntrospection =
-    resolvedOnly: ownDecls: own: parentCons:
-    let
-      parents = builtins.foldl' unionDisjoint (builtins.head parentCons).options (
-        map (c: c.options) (builtins.tail parentCons)
-      );
-      collides = builtins.any (
-        o:
-        builtins.isAttrs o
-        && builtins.any (
-          n:
-          parents ? ${n} && (isOptionDecl parents.${n} || !(builtins.isAttrs o.${n}) || isOptionDecl o.${n})
-        ) (builtins.attrNames o)
-      ) ownDecls;
-      options = if parents == null || collides then null else unionDisjoint parents own.options;
-    in
-    if options == null then
-      null
-    else
-      {
-        options = resolvedOnly options;
-        refs = resolvedOnly (builtins.foldl' (a: c: c.refs // a) own.refs parentCons);
-        refinements = builtins.foldl' (
-          a: c: c.refinements // a
-        ) (refinementsOfOptions own.options) parentCons;
-        inherit own;
-      };
 
   # A kind's OWN defs (den-hoag-a7c9r), for its plane's `modules`: the first `n` of `strippedDefs` (its
   # declared defs; the desugared parents follow them) less every parent `evalSchema` injected (decided by
@@ -3007,7 +2972,7 @@ let
                     );
 
                     # THE LAYERED INTROSPECTION (den-hoag-f1iza M1). A parented kind whose own defs
-                    # each declare from their own text (`plainLayerDecl`), with no injected base or
+                    # each declare from their own text (refusing `layerRefusedKeys`), with no injected base or
                     # methods module and only context-free parents, is evaluated over its own defs
                     # alone and unioned with each parent construction's published plane (itself
                     # layered or full); a leaf two sources declare falls back to the full evaluation.
@@ -3016,6 +2981,8 @@ let
                     # it by name at `resolvedOnly`. A def carrying the resolver's file prefix is
                     # context-free only where it is the resolver's own (`resolvedBy`, the exact file
                     # and value), so the layer leaves out every prefixed def and drops nothing else.
+                    # The def test is a lambda applied here and the layer is spelled in place, since a
+                    # library-scope binding of either costs a thunk per evaluation.
                     contextFree =
                       inheritanceCycle == null
                       && injected == [ ]
@@ -3024,7 +2991,7 @@ let
                         if prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")) then
                           builtins.any (p: resolvedBy kind p d) declaredInherits
                         else
-                          plainLayerDecl d.value
+                          (v: builtins.isAttrs v && builtins.intersectAttrs layerRefusedKeys v == { }) d.value
                       ) defs
                       && builtins.all (p: p ? __kindSelf && (p.__kindSelf null).__kindContextFree or false) kindParents;
                     layer =
@@ -3035,10 +3002,41 @@ let
                           ownDefsL = builtins.filter (
                             d: !(prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")))
                           ) (builtins.genList (builtins.elemAt strippedDefs) (builtins.length defs));
+                          # The parents' constructions' published planes first, so a collision between
+                          # two parents (a diamond, a redeclared ancestor leaf) falls back before this
+                          # kind's own layer is evaluated; then the own defs' declared top-level option
+                          # names (`ownDecls`, each def's `options` as written: a context-free def is an
+                          # attrset read without evaluation) against the parents' plane, so an own leaf
+                          # redeclaring a parent's falls back unevaluated too; then `own`, this kind's own
+                          # defs evaluated alone (den-hoag-f1iza C3, CF-1). `null` selects the full
+                          # evaluation.
+                          ownDecls = map (d: d.value.options or { }) ownDefsL;
+                          own = introspectOf (resolvedOnly (base.merge loc ownDefsL));
+                          parentCons = map (p: p.__kindSelf null) kindParents;
+                          parents = builtins.foldl' unionDisjoint (builtins.head parentCons).options (
+                            map (c: c.options) (builtins.tail parentCons)
+                          );
+                          collides = builtins.any (
+                            o:
+                            builtins.isAttrs o
+                            && builtins.any (
+                              n:
+                              parents ? ${n} && (isOptionDecl parents.${n} || !(builtins.isAttrs o.${n}) || isOptionDecl o.${n})
+                            ) (builtins.attrNames o)
+                          ) ownDecls;
+                          options = if parents == null || collides then null else unionDisjoint parents own.options;
                         in
-                        layeredIntrospection resolvedOnly (map (d: d.value.options or { }) ownDefsL) (introspectOf (
-                          resolvedOnly (base.merge loc ownDefsL)
-                        )) (map (p: p.__kindSelf null) kindParents);
+                        if options == null then
+                          null
+                        else
+                          {
+                            options = resolvedOnly options;
+                            refs = resolvedOnly (builtins.foldl' (a: c: c.refs // a) own.refs parentCons);
+                            refinements = builtins.foldl' (
+                              a: c: c.refinements // a
+                            ) (refinementsOfOptions own.options) parentCons;
+                            inherit own;
+                          };
                     introspect = if layer == null then introspectOf merged else layer;
                     plane = planeOf {
                       inherit
