@@ -1291,7 +1291,7 @@ with `attribute '<k>' missing`. Declaring a reserved collection key (`__functor`
 `__kindImports`, `__kindLineage`, `__kindSelf`, `__kindWitness`, `__mint`, `__pureModule`, `__reservedKeys`, `__sealed`, `__witness`, `_class`, `_file`, `_module`, `baseModule`,
 `collections`, `computed`, `config`, `disabledModules`, `freeformType`, `imports`, `key`,
 `keySemantics`, `kind`, `meta`, `mixins`, `mkType`, `options`, `refinements`, `refs`, `require`,
-`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 34 names: gen-merge's published
+`specialArgs`, `strict` — `schema._reservedCollectionKeys`, 38 names: gen-merge's published
 `moduleSyntax.structured` and `moduleSyntax.shorthandMeta`, the names gen-schema writes onto the kind
 value itself, and the schema's construction formals) is refused when `_collectionKeys` is read, exactly as it is refused when a
 kind is merged.

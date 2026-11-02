@@ -1271,8 +1271,10 @@ let
   # `imports` before the merge, silently, the same way a collection named for a structured key
   # already does. `declarationKeys` alone (gen-merge's STRUCTURED set) does not cover it, because a
   # shorthand-only key is never a structured one.
-  reservedCollectionKeys = prelude.sort (a: b: a < b) (
-    prelude.unique (
+  # The set, sorted and deduplicated, is the names of a `groupBy` on itself: no per-name thunk, where a
+  # string `unique` then `sort` allocates three per name.
+  reservedCollectionKeys = builtins.attrNames (
+    builtins.groupBy (n: n) (
       declarationKeys ++ merge.moduleSyntax.shorthandMeta ++ kindResultKeys ++ schemaEntryFormals
     )
   );
