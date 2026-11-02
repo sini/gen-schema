@@ -262,14 +262,26 @@ let
         a // b // builtins.listToAttrs subs;
   # A layered kind's published tree: its parents' constructions' published planes first, so a collision
   # between two parents (a diamond, a redeclared ancestor leaf) falls back before this kind's own layer
-  # is evaluated, then `own`, this kind's own defs evaluated alone (den-hoag-f1iza C3). `null` selects
-  # the full evaluation. Positional, so the call allocates no argument record.
+  # is evaluated; then the own defs' declared top-level option names (`ownDecls`, each def's `options`
+  # as written: a context-free def is an attrset read without evaluation) against the parents' plane, so
+  # an own leaf redeclaring a parent's falls back unevaluated too; then `own`, this kind's own defs
+  # evaluated alone (den-hoag-f1iza C3, CF-1). `null` selects the full evaluation. Positional, so the
+  # call allocates no argument record.
   layeredIntrospection =
-    resolvedOnly: own: parentCons:
+    resolvedOnly: ownDecls: own: parentCons:
     let
-      options = unionDisjoint (builtins.foldl' unionDisjoint (builtins.head parentCons).options (
+      parents = builtins.foldl' unionDisjoint (builtins.head parentCons).options (
         map (c: c.options) (builtins.tail parentCons)
-      )) own.options;
+      );
+      collides = builtins.any (
+        o:
+        builtins.isAttrs o
+        && builtins.any (
+          n:
+          parents ? ${n} && (isOptionDecl parents.${n} || !(builtins.isAttrs o.${n}) || isOptionDecl o.${n})
+        ) (builtins.attrNames o)
+      ) ownDecls;
+      options = if parents == null || collides then null else unionDisjoint parents own.options;
     in
     if options == null then
       null
@@ -3019,14 +3031,13 @@ let
                       if kindParents == [ ] || !contextFree then
                         null
                       else
-                        layeredIntrospection resolvedOnly (introspectOf (
-                          resolvedOnly (
-                            base.merge loc (
-                              builtins.filter (d: !(prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")))) (
-                                builtins.genList (builtins.elemAt strippedDefs) (builtins.length defs)
-                              )
-                            )
-                          )
+                        let
+                          ownDefsL = builtins.filter (
+                            d: !(prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")))
+                          ) (builtins.genList (builtins.elemAt strippedDefs) (builtins.length defs));
+                        in
+                        layeredIntrospection resolvedOnly (map (d: d.value.options or { }) ownDefsL) (introspectOf (
+                          resolvedOnly (base.merge loc ownDefsL)
                         )) (map (p: p.__kindSelf null) kindParents);
                     introspect = if layer == null then introspectOf merged else layer;
                     plane = planeOf {
@@ -3094,8 +3105,8 @@ let
                           # forces no mark. Where an opaque module is reached no syntactic reader sees its
                           # declarations, and the key is the mark: a fallback stated and chosen by
                           # constructor shape. The key must split exactly where the mark splits; a mark
-                          # component with no twin here is a coarser key, which the key-vs-mark agreement
-                          # razor (ci/tests/key-mark-agreement.nix) refuses.
+                          # component with no twin here is a coarser key, which would merge two kinds the
+                          # mark tells apart.
                           key =
                             let
                               markOrQ =

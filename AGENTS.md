@@ -91,7 +91,9 @@ record (`__keyEq.key`, read by gen-merge only at a meeting), its node and meetin
 mint-count cost cell is `ci/tests-process.nix`). One node decides by the seals and refuses a second
 construction of an equal mark; a kind setting a collection its schema keeps in identity decides by a
 per-construction token and refuses a second construction by name, the branch read on either side
-(den-hoag-xh14j, ADR-0034). A plain positioned `baseModule` is keyed `gen-schema-base:<pos>#base` and
+(den-hoag-xh14j, ADR-0034). Where a kind's defs reach no opaque module, its reference key is the syntactic separation
+key (den-hoag-a7c9r B′, `keyed` in `lib/entry-type.nix`), which must split exactly where the mark splits; the
+key-vs-mark razor is `ci/tests/key-mark-agreement.nix`. A plain positioned `baseModule` is keyed `gen-schema-base:<pos>#base` and
 sealed by its value (K2 (b)). A kind is removed by its computed key (`{ key = (k { }).key; }`), never
 a literal: the key's digests are internal addressing (ADR-0016 ruling 5), and the act renamed main's
 `gen-schema-kind:<kind>#<mark>` and a parentless kind's positional `<parent>:anon-<i>` (den-hoag-xh14j
