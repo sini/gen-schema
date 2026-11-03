@@ -27,6 +27,17 @@
         cd "$TMPDIR"
         export NIX_STATE_DIR=$TMPDIR/nix-state NIX_LOG_DIR=$TMPDIR/nix-log
         echo "evaluator: $(nix-instantiate --version | sed -n 1p)"
+        # A thunk count is defined only for a serial run, so the counted cells below (`cellThunks`) are
+        # serial, and every other cell runs under the column's own evaluator, Determinate's parallel one
+        # included. The options are resolved once (gen-harness `lib.serialEval`); `inst` carries them only
+        # while NIX_SHOW_STATS is set, so a counted cell cannot run unpinned, nor a correctness cell pinned.
+        # shellcheck disable=SC1091
+        source ${inputs.gen-harness.lib.serialEval { inherit pkgs; }}
+        serialEvalOptions "$(command -v nix-instantiate)" || {
+          echo "tests-process: CONTROL FAILED: the serial options of $(command -v nix-instantiate) could not be resolved" >&2
+          exit 2
+        }
+        echo "tests-process: serial options: ''${SERIAL_EVAL[*]:-(none)}"
         ran=0
         # The spy's trace label, generated fresh per run and never written down, so no text a cell
         # or a document carries can be mistaken for a firing.
@@ -37,7 +48,7 @@
         }
         # inst <flag>...: one evaluation of the cells file, in its own process.
         inst() {
-          nix-instantiate --eval --strict --readonly-mode "$@" \
+          nix-instantiate ''${NIX_SHOW_STATS:+"''${SERIAL_EVAL[@]}"} --eval --strict --readonly-mode "$@" \
             --argstr label "$label" \
             --argstr libSrc ${../lib} \
             --argstr preludeSrc ${inputs.gen-prelude} \
