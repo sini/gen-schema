@@ -208,7 +208,7 @@
 
         # 0/0 is a false pass: the runner must have executed every cell above.
         [ "$ran" = "19" ] || die runner "expected 19 evaluations, ran $ran"
-        echo "tests-process: 19 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth slopes $s1 / $s2 thunks per level"
+        echo "tests-process: 19 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth thunks $d16 / $d32 / $d64, slopes $s1 / $s2 thunks per level"
       '';
     };
 }
