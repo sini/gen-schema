@@ -8,11 +8,10 @@
 {
   prelude,
   merge,
-  hasDeclaredSubject,
-  declaresSubject,
-  sealedMarker,
+  algebra,
 }:
 let
+  inherit (algebra) sealedMarker;
   # A functor whose walk exhausts the bound is `set` by type; name the bound after it.
   exhausted =
     v:
@@ -132,7 +131,8 @@ let
                 {
                   inherit path;
                   # a slice keeps the check's slot, where a selection would be a fresh thunk
-                  value = if declaresSubject r.check then r.check else builtins.intersectAttrs { check = null; } r;
+                  value =
+                    if algebra.declaresSubject r.check then r.check else builtins.intersectAttrs { check = null; } r;
                 }
               ]
             ) (builtins.length normalized)
@@ -296,7 +296,8 @@ let
       # Raw `==` first, so every refinement keeps its slot; mapping both sides to subjects
       # unconditionally would copy each element out of its slot and split a bound function too.
       registered =
-        l: l != [ ] && builtins.all (r: builtins.isAttrs r && r ? check && declaresSubject r.check) l;
+        l:
+        l != [ ] && builtins.all (r: builtins.isAttrs r && r ? check && algebra.declaresSubject r.check) l;
       bySubject = map (r: r // { check = r.check.__mint.unmintable.subject; });
       sameRefinements =
         l:
@@ -306,8 +307,8 @@ let
           && registered normalized
           && bySubject l == bySubject normalized
           # standing only at equal subjects: unequal ones settle `false` whatever either check's standing
-          && builtins.all (r: hasDeclaredSubject r.check) l
-          && builtins.all (r: hasDeclaredSubject r.check) normalized
+          && builtins.all (r: algebra.hasDeclaredSubject r.check) l
+          && builtins.all (r: algebra.hasDeclaredSubject r.check) normalized
         );
 
       # ★ THE COPY IS TAKEN OF A RECORD IN GEN'S PROTOCOL. A FOREIGN base, one stating no
