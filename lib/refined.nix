@@ -296,11 +296,19 @@ let
       # Raw `==` first, so every refinement keeps its slot; mapping both sides to subjects
       # unconditionally would copy each element out of its slot and split a bound function too.
       registered =
-        l: l != [ ] && builtins.all (r: builtins.isAttrs r && r ? check && hasDeclaredSubject r.check) l;
+        l: l != [ ] && builtins.all (r: builtins.isAttrs r && r ? check && declaresSubject r.check) l;
       bySubject = map (r: r // { check = r.check.__mint.unmintable.subject; });
       sameRefinements =
         l:
-        l == normalized || (registered l && registered normalized && bySubject l == bySubject normalized);
+        l == normalized
+        || (
+          registered l
+          && registered normalized
+          && bySubject l == bySubject normalized
+          # standing only at equal subjects: unequal ones settle `false` whatever either check's standing
+          && builtins.all (r: hasDeclaredSubject r.check) l
+          && builtins.all (r: hasDeclaredSubject r.check) normalized
+        );
 
       # ★ THE COPY IS TAKEN OF A RECORD IN GEN'S PROTOCOL. A FOREIGN base, one stating no
       # `typeMergeRel` (the test `mergeTypes` itself splits the two arms on), is imported through
