@@ -5972,6 +5972,15 @@ in
           { config.schema.bobbin.options.n = genMerge.mkOption { type = ty; }; }
         ]).config.schema.bobbin;
       ctl = teq (rf d1) (rf (mk 1)) == true && kindEq (kindOf (rf d1)) (kindOf (rf (mk 1)));
+      # two kinds, each from its own tree, imported as modules of one tree: gen-merge's key dedup decides
+      # them by the kind's `__keyEq`; `3` reads back where one module was kept
+      importedSideBySide =
+        t1: t2:
+        (genMerge.evalModuleTree { } [
+          (kindOf t1)
+          (kindOf t2)
+          { config.n = 3; }
+        ]).config.n;
     in
     {
       test-a-refined-over-a-departed-construction-against-itself-is-refused = {
@@ -6006,6 +6015,32 @@ in
           assert ctl;
           verdict (kindEq (kindOf (rf x)) (kindOf (rf (mk 2))));
         expected = false;
+      };
+      # the kind key-dedup route (`kindNodeRecord`'s `__keyEq.decide`): two kinds over two different `//`
+      # extensions of one construction, imported side by side, are refused by name, never deduplicated
+      # into one module. Live controls: the honest pair composes to one module; another term shares the key.
+      test-kinds-over-two-departed-extensions-imported-side-by-side-are-refused-by-name = {
+        expr =
+          assert ctl;
+          importedSideBySide (rf (d1 // { includes = [ "A" ]; })) (rf (d1 // { includes = [ "B" ]; }));
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex "gen-schema: kind 'bobbin' is imported twice under one key: 'bobbin' holds component(s) 'options.n.type' that are not the value their producer completed: a `//` over it keeps its mark while changing what the mark stands for; build the change through its producer"
+            + "$";
+        };
+      };
+      test-kinds-over-two-constructions-of-one-term-imported-side-by-side-are-one-module = {
+        expr = importedSideBySide (rf d1) (rf (mk 1));
+        expected = 3;
+      };
+      test-kinds-over-two-terms-imported-side-by-side-share-the-key = {
+        expr = importedSideBySide (rf d1) (rf (mk 2));
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-merge: modules `<unknown-file>' and `<unknown-file>' share the key 'gen-schema-kind:bobbin#";
+        };
       };
     };
 }
