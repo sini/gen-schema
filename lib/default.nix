@@ -180,7 +180,7 @@ let
   };
   evalSchemaLib = import ./eval-schema.nix {
     inherit prelude merge;
-    inherit (entryType) mkSchemaOption;
+    inherit (entryType) mkSchemaOption inheritsResolvedFile;
   };
   instance = import ./instance.nix {
     inherit prelude merge;

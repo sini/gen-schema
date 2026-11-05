@@ -12,6 +12,7 @@
   prelude,
   merge,
   mkSchemaOption,
+  inheritsResolvedFile,
 }:
 let
   # MIXED door (P1, den-hoag-7gp66): `modules` is required, `schemaOption`/`specialArgs` optional —
@@ -71,9 +72,8 @@ let
       # evalModuleTree that `options`/`refs` come from.
       pass0 = evalAt [ ];
       kindNames = pass0._kindNames;
-      # `or [ ]` for a custom `mkType` entry, whose result carries no collections at all — the
-      # same fallback `_topology` takes on `parent`.
-      parentsOf = k: pass0.${k}.inherits or [ ];
+      # Every kind value carries `inherits`: the entry type writes it on both branches.
+      parentsOf = k: pass0.${k}.inherits;
 
       undeclared = prelude.concatMap (
         k:
@@ -126,6 +126,9 @@ let
             [ ]
           else
             map (p: {
+              # the resolver's provenance: the kind entry reads it to tell a resolved parent from one
+              # nothing read (den-hoag-8c8pr)
+              _file = inheritsResolvedFile k p;
               config.schema.${k} = {
                 imports = [
                   (
