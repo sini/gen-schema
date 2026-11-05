@@ -10,7 +10,7 @@ let
   refinedLib = import ../../lib/refined.nix {
     inherit prelude;
     merge = genMerge;
-    inherit (genAlgebra) hasDeclaredSubject declaresSubject sealedMarker;
+    algebra = genAlgebra;
   };
   inherit (refinedLib)
     types

@@ -16,7 +16,7 @@ let
   refinedLib = import ../../lib/refined.nix {
     inherit prelude;
     merge = genMerge;
-    inherit (genAlgebra) hasDeclaredSubject declaresSubject sealedMarker;
+    algebra = genAlgebra;
   };
 
   # --- Test 1: Auto-extracted refinements from inline type declarations ---
