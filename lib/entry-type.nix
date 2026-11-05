@@ -788,7 +788,9 @@ let
           let
             r = builtins.tryEval (a.sealed == b.sealed);
           in
-          r.success && r.value && (a.sealed != { } || a.mark == b.mark);
+          # a map carrying a departure record (gen-algebra `componentsPreimage`) is never one construction:
+          # `conflicts` hands it to `sealedCollisionEq`, which refuses it by name
+          !(a.sealed ? __departed) && r.success && r.value && (a.sealed != { } || a.mark == b.mark);
       onDistinct = "refuse-on-conflict";
       conflicts =
         a: b:
