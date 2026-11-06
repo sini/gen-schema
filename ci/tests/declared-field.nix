@@ -108,6 +108,57 @@ in
             };
           };
         };
+      # a `mkType` caller that states its datum, stamped (`_internal.stampInstanceDefinitions`), is served; the same
+      # datum unstamped is not read (the razor's `mktype` shape states none and falls back 4/4)
+      test-a-mktype-kind-stating-its-datum-is-served =
+        let
+          inherit (genMerge) mkOption types;
+          mod = {
+            options.aspects = mkOption {
+              type = types.listOf types.str;
+              default = [ ];
+            };
+          };
+          kindWith =
+            datum:
+            (genMerge.evalModuleTree { } [
+              {
+                options.schema = genSchema.mkSchemaOption {
+                  mkType =
+                    { ... }:
+                    {
+                      __functor = _: _: mod;
+                      _instanceDefinitions = datum;
+                    };
+                };
+              }
+              { config.schema.spindle = { }; }
+            ]).config.schema.spindle;
+          readWith =
+            datum:
+            let
+              ev = genMerge.evalModuleTree { } [
+                {
+                  options.spindles = genSchema.mkInstanceRegistry { } (kindWith datum);
+                  config.spindles.s0.aspects = [ "loom" ];
+                }
+              ];
+            in
+            genSchema.declaredField ev.options.spindles "aspects" "s0";
+        in
+        {
+          expr = {
+            stamped = readWith (genSchema._internal.stampInstanceDefinitions { });
+            unstamped = readWith {
+              by = null;
+              fields = { };
+            };
+          };
+          expected = {
+            stamped = [ "loom" ];
+            unstamped = null;
+          };
+        };
       # a record stating the datum's name without the library's token is not read: every node falls back
       test-a-forged-datum-is-not-read =
         let
