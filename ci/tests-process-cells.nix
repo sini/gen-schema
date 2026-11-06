@@ -225,7 +225,13 @@ let
                 default = [ ];
               };
               options.idx = merge.mkOption { type = T.int; };
-              config = if plant == "kind" then { aspects = merge.mkIf cond [ "spare" ]; } else { };
+              config =
+                if plant == "kind" then
+                  { aspects = merge.mkIf cond [ "spare" ]; }
+                else if plant == "kindcfg" then
+                  { aspects = [ "spare" ]; }
+                else
+                  { };
             };
           }
         ]).config.schema.spindle;
@@ -275,6 +281,10 @@ in
   declared-cost-16 = (declaredFleet "none" 16).declared;
   module-read-cost-4 = (declaredFleet "none" 4).moduleRead;
   module-read-cost-16 = (declaredFleet "none" 16).moduleRead;
+  # GS2 · a kind setting the field bare (`kindcfg`): every node defining it bare ties with the kind's definition, so
+  # every node falls back, and the registry-level test answers that with no per-node attempt
+  declared-fallback-cost-4 = (declaredFleet "kindcfg" 4).declared;
+  declared-fallback-cost-16 = (declaredFleet "kindcfg" 16).declared;
   # ONE kind, one instance and eight: the kind marks minted must not move with the instance count.
   mints-one-instance = instances 1;
   mints-eight-instances = instances 8;

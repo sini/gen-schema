@@ -142,18 +142,6 @@ let
   instanceDefinitionsToken = {
     t = _: null;
   };
-  # A field the library derives from the record's own minted `type`: it carries no distinguishing content, so the
-  # plane does not mint its name (ADR-0034). Its one member is a registry record's `_instanceDefinitions`, carrying
-  # the token; a declaration writing that name itself is refused by name, so the exclusion hides no content.
-  derivedFromType =
-    kind: q: o:
-    if
-      builtins.isAttrs o._instanceDefinitions
-      && (o._instanceDefinitions.by or null) == instanceDefinitionsToken
-    then
-      true
-    else
-      throw "gen-schema: kind '${kind}': the declaration at `${builtins.concatStringsSep "." (builtins.tail (builtins.tail q))}' writes `_instanceDefinitions', which is reserved: gen-schema writes it on a registry's option record as a function of the record's own type (`mkInstanceRegistry`), and a declaration does not state it";
   # A type record with no minted identity, unmigrated or unmintable: the mint refuses it either way,
   # so declaring it sealed moves no tag. The REGIME is still the mint's per-component tag
   # (den-hoag-markof-partial-preimage-znfjq, ruling (c+): decided by the mint unless the constructor
@@ -469,7 +457,25 @@ let
               if isOptionDecl o then
                 map (a: q ++ [ a ]) (
                   builtins.filter (
-                    a: a != "type" && a != "_type" && !(a == "_instanceDefinitions" && derivedFromType kind q o)
+                    a:
+                    a != "type"
+                    && a != "_type"
+                    # A field the library derives from the record's own minted `type`: it carries no distinguishing
+                    # content, so the plane does not mint its name (ADR-0034). Its one member is a registry record's
+                    # `_instanceDefinitions`, carrying the token; a declaration writing that name itself is refused
+                    # by name, so the exclusion hides no content. Inline, so the load allocates no binding for it.
+                    && !(
+                      a == "_instanceDefinitions"
+                      && (
+                        if
+                          builtins.isAttrs o._instanceDefinitions
+                          && (o._instanceDefinitions.by or null) == instanceDefinitionsToken
+                        then
+                          true
+                        else
+                          throw "gen-schema: kind '${kind}': the declaration at `${builtins.concatStringsSep "." (builtins.tail (builtins.tail q))}' writes `_instanceDefinitions', which is reserved: gen-schema writes it on a registry's option record as a function of the record's own type (`mkInstanceRegistry`), and a declaration does not state it"
+                      )
+                    )
                   ) (prelude.attrNames o)
                 )
               else if builtins.isAttrs o then

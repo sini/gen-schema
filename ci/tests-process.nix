@@ -244,9 +244,20 @@
         [ "$rs" -le 97 ] || die declared-cost-16 "the reader costs $rs thunks per node, over the landed 97"
         [ "$rs" -lt "$ms" ] || die module-read-cost-16 "the reader costs $rs thunks per node, not below the module read's $ms"
 
+        # den-hoag-ien5k T3 GS2 · a fallback costs the reader nothing per node where the kind sets the field bare: the
+        # registry-level test (a registry-side definition at gen-merge's `defaultOverridePriority`) decides it once.
+        cellThunks declared-fallback-cost-4
+        [ "$val" = "4" ] || die declared-fallback-cost-4 "expected every node to fall back, got '$val'"
+        f4=$thunks
+        cellThunks declared-fallback-cost-16
+        [ "$val" = "16" ] || die declared-fallback-cost-16 "expected every node to fall back, got '$val'"
+        f16=$thunks
+        fs=$(((f16 - f4) / 12))
+        [ "$fs" -le 1 ] || die declared-fallback-cost-16 "a fallback costs the reader $fs thunks per node, over 1: the registry-level test did not decide it"
+
         # 0/0 is a false pass: the runner must have executed every cell above.
-        [ "$ran" = "31" ] || die runner "expected 31 evaluations, ran $ran"
-        echo "tests-process: 31 cells, every exit read unpiped; declaredField unforced on 4 plants, controls live; declaredField $rs thunks per node against the module read's $ms; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth thunks $d16 / $d32 / $d64, slopes $s1 / $s2 thunks per level"
+        [ "$ran" = "33" ] || die runner "expected 33 evaluations, ran $ran"
+        echo "tests-process: 31 cells, every exit read unpiped; declaredField unforced on 4 plants, controls live; declaredField $rs thunks per node against the module read's $ms, a kind-set fallback $fs; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth thunks $d16 / $d32 / $d64, slopes $s1 / $s2 thunks per level"
       '';
     };
 }

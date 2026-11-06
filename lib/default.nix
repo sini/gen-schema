@@ -223,8 +223,8 @@ let
       declarationForm
       ;
     inherit refinedLib;
-    inherit (entryType) instanceDefinitionsOf instanceDefinitionsToken;
-    inherit (strictLib) unmatchedPaths;
+    # whole, so the load allocates no select per name (den-hoag-ien5k T3)
+    inherit entryType strictLib;
   };
   docs = import ./docs.nix { inherit prelude; };
   codecLib = import ./codec.nix {

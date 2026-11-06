@@ -25,9 +25,8 @@
   declarationForm,
   filterValidators,
   refinedLib,
-  instanceDefinitionsOf,
-  instanceDefinitionsToken,
-  unmatchedPaths,
+  entryType,
+  strictLib,
 }:
 let
   # OPTIONS FIRST, then the kind (den-hoag-7gp66 P2, rules 2 and 4): `mkInstanceType { extraModules?;
@@ -771,11 +770,11 @@ let
       # `deriveEither`, a validator, a ref binding or a kind ref field, whose missing binding refuses), an opaque
       # extra module. Per field: a refinement (the pass's or the kind's) and the instance's own names. Lazy, so a
       # registry nothing reads it on pays nothing.
-      _instanceDefinitions.by = instanceDefinitionsToken;
+      _instanceDefinitions.by = entryType.instanceDefinitionsToken;
       _instanceDefinitions.fields =
         let
           k = kindValue._instanceDefinitions or null;
-          extra = instanceDefinitionsOf (
+          extra = entryType.instanceDefinitionsOf (
             map (m: {
               file = "<gen-schema: ${kind} registry extraModules>";
               value = m;
@@ -854,6 +853,9 @@ let
   #     module (a `{ config = …; }` definition is a key named `config`).
   #   · The node's config has no undeclared path (`unmatchedPaths`, the strict rule), so a definition the kind's
   #     check rejects falls back and refuses there.
+  #   · No registry-side definition sits at the priority a node's bare definition takes (gen-merge's
+  #     `defaultOverridePriority`, nixpkgs' `lib.modules.defaultOverridePriority`): where one does, every node defining
+  #     the field bare ties with it, so the whole registry falls back with no per-node attempt.
   #   · Every definition reaching the field shows its priority without forcing: no `_type`, or an `override` whose
   #     `content` carries none, read to WHNF only, never an `mkIf`'s condition.
   # Then it serves `evalOptionValue`'s value where its `files` holds at most one survivor.
@@ -868,7 +870,7 @@ let
       record = regOpt._instanceDefinitions or null;
       # only this library's datum: a record stating the name without the token is not read
       datum =
-        if builtins.isAttrs record && (record.by or null) == instanceDefinitionsToken then
+        if builtins.isAttrs record && (record.by or null) == entryType.instanceDefinitionsToken then
           record.fields
         else
           null;
@@ -881,6 +883,17 @@ let
     if
       datum == null
       || side == null
+      || builtins.any (
+        d:
+        (
+          if builtins.isAttrs d.value && (d.value._type or null) == "override" then
+            d.value.priority
+          else if builtins.isAttrs d.value && d.value ? _type then
+            null
+          else
+            merge.defaultOverridePriority
+        ) == merge.defaultOverridePriority
+      ) side
       || builtins.length (regOpt.declarations or [ ]) != 1
       || !((regOpt.type.nestedTypes.elemType or { }).shorthandOnlyDefinesConfig or false)
       || decl == null
@@ -899,7 +912,7 @@ let
             let
               c = d.value.${node};
             in
-            if !(plain c) || unmatchedPaths subOpts c != [ ] then
+            if !(plain c) || strictLib.unmatchedPaths subOpts c != [ ] then
               null
             else if c ? ${field} then
               [
