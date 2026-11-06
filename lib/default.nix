@@ -301,5 +301,13 @@ in
 
   _internal = {
     inherit (methods) mkMethodsModule;
+    # For a `mkType` caller (den-hoag-ien5k T3): the walk that states the definitions a module list gives each
+    # instance field, and the stamp that makes a kind's datum this library's, so the caller states the datum it
+    # constructs and `declaredField` reads it.
+    inherit (entryType) instanceDefinitionsOf;
+    stampInstanceDefinitions = fields: {
+      by = entryType.instanceDefinitionsToken;
+      inherit fields;
+    };
   };
 }

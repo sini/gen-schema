@@ -2943,8 +2943,17 @@ let
                     __kindWitness = kindWitness;
                     __kindAncestors = resolvedOnly kindAncestorsByMark;
                     __kindLineage = resolvedOnly kindAncestors;
-                    # the caller's key space: no syntactic reader states what `mkType` gives an instance
-                    _instanceDefinitions = null;
+                    # The caller's key space: what `mkType` gives an instance is stated by the `mkType` caller, which
+                    # constructs it, on its result as `_instanceDefinitions`, stamped with this library's token
+                    # (`stampInstanceDefinitions`); unstamped, or beside a `computed` key space, it is `null`.
+                    _instanceDefinitions =
+                      let
+                        c = custom._instanceDefinitions or null;
+                      in
+                      if computed == null && builtins.isAttrs c && (c.by or null) == instanceDefinitionsToken then
+                        c.fields
+                      else
+                        null;
                   }
                   // kindNodeRecord kind kindWitness mkTypeMark plane mkTypeConstructionToken (
                     guard
