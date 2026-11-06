@@ -25,6 +25,8 @@
   declarationForm,
   filterValidators,
   refinedLib,
+  instanceDefinitionsOf,
+  unmatchedPaths,
 }:
 let
   # OPTIONS FIRST, then the kind (den-hoag-7gp66 P2, rules 2 and 4): `mkInstanceType { extraModules?;
@@ -199,6 +201,28 @@ let
         }
       )).withArgs
         specialArgs;
+
+  # Whether a type carries a module set at any carried depth, read through gen-merge's `importedCarried`, which
+  # forces no module set, to gen-merge's own walk bound, and `true` at exhaustion (a self-referential type
+  # never ends, so it exhausts the bound). Read by the registry's pipeline (`accessCheckedFields`) and by
+  # `declaredField`.
+  carriesModuleSet =
+    let
+      go =
+        fuel: ty:
+        let
+          e = merge.importedCarried "element" ty;
+          alts = merge.importedCarried "alternatives" ty;
+        in
+        builtins.isAttrs ty
+        && (
+          merge.importedCarried "moduleSet" ty != null
+          || fuel <= 0
+          || e != null && go (fuel - 1) e
+          || alts != null && builtins.any (go (fuel - 1)) alts
+        );
+    in
+    go merge.importedTypeWalkFuel;
 
   # Type-tree predicates for coercion chain dispatch.
   isRefLeaf = t: (t.refKind or null) != null;
@@ -636,23 +660,6 @@ let
           # walk reads it) carries a module set when an option beneath it does; the group is the kind's
           # own finite declaration, which the module system walks too. Computed once per field, never
           # per instance.
-          carriesModuleSet =
-            let
-              go =
-                fuel: ty:
-                let
-                  e = merge.importedCarried "element" ty;
-                  alts = merge.importedCarried "alternatives" ty;
-                in
-                builtins.isAttrs ty
-                && (
-                  merge.importedCarried "moduleSet" ty != null
-                  || fuel <= 0
-                  || e != null && go (fuel - 1) e
-                  || alts != null && builtins.any (go (fuel - 1)) alts
-                );
-            in
-            go merge.importedTypeWalkFuel;
           declCarriesModuleSet =
             o:
             if (o._type or null) == "option" then
@@ -753,6 +760,49 @@ let
       );
     merge.mkOption {
       inherit description;
+      # THE DEFINITIONS EACH INSTANCE RECEIVES FOR A FIELD FROM ITS REGISTRY'S OWN MODULES, AS WRITTEN: the inputs
+      # that sit beside the instance's own definition in the field's priority pass. They are not the instance's
+      # own definitions. (den-hoag-ien5k T3, read by `declaredField`.) `{ <field> = [ { file; value; } ] | null; }`:
+      # the kind's datum (`_instanceDefinitions` on the kind value) and the caller's `extraModules`', or `null`
+      # wherever they cannot be stated as data. Whole: a non-kind, the pipeline reaching every field (`derive`,
+      # `deriveEither`, a validator, a ref binding or a kind ref field, whose missing binding refuses), an opaque
+      # extra module. Per field: a refinement (the pass's or the kind's) and the instance's own names. Lazy, so a
+      # registry nothing reads it on pays nothing.
+      _instanceDefinitions =
+        let
+          k = kindValue._instanceDefinitions or null;
+          extra = instanceDefinitionsOf (
+            map (m: {
+              file = "<gen-schema: ${kind} registry extraModules>";
+              value = m;
+            }) extraModules
+          );
+        in
+        if
+          !(isSchemaKind kindValue)
+          || k == null
+          || extra == null
+          || derive != null
+          || deriveEither != null
+          || refs != { }
+          || (kindValue.refs or { }) != { }
+          || (kindValue.validators or [ ]) != [ ]
+        then
+          null
+        else
+          builtins.zipAttrsWith
+            (_: vs: if builtins.any (v: v == null) vs then null else builtins.concatLists vs)
+            [
+              k
+              extra
+            ]
+          // builtins.mapAttrs (_: _: null) ((kindValue.refinements or { }) // refinements)
+          // {
+            name = null;
+            id_hash = null;
+            _identityKeys = null;
+            _module = null;
+          };
       # `default` is LAZY in `kind`: `builtins.seq kind { }` is a thunk the option record's WHNF never
       # forces, so building the record against the self-referential idiom
       # `options.hosts = mkInstanceRegistry {} eval.config.schema.host` still needs no `kindValue`
@@ -787,7 +837,86 @@ let
         in
         prelude.mapAttrs (name: _: out.${name}) instances;
     };
+  # THE SYNTACTIC MEMBERSHIP READ (den-hoag-ien5k T3): `declaredField regOpt field` is `node → value | null`
+  # over a SERVED registry option. A node's `field` is served from its declarations only where they decide it
+  # alone, through gen-merge's own fold (`evalOptionValue`); anywhere else the answer is `null`, and the caller
+  # runs the module-system read. Nothing here restates the merge law or the priority law.
+  #   · The registry's datum (`_instanceDefinitions`) states the field's registry-side definitions, the option is
+  #     declared once (a second declaration's type can carry modules defining the field that the datum never
+  #     saw), the field's type carries no module set (folded only inside the evaluation that holds it), and every
+  #     registry definition is a plain attrset.
+  #   · The element type reads an attrset definition as its config (`shorthandOnlyDefinesConfig`), and each
+  #     definition of the node is a plain attrset: that definition IS the node's config, never classified as a
+  #     module (a `{ config = …; }` definition is a key named `config`).
+  #   · The node's config has no undeclared path (`unmatchedPaths`, the strict rule), so a definition the kind's
+  #     check rejects falls back and refuses there.
+  #   · Every definition reaching the field shows its priority without forcing: no `_type`, or an `override` whose
+  #     `content` carries none, read to WHNF only, never an `mkIf`'s condition.
+  # Then it serves `evalOptionValue`'s value where its `files` holds at most one survivor.
+  declaredField =
+    regOpt: field:
+    let
+      plain = v: builtins.isAttrs v && !(v ? _type) && !(v ? __functor);
+      visible =
+        v:
+        !(builtins.isAttrs v && v ? _type)
+        || v._type == "override" && !(builtins.isAttrs v.content && v.content ? _type);
+      datum = regOpt._instanceDefinitions or null;
+      side = datum.${field} or [ ];
+      rdefs = regOpt.definitionsWithLocations;
+      subOpts = regOpt.type.getSubOptions [ ];
+      decl = subOpts.${field} or null;
+      loc = regOpt.loc or [ ];
+    in
+    if
+      datum == null
+      || side == null
+      || builtins.length (regOpt.declarations or [ ]) != 1
+      || !((regOpt.type.nestedTypes.elemType or { }).shorthandOnlyDefinesConfig or false)
+      || decl == null
+      || (decl ? type && carriesModuleSet decl.type)
+      || !builtins.all (d: plain d.value) rdefs
+    then
+      _: null
+    else
+      node:
+      let
+        per = map (
+          d:
+          if !(d.value ? ${node}) then
+            [ ]
+          else
+            let
+              c = d.value.${node};
+            in
+            if !(plain c) || unmatchedPaths subOpts c != [ ] then
+              null
+            else if c ? ${field} then
+              [
+                {
+                  inherit (d) file;
+                  value = c.${field};
+                }
+              ]
+            else
+              [ ]
+        ) rdefs;
+        ds = side ++ builtins.concatLists per;
+        r = merge.evalOptionValue (
+          loc
+          ++ [
+            node
+            field
+          ]
+        ) decl ds;
+      in
+      if builtins.any (x: x == null) per || !builtins.all (d: visible d.value) ds then
+        null
+      else if builtins.length r.files > 1 then
+        null
+      else
+        r.value;
 in
 {
-  inherit mkInstanceType mkInstanceRegistry;
+  inherit mkInstanceType mkInstanceRegistry declaredField;
 }

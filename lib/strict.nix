@@ -67,6 +67,8 @@ let
   renderPath = p: builtins.concatStringsSep "." (map renderSegment p);
 in
 {
+  # the strict rule's capture paths, read by `declaredField` (instance.nix) as the strict check reads them
+  inherit unmatchedPaths;
   mkStrictModule =
     kind:
     { options, ... }:

@@ -201,8 +201,80 @@ let
       { options.o = merge.mkOption { type = ty; }; }
       { config.o = v; }
     ]).config.o;
+  # den-hoag-ien5k T3 GS4/GS2 · a fleet of `n` nodes of one kind, each a member of `loom`, with an abort-planted
+  # `mkIf` at the kind (`kind`), the last node (`node`), the last node under `mkMerge` (`merge`), or the last
+  # node under `mkForce` (`force`, a refusal-parity control: the module read refuses it by name, as the
+  # element type cannot consume a pushed-down override over an `mkIf`). `declared` reads `declaredField` for
+  # every declared node by the fixture's own names (no registry value), deep, and is the count that falls
+  # back; `moduleRead` reads every node's `aspects` through the module system (the control: it forces the
+  # condition, or refuses).
+  declaredFleet =
+    plant: n:
+    let
+      name = i: "s${toString i}";
+      names = builtins.genList name n;
+      last = name (n - 1);
+      cond = abort "ien5k-t3: ${plant} mkIf condition forced";
+      kind =
+        (merge.evalModuleTree { } [
+          { options.schema = S.mkSchemaOption { }; }
+          {
+            config.schema.spindle = {
+              options.aspects = merge.mkOption {
+                type = T.listOf T.str;
+                default = [ ];
+              };
+              options.idx = merge.mkOption { type = T.int; };
+              config = if plant == "kind" then { aspects = merge.mkIf cond [ "spare" ]; } else { };
+            };
+          }
+        ]).config.schema.spindle;
+      own =
+        if plant == "node" then
+          { aspects = merge.mkIf cond [ "loom" ]; }
+        else if plant == "merge" then
+          { aspects = merge.mkMerge [ (merge.mkIf cond [ "loom" ]) ]; }
+        else if plant == "force" then
+          { aspects = merge.mkForce (merge.mkIf cond [ "loom" ]); }
+        else
+          { };
+      ev = merge.evalModuleTree { } [
+        {
+          options.spindles = S.mkInstanceRegistry { } kind;
+          config.spindles = builtins.listToAttrs (
+            builtins.genList (i: {
+              name = name i;
+              value = {
+                aspects = [ "loom" ];
+                idx = i;
+              }
+              // (if name i == last then own else { });
+            }) n
+          );
+        }
+      ];
+      read = S.declaredField ev.options.spindles "aspects";
+      answers = map read names;
+    in
+    {
+      declared = builtins.deepSeq answers (builtins.length (builtins.filter (a: a == null) answers));
+      moduleRead = builtins.deepSeq (map (nm: ev.config.spindles.${nm}.aspects) names) n;
+    };
 in
 {
+  declared-unforced-kind = (declaredFleet "kind" 4).declared;
+  declared-unforced-node = (declaredFleet "node" 4).declared;
+  declared-unforced-merge = (declaredFleet "merge" 4).declared;
+  declared-unforced-force = (declaredFleet "force" 4).declared;
+  declared-control-kind = (declaredFleet "kind" 4).moduleRead;
+  declared-control-node = (declaredFleet "node" 4).moduleRead;
+  declared-control-merge = (declaredFleet "merge" 4).moduleRead;
+  declared-control-force = (declaredFleet "force" 4).moduleRead;
+  # GS2: the reader's cost over every node, and the module read's (the RED), N 4 and 16
+  declared-cost-4 = (declaredFleet "none" 4).declared;
+  declared-cost-16 = (declaredFleet "none" 16).declared;
+  module-read-cost-4 = (declaredFleet "none" 4).moduleRead;
+  module-read-cost-16 = (declaredFleet "none" 16).moduleRead;
   # ONE kind, one instance and eight: the kind marks minted must not move with the instance count.
   mints-one-instance = instances 1;
   mints-eight-instances = instances 8;
