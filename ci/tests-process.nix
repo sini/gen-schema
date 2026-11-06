@@ -206,9 +206,47 @@
         [ $((s2 * 100)) -le $((s1 * 130)) ] ||
           die depth-host-64 "a kind chain's cost is superlinear in depth: $s1 thunks per level from 16 to 32, $s2 from 32 to 64, a ratio over 1.30"
 
+        # den-hoag-ien5k T3 GS4 · the membership read forces no kind- or node-side `mkIf` condition: each plant's
+        # condition is an `abort`, which `tryEval` cannot catch, so a forced condition is a nonzero exit. The kind
+        # plant falls back on all 4 nodes and the node plants on 1. The control is the module read of the same
+        # fleet, which forces the condition (or refuses the `mkForce (mkIf …)` plant by name, a refusal-parity
+        # control and not a forcing plant), so every condition is live in this run.
+        for plant in kind:4 node:1 merge:1 force:1; do
+          evalArm "declared-unforced-''${plant%:*}"
+          [ "$val" = "''${plant##*:}" ] || die "declared-unforced-''${plant%:*}" "expected ''${plant##*:} nodes to fall back, got '$val'"
+          rc=0
+          inst --argstr arm "declared-control-''${plant%:*}" > /dev/null 2> "$TMPDIR/err" || rc=$?
+          ran=$((ran + 1))
+          [ "$rc" -ne 0 ] || die "declared-control-''${plant%:*}" "expected the module read to force or refuse, got exit 0"
+          if [ "''${plant%:*}" = force ]; then
+            grep -q "listOf' cannot consume" "$TMPDIR/err" || die declared-control-force "expected the refusal by name: $(tail -n 3 "$TMPDIR/err")"
+          else
+            grep -q "ien5k-t3: ''${plant%:*} mkIf condition forced" "$TMPDIR/err" ||
+              die "declared-control-''${plant%:*}" "expected the plant's abort: $(tail -n 3 "$TMPDIR/err")"
+          fi
+        done
+
+        # den-hoag-ien5k T3 GS2 · the reader's per-node cost over a registry, N 4 to 16, at or below its landed
+        # figure, and below the module read's on the same fixture (the RED).
+        cellThunks declared-cost-4
+        [ "$val" = "0" ] || die declared-cost-4 "expected every node served, got '$val' falling back"
+        r4=$thunks
+        cellThunks declared-cost-16
+        [ "$val" = "0" ] || die declared-cost-16 "expected every node served, got '$val' falling back"
+        r16=$thunks
+        cellThunks module-read-cost-4
+        m4=$thunks
+        cellThunks module-read-cost-16
+        m16=$thunks
+        rs=$(((r16 - r4) / 12))
+        ms=$(((m16 - m4) / 12))
+        [ "$rs" -gt 0 ] || die declared-cost-16 "the reader's slope is $rs thunks per node: cannot measure"
+        [ "$rs" -le 97 ] || die declared-cost-16 "the reader costs $rs thunks per node, over the landed 97"
+        [ "$rs" -lt "$ms" ] || die module-read-cost-16 "the reader costs $rs thunks per node, not below the module read's $ms"
+
         # 0/0 is a false pass: the runner must have executed every cell above.
-        [ "$ran" = "19" ] || die runner "expected 19 evaluations, ran $ran"
-        echo "tests-process: 19 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth thunks $d16 / $d32 / $d64, slopes $s1 / $s2 thunks per level"
+        [ "$ran" = "31" ] || die runner "expected 31 evaluations, ran $ran"
+        echo "tests-process: 31 cells, every exit read unpiped; declaredField unforced on 4 plants, controls live; declaredField $rs thunks per node against the module read's $ms; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth thunks $d16 / $d32 / $d64, slopes $s1 / $s2 thunks per level"
       '';
     };
 }

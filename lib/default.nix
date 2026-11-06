@@ -223,6 +223,8 @@ let
       declarationForm
       ;
     inherit refinedLib;
+    inherit (entryType) instanceDefinitionsOf;
+    inherit (strictLib) unmatchedPaths;
   };
   docs = import ./docs.nix { inherit prelude; };
   codecLib = import ./codec.nix {
@@ -262,7 +264,7 @@ in
     entryReservation
     ;
   inherit (evalSchemaLib) evalSchema;
-  inherit (instance) mkInstanceType mkInstanceRegistry;
+  inherit (instance) mkInstanceType mkInstanceRegistry declaredField;
   inherit (validate) validateInstances mkFieldValidator filterValidators;
   inherit (refLib)
     declarationOf

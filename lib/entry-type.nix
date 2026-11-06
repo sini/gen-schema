@@ -107,6 +107,36 @@ let
     else
       [ { opaque = v; } ]
   );
+  # THE DEFINITIONS A MODULE LIST GIVES EACH INSTANCE FIELD, AS WRITTEN (den-hoag-ien5k T3): `{ <field> =
+  # [ { file; value; } ]; }` over the same walk the plane makes (`modulesOf`), or `null` where the walk
+  # reaches an opaque module or a `config` that is not plain data (a property), whose fields no syntactic
+  # reader can state. A structured module contributes its `config` (and `meta`, as gen-merge's `configOf`
+  # folds it), a shorthand one every key but the module-syntax keys. A value is carried as written, its
+  # property wrapper included: which definitions survive is `evalOptionValue`'s question.
+  instanceDefinitionsOf =
+    defs:
+    let
+      fieldsOf =
+        file: m:
+        let
+          c =
+            if isStructuredDecl m then
+              (m.config or { }) // (if m ? meta then { inherit (m) meta; } else { })
+            else
+              builtins.removeAttrs m merge.moduleSyntax.shorthandMeta;
+        in
+        if !(builtins.isAttrs c) || c ? _type || c ? __functor then
+          null
+        else
+          builtins.mapAttrs (_: value: {
+            file = m._file or file;
+            inherit value;
+          }) c;
+      per = prelude.concatMap (
+        d: map (w: if w ? opaque then null else fieldsOf d.file w.open) (modulesOf [ d.value ])
+      ) defs;
+    in
+    if builtins.any (x: x == null) per then null else builtins.zipAttrsWith (_: vs: vs) per;
   # A type record with no minted identity, unmigrated or unmintable: the mint refuses it either way,
   # so declaring it sealed moves no tag. The REGIME is still the mint's per-component tag
   # (den-hoag-markof-partial-preimage-znfjq, ruling (c+): decided by the mint unless the constructor
@@ -1232,6 +1262,8 @@ let
     "__witness"
     "__kindContextFree"
     "__kindLineage"
+    # the registry-definitions datum (den-hoag-ien5k T3), both branches
+    "_instanceDefinitions"
   ];
 
   # ★ THE COLLECTION KEY SPACE'S RESERVED SET (den-hoag-6vgwm). A caller-supplied collection NAME
@@ -2890,6 +2922,8 @@ let
                     __kindWitness = kindWitness;
                     __kindAncestors = resolvedOnly kindAncestorsByMark;
                     __kindLineage = resolvedOnly kindAncestors;
+                    # the caller's key space: no syntactic reader states what `mkType` gives an instance
+                    _instanceDefinitions = null;
                   }
                   // kindNodeRecord kind kindWitness mkTypeMark plane mkTypeConstructionToken (
                     guard
@@ -3286,6 +3320,38 @@ let
                     __kindAncestors = resolvedOnly kindAncestorsByMark;
                     __kindContextFree = contextFree;
                     __kindLineage = resolvedOnly kindAncestors;
+                    # THE DEFINITIONS EACH INSTANCE RECEIVES FROM THIS KIND, PER FIELD, AS WRITTEN (den-hoag-ien5k
+                    # T3; `instanceDefinitionsOf`): its own declarations', then each parent's own datum (the
+                    # parents as values, `__kindImports`). The resolver's def is a parent's, recognised by
+                    # `resolvedBy` (file and shape), and every declared parent must be one the tree holds, so
+                    # no parent's definitions reach an instance unread. `null` where they cannot be stated: a
+                    # `computed` key space, a mixin, a base module, a parent spelled inline (`kindImports`), a
+                    # parent stating none; a method's field is `null` (its module is the methods module's).
+                    _instanceDefinitions =
+                      if
+                        computed != null
+                        || mixins != [ ]
+                        || effectiveBase != null
+                        || kindImports != [ ]
+                        || !builtins.all (p: tree != null && builtins.elem p tree._kindNames) declaredInherits
+                      then
+                        null
+                      else
+                        let
+                          own = instanceDefinitionsOf (
+                            builtins.filter (d: !(builtins.any (p: resolvedBy kind p d) declaredInherits)) (
+                              builtins.genList (builtins.elemAt strippedDefs) (builtins.length defs)
+                            )
+                          );
+                          sides = [ own ] ++ map (p: p._instanceDefinitions or null) (resolvedOnly kindParents);
+                        in
+                        if builtins.any (x: x == null) sides then
+                          null
+                        else
+                          builtins.zipAttrsWith (
+                            _: vs: if builtins.any (v: v == null) vs then null else builtins.concatLists vs
+                          ) sides
+                          // builtins.mapAttrs (_: _: null) extractedCollections.methods;
                   }
                   // keyEqRecord
               )
@@ -3649,5 +3715,6 @@ in
     inheritsResolvedFile
     inheritedModule
     entryReservation
+    instanceDefinitionsOf
     ;
 }
