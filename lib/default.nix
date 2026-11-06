@@ -223,7 +223,7 @@ let
       declarationForm
       ;
     inherit refinedLib;
-    inherit (entryType) instanceDefinitionsOf;
+    inherit (entryType) instanceDefinitionsOf instanceDefinitionsToken;
     inherit (strictLib) unmatchedPaths;
   };
   docs = import ./docs.nix { inherit prelude; };

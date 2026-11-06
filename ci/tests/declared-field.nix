@@ -66,6 +66,77 @@ in
       }) (builtins.attrNames shapes)
     )
     // {
+      # a field whose type carries a module set falls back to the module read (den-hoag-hil68: `evalOptionValue`
+      # refuses a nested type outside an evaluation, so the reader never folds one), and never refuses the read
+      test-a-nested-typed-field-falls-back-to-the-module-read =
+        let
+          inherit (genMerge) mkOption types;
+          kind =
+            (genSchema.evalSchema { } [
+              {
+                config.schema.loom.options.frames = mkOption {
+                  type = types.attrsOf (types.submodule { options.w = mkOption { type = types.int; }; });
+                  default = { };
+                };
+              }
+            ]).loom;
+          ev = genMerge.evalModuleTree { } [
+            {
+              options.looms = genSchema.mkInstanceRegistry { } kind;
+              config.looms.l0.frames.f.w = 1;
+              config.looms.l1 = { };
+            }
+          ];
+          read = genSchema.declaredField ev.options.looms "frames";
+        in
+        {
+          expr = {
+            answers = map read [
+              "l0"
+              "l1"
+            ];
+            module = builtins.mapAttrs (_: l: l.frames) ev.config.looms;
+          };
+          expected = {
+            answers = [
+              null
+              null
+            ];
+            module = {
+              l0.f.w = 1;
+              l1 = { };
+            };
+          };
+        };
+      # a record stating the datum's name without the library's token is not read: every node falls back
+      test-a-forged-datum-is-not-read =
+        let
+          inherit (genMerge) mkOption types;
+          kind =
+            (genSchema.evalSchema { } [
+              { config.schema.spindle.options.aspects = mkOption { type = types.listOf types.str; }; }
+            ]).spindle;
+          ev = genMerge.evalModuleTree { } [
+            {
+              options.spindles = genSchema.mkInstanceRegistry { } kind // {
+                _instanceDefinitions = {
+                  by.t = _: null;
+                  fields.aspects = [
+                    {
+                      file = "forged";
+                      value = [ "forged" ];
+                    }
+                  ];
+                };
+              };
+              config.spindles.s0.aspects = [ "loom" ];
+            }
+          ];
+        in
+        {
+          expr = genSchema.declaredField ev.options.spindles "aspects" "s0";
+          expected = null;
+        };
       # the published datum on the kind value and on the registry record, read off the built fleet
       test-the-kind-states-its-own-definitions-as-written =
         let

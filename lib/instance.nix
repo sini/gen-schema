@@ -26,6 +26,7 @@
   filterValidators,
   refinedLib,
   instanceDefinitionsOf,
+  instanceDefinitionsToken,
   unmatchedPaths,
 }:
 let
@@ -762,13 +763,16 @@ let
       inherit description;
       # THE DEFINITIONS EACH INSTANCE RECEIVES FOR A FIELD FROM ITS REGISTRY'S OWN MODULES, AS WRITTEN: the inputs
       # that sit beside the instance's own definition in the field's priority pass. They are not the instance's
-      # own definitions. (den-hoag-ien5k T3, read by `declaredField`.) `{ <field> = [ { file; value; } ] | null; }`:
+      # own definitions. (den-hoag-ien5k T3, read by `declaredField`.) `{ by; fields; }`, `by` the library's token (the
+      # kind plane mints no name of a field derived from the record's own type, and refuses a declaration writing
+      # it), `fields` the datum `{ <field> = [ { file; value; } ] | null; }`:
       # the kind's datum (`_instanceDefinitions` on the kind value) and the caller's `extraModules`', or `null`
       # wherever they cannot be stated as data. Whole: a non-kind, the pipeline reaching every field (`derive`,
       # `deriveEither`, a validator, a ref binding or a kind ref field, whose missing binding refuses), an opaque
       # extra module. Per field: a refinement (the pass's or the kind's) and the instance's own names. Lazy, so a
       # registry nothing reads it on pays nothing.
-      _instanceDefinitions =
+      _instanceDefinitions.by = instanceDefinitionsToken;
+      _instanceDefinitions.fields =
         let
           k = kindValue._instanceDefinitions or null;
           extra = instanceDefinitionsOf (
@@ -861,7 +865,13 @@ let
         v:
         !(builtins.isAttrs v && v ? _type)
         || v._type == "override" && !(builtins.isAttrs v.content && v.content ? _type);
-      datum = regOpt._instanceDefinitions or null;
+      record = regOpt._instanceDefinitions or null;
+      # only this library's datum: a record stating the name without the token is not read
+      datum =
+        if builtins.isAttrs record && (record.by or null) == instanceDefinitionsToken then
+          record.fields
+        else
+          null;
       side = datum.${field} or [ ];
       rdefs = regOpt.definitionsWithLocations;
       subOpts = regOpt.type.getSubOptions [ ];

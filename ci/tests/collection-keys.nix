@@ -263,6 +263,7 @@ in
           "__okAt"
           "__sealed"
           "__witness"
+          "_instanceDefinitions"
           "keySemantics"
           "kind"
           "mixins"
