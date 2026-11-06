@@ -1173,7 +1173,7 @@ in
         (kindOf { computed = _: _: { options = "COMPUTED"; }; } { options.role = strOpt; }).options;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __okAt, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness, __kindContextFree, __kindLineage$";
+        msg = "^gen-schema: computed field 'options' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __okAt, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness, __kindContextFree, __kindLineage, _instanceDefinitions$";
       };
     };
 
@@ -1203,7 +1203,7 @@ in
         } { }).refs;
       expectedError = {
         type = "ThrownError";
-        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __okAt, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness, __kindContextFree, __kindLineage$";
+        msg = "^gen-schema: computed field 'refs' is reserved — it is part of the kind-value contract; reserved computed-field names: __functor, kind, mixins, strict, keySemantics, options, refs, refinements, __mint, __okAt, __sealed, __kindImports, __kindWitness, __moduleKey, __kindAncestors, __kindCycleParents, __kindSelf, __witness, __kindContextFree, __kindLineage, _instanceDefinitions$";
       };
     };
   };
@@ -6040,6 +6040,45 @@ in
         expectedError = {
           type = "ThrownError";
           msg = "^gen-merge: modules `<unknown-file>' and `<unknown-file>' share the key 'gen-schema-kind:bobbin#";
+        };
+      };
+    };
+
+  # den-hoag-ien5k T3, arm (B): a declaration writing `_instanceDefinitions` on an option record is refused by name,
+  # since the kind plane mints no path for that name (`ci/tests/registry-record-identity.nix`). A forged token is a
+  # declaration's own value, so it is refused the same way. Red at gen-schema main 1d5d117: the name is minted, and
+  # the mark is served.
+  flake.testsError.registry-record-identity =
+    let
+      T = genMerge.types;
+      markWith =
+        extra:
+        builtins.deepSeq
+          (genSchema.evalSchema { } [
+            {
+              config.schema.site.options.addr = genMerge.mkOption { type = T.str; } // extra;
+            }
+          ]).site.__mint.minted
+          null;
+    in
+    {
+      test-a-declared-instance-definitions-is-refused-by-name = {
+        expr = markWith { _instanceDefinitions = { }; };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'site': the declaration at `addr' writes `_instanceDefinitions', which is reserved";
+        };
+      };
+      test-a-forged-token-is-refused-by-name = {
+        expr = markWith {
+          _instanceDefinitions = {
+            by.t = _: null;
+            fields = { };
+          };
+        };
+        expectedError = {
+          type = "ThrownError";
+          msg = "^gen-schema: kind 'site': the declaration at `addr' writes `_instanceDefinitions', which is reserved";
         };
       };
     };
