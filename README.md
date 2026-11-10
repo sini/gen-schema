@@ -70,16 +70,17 @@ The mental model has two layers. A **kind** is a schema-level type — a deferre
 
 The authoring surface is small — most schemas are built from these constructors:
 
-| Constructor                         | Role                                                                                                               |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `mkSchemaOption`                    | Declares the `schema` option (holds all kinds; carries `strict`, `baseModule`, `collections`, `computed` settings) |
-| `mkInstanceRegistry`                | Turns a kind into an `attrsOf` registry of instances, with `refs`, `derive`, and validator pipeline                |
-| `mkInstanceType`                    | The single-instance submodule type (identity + strict injected), used by registries                                |
-| `declarationOf` / `setOf` / `toSet` | Cross-instance references (deferred or direct) and identity-deduplicated collections                               |
-| `schemaFn`                          | Declarative methods on a kind, with named args auto-resolved from instance config                                  |
-| `mkValidator` / `mkFieldValidator`  | Cross-field constraints that travel with a kind and fire on every registry                                         |
-| `refined` / `blame` / `mkMixin`     | Refinement contracts, blame records, and first-class mixin fragments                                               |
-| `mkCodec` / `renderDocs`            | Serialization round-trips and markdown reference generation                                                        |
+| Constructor                         | Role                                                                                                                                                                          |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mkSchemaOption`                    | Declares the `schema` option (holds all kinds; carries `strict`, `baseModule`, `collections`, `computed` settings)                                                            |
+| `mkInstanceRegistry`                | Turns a kind into an `attrsOf` registry of instances, with `refs`, `derive`, and validator pipeline                                                                           |
+| `mkInstanceType`                    | The single-instance submodule type (identity + strict injected), used by registries                                                                                           |
+| `declaredField`                     | Reads one field of a registry's nodes from their own definitions, without evaluating the nodes; `null` where the answer needs the module system, so the caller reads it there |
+| `declarationOf` / `setOf` / `toSet` | Cross-instance references (deferred or direct) and identity-deduplicated collections                                                                                          |
+| `schemaFn`                          | Declarative methods on a kind, with named args auto-resolved from instance config                                                                                             |
+| `mkValidator` / `mkFieldValidator`  | Cross-field constraints that travel with a kind and fire on every registry                                                                                                    |
+| `refined` / `blame` / `mkMixin`     | Refinement contracts, blame records, and first-class mixin fragments                                                                                                          |
+| `mkCodec` / `renderDocs`            | Serialization round-trips and markdown reference generation                                                                                                                   |
 
 Everything above the instance layer is pure schema — no validation or hashing happens at the kind level, which is what lets kinds compose via `imports` without duplicate-module conflicts. Instances are where the infrastructure (strict rejection, `id_hash`, ref binding, derive) is injected. Registries expose flat `_`-prefixed introspection (`_kindNames`, `_topology`, `_edges`, `_refEdges`, `_roots`, `_leaves`, `_collectionKeys`) that consumers read to build whatever graph format their evaluator needs.
 

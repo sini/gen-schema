@@ -241,7 +241,7 @@
         rs=$(((r16 - r4) / 12))
         ms=$(((m16 - m4) / 12))
         [ "$rs" -gt 0 ] || die declared-cost-16 "the reader's slope is $rs thunks per node: cannot measure"
-        [ "$rs" -le 97 ] || die declared-cost-16 "the reader costs $rs thunks per node, over the landed 97"
+        [ "$rs" -le 61 ] || die declared-cost-16 "the reader costs $rs thunks per node, over the landed 61"
         [ "$rs" -lt "$ms" ] || die module-read-cost-16 "the reader costs $rs thunks per node, not below the module read's $ms"
 
         # den-hoag-ien5k T3 GS2 · a fallback costs the reader nothing per node where the kind sets the field bare: the
