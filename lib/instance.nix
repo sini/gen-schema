@@ -769,8 +769,19 @@ let
       # wherever they cannot be stated as data. Whole: a non-kind, the pipeline reaching every field (`derive`,
       # `deriveEither`, a validator, a ref binding or a kind ref field, whose missing binding refuses), an opaque
       # extra module. Per field: a refinement (the pass's or the kind's) and the instance's own names. Lazy, so a
-      # registry nothing reads it on pays nothing.
+      # registry nothing reads it on pays nothing. `options`: the option tree those definitions meet, the kind's
+      # published declarations and the extra modules' by gen-merge's declaration stratum, as one tree where they
+      # are disjoint (`unionDisjoint`), else `null`; the instance's own names are the instance type's.
       _instanceDefinitions.by = entryType.instanceDefinitionsToken;
+      _instanceDefinitions.options =
+        if extraModules == [ ] then
+          kindValue.options or null
+        else
+          entryType.unionDisjoint (kindValue.options or null) (
+            prelude.filterAttrs (n: _: !(prelude.hasPrefix "_module" n)) (
+              merge.declaredOptions { inherit specialArgs; } extraModules
+            )
+          );
       _instanceDefinitions.fields =
         let
           k = kindValue._instanceDefinitions or null;
@@ -876,7 +887,13 @@ let
           null;
       side = datum.${field} or [ ];
       rdefs = regOpt.definitionsWithLocations;
-      subOpts = regOpt.type.getSubOptions [ ];
+      # the declarations the datum's definitions meet (the record's `options`), the element's full option tree
+      # only where the record states none; the instance type's own names are declared beside them
+      subOpts =
+        if datum != null && record.options or null != null then
+          record.options
+        else
+          regOpt.type.getSubOptions [ ];
       decl = subOpts.${field} or null;
       loc = regOpt.loc or [ ];
     in
@@ -912,7 +929,20 @@ let
             let
               c = d.value.${node};
             in
-            if !(plain c) || strictLib.unmatchedPaths subOpts c != [ ] then
+            if
+              !(plain c)
+              # the instance type's own names are declared beside the record's `options`
+              ||
+                strictLib.unmatchedPaths subOpts c != [ ]
+                &&
+                  strictLib.unmatchedPaths subOpts (
+                    builtins.removeAttrs c [
+                      "name"
+                      "id_hash"
+                      "_identityKeys"
+                    ]
+                  ) != [ ]
+            then
               null
             else if c ? ${field} then
               [

@@ -137,6 +137,10 @@ let
           }
         else if is "undeclared" then
           base // { bogusKey = 1; }
+        else if is "extradecl" then
+          base // { loomCount = 1; }
+        else if is "ownname" then
+          base // { name = last; }
         else if is "nodemkif" then
           base // { aspects = mkIf true [ "loom" ]; }
         else if is "kinddefaultnodeforce" then
@@ -163,6 +167,24 @@ let
   );
   registryOpts =
     (if is "extramod" then { extraModules = [ { config.aspects = [ "spare" ]; } ]; } else { })
+    # C7: an extra module declaring a key the last node sets, and one redeclaring the field
+    // (
+      if is "extradecl" then
+        {
+          extraModules = [
+            {
+              options.loomCount = mkOption {
+                type = types.int;
+                default = 0;
+              };
+            }
+          ];
+        }
+      else if is "extraredecl" then
+        { extraModules = [ { options.aspects = mkOption { apply = x: x ++ [ "spare" ]; }; } ]; }
+      else
+        { }
+    )
     // (
       if is "derive" then
         { derive = instances: builtins.mapAttrs (_: _: { aspects = [ "spare" ]; }) instances; }

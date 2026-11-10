@@ -6,7 +6,9 @@
 # shape's own: on this fixture a reader serving two survivors' fold can agree by coincidence of order, so the
 # count is what sees the survivor count there (`kindcfg`, `samedefault`).
 #   served         none, force, apply, omit, view, enum (s3 refuses on both sides), kinddefault, kindforce,
-#                  kinddefaultnodeforce
+#                  kinddefaultnodeforce, and the declarations the record states (C7): an extra module declaring a
+#                  key the node sets (`extradecl`), one redeclaring the field (`extraredecl`, its `apply` served), the
+#                  node setting the instance's own `name` (`ownname`)
 #   falls back 1   twodefs, undeclared, structured, structextra, samedefault, nodemkif
 #   falls back 4   kindcfg, kindmkif, parent, extramod, derive, a function module, a validator, a refinement of
 #                  the field, a ref binding module, a `mkType` kind, a mixin, and the registry option declared
@@ -34,6 +36,9 @@ let
     kinddefault = 0;
     kindforce = 0;
     kinddefaultnodeforce = 0;
+    extradecl = 0;
+    extraredecl = 0;
+    ownname = 0;
     twodefs = 1;
     undeclared = 1;
     structured = 1;

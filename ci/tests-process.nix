@@ -255,9 +255,21 @@
         fs=$(((f16 - f4) / 12))
         [ "$fs" -le 1 ] || die declared-fallback-cost-16 "a fallback costs the reader $fs thunks per node, over 1: the registry-level test did not decide it"
 
+        # den-hoag-ien5k T3 GS2 · C7: the reader's own cost at one node, over the registry's evaluation, at or below its
+        # landed figure: it reads the declarations the registry record states, never a second evaluation of the
+        # element's option tree (`getSubOptions [ ]`, which the record's `options` dropped reads at about 1,500).
+        cellThunks declared-own-base-1
+        [ "$val" = "1" ] || die declared-own-base-1 "expected value 1, got '$val'"
+        o0=$thunks
+        cellThunks declared-own-1
+        [ "$val" = "0" ] || die declared-own-1 "expected the node served, got '$val' falling back"
+        own1=$((thunks - o0))
+        [ "$own1" -gt 0 ] || die declared-own-1 "the reader's own cost is $own1 thunks: cannot measure"
+        [ "$own1" -le 361 ] || die declared-own-1 "the reader costs $own1 thunks at one node, over the landed 361"
+
         # 0/0 is a false pass: the runner must have executed every cell above.
-        [ "$ran" = "33" ] || die runner "expected 33 evaluations, ran $ran"
-        echo "tests-process: 31 cells, every exit read unpiped; declaredField unforced on 4 plants, controls live; declaredField $rs thunks per node against the module read's $ms, a kind-set fallback $fs; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth thunks $d16 / $d32 / $d64, slopes $s1 / $s2 thunks per level"
+        [ "$ran" = "35" ] || die runner "expected 35 evaluations, ran $ran"
+        echo "tests-process: 33 cells, every exit read unpiped; declaredField unforced on 4 plants, controls live; declaredField $rs thunks per node against the module read's $ms, a kind-set fallback $fs, its own cost at one node $own1; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth thunks $d16 / $d32 / $d64, slopes $s1 / $s2 thunks per level"
       '';
     };
 }

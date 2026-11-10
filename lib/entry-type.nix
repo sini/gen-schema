@@ -3753,5 +3753,6 @@ in
     entryReservation
     instanceDefinitionsOf
     instanceDefinitionsToken
+    unionDisjoint
     ;
 }

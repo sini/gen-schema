@@ -261,10 +261,16 @@ let
       ];
       read = S.declaredField ev.options.spindles "aspects";
       answers = map read names;
+      idx = map (nm: ev.config.spindles.${nm}.idx) names;
     in
     {
       declared = builtins.deepSeq answers (builtins.length (builtins.filter (a: a == null) answers));
       moduleRead = builtins.deepSeq (map (nm: ev.config.spindles.${nm}.aspects) names) n;
+      # C7: the reader's own cost where the registry is evaluated anyway (every node's `idx` read first)
+      ownBase = builtins.deepSeq idx n;
+      own = builtins.deepSeq idx (
+        builtins.deepSeq answers (builtins.length (builtins.filter (a: a == null) answers))
+      );
     };
 in
 {
@@ -285,6 +291,9 @@ in
   # every node falls back, and the registry-level test answers that with no per-node attempt
   declared-fallback-cost-4 = (declaredFleet "kindcfg" 4).declared;
   declared-fallback-cost-16 = (declaredFleet "kindcfg" 16).declared;
+  # GS2 · C7: the reader's own fixed cost at one node, over the registry's evaluation
+  declared-own-base-1 = (declaredFleet "none" 1).ownBase;
+  declared-own-1 = (declaredFleet "none" 1).own;
   # ONE kind, one instance and eight: the kind marks minted must not move with the instance count.
   mints-one-instance = instances 1;
   mints-eight-instances = instances 8;
