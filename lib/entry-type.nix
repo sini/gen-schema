@@ -1046,7 +1046,7 @@ let
   # published key set must reach the same refusal a kind merge does, so a schema that
   # declares a reserved collection is refused whether or not it declares a kind.
   mkAllCollections =
-    mkType: collections:
+    door: mkType: collections:
     let
       merged = {
         methods = {
@@ -1086,7 +1086,15 @@ let
       # built-in's default is plain, so only the declared collections are read.
       // prelude.mapAttrs (
         name: c:
-        if !(builtins.isAttrs (c.default or null) && c.default ? _type) then
+        # THE CLOSED FIELD SET (`collectionFields`), on the one pass every declaration already takes:
+        # `bad` (below) reads each, so the refusal fires wherever the collection set is read
+        if
+          builtins.isAttrs c
+          && (c ? type || builtins.removeAttrs c collectionFields != { })
+          && collectionFault door name c != null
+        then
+          throw (collectionFault door name c)
+        else if !(builtins.isAttrs (c.default or null) && c.default ? _type) then
           c
         else
           c
@@ -1233,6 +1241,38 @@ let
     "__kindContextFree"
     "__kindLineage"
   ];
+
+  # THE CLOSED FIELD SET of a collection declaration (C-A1): no reader consumes any other field, so one
+  # would be dropped in silence. `mkAllCollections` takes the diagnosis only for a declaration that
+  # carries `type` or a field outside the set, so an undeclared collection pays one `removeAttrs`.
+  collectionFields = [
+    "default"
+    "identity"
+    "merge"
+    "type"
+  ];
+  # The refusal for such a declaration, or null. A field outside the set is refused by the shared
+  # closed-options check, naming the door the caller invoked (den-hoag-7gp66 R5, Q2 (ii)); then a
+  # declared `type` beside a `merge`, on a built-in, or that is not an option type.
+  collectionFault =
+    door: k: c:
+    builtins.seq (prelude.checkOptions "${door}: collection '${k}'" collectionFields c) (
+      if c ? merge then
+        "gen-schema: collection '${k}' declares both `type` and `merge`; a declared type merges its own definitions, so declare one of them"
+      else if
+        builtins.elem k [
+          "inherits"
+          "methods"
+          "parent"
+          "validators"
+        ]
+      then
+        "gen-schema: collection '${k}' is built in and takes no `type`; a built-in collection's container stays lazy"
+      else if (c.type._type or null) != "option-type" then
+        "gen-schema: collection '${k}': `type` must be an option type (a type record); got a ${builtins.typeOf c.type}"
+      else
+        null
+    );
 
   # ★ THE COLLECTION KEY SPACE'S RESERVED SET (den-hoag-6vgwm). A caller-supplied collection NAME
   # lands in a key space gen-schema already occupies, and the collision bites in TWO places, both
@@ -1519,11 +1559,13 @@ let
   # `evalSchema` did not build means what `imports = [ config.schema.<p> ]` means there). `tree` is
   # the tree's own `config` — the kind values the deprecated spelling reads — or `null` for an entry
   # type built outside a tree, where a declared parent has nothing to be read from.
-  mkSchemaEntryTypeIn = tree: entryTypeDoor (mkSchemaEntryTypeCore tree);
+  mkSchemaEntryTypeIn =
+    tree: entryTypeDoor (mkSchemaEntryTypeCore "gen-schema.mkSchemaEntryType" tree);
   # The unchecked core, which `mkSchemaOption` below calls with the set its own door already checked
-  # against the same list.
+  # against the same list. `door` is the published door the caller invoked, which a refusal the core
+  # raises through a shared check names (den-hoag-7gp66 Q2 (ii)).
   mkSchemaEntryTypeCore =
-    tree:
+    door: tree:
     # The record is applied to a NATIVE attrset-pattern lambda rather than destructured field-by-field:
     # each field below becomes a `compared` component (see `components`, below) whose value
     # `constructionRelation` must keep the SLOT this constructor was HANDED, not a fresh selection off
@@ -1579,7 +1621,15 @@ let
               collections = builtins.mapAttrs (
                 _: c:
                 if builtins.isAttrs c then
-                  inertOr (builtins.removeAttrs c [ "merge" ] // { merge = c ? merge; })
+                  inertOr (
+                    builtins.removeAttrs c [
+                      "merge"
+                      "type"
+                    ]
+                    // {
+                      merge = c ? merge;
+                    }
+                  )
                 else
                   inertOr c
               ) collections;
@@ -1667,7 +1717,7 @@ let
             refs = refsFromOptionsWithTypes options;
           };
 
-        allCollections = mkAllCollections mkType collections;
+        allCollections = mkAllCollections door mkType collections;
 
         # Infer merge strategy from default type
         inferMerge =
@@ -1678,6 +1728,8 @@ let
             (acc: val: acc ++ val)
           else if builtins.isAttrs collection.default then
             (acc: val: acc // val)
+          else if collection ? type then
+            throw "gen-schema: collection '${name}': its `default` is not a list or attrset, so it has no seed to fold the definitions of its declared `type` onto; declare a list or attrset `default`, or none"
           else
             throw "gen-schema: collection '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
 
@@ -1692,7 +1744,10 @@ let
         # definitions, whose top level alone is resolved.
         collectionTypes = prelude.mapAttrs (
           name: collection:
-          if collection ? merge then
+          # a DECLARED type is the collection's type; its seed is still folded on (`declaredOf`)
+          if collection ? type then
+            collection.type
+          else if collection ? merge then
             merge.mkOptionType {
               name = "schemaCollection";
               # A collection declaring no `default` has no seed: read where no definition of it
@@ -1767,7 +1822,14 @@ let
           let
             collection = allCollections.${name};
           in
-          if
+          if collection ? type then
+            merge.mergeDefs [ "collections" name "default" ] collection.type [
+              {
+                file = "gen-schema/default";
+                value = collection.default;
+              }
+            ]
+          else if
             collection ? merge
             || !(builtins.isList collection.default || builtins.isAttrs collection.default)
             || collection.default == [ ]
@@ -3337,13 +3399,15 @@ let
             specialArgs
             ;
         };
-        entry = mkSchemaEntryTypeCore null entryArgs;
+        entry = mkSchemaEntryTypeCore "gen-schema.mkSchemaOption" null entryArgs;
         inner = merge.types.submodule (
           { config, options, ... }:
           {
             # The kinds are typed by this tree's own entry type, which reads a declared parent off
             # `config` — the same kind values `imports = [ config.schema.<p> ]` reads (den-hoag-8c8pr).
-            freeformType = merge.types.lazyAttrsOf (mkSchemaEntryTypeCore config entryArgs);
+            freeformType = merge.types.lazyAttrsOf (
+              mkSchemaEntryTypeCore "gen-schema.mkSchemaOption" config entryArgs
+            );
 
             # READ-ONLY, on two measured bases (den-hoag-px98p): a well-typed write to a derived output
             # (`config.schema._collectionKeys = [ "fake" ]`) would otherwise be published silently, and
@@ -3588,7 +3652,9 @@ let
                 _leaves = leaves;
                 # The same derivation the entry type extracts with — not a second spelling.
                 # attrNames is already sorted, so no sort is added.
-                _collectionKeys = prelude.attrNames (mkAllCollections mkType collections);
+                _collectionKeys = prelude.attrNames (
+                  mkAllCollections "gen-schema.mkSchemaOption" mkType collections
+                );
                 # Likewise ONE derivation with the guard's own predicate.
                 _declarationKeys = declarationKeys;
                 _reservedCollectionKeys = reservedCollectionKeys;

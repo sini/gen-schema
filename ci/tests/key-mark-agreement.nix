@@ -7,9 +7,9 @@
 # declaration node), marks equal, foreign keys equal. Only one-node rows (`w`) are the property's; the
 # others compose by node and are carried as rows only.
 #
-# The corpus: 17 constructed shapes, each as a differing pair and as a twin, and the granularity
-# razor's default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`). The `mkType` arm
-# writes no foreign key.
+# The corpus: 17 constructed shapes, each as a differing pair and as a twin, the granularity razor's
+# default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`), and 3 declared-collection
+# pairs under both identity settings. The `mkType` arm writes no foreign key.
 #
 # PLANTED RED, in the suite: the same predicate over a node-only key (the witness alone, no content)
 # reads every one-node row whose marks differ as coarser, so a zero on the real key is read with the
@@ -423,7 +423,67 @@ let
       identityFalseA = read (policy [ "t1" ]).a (policy [ "t2" ]).a;
       identityFalseB = read (policy [ "t1" ]).b (policy [ "t2" ]).b;
     };
-  rows = shapeRows // lib.mapAttrs' (n: v: lib.nameValuePair "razor-${n}" v) razorRows;
+  # DECLARED collection types (den-hoag-collection-declared-element-type-fwjez): one kind declaration
+  # node (`portsDef`) under schemas whose `ports` differ only in a declared `type`, both identity
+  # settings. A type enters no mark, so the key must not split on it (on its presence either).
+  declaredRows =
+    let
+      portsDef = {
+        ports = [ 3 ];
+      };
+      kindOf =
+        decl:
+        (schema { collections.ports = decl; } (_: {
+          user = portsDef;
+        })).user;
+      chk =
+        c:
+        T.mkOptionType {
+          name = "c";
+          check = c;
+          merge = _: defs: (builtins.head defs).value;
+        };
+      odd = x: x / 2 * 2 != x;
+      pairs = {
+        declaredVsUndeclared = {
+          a = {
+            default = [ ];
+            type = T.listOf T.int;
+          };
+          b.default = [ ];
+        };
+        checkOnly = {
+          a = {
+            default = [ ];
+            type = T.listOf (chk odd);
+          };
+          b = {
+            default = [ ];
+            type = T.listOf (chk (_: true));
+          };
+        };
+        elemTypeOnly = {
+          a = {
+            default = [ ];
+            type = T.listOf T.int;
+          };
+          b = {
+            default = [ ];
+            type = T.listOf T.raw;
+          };
+        };
+      };
+    in
+    lib.concatMapAttrs (n: p: {
+      "${n}" = read (kindOf p.a) (kindOf p.b);
+      "${n}IdFalse" = read (kindOf (p.a // { identity = false; })) (
+        kindOf (p.b // { identity = false; })
+      );
+    }) pairs;
+  rows =
+    shapeRows
+    // lib.mapAttrs' (n: v: lib.nameValuePair "razor-${n}" v) razorRows
+    // lib.mapAttrs' (n: v: lib.nameValuePair "declared-${n}" v) declaredRows;
   names = builtins.attrNames rows;
   oneNode = builtins.filter (n: rows.${n}.w == true) names;
   verdict = keyEq: {
@@ -439,8 +499,8 @@ in
     test-the-foreign-key-splits-exactly-where-the-mark-splits = {
       expr = verdict (n: rows.${n}.k);
       expected = {
-        rows = 54;
-        oneNode = 40;
+        rows = 60;
+        oneNode = 46;
         nonBool = [ ];
         coarser = [ ];
         finer = [ ];

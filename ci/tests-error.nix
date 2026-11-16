@@ -6043,4 +6043,214 @@ in
         };
       };
     };
+
+  # A declared collection `type` (`tests/collection-declared-type.nix`) checks its definitions, a
+  # mixin's and its own default; the closed field set refuses a field outside `default`, `identity`,
+  # `merge`, `type` by the shared closed-options check, naming the door; `type` beside `merge`, on a
+  # built-in, or that is not a type record, is refused by name. RED before: each was served, the field
+  # unread.
+  flake.testsError.collection-declared-type-refusals =
+    let
+      T = genMerge.types;
+      userWith =
+        opts: defs:
+        (genMerge.evalModuleTree { } (
+          [
+            { options.schema = mkSchemaOption opts; }
+            { config.schema.user = { }; }
+          ]
+          ++ map (d: { config.schema.user = d; }) defs
+        )).config.schema.user;
+      user = collections: userWith { inherit collections; };
+      read = v: builtins.deepSeq v v;
+      lsStr = T.listOf T.str;
+      typed = default: type: { inherit default type; };
+      err = m: {
+        type = "ThrownError";
+        msg = "^" + escapeRegex m;
+      };
+      fields = [
+        "default"
+        "identity"
+        "merge"
+        "type"
+      ];
+      unknown =
+        door: k: f:
+        err (refusals.unknownOption "${door}: collection '${k}'" fields f);
+      notString =
+        at: v: t:
+        err "gen-merge: a definition for option `${at}' is not of the expected type: expected type 'string' but value ${v} is of type '${t}'";
+      entry1 = ''"[definition 1-entry 1]"'';
+      even = x: builtins.isInt x && x / 2 * 2 == x;
+      evenT = genMerge.mkOptionType {
+        name = "even";
+        check = even;
+        merge = _: defs: (builtins.head defs).value;
+      };
+      oneEntry = mkSchemaEntryType { collections.ports = typed [ ] (T.listOf evenT); };
+      kinds =
+        entries: val:
+        (genMerge.evalModuleTree { } (
+          map (e: { options.kinds = genMerge.mkOption { type = T.lazyAttrsOf e; }; }) entries
+          ++ [ { kinds.k.ports = val; } ]
+        )).config.kinds.k.ports;
+    in
+    {
+      # ── checks ──
+      test-element-check = {
+        expr = read (user { classes = typed [ ] lsStr; } [ { classes = [ 1 ]; } ]).classes;
+        expectedError = notString "schema.user.classes.${entry1}" "1" "int";
+      };
+      test-foreign-type-element-check = {
+        expr =
+          read
+            (user { classes = typed [ ] (lib.types.listOf lib.types.str); } [ { classes = [ 1 ]; } ]).classes;
+        expectedError = err "A definition for option `schema.user.classes.${entry1}' is not of type `string'.";
+      };
+      test-default-checked = {
+        expr = read (user { c = typed [ 1 ] lsStr; } [ ]).c;
+        expectedError = notString "collections.c.default.${entry1}" "1" "int";
+      };
+      test-mixin-contribution-checked = {
+        expr =
+          read
+            (userWith {
+              collections.classes = typed [ ] lsStr;
+              baseModule = { };
+              mixins = [
+                (mkMixin { } (_: {
+                  classes = [ 1 ];
+                }))
+              ];
+            } [ { classes = [ "k" ]; } ]).classes;
+        expectedError = err "gen-merge: a definition for option `schema.user.classes.";
+      };
+      # one entry value declared twice keeps its check
+      test-one-entry-value-redeclared-keeps-its-check = {
+        expr = read (
+          kinds
+            [
+              oneEntry
+              oneEntry
+            ]
+            [ 3 ]
+        );
+        expectedError = err "gen-merge: a definition for option `kinds.k.ports.${entry1}' is not of type `even'";
+      };
+      # two entry types differing only in a declared check do not merge (never one of them kept)
+      test-distinct-checks-redeclared-refused = {
+        expr = read (
+          kinds
+            [
+              oneEntry
+              (mkSchemaEntryType { collections.ports = typed [ ] (T.listOf T.int); })
+            ]
+            [ 4 ]
+        );
+        expectedError = err "gen-merge: option `kinds' is declared with types that do not merge";
+      };
+
+      # ── the closed field set: the shared check, naming the door the caller invoked ──
+      test-unknown-field-defined = {
+        expr =
+          read
+            (user {
+              classes = {
+                default = [ ];
+                typo = 1;
+              };
+            } [ { classes = [ 1 ]; } ]).classes;
+        expectedError = unknown "gen-schema.mkSchemaOption" "classes" "typo";
+      };
+      # on a kind that never defines the collection
+      test-unknown-field-undefined = {
+        expr =
+          read
+            (user {
+              classes = {
+                default = [ ];
+                typo = 1;
+              };
+            } [ ]).kind;
+        expectedError = unknown "gen-schema.mkSchemaOption" "classes" "typo";
+      };
+      test-unknown-field-collection-keys = {
+        expr =
+          read
+            (genMerge.evalModuleTree { } [
+              {
+                options.schema = mkSchemaOption {
+                  collections.classes = {
+                    default = [ ];
+                    typo = 1;
+                  };
+                };
+              }
+            ]).config.schema._collectionKeys;
+        expectedError = unknown "gen-schema.mkSchemaOption" "classes" "typo";
+      };
+      test-unknown-field-entry-type-door = {
+        expr =
+          read
+            (genMerge.evalModuleTree { } [
+              {
+                options.kinds = genMerge.mkOption {
+                  type = T.lazyAttrsOf (mkSchemaEntryType {
+                    collections.classes = {
+                      default = [ ];
+                      typo = 1;
+                    };
+                  });
+                };
+              }
+              { kinds.k = { }; }
+            ]).config.kinds.k.classes;
+        expectedError = unknown "gen-schema.mkSchemaEntryType" "classes" "typo";
+      };
+      # an unknown field is refused before the key walk reaches its value (it aborted uncatchably)
+      test-unknown-aborting-field-refused-at-the-key = {
+        expr =
+          let
+            k = user {
+              ports = {
+                default = [ ];
+                foo = abort "unknown field forced";
+              };
+            } [ ];
+          in
+          read (k.__functor k { }).key;
+        expectedError = unknown "gen-schema.mkSchemaOption" "ports" "foo";
+      };
+
+      # ── `type`'s own refusals ──
+      test-type-and-merge = {
+        expr =
+          read
+            (user {
+              classes = typed [ ] lsStr // {
+                merge = a: b: a ++ b;
+              };
+            } [ ]).classes;
+        expectedError = err "gen-schema: collection 'classes' declares both `type` and `merge`; a declared type merges its own definitions, so declare one of them";
+      };
+      test-type-on-builtin-inherits = {
+        expr = read (user { inherits = typed [ ] (T.listOf T.raw); } [ ]).inherits;
+        expectedError = err "gen-schema: collection 'inherits' is built in and takes no `type`; a built-in collection's container stays lazy";
+      };
+      test-type-on-builtin-validators = {
+        expr = read (user { validators = typed [ ] (T.listOf T.raw); } [ ]).validators;
+        expectedError = err "gen-schema: collection 'validators' is built in and takes no `type`; a built-in collection's container stays lazy";
+      };
+      test-type-not-a-type = {
+        expr = read (user { classes = typed [ ] "listOf str"; } [ ]).classes;
+        expectedError = err "gen-schema: collection 'classes': `type` must be an option type (a type record); got a string";
+      };
+      # OPEN RESIDUE, pinned at its current value (ADR-0039 rule (1)): a typed scalar collection is
+      # refused where an option of the type serves (`nullOr str`, default null, defined "x")
+      test-residue-typed-scalar-default-refused = {
+        expr = read (user { p = typed null (T.nullOr T.str); } [ { p = "x"; } ]).p;
+        expectedError = err "gen-schema: collection 'p': its `default` is not a list or attrset, so it has no seed to fold the definitions of its declared `type` onto; declare a list or attrset `default`, or none";
+      };
+    };
 }
