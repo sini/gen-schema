@@ -8,11 +8,12 @@
 # functor, gen defers to the refined relation and meets its answer with the copy's own declaration
 # (`functor.__declared`, the slot a re-doored `verify` copy states), as the name-matching arm does. Without
 # that meet the deferral answers the refined record bare and 5 is served.
+# A re-doored `addCheck` or `check` copy declared first is met the same way: the door's copy names itself
+# as the declaration (`functor.__declared`) wherever it is carried, so gen's relation, which nixpkgs asks,
+# owes its check and 5 is refused. gen's door enforces the declared check (ADR-0039 doors clause;
+# den-hoag-exported-typemerge-drops-on-nixpkgs-engine-alnjf).
 #
 # ★ THE REST OF THE NIXPKGS-ENGINE ROWS SERVE 5, AND EACH IS PINNED HERE AS THE SHAPE IT IS:
-# - a re-doored `addCheck` or `check` copy declared first: its functor carries no `__declared`, so the
-#   check never reaches gen and nixpkgs' merge drops it. That is nixpkgs' drop, Not covered (den-hoag-xdvta,
-#   half 1, arm N). The same copy beside its own original serves 5 too.
 # - a raw `addCheck` or `check` copy, either order: PROVISIONAL on the open classification of a raw copy
 #   under nixpkgs' engine (den-hoag-f66c6, S′). The same copy beside its own original serves 5 too. If that
 #   ruling refuses them, these rows flip.
@@ -96,10 +97,6 @@ let
     copyFirst = "4,R,R";
     copySecond = "4,R,R";
   };
-  dropsFirst = {
-    copyFirst = "4,5,R";
-    copySecond = "4,R,R";
-  };
   dropsBoth = {
     copyFirst = "4,5,R";
     copySecond = "4,5,R";
@@ -132,9 +129,9 @@ in
     test-every-copy-meets-in-gens-engine =
       each "gen" (builtins.attrNames copies) (builtins.attrNames doors)
         met;
-    test-not-covered-a-re-doored-addcheck-or-check-copy-declared-first-is-dropped-by-nixpkgs-merge =
+    test-a-re-doored-addcheck-or-check-copy-declared-first-keeps-its-check-in-nixpkgs-engine =
       each "nixpkgs" [ "addCheck" "check" ] [ "defineType" "mkOptionType" ]
-        dropsFirst;
+        met;
     test-provisional-a-raw-addcheck-or-check-copy-is-unclassified-in-nixpkgs-engine =
       each "nixpkgs" [ "addCheck" "check" ] [ "raw" ]
         dropsBoth;
