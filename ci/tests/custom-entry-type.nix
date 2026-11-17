@@ -153,35 +153,6 @@ let
   # Evaluate the custom type as a module to check baseModule options are accessible
   baseModInnerEval = genMerge.evalModuleTree { } [ baseModEval.config.schema.host ];
 
-  # --- Mixin pipeline skipped with custom mkType ---
-  # If mixins ran, they'd fail since our custom type doesn't go through applyMixin.
-  # The fact that this evaluates proves mixins are skipped.
-
-  mixinSkipEval = genMerge.evalModuleTree { } [
-    {
-      options.schema = mkSchemaOption {
-        mkType = customMkType;
-        mixins = [
-          (
-            { record, ... }:
-            record
-            // {
-              extraField = {
-                type = genMerge.types.str;
-                default = "mixin-value";
-              };
-            }
-          )
-        ];
-      };
-      config.schema.host = {
-        options.name = genMerge.mkOption { type = genMerge.types.str; };
-      };
-    }
-  ];
-
-  mixinSkipHost = mixinSkipEval.config.schema.host;
-
   # --- baseModule as function of kind name ---
 
   baseModFnEval = genMerge.evalModuleTree { } [
@@ -265,10 +236,6 @@ in
       host = [ "name" ];
       user = [ "userName" ];
     };
-  };
-  flake.tests.custom-entry-type.test-mixin-skipped = {
-    expr = !(mixinSkipHost ? extraField);
-    expected = true;
   };
   flake.tests.custom-entry-type.test-basemodule-passed-as-kindmodule = {
     # Proves baseModule was forwarded as kindModule: the __functor imports it,

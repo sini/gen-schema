@@ -6043,4 +6043,77 @@ in
         };
       };
     };
+
+  # den-hoag-8kdu2: a kind's mixins are carried or refused by name, never dropped. The values (carried
+  # over a `null` base, refused on every reader) are in `./tests/kind-mixin-base-shapes.nix`; these cells
+  # pin WHICH refusal fired. `test-mixin-skipped` (once `./tests/custom-entry-type.nix`, pinning the
+  # silent skip with a non-mixin value in `mixins`) is re-homed here, on its own fixture, as
+  # `test-mktype-arm-refuses-mixins-by-name`: the refusal fires before any mixin is applied.
+  flake.testsError.mixin-base-refusals =
+    let
+      mx = mkMixin { } (_: {
+        mxo = genMerge.mkOption {
+          type = genMerge.types.str;
+          default = "m";
+        };
+      });
+      userWith =
+        args:
+        (plainTreeWith (mkSchemaOption args) [
+          { config.schema.user.options.ua = genMerge.mkOption { type = genMerge.types.str; }; }
+        ]).user;
+      notAnAttrset =
+        t:
+        "^"
+        + escapeRegex "gen-schema: kind 'user' declares mixins, and its baseModule is not an attrset (a ${t}), so the mixin pipeline cannot read it as a record; declare the base as an inline attrset, or define the contribution on the kind"
+        + "$";
+    in
+    {
+      test-mktype-arm-refuses-mixins-by-name = {
+        expr =
+          (userWith {
+            mkType = bareMkType;
+            mixins = [ ({ record, ... }: record // { extraField = "mixin-value"; }) ];
+          }).kind;
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex "gen-schema: a schema built with `mkType` cannot take `mixins`: the `mkType` result is the module an instance imports, and the mixin pipeline has no place in it; define the contribution in the `mkType` result, or drop `mkType`"
+            + "$";
+        };
+      };
+      test-function-module-base-with-mixins-is-refused-by-name = {
+        expr =
+          (userWith {
+            baseModule = _: ({ ... }: { });
+            mixins = [ mx ];
+          }).options;
+        expectedError = {
+          type = "ThrownError";
+          msg = notAnAttrset "lambda";
+        };
+      };
+      test-path-base-with-mixins-is-refused-by-name = {
+        expr =
+          (userWith {
+            baseModule = ./test-fixtures/empty-module.nix;
+            mixins = [ mx ];
+          }).options;
+        expectedError = {
+          type = "ThrownError";
+          msg = notAnAttrset "path";
+        };
+      };
+      test-null-base-with-an-unmet-requires-is-refused-by-name = {
+        expr =
+          (userWith {
+            mixins = [ (mkMixin { requires = [ "port" ]; } (_: { })) ];
+          }).options;
+        expectedError = {
+          type = "ThrownError";
+          msg = "^" + escapeRegex "rec: missing required fields: port" + "$";
+        };
+      };
+    };
 }

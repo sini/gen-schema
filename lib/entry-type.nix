@@ -2577,19 +2577,23 @@ let
                 else
                   baseModule;
 
-              # When mixins are present and baseModule is an inline attrset, apply mixins via the
-              # record algebra and emit through the bridge. Default branch only: the `mkType` caller
-              # receives no mixin pipeline.
+              # Mixins are applied via the record algebra and emitted through the bridge. An absent base
+              # is the unit record (a mixin maps a base record to a record), so `null` and `{ }` carry
+              # alike (den-hoag-8kdu2). A base the algebra cannot read as a record (a function module or
+              # a path, after resolution) is refused by name here, so every reader that pools a mixin's
+              # contribution meets one refusal. The `mkType` arm is refused at its WHNF (below).
+              mixinBase = if resolvedBase == null then { } else resolvedBase;
               mixinResult =
-                if mkType == null && mixins != [ ] && resolvedBase != null && builtins.isAttrs resolvedBase then
-                  let
-                    baseRecord = record.fromAttrs resolvedBase;
-                    withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
-                    emitted = emitModule collectionKeys withMixins;
-                  in
-                  emitted
+                if mixins == [ ] || mkType != null then
+                  null
+                else if !(builtins.isAttrs mixinBase) then
+                  throw "gen-schema: kind '${kind}' declares mixins, and its baseModule is not an attrset (a ${builtins.typeOf mixinBase}), so the mixin pipeline cannot read it as a record; declare the base as an inline attrset, or define the contribution on the kind"
                 else
-                  null;
+                  let
+                    baseRecord = record.fromAttrs mixinBase;
+                    withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
+                  in
+                  emitModule collectionKeys withMixins;
 
               # ── THE DECLARATION-KEY GUARD (den-hoag-nn4) ──────────────────────────────────────────
               #
@@ -2718,11 +2722,21 @@ let
               checkDeclarationKeys (
                 # The collection door is read at this arm's WHNF: its result publishes no collection, so
                 # a schema the door refuses (an `identity = false` beside `mkType`) would otherwise be
-                # served on every read that forces no collection, its `kind` among them.
-                if mkType != null && builtins.seq allCollections true then
+                # served on every read that forces no collection, its `kind` among them. `mixins` is
+                # refused at the same WHNF: the `mkType` result is what an instance imports, so a
+                # mixin's module half would reach an instance only through caller code this library
+                # cannot see, and its pooled collections would disagree with the instance (den-hoag-8kdu2).
+                if
+                  mkType != null
+                  && builtins.seq allCollections true
+                  && (
+                    mixins == [ ]
+                    || throw "gen-schema: a schema built with `mkType` cannot take `mixins`: the `mkType` result is the module an instance imports, and the mixin pipeline has no place in it; define the contribution in the `mkType` result, or drop `mkType`"
+                  )
+                then
                   # Custom entry type: collection extraction runs first (above),
-                  # then mkType controls the result. The mixin pipeline and __functor
-                  # wrapping are skipped; `options`, `refs` and `refinements` are DERIVED, from the
+                  # then mkType controls the result. Mixins are refused (above) and the __functor
+                  # wrapping is skipped; `options`, `refs` and `refinements` are DERIVED, from the
                   # option plane of the value an instance of this kind imports.
                   # Precedence: computedFields wins over mkType result for same-named keys,
                   # so computed topology/meta fields remain authoritative.

@@ -69,7 +69,7 @@ gen-merge exports became unreachable.
 
 `baseModule` may be a module or `kindName -> module`. `computed : collections -> defs -> attrset`
 (wins over collections of the same name). `mkType : { kindModule, collections, defs, kind } -> attrset`
-is the escape hatch — it skips the mixin pipeline and the `__functor` wrapping. `options`, `refs` and
+is the escape hatch — it skips the `__functor` wrapping, and a non-empty `mixins` beside it is refused by name. `mixins` run over `baseModule` as a record (`null` is the empty record); a non-attrset base with `mixins` is refused by name. `options`, `refs` and
 `refinements` are still published, from one evaluation of the module an instance imports (the plane
 the mark reads), and the result's own `__functor` is applied to that same module. The kind value
 always carries `inherits` and `parent`, written over the result, since `evalSchema` and `_topology` read
