@@ -7,9 +7,10 @@
 # declaration node), marks equal, foreign keys equal. Only one-node rows (`w`) are the property's; the
 # others compose by node and are carried as rows only.
 #
-# The corpus: 17 constructed shapes, each as a differing pair and as a twin, and the granularity
+# The corpus: 21 constructed shapes, each as a differing pair and as a twin, and the granularity
 # razor's default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`). The `mkType` arm
-# writes no foreign key.
+# writes no foreign key. Four shapes redeclare one option embedding an instance type (twice, beside a
+# plain submodule in either order, thrice), a join gen-merge mints over its declarations (den-hoag-2vtgj).
 #
 # PLANTED RED, in the suite: the same predicate over a node-only key (the witness alone, no content)
 # reads every one-node row whose marks differ as coarser, so a zero on the real key is read with the
@@ -51,7 +52,43 @@ let
         ]
       )
     );
+  # the redeclaration shapes: `owner` embeds an instance type of `user` (tag "a") or `grp`, declared more than once
+  embedded = schema { } (_: {
+    user.options.uname = opt T.str;
+    grp.options.gid = opt T.int;
+  });
+  instanceOf = tag: genSchema.mkInstanceType { } (if tag == "a" then embedded.user else embedded.grp);
+  plainSub = T.submodule { options.extra = genMerge.mkOption { default = ""; }; };
+  redeclared = tys: {
+    args = { };
+    decl = lib.mkMerge (map (t: { options.owner = opt t; }) tys);
+  };
   shapes = {
+    instanceTwice =
+      tag:
+      redeclared [
+        (instanceOf tag)
+        (instanceOf tag)
+      ];
+    instancePlus =
+      tag:
+      redeclared [
+        (instanceOf tag)
+        plainSub
+      ];
+    instancePlusRev =
+      tag:
+      redeclared [
+        plainSub
+        (instanceOf tag)
+      ];
+    instanceThrice =
+      tag:
+      redeclared [
+        (instanceOf tag)
+        (instanceOf tag)
+        (instanceOf tag)
+      ];
     schemaCollection = tag: {
       args =
         if tag == "a" then
@@ -439,8 +476,8 @@ in
     test-the-foreign-key-splits-exactly-where-the-mark-splits = {
       expr = verdict (n: rows.${n}.k);
       expected = {
-        rows = 54;
-        oneNode = 40;
+        rows = 62;
+        oneNode = 48;
         nonBool = [ ];
         coarser = [ ];
         finer = [ ];
@@ -454,6 +491,10 @@ in
         "functionModuleDef"
         "importedAttrsetModule"
         "importedFunctionModule"
+        "instancePlus"
+        "instancePlusRev"
+        "instanceThrice"
+        "instanceTwice"
         "keptCollectionValue"
         "nestedOption"
         "parentType"

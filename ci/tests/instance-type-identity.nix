@@ -6,9 +6,14 @@
 # A self-referential instance type has no identity (ADR-0034's excluded populations) and is refused by
 # name at gen-types' depth bound; the kinds around it still mint, guarded by the kind's `__okAt`.
 #
-# THE RESIDUE, pinned so a fix is visible (A10): an embedding option declared TWICE, or redeclared as a
-# plain submodule, reaches the mark through gen-merge's union, which states nothing and seals the module
-# list, so two such kinds embedding different kinds still share one mark and `kindEq` refuses.
+# An embedding option declared TWICE, or redeclared beside a plain submodule (A10), reaches the mark through
+# gen-merge's union, which states its join (`gen-merge.submodule-join`, den-hoag-2vtgj) over the two
+# declarations, each a member by its mark: two such kinds embedding different kinds read two marks, `kindEq`
+# decides them, and the foreign key splits where the mark does. Instances of the two kinds holding the same
+# data read two `id_hash`es; that reading keys off a kind mark whose `__sealed` is non-empty (the rebuilt
+# module set), so where gen-schema's instance key comes to refuse such a mark, that cell moves to refused.
+# A self-referential instance type declared twice joins a member with no identity, sealed by its own regime:
+# its marks and `kindEq` answer, or refuse by name, and never abort.
 {
   genSchema,
   genMerge,
@@ -107,6 +112,40 @@ let
       }
     )
   ];
+  # instances holding the same data (`owner = null`), of a kind whose `owner` is declared twice
+  nullOrTwice =
+    ty:
+    (evalSchema { } [
+      {
+        config.schema.host.options.owner = genMerge.mkOption { type = T.nullOr ty; };
+      }
+      {
+        config.schema.host.options.owner = genMerge.mkOption { type = T.nullOr ty; };
+      }
+    ]).host;
+  idHashOf =
+    host:
+    (genMerge.evalModuleTree { } [
+      { options.h = genMerge.mkOption { type = mkInstanceType { } host; }; }
+      {
+        config.h.name = "a";
+        config.h.owner = null;
+      }
+    ]).config.h.id_hash;
+  redeclared = f: {
+    marksEqual = (f tU).__mint.minted == (f tG).__mint.minted;
+    kindEq = attempt (kindEq (f tU) (f tG));
+    keyAgreesWithMark =
+      ((f tU).__keyEq.key == (f tG).__keyEq.key) == ((f tU).__mint.minted == (f tG).__mint.minted);
+  };
+  twiceType =
+    ty:
+    (genMerge.evalModuleTree { } [
+      { options.o = direct ty; }
+      { options.o = direct ty; }
+    ]).options.o.type;
+  tSelf = mkInstanceType { } selfS.host;
+  tSelf2 = mkInstanceType { } selfS.host;
   selfInst =
     (genMerge.evalModuleTree { } [
       { options.h = genMerge.mkOption { type = mkInstanceType { } selfS.host; }; }
@@ -236,19 +275,67 @@ in
         tagIsSealedMarker = true;
       };
     };
-    # THE RESIDUE: the union route states nothing, so the marks collide and kindEq refuses
-    test-a10-an-option-declared-twice-keeps-the-collision = {
+    test-a10-an-option-declared-twice-reads-the-embedded-kind = {
       expr = {
-        twiceMarksEqual = (twice tU).__mint.minted == (twice tG).__mint.minted;
-        twiceKindEq = attempt (kindEq (twice tU) (twice tG));
-        plusMarksEqual = (plus tU).__mint.minted == (plus tG).__mint.minted;
-        plusKindEq = attempt (kindEq (plus tU) (plus tG));
+        twice = redeclared twice;
+        plus = redeclared plus;
+        nullOrTwiceIdHashesEqual = idHashOf (nullOrTwice tU) == idHashOf (nullOrTwice tG);
       };
       expected = {
-        twiceMarksEqual = true;
-        twiceKindEq.success = false;
-        plusMarksEqual = true;
-        plusKindEq.success = false;
+        twice = {
+          marksEqual = false;
+          kindEq = {
+            success = true;
+            value = false;
+          };
+          keyAgreesWithMark = true;
+        };
+        plus = {
+          marksEqual = false;
+          kindEq = {
+            success = true;
+            value = false;
+          };
+          keyAgreesWithMark = true;
+        };
+        nullOrTwiceIdHashesEqual = false;
+      };
+    };
+    # a self-referential instance type declared twice: its join's first member has no identity, so it is sealed
+    # by its own regime. Its kind still mints apart from another embedding kind's; twins are refused by name, and
+    # their joined types read `false`, as two separately built self-referential types read alone (A8), and so do two
+    # joins of one binding built in two evaluations
+    test-a10-a-self-referential-instance-type-declared-twice-never-aborts = {
+      expr = {
+        marksApart = attempt ((twice tSelf).__mint.minted != (twice tU).__mint.minted);
+        kindEqApart = attempt (kindEq (twice tSelf) (twice tU));
+        kindEqTwins = attempt (kindEq (twice tSelf) (twice tSelf2));
+        typeEqTwins = attempt (T.typeEq (twiceType tSelf) (twiceType tSelf2));
+        typeEqSameBinding = attempt (T.typeEq (twiceType tSelf) (twiceType tSelf));
+        loneTypeEqTwins = attempt (T.typeEq tSelf tSelf2);
+      };
+      expected = {
+        marksApart = {
+          success = true;
+          value = true;
+        };
+        kindEqApart = {
+          success = true;
+          value = false;
+        };
+        kindEqTwins.success = false;
+        typeEqTwins = {
+          success = true;
+          value = false;
+        };
+        typeEqSameBinding = {
+          success = true;
+          value = false;
+        };
+        loneTypeEqTwins = {
+          success = true;
+          value = false;
+        };
       };
     };
   };
