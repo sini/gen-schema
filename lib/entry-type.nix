@@ -2582,15 +2582,14 @@ let
               # alike (den-hoag-8kdu2). A base the algebra cannot read as a record (a function module or
               # a path, after resolution) is refused by name here, so every reader that pools a mixin's
               # contribution meets one refusal. The `mkType` arm is refused at its WHNF (below).
-              mixinBase = if resolvedBase == null then { } else resolvedBase;
               mixinResult =
                 if mixins == [ ] || mkType != null then
                   null
-                else if !(builtins.isAttrs mixinBase) then
-                  throw "gen-schema: kind '${kind}' declares mixins, and its baseModule is not an attrset (a ${builtins.typeOf mixinBase}), so the mixin pipeline cannot read it as a record; declare the base as an inline attrset, or define the contribution on the kind"
+                else if resolvedBase != null && !(builtins.isAttrs resolvedBase) then
+                  throw "gen-schema: kind '${kind}' declares mixins, and its baseModule is not an attrset (a ${builtins.typeOf resolvedBase}), so the mixin pipeline cannot read it as a record; declare the base as an inline attrset, or define the contribution on the kind"
                 else
                   let
-                    baseRecord = record.fromAttrs mixinBase;
+                    baseRecord = record.fromAttrs (if resolvedBase == null then { } else resolvedBase);
                     withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
                   in
                   emitModule collectionKeys withMixins;
