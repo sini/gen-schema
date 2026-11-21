@@ -6166,6 +6166,14 @@ in
         merge = _: defs: (builtins.head defs).value;
       };
       oneEntry = mkSchemaEntryType { collections.ports = typed [ ] (T.listOf evenT); };
+      # the whole message, as `collection-no-default-refusals` pins it at its other sites
+      undefinedP = {
+        type = "ThrownError";
+        msg =
+          "^"
+          + escapeRegex "gen-schema: `schema.user.p': collection 'p' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`"
+          + "$";
+      };
       kinds =
         entries: val:
         (genMerge.evalModuleTree { } (
@@ -6352,6 +6360,41 @@ in
       test-scalar-default-planted-default = {
         expr = read (user { p = typed 5 (T.nullOr T.str); } [ { p = genMerge.mkIf false "x"; } ]).p;
         expectedError = notString "schema.user.p" "5" "int";
+      };
+
+      # ── no default and no definition, the type stating no empty value: refused by name, as an
+      # option of the type is ("accessed but has no value defined"); the type decides by its own
+      # `emptyValue`, never by its name (`tests/collection-declared-type.nix` for the served half)
+      test-undefined-typed-scalar-refuses-by-name = {
+        expr = read (user { p.type = T.str; } [ ]).p;
+        expectedError = undefinedP;
+      };
+      test-undefined-user-type-without-empty-value-refuses-by-name = {
+        expr =
+          read
+            (user {
+              p.type = genMerge.mkOptionType {
+                name = "concat";
+                check = builtins.isString;
+                merge = _: defs: builtins.concatStringsSep "" (map (d: d.value) defs);
+              };
+            } [ ]).p;
+        expectedError = undefinedP;
+      };
+      test-undefined-foreign-non-empty-list-refuses-by-name = {
+        expr = read (user { p.type = lib.types.nonEmptyListOf lib.types.str; } [ ]).p;
+        expectedError = undefinedP;
+      };
+      # a `listOf` whose `emptyValue` is overridden away, nixpkgs' own `nonEmptyListOf` construction
+      test-undefined-list-without-empty-value-refuses-by-name = {
+        expr =
+          read
+            (user {
+              p.type = lsStr // {
+                emptyValue = { };
+              };
+            } [ ]).p;
+        expectedError = undefinedP;
       };
     };
 }
