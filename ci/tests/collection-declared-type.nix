@@ -269,6 +269,42 @@ let
         ]
     ) (builtins.attrNames scalarVals)
   );
+  # A typed collection no kind defines and with no default, against an option of the type with no
+  # definition (`twin`): nixpkgs' `mergedValue` serves the type's own `emptyValue.value` where it states
+  # one. `user` gives each read its own schema; `emptyCase` reads both engines over one type pair.
+  emptyCase = g: n: {
+    gen = (user { p.type = g; } [ ]).p;
+    nixpkgs = twin n { } [ ];
+  };
+  emptyBoth = v: {
+    gen = v;
+    nixpkgs = v;
+  };
+  concatT =
+    l: withEmpty:
+    l.mkOptionType (
+      {
+        name = "concat";
+        check = builtins.isString;
+        merge = _: defs: builtins.concatStringsSep "" (map (d: d.value) defs);
+      }
+      // (if withEmpty then { emptyValue.value = "E"; } else { })
+    );
+  subT =
+    l:
+    l.types.submodule {
+      options.a = l.mkOption {
+        type = l.types.str;
+        default = "x";
+      };
+    };
+  # a kind's mark under two declarations of one collection, every read in its own schema
+  markOf =
+    opts:
+    (gm.evalModuleTree { } [
+      { options.schema = genSchema.mkSchemaOption opts; }
+      { config.schema.user = { }; }
+    ]).config.schema.user.__mint.minted;
 in
 {
   flake.tests.collection-declared-type =
@@ -468,6 +504,105 @@ in
       test-no-default-typed = {
         expr = seedOf { type = lsStr; } [ [ "x" ] ];
         expected = [ "x" ];
+      };
+
+      # ── no default and no definition: the type's own empty value (ADR-0039 rule (1)) ──────────────
+      # Read where no definition survives, the collection answers its declared type's `emptyValue.value`
+      # where the type states one, as an option of the type does, and is refused by name where it states
+      # none (`../tests-error.nix`). The type decides by its own field, never by its name. RED before:
+      # each was refused, "declares no `default`".
+      test-undefined-typed-list-is-empty = {
+        expr = emptyCase lsStr (NT.listOf NT.str);
+        expected = emptyBoth [ ];
+      };
+      test-undefined-typed-attrs-is-empty = {
+        expr = emptyCase (T.attrsOf T.str) (NT.attrsOf NT.str);
+        expected = emptyBoth { };
+      };
+      test-undefined-typed-nullor-is-null = {
+        expr = emptyCase (T.nullOr T.str) (NT.nullOr NT.str);
+        expected = emptyBoth null;
+      };
+      test-undefined-foreign-typed-list-is-empty = {
+        expr = emptyCase (NT.listOf NT.str) (NT.listOf NT.str);
+        expected = emptyBoth [ ];
+      };
+      test-undefined-typed-submodule-reads-its-base = {
+        expr = emptyCase (subT gm) (subT lib);
+        expected = emptyBoth { a = "x"; };
+      };
+      test-undefined-user-type-reads-its-empty-value = {
+        expr = emptyCase (concatT gm true) (concatT lib true);
+        expected = emptyBoth "E";
+      };
+      # membership, never name: a scalar record given an empty value reads it
+      test-undefined-scalar-given-an-empty-value-reads-it = {
+        expr = emptyCase (T.str // { emptyValue.value = "E"; }) (NT.str // { emptyValue.value = "E"; });
+        expected = emptyBoth "E";
+      };
+      # a mixin that never writes the collection leaves it undefined
+      test-undefined-typed-beside-a-mixin-is-empty = {
+        expr =
+          (userWith {
+            collections.p.type = lsStr;
+            collections.o.default = [ ];
+            baseModule = { };
+            mixins = [
+              (genSchema.mkMixin { } (_: {
+                o = [ "m" ];
+              }))
+            ];
+          } [ ]).p;
+        expected = [ ];
+      };
+      # the undefined read equals the read where every definition discharges (gen-merge's empty value)
+      test-undefined-typed-equals-all-discharged = {
+        expr = {
+          undefined = (user { p.type = lsStr; } [ ]).p;
+          discharged = (user { p.type = lsStr; } [ { p = gm.mkIf false [ "a" ]; } ]).p;
+        };
+        expected = {
+          undefined = [ ];
+          discharged = [ ];
+        };
+      };
+      # the computed field reads the served value
+      test-undefined-typed-read-by-computed = {
+        expr =
+          (userWith {
+            collections.p.type = lsStr;
+            computed = cs: _: { seen = cs.p; };
+          } [ ]).seen;
+        expected = [ ];
+      };
+      # identity: undefined, the collection mints as one declaring its type's empty value as its default,
+      # in identity and through the projection of a collection declared `identity = false` (`minted`)
+      test-undefined-typed-mints-as-its-empty-default = {
+        expr =
+          markOf { collections.p.type = lsStr; } == markOf {
+            collections.p = typed [ ] lsStr;
+          };
+        expected = true;
+      };
+      test-undefined-typed-outside-identity-projects-its-empty-default = {
+        expr =
+          let
+            withP = p: {
+              collections.p = p // {
+                identity = false;
+              };
+              computed = cs: _: { seen = cs.p; };
+            };
+          in
+          markOf (withP {
+            type = lsStr;
+          }) == markOf (withP (typed [ ] lsStr));
+        expected = true;
+      };
+      # control: an undefined collection that states no empty value mints apart from a defaulted one
+      test-undefined-untyped-mints-apart-from-a-defaulted-one = {
+        expr = markOf { collections.p = { }; } == markOf { collections.p.default = [ ]; };
+        expected = false;
       };
 
       # ── a scalar default is an option default (ADR-0039 rule (1)) ────────────────────────────────

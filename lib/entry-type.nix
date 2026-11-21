@@ -1992,6 +1992,9 @@ let
                 if stacks == [ ] && !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs) then
                   if collection ? default then
                     seeds.${name} or collection.default
+                  # a declared type answers its own empty value, as an option of it does (nixpkgs `mergedValue`)
+                  else if (collection.type.emptyValue or { }) ? value then
+                    collection.type.emptyValue.value
                   else
                     throw "gen-schema: `${
                       merge.showOption (loc ++ [ name ])
@@ -2630,6 +2633,8 @@ let
                           value =
                             if allCollections.${n} ? default then
                               seeds.${n} or allCollections.${n}.default
+                            else if (allCollections.${n}.type.emptyValue or { }) ? value then
+                              allCollections.${n}.type.emptyValue.value
                             else
                               throw "gen-schema: `${
                                 merge.showOption (loc ++ [ n ])
