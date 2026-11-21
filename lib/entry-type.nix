@@ -1749,8 +1749,10 @@ let
           # its seed, and any other default is one definition at `mkOptionDefault`, carried here as
           # `poolHead` so that `declaredOf` decides nothing per kind
           if collection ? type then
+            # the default is pattern-bound: a select passed to a primop is thunked, a variable is not
             if
-              collection ? default && !(builtins.isList collection.default || builtins.isAttrs collection.default)
+              collection ? default
+              && (({ default, ... }: !(builtins.isList default || builtins.isAttrs default)) collection)
             then
               collection.type
               // {
