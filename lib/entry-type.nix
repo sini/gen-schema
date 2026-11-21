@@ -1992,7 +1992,9 @@ let
                 if stacks == [ ] && !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs) then
                   if collection ? default then
                     seeds.${name} or collection.default
-                  # a declared type answers its own empty value, as an option of it does (nixpkgs `mergedValue`)
+                  # a declared type answers its own empty value, as an option of it does (nixpkgs `mergedValue`).
+                  # The kind's mark moves with it, to the mark of a `default` of that value: ADR-0016 ruling 5
+                  # ("internal addressing only") admits the move. It joins the mark's `{ }`/`[ ]` class (den-hoag-0pwbu).
                   else if (collection.type.emptyValue or { }) ? value then
                     collection.type.emptyValue.value
                   else
