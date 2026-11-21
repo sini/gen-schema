@@ -5845,12 +5845,16 @@ in
           msg = "^" + escapeRegex "gen-merge: the option `schema.user.rank.x' has conflicting definitions";
         };
       };
-      # a default neither a list nor an attrset, with no `merge`, cannot fold a definition
-      test-scalar-default-definition-has-no-merge-strategy = {
-        expr = userOf { default = 5; } "rank" [ 7 ];
+      # a scalar default is one definition at `mkOptionDefault` (`tests/collection-scalar-default.nix`):
+      # two differing definitions of it conflict, as nixpkgs refuses them ("Cannot merge definitions")
+      test-scalar-default-differing-definitions-conflict = {
+        expr = userOf { default = 5; } "rank" [
+          7
+          8
+        ];
         expectedError = {
           type = "ThrownError";
-          msg = "^" + escapeRegex "gen-schema: collection 'rank': no merge strategy";
+          msg = "^" + escapeRegex "gen-merge: the option `schema.user.rank' has conflicting definitions";
         };
       };
     };
@@ -6319,11 +6323,35 @@ in
         expr = read (user { classes = typed [ ] "listOf str"; } [ ]).classes;
         expectedError = err "gen-schema: collection 'classes': `type` must be an option type (a type record); got a string";
       };
-      # OPEN RESIDUE, pinned at its current value (ADR-0039 rule (1)): a typed scalar collection is
-      # refused where an option of the type serves (`nullOr str`, default null, defined "x")
-      test-residue-typed-scalar-default-refused = {
-        expr = read (user { p = typed null (T.nullOr T.str); } [ { p = "x"; } ]).p;
-        expectedError = err "gen-schema: collection 'p': its `default` is not a list or attrset, so it has no seed to fold the definitions of its declared `type` onto; declare a list or attrset `default`, or none";
+      # ── a declared type's scalar default is an option default (values: `tests/collection-declared-type.nix`) ──
+      # its definitions are the type's: two differing ones conflict, as nixpkgs refuses them
+      test-scalar-default-conflict-str = {
+        expr =
+          read
+            (user { p = typed null (T.nullOr T.str); } [
+              { p = "x"; }
+              { p = "y"; }
+            ]).p;
+        expectedError = err "gen-merge: the option `schema.user.p' has conflicting definitions";
+      };
+      test-scalar-default-conflict-int = {
+        expr =
+          read
+            (user { p = typed 4 (T.nullOr T.int); } [
+              { p = 7; }
+              { p = 9; }
+            ]).p;
+        expectedError = err "gen-merge: the option `schema.user.p' has conflicting definitions";
+      };
+      # planted: a definition the type's check rejects is refused
+      test-scalar-default-planted-definition = {
+        expr = read (user { p = typed null (T.nullOr T.str); } [ { p = 1; } ]).p;
+        expectedError = notString "schema.user.p" "1" "int";
+      };
+      # planted: a default the check rejects is refused where it answers, every definition discharged
+      test-scalar-default-planted-default = {
+        expr = read (user { p = typed 5 (T.nullOr T.str); } [ { p = genMerge.mkIf false "x"; } ]).p;
+        expectedError = notString "schema.user.p" "5" "int";
       };
     };
 }

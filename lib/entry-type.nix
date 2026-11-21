@@ -1723,19 +1723,16 @@ let
 
         allCollections = mkAllCollections door mkType collections;
 
-        # Infer merge strategy from default type
+        # The fold onto the seed: an explicit `merge`, or the default's shape (a list or attrset; any
+        # other default is pooled at `mkOptionDefault`, `poolHead` below, and never folded)
         inferMerge =
-          name: collection:
+          collection:
           if collection ? merge then
             collection.merge
           else if builtins.isList collection.default then
             (acc: val: acc ++ val)
-          else if builtins.isAttrs collection.default then
-            (acc: val: acc // val)
-          else if collection ? type then
-            throw "gen-schema: collection '${name}': its `default` is not a list or attrset, so it has no seed to fold the definitions of its declared `type` onto; declare a list or attrset `default`, or none"
           else
-            throw "gen-schema: collection '${name}': no merge strategy — default is not a list or attrset; provide an explicit merge function";
+            (acc: val: acc // val);
 
         # Each collection's type, built once per schema, never per kind merge, branching as
         # `inferMerge` does. A list or attrset collection is a lazy container whose element is opaque:
@@ -1748,9 +1745,24 @@ let
         # definitions, whose top level alone is resolved.
         collectionTypes = prelude.mapAttrs (
           name: collection:
-          # a DECLARED type is the collection's type; its seed is still folded on (`declaredOf`)
+          # a DECLARED type is the collection's type; a list or attrset default is still folded on as
+          # its seed, and any other default is one definition at `mkOptionDefault`, carried here as
+          # `poolHead` so that `declaredOf` decides nothing per kind
           if collection ? type then
-            collection.type
+            if
+              collection ? default && !(builtins.isList collection.default || builtins.isAttrs collection.default)
+            then
+              collection.type
+              // {
+                poolHead = [
+                  {
+                    file = "gen-schema/default";
+                    value = merge.mkOptionDefault collection.default;
+                  }
+                ];
+              }
+            else
+              collection.type
           else if collection ? merge then
             merge.mkOptionType {
               name = "schemaCollection";
@@ -1761,7 +1773,7 @@ let
               # binding costs a thunk on every schema or kind evaluation that never refuses.
               merge =
                 loc:
-                prelude.foldl' (acc: d: inferMerge name collection acc d.value) (
+                prelude.foldl' (acc: d: inferMerge collection acc d.value) (
                   collection.default
                     or (throw "gen-schema: `${merge.showOption loc}': collection '${name}' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`")
                 );
@@ -1812,14 +1824,24 @@ let
                 merge = _: defs: (prelude.last defs).value;
               }
             )
+          # any other default is an option's default with no type: its definitions fold untyped, and
+          # the default is one definition at `mkOptionDefault` (`poolHead`)
           else
-            inferMerge name collection
+            merge.types.unspecified
+            // {
+              poolHead = [
+                {
+                  file = "gen-schema/default";
+                  value = merge.mkOptionDefault collection.default;
+                }
+              ];
+            }
         ) allCollections;
 
         # The seed `declaredOf` folds: a list or attrset default resolved alone, as one definition of
         # its collection, once per schema; an explicit collection's default is its type's own seed,
-        # and any other is served as it is to a kind that never defines it (only a definition needs
-        # a merge strategy). A built-in's default is plain, so only the declared collections are
+        # and any other is served as it is to a kind that never defines it (a kind that defines it
+        # pools it, `poolHead`). A built-in's default is plain, so only the declared collections are
         # resolved.
         seeds = prelude.mapAttrs (
           name: _:
@@ -1975,19 +1997,21 @@ let
                 else
                   let
                     merged = merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} (
-                      map (d: {
+                      collectionTypes.${name}.poolHead or [ ]
+                      ++ map (d: {
                         inherit (d) file;
                         value = d.value.${name};
                       }) (builtins.filter (d: builtins.isAttrs d.value && d.value ? ${name}) defs)
                       ++ stacks
                     );
                   in
-                  # an explicit collection's type seeds itself; a list or attrset is seeded after the
-                  # merge, which equals the left fold because `++` and `//` are associative
-                  if collection ? merge || !(collection ? default) then
+                  # an explicit collection's type seeds itself, and a pooled default is already a
+                  # definition (`poolHead`); a list or attrset is seeded after the merge, which equals
+                  # the left fold because `++` and `//` are associative
+                  if collection ? merge || !(collection ? default) || collectionTypes.${name} ? poolHead then
                     merged
                   else
-                    inferMerge name collection (seeds.${name} or collection.default) merged;
+                    inferMerge collection (seeds.${name} or collection.default) merged;
 
               # A DECLARED parent nothing else composes (den-hoag-8c8pr), which the desugar below
               # imports: no def of this kind carries the resolver's provenance for it, and it is not
