@@ -8,8 +8,9 @@
 # others compose by node and are carried as rows only.
 #
 # The corpus: 21 constructed shapes, each as a differing pair and as a twin, the granularity razor's
-# default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`), and 3 declared-collection
-# pairs under both identity settings. The `mkType` arm writes no foreign key. Four shapes redeclare one
+# default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`), 11 declared-collection
+# pairs under both identity settings, 2 rows over an `identity = false` collection and 2 over a kept
+# collection the kind does not define. The `mkType` arm writes no foreign key. Four shapes redeclare one
 # option embedding an instance type (twice, beside a plain submodule in either order, thrice), a join
 # gen-merge mints over its declarations (den-hoag-2vtgj).
 #
@@ -461,9 +462,12 @@ let
       identityFalseA = read (policy [ "t1" ]).a (policy [ "t2" ]).a;
       identityFalseB = read (policy [ "t1" ]).b (policy [ "t2" ]).b;
     };
-  # DECLARED collection types (den-hoag-collection-declared-element-type-fwjez): one kind declaration
-  # node (`portsDef`) under schemas whose `ports` differ only in a declared `type`, both identity
-  # settings. A type enters no mark, so the key must not split on it (on its presence either).
+  # DECLARED collections: one kind declaration node (`portsDef`) under schemas whose `ports` differ
+  # in one field of its declaration, both identity settings. The mark reads a collection's name and,
+  # where it is kept in identity, its resolved default and its value; a `type`, a `merge` and an
+  # `identity` enter no mark, so the key must not split on them, on their presence either
+  # (den-hoag-collection-declared-element-type-fwjez for `type`). A `merge` that changes the merged
+  # value splits the mark through the value, and the key with it.
   declaredRows =
     let
       portsDef = {
@@ -482,7 +486,57 @@ let
           merge = _: defs: (builtins.head defs).value;
         };
       odd = x: x / 2 * 2 != x;
+      cat = acc: v: acc ++ v;
+      nullCat = acc: v: (if acc == null then [ ] else acc) ++ v;
       pairs = {
+        mergePresence = {
+          a = {
+            default = [ ];
+            merge = cat;
+          };
+          b.default = [ ];
+        };
+        mergeChangesValue = {
+          a = {
+            default = [ ];
+            merge = acc: v: acc ++ v ++ v;
+          };
+          b.default = [ ];
+        };
+        identityPresence = {
+          a = {
+            default = [ ];
+            identity = true;
+          };
+          b.default = [ ];
+        };
+        defaultValue = {
+          a.default = [ ];
+          b.default = [ 9 ];
+        };
+        defaultPresence = {
+          a.merge = nullCat;
+          b = {
+            default = [ ];
+            merge = nullCat;
+          };
+        };
+        orderedDefault = {
+          a.default = lib.mkOrder 500 [ ];
+          b.default = [ ];
+        };
+        elemIfTrue = {
+          a.default = [ (lib.mkIf true 9) ];
+          b.default = [ 9 ];
+        };
+        attrMkDefault = {
+          a.default = {
+            x = lib.mkDefault 1;
+          };
+          b.default = {
+            x = 1;
+          };
+        };
         declaredVsUndeclared = {
           a = {
             default = [ ];
@@ -517,7 +571,55 @@ let
       "${n}IdFalse" = read (kindOf (p.a // { identity = false; })) (
         kindOf (p.b // { identity = false; })
       );
-    }) pairs;
+    }) pairs
+    // (
+      let
+        kindWith =
+          args:
+          (schema args (_: {
+            user = portsDef;
+          })).user;
+        # a kind that does not define `ports` reads its default where the mark reads its resolved seed
+        undefinedOn =
+          d:
+          (schema { collections.ports.default = d; } (_: {
+            user.options.trail = opt T.str;
+          })).user;
+        outOfIdentity = d: {
+          default = d;
+          identity = false;
+        };
+      in
+      {
+        # an `identity = false` collection's name is in the mark, its contents are not
+        idFalseCollectionNamed =
+          read
+            (kindWith {
+              collections = {
+                ports.default = [ ];
+                extra = outOfIdentity [ ];
+              };
+            })
+            (kindWith {
+              collections.ports.default = [ ];
+            });
+        # its default still reaches the mark through a computed field, which the key reads
+        idFalseDefaultComputed =
+          let
+            k =
+              d:
+              kindWith {
+                collections.ports = outOfIdentity d;
+                computed = cs: _: { n = cs.ports; };
+              };
+          in
+          read (k [ ]) (k [ 9 ]);
+        elemIfTrueUndefined = read (undefinedOn [ (lib.mkIf true 9) ]) (undefinedOn [ 9 ]);
+        attrMkDefaultUndefined = read (undefinedOn { x = lib.mkDefault 1; }) (undefinedOn {
+          x = 1;
+        });
+      }
+    );
   rows =
     shapeRows
     // lib.mapAttrs' (n: v: lib.nameValuePair "razor-${n}" v) razorRows
@@ -537,8 +639,8 @@ in
     test-the-foreign-key-splits-exactly-where-the-mark-splits = {
       expr = verdict (n: rows.${n}.k);
       expected = {
-        rows = 68;
-        oneNode = 54;
+        rows = 88;
+        oneNode = 74;
         nonBool = [ ];
         coarser = [ ];
         finer = [ ];
@@ -549,6 +651,11 @@ in
       expr = (verdict (_: true)).coarser;
       expected = [
         "computedField"
+        "declared-defaultPresence"
+        "declared-defaultValue"
+        "declared-idFalseCollectionNamed"
+        "declared-idFalseDefaultComputed"
+        "declared-mergeChangesValue"
         "functionModuleDef"
         "importedAttrsetModule"
         "importedFunctionModule"

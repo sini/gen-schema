@@ -206,9 +206,32 @@
         [ $((s2 * 100)) -le $((s1 * 130)) ] ||
           die depth-host-64 "a kind chain's cost is superlinear in depth: $s1 thunks per level from 16 to 32, $s2 from 32 to 64, a ratio over 1.30"
 
+        # den-hoag-t7pc7 · a kind's reference key under a schema of 1, 4, 16 and 64 collections, each
+        # declaring `merge`: the schema's construction digest reads every collection once, so the cost is
+        # linear in the collection count, the per-collection slope from 16 to 64 at most 1.30 times the
+        # slope from 4 to 16. A digest reading every collection per collection doubles the slope per
+        # quadrupling. The value, not the counts, is pinned.
+        cellThunks merge-collections-1
+        [ "$val" = "1" ] || die merge-collections-1 "expected value 1, got '$val'"
+        m1=$thunks
+        cellThunks merge-collections-4
+        [ "$val" = "4" ] || die merge-collections-4 "expected value 4, got '$val'"
+        m4=$thunks
+        cellThunks merge-collections-16
+        [ "$val" = "16" ] || die merge-collections-16 "expected value 16, got '$val'"
+        m16=$thunks
+        cellThunks merge-collections-64
+        [ "$val" = "64" ] || die merge-collections-64 "expected value 64, got '$val'"
+        m64=$thunks
+        r1=$(((m16 - m4) / 12))
+        r2=$(((m64 - m16) / 48))
+        [ "$r1" -gt 0 ] || die merge-collections-16 "the slope from 4 to 16 is $r1 thunks per collection: cannot measure"
+        [ $((r2 * 100)) -le $((r1 * 130)) ] ||
+          die merge-collections-64 "a kind key's cost is superlinear in the schema's collections: $r1 thunks per collection from 4 to 16, $r2 from 16 to 64, a ratio over 1.30"
+
         # 0/0 is a false pass: the runner must have executed every cell above.
-        [ "$ran" = "19" ] || die runner "expected 19 evaluations, ran $ran"
-        echo "tests-process: 19 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth thunks $d16 / $d32 / $d64, slopes $s1 / $s2 thunks per level"
+        [ "$ran" = "23" ] || die runner "expected 23 evaluations, ran $ran"
+        echo "tests-process: 23 cells, every exit read unpiped; kind mints $one for 1 instance and $eight for 8; spy control $control; component mints $c1 for 1 kind and $c4 for 4; mkType two-construction mints 2; refined predicate applications 1/1/1/3; attribution $attributed; identity guard $guarded / $guardedLast; projection $projected / $projectedInst; depth thunks $d16 / $d32 / $d64, slopes $s1 / $s2 thunks per level; merge-collection key thunks $m1 / $m4 / $m16 / $m64, slopes $r1 / $r2 thunks per collection"
       '';
     };
 }

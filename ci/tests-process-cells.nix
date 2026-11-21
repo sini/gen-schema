@@ -175,6 +175,38 @@ let
         ]).config.h;
     in
     builtins.seq h.id_hash (builtins.length (builtins.filter (o: h.${o} == "${o}-v") allOpts));
+  # den-hoag-t7pc7 · ONE kind under a schema of `c` collections, each declaring `merge`, the first defined
+  # by the kind: its reference key read, the key nixpkgs dedups the kind by, which reads the schema's
+  # construction digest over every collection. The value is `c`; the runner reads the cost as the
+  # process's thunks.
+  mergeCollections =
+    c:
+    let
+      names = builtins.genList (i: "c${toString i}") c;
+      k =
+        (merge.evalModuleTree { } [
+          {
+            options.schema = S.mkSchemaOption {
+              collections = builtins.listToAttrs (
+                map (n: {
+                  name = n;
+                  value = {
+                    default = [ ];
+                    merge = acc: val: acc ++ val;
+                  };
+                }) names
+              );
+            };
+          }
+          {
+            config.schema.k = {
+              options.a = merge.mkOption { type = merge.types.str; };
+              c0 = [ "x" ];
+            };
+          }
+        ]).config.schema.k;
+    in
+    builtins.seq (k.__functor k { }).key (builtins.length names);
   # A refined type's predicate applications (den-hoag-refined-outside-kind-silent-1jlsq): the spy
   # refinement traces `label` once per application, so the label's count is the cost.
   T = merge.types;
@@ -427,6 +459,10 @@ in
       )
     ]).config.hosts.igloo.id_hash;
   depth-host-16 = depthHost 16;
+  merge-collections-1 = mergeCollections 1;
+  merge-collections-4 = mergeCollections 4;
+  merge-collections-16 = mergeCollections 16;
+  merge-collections-64 = mergeCollections 64;
   depth-host-32 = depthHost 32;
   depth-host-64 = depthHost 64;
   # A predicate ill-typed over its base aborts uncatchably; the abort names the refinement.

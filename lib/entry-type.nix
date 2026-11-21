@@ -1606,6 +1606,8 @@ let
         base = merge.types.deferredModule;
         # The schema's construction parameters, minted once per schema evaluation and shared by every
         # kind's separation key (arm B′, below); a non-inert parameter enters as "sealed".
+        # A collection enters as the mark reads it: its name always, its resolved `default` only where it
+        # is kept in identity; its `merge` and `type` mint nothing and its `identity` only chooses between the two.
         schemaDigest =
           let
             inertOr =
@@ -1619,19 +1621,21 @@ let
             l:
             {
               collections = builtins.mapAttrs (
-                _: c:
-                if builtins.isAttrs c then
-                  inertOr (
-                    builtins.removeAttrs c [
-                      "merge"
-                      "type"
-                    ]
-                    // {
-                      merge = c ? merge;
-                    }
-                  )
+                n: _:
+                let
+                  c = allCollections.${n};
+                in
+                if builtins.elem n dropped then
+                  null
                 else
-                  inertOr c
+                  inertOr (
+                    if !(builtins.isAttrs c) then
+                      c
+                    else if c ? default then
+                      { default = seeds.${n}; }
+                    else
+                      { }
+                  )
               ) collections;
               keySemantics = inertOr keySemantics;
               flags = {
@@ -3231,7 +3235,8 @@ let
                                 c:
                                 let
                                   r = builtins.tryEval (
-                                    allCollections.${c} ? default && extractedCollections.${c} == allCollections.${c}.default
+                                    allCollections.${c} ? default
+                                    && extractedCollections.${c} == (seeds.${c} or allCollections.${c}.default)
                                   );
                                 in
                                 r.success && r.value;
