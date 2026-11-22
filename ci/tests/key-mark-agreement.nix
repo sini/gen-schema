@@ -7,13 +7,14 @@
 # declaration node), marks equal, foreign keys equal. Only one-node rows (`w`) are the property's; the
 # others compose by node and are carried as rows only.
 #
-# The corpus: 46 constructed shapes, each as a differing pair and as a twin, the granularity razor's
+# The corpus: 47 constructed shapes, each as a differing pair and as a twin, the granularity razor's
 # default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`), 11 declared-collection
 # pairs under both identity settings, 2 rows over an `identity = false` collection and 2 over a kept
 # collection the kind does not define. The `mkType` arm writes no foreign key. Four shapes redeclare one
 # option embedding an instance type (twice, beside a plain submodule in either order, thrice), a join
-# gen-merge mints over its declarations (den-hoag-2vtgj). Twenty-five vary one construction parameter: the
-# base (absent, empty, attrset at one or two literals, positionless, function, path), the mixins, a
+# gen-merge mints over its declarations (den-hoag-2vtgj). Twenty-six vary one construction parameter: the
+# base (absent, empty, attrset at one or two literals, positionless, function, path), the mixins (two
+# lists that fold to one record among them), a
 # sealed leaf beside an inert one (keySemantics, a seed, a computed field, a kept value), specialArgs,
 # and a declaration's open paths and module order (den-hoag-y9j03).
 #

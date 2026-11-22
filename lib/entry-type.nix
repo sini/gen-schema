@@ -168,28 +168,6 @@ let
   # defaulted, reversible.
   comparedTyped = records: v: merge.closuresFirst records v;
 
-  markOrQ =
-    t:
-    if builtins.isAttrs t && t ? __mint && builtins.isAttrs t.__mint && t.__mint ? minted then
-      t.__mint.minted
-    else
-      "?";
-  optsOf = m: if builtins.isAttrs (m.options or null) then m.options else { };
-  optsKey =
-    pre: os:
-    prelude.concatMap (
-      n:
-      let
-        o = os.${n};
-      in
-      if isOptionDecl o then
-        [ "${pre}${n}=${markOrQ (o.type or null)}" ]
-      else if builtins.isAttrs o then
-        optsKey "${pre}${n}." o
-      else
-        [ "${pre}${n}=?" ]
-    ) (builtins.attrNames os);
-
   # An attrset-valued component is spread one level, so a refusal names the member (a method,
   # a category) rather than the whole collection; its key set stays a component of its own.
   # `recordsOf` names the type records a member's grammar holds; a member holding a sealed one is
@@ -257,6 +235,71 @@ let
   # identity, so a reordered or regrouped twin reaches the same paths and is refused on the
   # subject rather than split by the mark.
   openPathsByName =
+    # bound over its one reader, so an evaluation allocates it only once a plane reads paths
+    let
+      openPathsOf =
+        m:
+        let
+          s = isStructuredDecl m;
+          # gen-merge's `configOf`, at the key level: a structured module's config plus its `meta`,
+          # a shorthand module less its module-syntax keys.
+          defs =
+            if s then
+              (m.config or { }) // (if m ? meta then { inherit (m) meta; } else { })
+            else
+              builtins.removeAttrs m merge.moduleSyntax.shorthandMeta;
+          whole = !(builtins.isAttrs defs) || defs ? _type;
+          attrsOf =
+            pre: t:
+            prelude.concatMap (
+              n:
+              let
+                o = t.${n};
+                q = pre ++ [ n ];
+              in
+              if isOptionDecl o then
+                map (a: q ++ [ a ]) (builtins.filter (a: a != "type" && a != "_type") (prelude.attrNames o))
+              else if builtins.isAttrs o then
+                attrsOf q o
+              else
+                [ ]
+            ) (prelude.attrNames t);
+          moduleKeys =
+            let
+              top = m._module or { };
+              inner = if whole then { } else defs._module or { };
+            in
+            builtins.filter (k: k != "freeformType") (
+              prelude.attrNames (
+                (if builtins.isAttrs top then top else { }) // (if builtins.isAttrs inner then inner else { })
+              )
+            );
+        in
+        attrsOf [
+          "open"
+          "options"
+        ] (if s then m.options or { } else { })
+        ++ (
+          if whole then
+            [
+              [
+                "open"
+                "config"
+              ]
+            ]
+          else
+            map (n: [
+              "open"
+              "config"
+              n
+            ]) (builtins.filter (n: n != "_module") (prelude.attrNames defs))
+        )
+        ++ map (k: [
+          "open"
+          "_module"
+          k
+        ]) moduleKeys;
+    in
     open:
     builtins.listToAttrs (
       map (p: {
@@ -264,69 +307,6 @@ let
         value = p;
       }) (prelude.concatMap openPathsOf open)
     );
-  openPathsOf =
-    m:
-    let
-      s = isStructuredDecl m;
-      # gen-merge's `configOf`, at the key level: a structured module's config plus its `meta`,
-      # a shorthand module less its module-syntax keys.
-      defs =
-        if s then
-          (m.config or { }) // (if m ? meta then { inherit (m) meta; } else { })
-        else
-          builtins.removeAttrs m merge.moduleSyntax.shorthandMeta;
-      whole = !(builtins.isAttrs defs) || defs ? _type;
-      attrsOf =
-        pre: t:
-        prelude.concatMap (
-          n:
-          let
-            o = t.${n};
-            q = pre ++ [ n ];
-          in
-          if isOptionDecl o then
-            map (a: q ++ [ a ]) (builtins.filter (a: a != "type" && a != "_type") (prelude.attrNames o))
-          else if builtins.isAttrs o then
-            attrsOf q o
-          else
-            [ ]
-        ) (prelude.attrNames t);
-      moduleKeys =
-        let
-          top = m._module or { };
-          inner = if whole then { } else defs._module or { };
-        in
-        builtins.filter (k: k != "freeformType") (
-          prelude.attrNames (
-            (if builtins.isAttrs top then top else { }) // (if builtins.isAttrs inner then inner else { })
-          )
-        );
-    in
-    attrsOf [
-      "open"
-      "options"
-    ] (if s then m.options or { } else { })
-    ++ (
-      if whole then
-        [
-          [
-            "open"
-            "config"
-          ]
-        ]
-      else
-        map (n: [
-          "open"
-          "config"
-          n
-        ]) (builtins.filter (n: n != "_module") (prelude.attrNames defs))
-    )
-    ++ map (k: [
-      "open"
-      "_module"
-      k
-    ]) moduleKeys;
-
   # ★ THE OWN OPTIONS (den-hoag-a7c9r). The tree is the MERGED one, evaluated with the parents present
   # as every instance evaluates it, so a declaration reading its parent (`options.x.type`,
   # `config.flag`) is as total as the published plane. An option a parent publishes at the same
@@ -1616,6 +1596,32 @@ let
   # against the same list. `door` is the published door the caller invoked, which a refusal the core
   # raises through a shared check names (den-hoag-7gp66 Q2 (ii)).
   mkSchemaEntryTypeCore =
+    # the key's option readers, bound over their one reader, so loading the library allocates neither
+    let
+      optsOf = m: if builtins.isAttrs (m.options or null) then m.options else { };
+      optsKey =
+        let
+          markOrQ =
+            t:
+            if builtins.isAttrs t && t ? __mint && builtins.isAttrs t.__mint && t.__mint ? minted then
+              t.__mint.minted
+            else
+              "?";
+        in
+        pre: os:
+        prelude.concatMap (
+          n:
+          let
+            o = os.${n};
+          in
+          if isOptionDecl o then
+            [ "${pre}${n}=${markOrQ (o.type or null)}" ]
+          else if builtins.isAttrs o then
+            optsKey "${pre}${n}." o
+          else
+            [ "${pre}${n}=?" ]
+        ) (builtins.attrNames os);
+    in
     door: tree:
     # The record is applied to a NATIVE attrset-pattern lambda rather than destructured field-by-field:
     # each field below becomes a `compared` component (see `components`, below) whose value
