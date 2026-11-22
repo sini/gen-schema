@@ -1774,7 +1774,9 @@ let
           # a DECLARED type is the collection's type; a list or attrset default is still folded on as
           # its seed, and any other default is one definition at `mkOptionDefault`, carried here as
           # `poolHead` so that `declaredOf` decides nothing per kind
-          if collection ? type then
+          if collection ? type && isNestingType collection.type then
+            collection.type
+          else if collection ? type then
             # the default is pattern-bound: a select passed to a primop is thunked, a variable is not
             if
               collection ? default
@@ -1877,6 +1879,81 @@ let
               ];
             }
         ) allCollections;
+
+        # A NESTING collection type (gen-merge's own reading: `nests` and a threaded sibling): its value
+        # is a nested tree, a child of the one evaluation at the kind's position extended by the
+        # collection's name, and its default is one definition at `mkOptionDefault`, pooled at the head
+        # of the definitions and priority-filtered with them (nixpkgs `mergeDefinitions`).
+        isNestingType = t: builtins.isAttrs t && t ? nests && t ? mergeDefs.threaded;
+        nestingNames = builtins.filter (n: collections.${n} ? type && isNestingType collections.${n}.type) (
+          prelude.attrNames collections
+        );
+        nestingHead =
+          name:
+          if collections.${name} ? default then
+            [
+              {
+                file = "gen-schema/default";
+                value = merge.mkOptionDefault collections.${name}.default;
+              }
+            ]
+          else
+            [ ];
+        # Resolve baseModule value (may be a function of kind name)
+        resolvedBaseOf =
+          kind:
+          if baseModule == null then
+            null
+          else if builtins.isFunction baseModule then
+            baseModule kind
+          else
+            baseModule;
+        mixinResultOf =
+          kind:
+          let
+            resolvedBase = resolvedBaseOf kind;
+          in
+          if mixins == [ ] || mkType != null then
+            null
+          else if resolvedBase != null && !(builtins.isAttrs resolvedBase) then
+            throw "gen-schema: kind '${kind}' declares mixins, and its baseModule is not an attrset (a ${builtins.typeOf resolvedBase}), so the mixin pipeline cannot read it as a record; declare the base as an inline attrset, or define the contribution on the kind"
+          else
+            let
+              baseRecord = record.fromAttrs (if resolvedBase == null then { } else resolvedBase);
+              withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
+            in
+            emitModule collectionKeys withMixins;
+        # One nesting collection's definitions at a kind: the pooled default, the kind's own, then each
+        # mixin's contribution. `addr` is the definition record a definition the host does not hold
+        # carries (the default, a mixin's contribution): PROTO, see the spec's fork on the split's
+        # synthetic definitions.
+        nestingDefsOf =
+          addr: kind: name: defs:
+          let
+            mr = mixinResultOf kind;
+          in
+          map (d: d // { file = addr d.file; }) (nestingHead name)
+          ++ map (d: {
+            inherit (d) file;
+            value = d.value.${name};
+          }) (builtins.filter (d: builtins.isAttrs d.value && d.value ? ${name}) defs)
+          ++ (
+            if mr == null then
+              [ ]
+            else
+              map (value: {
+                file = addr "gen-schema/mixin";
+                inherit value;
+              }) (mr.collections.${name} or [ ])
+          );
+        # the threaded twin of a nesting collection's type at the kind's accessor (gen-aspects
+        # `aspectsRootWith`'s pattern): the fold's spine over the type whose fold reads the child
+        threadedAt =
+          ev: name:
+          let
+            t = collections.${name}.type;
+          in
+          t // { mergeDefs = t.mergeDefs.threaded (ev // { position = ev.position ++ [ name ]; }); };
 
         # The seed `declaredOf` folds: a list or attrset default resolved alone, as one definition of
         # its collection, once per schema; an explicit collection's default is its type's own seed,
@@ -1987,1461 +2064,1495 @@ let
       # this one's payload and binOp), so a redeclared option typed by it meets a second record:
       # `functor` is the relation that merges the two when they are one construction.
       let
-        self = merge.mkOptionType {
+        functor = constructionRelationCore "schemaKindEntry" components self;
+        typeMerge =
+          f:
+          if
+            !(builtins.isAttrs f) || (f.name or null) != "schemaKindEntry" || (f.payload or null) == null
+          then
+            null
+          else if functor.binOp functor.payload f.payload == null then
+            null
+          else
+            self;
+        self = merge.types.defineType {
           name = "schemaKindEntry";
           description = "schema kind entry — options, config, collections and computed fields";
-          functor = constructionRelationCore "schemaKindEntry" components self;
-          # deferredModule accepts any def value and lets the merge decide; so does this.
-          inherit (base) check;
-          merge =
-            loc: defs:
+          retainedRelation = { inherit functor typeMerge; };
+          typeMergeRel =
+            other:
             let
-              kind = prelude.last loc;
+              m = if builtins.isAttrs other then typeMerge (other.functor or null) else null;
+            in
+            if m == null then
+              {
+                refused = "`schemaKindEntry' and `${
+                  if builtins.isAttrs other then other.name or "<unnamed>" else builtins.typeOf other
+                }', which are not one construction";
+              }
+            else
+              { merged = m; };
+          # PROTO (fork F1): the nesting collections' types, under the one role the walk reads
+          carries.alternatives = map (n: collections.${n}.type) nestingNames;
+          substructure = {
+            declares = _: { };
+            modules = null;
+            rebuild = _: self;
+          };
+          split =
+            loc: defs:
+            map (name: {
+              step = [ name ];
+              loc = loc ++ [ name ];
+              defs = nestingDefsOf (f: {
+                file = f;
+                at = throw "gen-schema: `${
+                  merge.showOption (loc ++ [ name ])
+                }': a definition gen-schema adds (`${f}') has no declaration address";
+              }) (prelude.last loc) name defs;
+              type = collections.${name}.type;
+            }) nestingNames;
+          mergeDefs = {
+            __functor = _: fold null;
+            threaded = fold;
+          };
+        };
+        fold =
+          ev: loc: defs:
+          let
+            kind = prelude.last loc;
 
-              # Extract each collection from defs, merge with strategy.
-              # NOTE: collections must be declared via inline attrsets, not path modules.
-              # Path-based kind declarations pass through as paths — the isAttrs check
-              # skips them. If two modules declare the same collection key, they merge
-              # according to the collection's merge strategy.
-              # A collection a mixin contributes to is pooled here, each stack entry one definition
-              # after the kind's own, through the collection's type (`declaredOf`), so the published
-              # value, the `computed` hook, the mark and every other reader read one value
-              # (den-hoag-s0lqh). `inherits` is pooled where it is declared (`declaredRaw`). A kind
-              # with no mixin takes the literal `[ ]` arm, so it allocates no stack.
-              extractedCollections = prelude.mapAttrs (
-                name: collection:
-                if name == "inherits" then
-                  map (e: builtins.seq inheritsVerdict e) (aliasedInherits declaredRendered)
-                else if mixinResult == null then
-                  declaredOf name collection [ ]
+            # Extract each collection from defs, merge with strategy.
+            # NOTE: collections must be declared via inline attrsets, not path modules.
+            # Path-based kind declarations pass through as paths — the isAttrs check
+            # skips them. If two modules declare the same collection key, they merge
+            # according to the collection's merge strategy.
+            # A collection a mixin contributes to is pooled here, each stack entry one definition
+            # after the kind's own, through the collection's type (`declaredOf`), so the published
+            # value, the `computed` hook, the mark and every other reader read one value
+            # (den-hoag-s0lqh). `inherits` is pooled where it is declared (`declaredRaw`). A kind
+            # with no mixin takes the literal `[ ]` arm, so it allocates no stack.
+            extractedCollections = prelude.mapAttrs (
+              name: collection:
+              if name == "inherits" then
+                map (e: builtins.seq inheritsVerdict e) (aliasedInherits declaredRendered)
+              else if mixinResult == null then
+                declaredOf name collection [ ]
+              else
+                declaredOf name collection (
+                  map (value: {
+                    file = "gen-schema/mixin";
+                    inherit value;
+                  }) (mixinResult.collections.${name} or [ ])
+                )
+            ) allCollections;
+
+            # `stacks`: definitions a mixin contributes, after the kind's own, in one priority pool
+            declaredOf =
+              name: collection: stacks:
+              if ev != null && builtins.elem name nestingNames then
+                merge.mergeDefs (loc ++ [ name ]) (threadedAt ev name) (nestingDefsOf (f: f) kind name defs)
+              # tested before it is filtered, so a kind that never defines the collection binds nothing
+              else if
+                stacks == [ ] && !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs)
+              then
+                if collection ? default then
+                  seeds.${name} or collection.default
+                # a declared type answers its own empty value, as an option of it does (nixpkgs `mergedValue`).
+                # The kind's mark moves with it, to the mark of a `default` of that value: ADR-0016 ruling 5
+                # ("internal addressing only") admits the move. It joins the mark's `{ }`/`[ ]` class (den-hoag-0pwbu).
+                else if (collection.type.emptyValue or { }) ? value then
+                  collection.type.emptyValue.value
                 else
-                  declaredOf name collection (
-                    map (value: {
-                      file = "gen-schema/mixin";
-                      inherit value;
-                    }) (mixinResult.collections.${name} or [ ])
-                  )
-              ) allCollections;
-
-              # `stacks`: definitions a mixin contributes, after the kind's own, in one priority pool
-              declaredOf =
-                name: collection: stacks:
-                # tested before it is filtered, so a kind that never defines the collection binds nothing
-                if stacks == [ ] && !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs) then
-                  if collection ? default then
-                    seeds.${name} or collection.default
-                  # a declared type answers its own empty value, as an option of it does (nixpkgs `mergedValue`).
-                  # The kind's mark moves with it, to the mark of a `default` of that value: ADR-0016 ruling 5
-                  # ("internal addressing only") admits the move. It joins the mark's `{ }`/`[ ]` class (den-hoag-0pwbu).
-                  else if (collection.type.emptyValue or { }) ? value then
-                    collection.type.emptyValue.value
-                  else
-                    throw "gen-schema: `${
-                      merge.showOption (loc ++ [ name ])
-                    }': collection '${name}' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`"
+                  throw "gen-schema: `${
+                    merge.showOption (loc ++ [ name ])
+                  }': collection '${name}' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`"
+              else
+                let
+                  merged = merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} (
+                    collectionTypes.${name}.poolHead or [ ]
+                    ++ map (d: {
+                      inherit (d) file;
+                      value = d.value.${name};
+                    }) (builtins.filter (d: builtins.isAttrs d.value && d.value ? ${name}) defs)
+                    ++ stacks
+                  );
+                in
+                # an explicit collection's type seeds itself, and a pooled default is already a
+                # definition (`poolHead`); a list or attrset is seeded after the merge, which equals
+                # the left fold because `++` and `//` are associative
+                if collection ? merge || !(collection ? default) || collectionTypes.${name} ? poolHead then
+                  merged
                 else
-                  let
-                    merged = merge.mergeDefs (loc ++ [ name ]) collectionTypes.${name} (
-                      collectionTypes.${name}.poolHead or [ ]
-                      ++ map (d: {
-                        inherit (d) file;
-                        value = d.value.${name};
-                      }) (builtins.filter (d: builtins.isAttrs d.value && d.value ? ${name}) defs)
-                      ++ stacks
-                    );
-                  in
-                  # an explicit collection's type seeds itself, and a pooled default is already a
-                  # definition (`poolHead`); a list or attrset is seeded after the merge, which equals
-                  # the left fold because `++` and `//` are associative
-                  if collection ? merge || !(collection ? default) || collectionTypes.${name} ? poolHead then
-                    merged
-                  else
-                    inferMerge collection (seeds.${name} or collection.default) merged;
+                  inferMerge collection (seeds.${name} or collection.default) merged;
 
-              # A DECLARED parent nothing else composes (den-hoag-8c8pr), which the desugar below
-              # imports: no def of this kind carries the resolver's provenance for it, and it is not
-              # spelled either (a spelled parent composes where it is written). Computed only past a
-              # non-empty declaration, so a kind that inherits nothing pays one comparison.
-              # `inherits` holds names and kind VALUES (den-hoag-l0y F4). A value whose name the tree
-              # holds at an entry that reaches this kind is foreign (the reach step below). Otherwise a
-              # value is the tree's own iff the tree holds an entry at its name with an equal mark and
-              # `kindEq` decides `true` (an equal mark `kindEq` refuses is that refusal), and then it IS
-              # the name; anything else,
-              # and every value off a tree, is foreign and stays a VALUE entry, never resolved against
-              # an in-tree name (ADR-0034: identity through the one mint, never by name). It forces
-              # both marks where `inherits` is read, so the cycle walk reads `cycleParents` instead.
-              formOfWith =
-                composing: v:
-                if !(isSchemaKind v) then
-                  throw "gen-schema: kind '${kind}' inherits ${
-                    if builtins.isAttrs v then "an attrset with no mark" else "a ${builtins.typeOf v}"
-                  }: an `inherits` entry is a kind name or a kind value (`kind` and a mint-backed mark `__mint.minted`)"
-                # A KIND ON AN INHERITANCE CYCLE CLASSIFIES NO PARENT (den-hoag-1o0o1): its verdict is
-                # read before every arm that reads a stamp or a mark. A partner's stamp read forces the
-                # partner's own classification of this kind (nix and Determinate force both slots under
-                # `==`), which re-enters this kind's in-flight defs and blackholes; refused here, the
-                # partner's `stampAgrees` catches this refusal and the cycle is refused by name at
-                # composition. The walk reads witnesses and `__kindCycleParents` only, so no mark.
-                # On the `mkType` arm this kind's value is the caller's result, which reads the caller's
-                # `defs`; their shape reads no parent (den-hoag-24zdh, at `custom`), so the kind has a
-                # WHNF before this runs and a value cycle meets the walk as on the default arm.
-                # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): a caller whose result SHAPE reads what a
-                # parent IS (the desugared def's `imports`, an `inherits` entry) forces each partner's
-                # WHNF at this kind's own, before this runs, and aborts uncatchably on every evaluator.
-                # Pinned by
-                # `cross-tree-cycle-refusals.test-a-caller-reading-the-parent-imports-at-its-result-shape-aborts`.
-                else if inheritanceCycle != null then
-                  cycleRefusal
-                # THE REACH STEP (den-hoag-l0y, foreign arm): the tree's entry at the value's name
-                # reaches THIS kind (it is this kind, or inherits it). Were the value that entry, this
-                # kind would inherit itself through it, which the cycle walk refuses; so with no cycle
-                # it is foreign, and its stamp is read. Taken before any mark, because that entry's
-                # mark is this kind's, in flight. The witness walk only ROUTES the value here: the
-                # verdict stays with the cycle walk and the stamp, never a witness comparison.
-                else if tree != null && builtins.elem v.kind tree._kindNames && reachesThis v.kind then
-                  if v ? __kindSelf && !(stampOk v) then
-                    stampRefusal "gen-schema: kind '${kind}' inherits" v
-                  else
-                    "value"
-                else if
-                  tree != null
-                  && builtins.elem v.kind tree._kindNames
-                  && (
-                    (composing && sameConstruction tree.${v.kind} v)
-                    || (tree.${v.kind}.__mint.minted == v.__mint.minted && kindEq tree.${v.kind} v)
-                  )
-                then
-                  "name"
-                # A FOREIGN value decides by no `kindEq`, so its stamp is read here: a `//` copy of a
-                # kind from another tree would otherwise compose the original and publish the copy.
-                # Guarded by `? __kindSelf`: a stamp-less kind-shaped value is admitted foreign as
-                # before (`ci/test-fixtures/cxlc0/kind-shaped.nix`), and the fold below refuses it
-                # by name only where a diamond decides it.
-                else if v ? __kindSelf && !(stampOk v) then
+            # A DECLARED parent nothing else composes (den-hoag-8c8pr), which the desugar below
+            # imports: no def of this kind carries the resolver's provenance for it, and it is not
+            # spelled either (a spelled parent composes where it is written). Computed only past a
+            # non-empty declaration, so a kind that inherits nothing pays one comparison.
+            # `inherits` holds names and kind VALUES (den-hoag-l0y F4). A value whose name the tree
+            # holds at an entry that reaches this kind is foreign (the reach step below). Otherwise a
+            # value is the tree's own iff the tree holds an entry at its name with an equal mark and
+            # `kindEq` decides `true` (an equal mark `kindEq` refuses is that refusal), and then it IS
+            # the name; anything else,
+            # and every value off a tree, is foreign and stays a VALUE entry, never resolved against
+            # an in-tree name (ADR-0034: identity through the one mint, never by name). It forces
+            # both marks where `inherits` is read, so the cycle walk reads `cycleParents` instead.
+            formOfWith =
+              composing: v:
+              if !(isSchemaKind v) then
+                throw "gen-schema: kind '${kind}' inherits ${
+                  if builtins.isAttrs v then "an attrset with no mark" else "a ${builtins.typeOf v}"
+                }: an `inherits` entry is a kind name or a kind value (`kind` and a mint-backed mark `__mint.minted`)"
+              # A KIND ON AN INHERITANCE CYCLE CLASSIFIES NO PARENT (den-hoag-1o0o1): its verdict is
+              # read before every arm that reads a stamp or a mark. A partner's stamp read forces the
+              # partner's own classification of this kind (nix and Determinate force both slots under
+              # `==`), which re-enters this kind's in-flight defs and blackholes; refused here, the
+              # partner's `stampAgrees` catches this refusal and the cycle is refused by name at
+              # composition. The walk reads witnesses and `__kindCycleParents` only, so no mark.
+              # On the `mkType` arm this kind's value is the caller's result, which reads the caller's
+              # `defs`; their shape reads no parent (den-hoag-24zdh, at `custom`), so the kind has a
+              # WHNF before this runs and a value cycle meets the walk as on the default arm.
+              # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1): a caller whose result SHAPE reads what a
+              # parent IS (the desugared def's `imports`, an `inherits` entry) forces each partner's
+              # WHNF at this kind's own, before this runs, and aborts uncatchably on every evaluator.
+              # Pinned by
+              # `cross-tree-cycle-refusals.test-a-caller-reading-the-parent-imports-at-its-result-shape-aborts`.
+              else if inheritanceCycle != null then
+                cycleRefusal
+              # THE REACH STEP (den-hoag-l0y, foreign arm): the tree's entry at the value's name
+              # reaches THIS kind (it is this kind, or inherits it). Were the value that entry, this
+              # kind would inherit itself through it, which the cycle walk refuses; so with no cycle
+              # it is foreign, and its stamp is read. Taken before any mark, because that entry's
+              # mark is this kind's, in flight. The witness walk only ROUTES the value here: the
+              # verdict stays with the cycle walk and the stamp, never a witness comparison.
+              else if tree != null && builtins.elem v.kind tree._kindNames && reachesThis v.kind then
+                if v ? __kindSelf && !(stampOk v) then
                   stampRefusal "gen-schema: kind '${kind}' inherits" v
                 else
-                  "value";
-              # TWO DOORS OVER ONE CLASSIFICATION (den-hoag-c2836). Composition (`options`, `refs`, an
-              # instance's import) reads `formOf`, which takes the tree's own construction by its stamp
-              # slot and reads no mark, as `mkInstanceType`'s import reads the content stamp alone: a
-              # parent whose collection reads an instance of this kind composes. Every read that answers
-              # an identity (the mark, `__sealed`, an `inherits` entry, `__kindAncestors`, `id_hash`)
-              # first forces `identityVerdict`: the ancestors' whole stamps in walk order, then each
-              # parent value classified by mark and `kindEq` (`inheritsVerdict`, which an `inherits`
-              # entry forces alone). So a `//` copy over a parent's identity cells is refused there, and
-              # no answer reads an identity a copy forged.
-              formOf = formOfWith true;
-              inheritsVerdict = builtins.foldl' (acc: v: builtins.seq (formOfWith false v) acc) true (
-                builtins.filter (v: !(builtins.isString v)) (declaredRaw ++ kindImports)
-              );
-              identityVerdict = builtins.seq lineageStamped inheritsVerdict;
-              rendered = v: if builtins.isString v || formOf v == "value" then v else v.kind;
-              # The kind's own definitions and each mixin's, in one priority pool (`declaredOf`'s
-              # `stacks`), so every reader below (the walk, the desugar, the ancestor map, the witness)
-              # reads the parents the published `inherits` holds (den-hoag-ppctt). A kind with no mixin
-              # takes the literal `[ ]` arm, so it allocates no stack.
-              declaredRaw =
-                if mixinResult == null then
-                  declaredOf "inherits" allCollections.inherits [ ]
+                  "value"
+              else if
+                tree != null
+                && builtins.elem v.kind tree._kindNames
+                && (
+                  (composing && sameConstruction tree.${v.kind} v)
+                  || (tree.${v.kind}.__mint.minted == v.__mint.minted && kindEq tree.${v.kind} v)
+                )
+              then
+                "name"
+              # A FOREIGN value decides by no `kindEq`, so its stamp is read here: a `//` copy of a
+              # kind from another tree would otherwise compose the original and publish the copy.
+              # Guarded by `? __kindSelf`: a stamp-less kind-shaped value is admitted foreign as
+              # before (`ci/test-fixtures/cxlc0/kind-shaped.nix`), and the fold below refuses it
+              # by name only where a diamond decides it.
+              else if v ? __kindSelf && !(stampOk v) then
+                stampRefusal "gen-schema: kind '${kind}' inherits" v
+              else
+                "value";
+            # TWO DOORS OVER ONE CLASSIFICATION (den-hoag-c2836). Composition (`options`, `refs`, an
+            # instance's import) reads `formOf`, which takes the tree's own construction by its stamp
+            # slot and reads no mark, as `mkInstanceType`'s import reads the content stamp alone: a
+            # parent whose collection reads an instance of this kind composes. Every read that answers
+            # an identity (the mark, `__sealed`, an `inherits` entry, `__kindAncestors`, `id_hash`)
+            # first forces `identityVerdict`: the ancestors' whole stamps in walk order, then each
+            # parent value classified by mark and `kindEq` (`inheritsVerdict`, which an `inherits`
+            # entry forces alone). So a `//` copy over a parent's identity cells is refused there, and
+            # no answer reads an identity a copy forged.
+            formOf = formOfWith true;
+            inheritsVerdict = builtins.foldl' (acc: v: builtins.seq (formOfWith false v) acc) true (
+              builtins.filter (v: !(builtins.isString v)) (declaredRaw ++ kindImports)
+            );
+            identityVerdict = builtins.seq lineageStamped inheritsVerdict;
+            rendered = v: if builtins.isString v || formOf v == "value" then v else v.kind;
+            # The kind's own definitions and each mixin's, in one priority pool (`declaredOf`'s
+            # `stacks`), so every reader below (the walk, the desugar, the ancestor map, the witness)
+            # reads the parents the published `inherits` holds (den-hoag-ppctt). A kind with no mixin
+            # takes the literal `[ ]` arm, so it allocates no stack.
+            declaredRaw =
+              if mixinResult == null then
+                declaredOf "inherits" allCollections.inherits [ ]
+              else
+                declaredOf "inherits" allCollections.inherits (
+                  map (value: {
+                    file = "gen-schema/mixin";
+                    inherit value;
+                  }) (mixinResult.collections.inherits or [ ])
+                );
+            declaredRendered = map rendered declaredRaw;
+            declaredInherits = builtins.filter builtins.isString declaredRendered;
+            declaredValues = builtins.filter (v: !(builtins.isString v)) declaredRendered;
+            # the spelled parents that are the tree's own, by name: a foreign spelled value is not
+            # the same-named declared parent and does not stand in for it
+            spelledNames = map (k: k.kind) (builtins.filter (k: formOf k == "name") kindImports);
+            unresolvedInherits =
+              if declaredInherits == [ ] then
+                [ ]
+              else
+                builtins.filter (
+                  p: !(builtins.any (resolvedBy kind p) defs) && !(builtins.elem p spelledNames)
+                ) declaredInherits;
+            # Sited on the COMPOSED value (`merged`, `treeModule`), never the kind's WHNF: `evalSchema`
+            # reads `inherits` off its names read, where no parent is injected, and the collections, `kind`
+            # and `_kindNames` stay readable. It carries two refusals, each at every read that would
+            # compose the parent: `options`, `refs` (so `_edges`), the mark, an instance. An
+            # inheritance cycle, in either spelling, on any tree; and a declared parent on an entry
+            # type built outside a tree, which has no parent to read.
+            # A computed field is caller-built from the raw defs as well, so it is read through the
+            # guard on both branches, as the `mkType` result's own fields are.
+            guardedComputed = prelude.mapAttrs (_: resolvedOnly) computedFields;
+            # THE WALK'S REFUSAL STATES WHAT THE WALK KNOWS (den-hoag-4i0o5). The walk compares content
+            # witnesses, and a witness is read before composition, so it cannot tell this kind from
+            # another kind of the same name declared from the same source with the same parent names
+            # and directly declared option names (one helper applied in two trees, `t2.base` <-
+            # `t1.base` <- `t0.base`). No pre-composition reading can: a chain of such applications
+            # and a cycle through them agree to any finite depth. So the refusal names both readings,
+            # and the remedy that separates the second: provenance, which the witness reads as each
+            # def's file. A module takes the `_file` its own content sets (a path module's too), else its path.
+            cycleRefusal = throw "gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}), among kinds [${
+              prelude.concatStringsSep " " (
+                prelude.sort (a: b: a < b) (prelude.unique (prelude.init inheritanceCycle))
+              )
+            }]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module its own `_file` separates them (a module imported by path is named by the `_file` its own content sets, else by its path; an importing module's `_file` does not reach it)";
+            resolvedOnly =
+              v:
+              if inheritanceCycle != null then
+                cycleRefusal
+              else if unresolvedInherits != [ ] && tree == null then
+                throw "gen-schema: kind '${kind}' inherits '${builtins.head unresolvedInherits}', but nothing resolved it: this entry type was built outside a kind tree, so there is no parent to read. Declare the kind through `mkSchemaOption` or `evalSchema`"
+              else
+                builtins.seq lineageChecked v;
+
+            # THE LINEAGE REFUSALS, after the cycle walk (the fold forces marks, which a cycle would
+            # recurse through): the ancestor map's diamond refusal and the class check. Read through
+            # `resolvedOnly`, so at the composed reads only; a kind with no parents pays one comparison.
+            lineageChecked =
+              if kindParents == [ ] then
+                true
+              else if builtins.seq kindAncestors classDefects == [ ] then
+                true
+              else
+                let
+                  d = builtins.head classDefects;
+                  show = c: if builtins.isString c then "'${c}'" else "<a ${builtins.typeOf c}>";
+                in
+                throw (
+                  "gen-schema: kind '${kind}' inherits ${ancestorName d.ancestor}, whose keySemantics "
+                  + (
+                    if d.own then
+                      "gives the key '${d.key}' the category ${show d.theirs}, and this kind's keySemantics gives it ${show d.ours}"
+                    else
+                      "declares the key '${d.key}', and this kind's keySemantics does not"
+                  )
+                  + ": a subkind's keySemantics must hold every key of each ancestor's, with the same category; build this kind's schema with '${d.key}' in its keySemantics as the ancestor declares it"
+                );
+
+            # An ancestor that carries this kind's name is a foreign kind value (within one tree a
+            # name is one entry, and this kind reaching its own entry is a cycle), so the lineage
+            # refusals name it as one rather than reading as a kind inheriting itself.
+            ancestorName = n: if n == kind then "the foreign kind value '${n}'" else "'${n}'";
+
+            # THE TRANSITIVE ANCESTOR MAP (den-hoag-l0y): mark -> ancestor kind VALUE, read per kind
+            # value and never memoised by mark, so nodes share one reference per kind. A fold over the
+            # ancestor DAG, linear in the ancestors reached: a mark already present is decided through
+            # `sealedCollisionEq`, the decision `kindEq` makes, with a site naming this kind and both
+            # lineage paths. Equal marks decide `true` (a diamond over one kind: one entry, not walked
+            # again), `false` (two kinds the mark cannot tell apart, differing only at an inert
+            # declared subject such as a registered construction) or refuse by name; `false` is refused
+            # here too, since the map is keyed by the mark and cannot hold both, so two kinds reached
+            # along two paths are never merged last-wins. Distinct marks are two kinds, and composing both is gen-merge's to
+            # refuse where they conflict. A kind value this entry type did not build publishes no
+            # parents, so the walk stops at it. Published as `__kindAncestors`. Each side's subject
+            # is `kindSubject`'s, so a diamond reaching a `//` copy of an ancestor refuses by the
+            # stamp, and an ancestor short of sealed subjects or a stamp is refused naming what it lacks.
+            # COMPOSED FROM THE PARENTS' (den-hoag-f1iza M2, a7c9r V1-c): each parent's own construction
+            # decided and stamped its ancestors behind its `resolvedOnly`, and publishes them by name
+            # (`__kindLineage`), so this kind stamps its direct parents on entry and merges each one's
+            # lineage, deciding only at a name two sources hold. A chain holds none, so a kind pays its
+            # parents, not its ancestry. A refusal names both routes from this kind, in the walk's order
+            # (parents first, each before its own): the first route to each construction, read only
+            # inside the refusal's text.
+            kindAncestors =
+              let
+                arrow = prelude.concatStringsSep " -> ";
+                subjectOf = kindSubject "gen-schema: kind '${kind}' inherits";
+                firstRoute =
+                  v: ps:
+                  builtins.foldl' (
+                    r: q:
+                    if r != null then
+                      r
+                    else if sameConstruction q v then
+                      [ q.kind ]
+                    else
+                      let
+                        t = firstRoute v (q.__kindImports or [ ]);
+                      in
+                      if t == null then null else [ q.kind ] ++ t
+                  ) null ps;
+                routeOf =
+                  ps: v:
+                  let
+                    r = firstRoute v ps;
+                  in
+                  arrow ([ kind ] ++ (if r == null then [ v.kind ] else r));
+                # `held`, the values one side holds under a name, absorbs `v`, reached through the
+                # parents `ps`: the one construction reached again, or an equal mark whose subjects
+                # agree, is the value already held; an equal mark whose subjects differ is refused; a
+                # different mark is a second entry
+                absorb =
+                  ps: held: v:
+                  let
+                    same = builtins.filter (x: sameConstruction x v) held;
+                    met = if same != [ ] then same else builtins.filter (x: x.__mint.minted == v.__mint.minted) held;
+                    x = builtins.head met;
+                  in
+                  if met == [ ] then
+                    held ++ [ v ]
+                  else if
+                    same != [ ]
+                    ||
+                      sealedCollisionEq
+                        "gen-schema: kind '${kind}' reaches ${ancestorName v.kind} along ${routeOf kindParents x} and along ${routeOf ps v}"
+                        (subjectOf x)
+                        (subjectOf v)
+                  then
+                    held
+                  else
+                    throw "gen-schema: kind '${kind}' reaches two kinds named '${v.kind}' that share one mark, along ${routeOf kindParents x} and along ${routeOf ps v}: they differ only at a declared subject (a registered construction), which the mark is blind to, and the ancestor map is keyed by the mark, so it cannot hold both; give the two kinds different names or one construction";
+                # forced at every name both sides hold, so a refusal fires at this kind's composed read
+                merge =
+                  ps: a: b:
+                  let
+                    met = builtins.mapAttrs (n: held: builtins.foldl' (absorb ps) held b.${n}) (
+                      builtins.intersectAttrs b a
+                    );
+                  in
+                  if met == { } then
+                    a // b
+                  else
+                    builtins.foldl' (u: n: builtins.seq met.${n} u) (a // b // met) (builtins.attrNames met);
+                # a parent whose name is held at an equal mark or as one construction is decided
+                # there (its lineage is the held one's, so it is not merged again); any other parent
+                # holds its whole stamp on entry and brings its own lineage
+                stepParent =
+                  acc: p:
+                  let
+                    held = acc.${p.kind} or [ ];
+                  in
+                  if
+                    held != [ ] && builtins.any (x: sameConstruction x p || x.__mint.minted == p.__mint.minted) held
+                  then
+                    merge [ p ] acc { ${p.kind} = [ p ]; }
+                  else if p ? __kindSelf && !(stampImportOk p) then
+                    stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${
+                      arrow [
+                        kind
+                        p.kind
+                      ]
+                    }" p
+                  else
+                    merge [ p ] acc (
+                      merge [ p ] { ${p.kind} = [ p ]; } (
+                        if p ? __kindSelf then (p.__kindSelf null).__kindLineage or { } else { }
+                      )
+                    );
+              in
+              builtins.foldl' stepParent { } kindParents;
+            # THE IDENTITY HALF: each parent holds its whole stamp, after its own identity verdict
+            # (which holds its parents', so by induction every ancestor's).
+            lineageStamped = builtins.foldl' (
+              acc: p:
+              if builtins.seq (p.__kindAncestors or null) (p ? __kindSelf && !(stampOk p)) then
+                stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${kind} -> ${p.kind}" p
+              else
+                acc
+            ) true kindParents;
+            # the published map, keyed by mark (an identity read): the parents' maps and the parents,
+            # the earlier parent's entry kept
+            kindAncestorsByMark = builtins.seq identityVerdict (
+              builtins.seq kindAncestors (
+                builtins.foldl' (
+                  acc: p:
+                  acc
+                  // builtins.removeAttrs ((p.__kindAncestors or { }) // { ${p.__mint.minted} = p; }) (
+                    builtins.attrNames acc
+                  )
+                ) { } kindParents
+              )
+            );
+
+            # THE CLASS RULE IS A CHECK (den-hoag-l0y C2): `keySemantics` is a construction formal,
+            # fixed before the tree resolves `inherits`, so a subkind cannot take a union of its
+            # ancestors' — that would make the formal read the tree it constructs. Each ancestor's key
+            # must be present with the same `category`; categories are compared as values, never
+            # interpreted (the vocabulary is the consumer's).
+            classDefects =
+              let
+                bad = builtins.filter (x: x.ds != [ ]) (
+                  map (a: {
+                    inherit a;
+                    ds = classDefectsOf a;
+                  }) kindParents
+                );
+              in
+              prelude.concatMap (x: x.ds) (
+                if builtins.length bad <= 1 then
+                  bad
                 else
-                  declaredOf "inherits" allCollections.inherits (
-                    map (value: {
-                      file = "gen-schema/mixin";
-                      inherit value;
-                    }) (mixinResult.collections.inherits or [ ])
-                  );
-              declaredRendered = map rendered declaredRaw;
-              declaredInherits = builtins.filter builtins.isString declaredRendered;
-              declaredValues = builtins.filter (v: !(builtins.isString v)) declaredRendered;
-              # the spelled parents that are the tree's own, by name: a foreign spelled value is not
-              # the same-named declared parent and does not stand in for it
-              spelledNames = map (k: k.kind) (builtins.filter (k: formOf k == "name") kindImports);
-              unresolvedInherits =
-                if declaredInherits == [ ] then
+                  prelude.sort (x: y: x.a.__mint.minted < y.a.__mint.minted) bad
+              );
+            classDefectsOf =
+              let
+                catOf = e: if builtins.isAttrs e then e.category or null else null;
+              in
+              (
+                a:
+                let
+                  theirs = a.keySemantics or { };
+                in
+                prelude.concatMap (
+                  k:
+                  if !(keySemantics ? ${k}) then
+                    [
+                      {
+                        ancestor = a.kind;
+                        key = k;
+                        own = false;
+                      }
+                    ]
+                  else if catOf keySemantics.${k} != catOf theirs.${k} then
+                    [
+                      {
+                        ancestor = a.kind;
+                        key = k;
+                        own = true;
+                        ours = catOf keySemantics.${k};
+                        theirs = catOf theirs.${k};
+                      }
+                    ]
+                  else
+                    [ ]
+                ) (prelude.attrNames theirs)
+              );
+
+            # THE PARENTS THIS KIND COMPOSES, as kind VALUES, in either spelling: the spelled ones
+            # (`kindImports`) and, on a tree, each declared name the tree holds and nothing spelled.
+            # Both compose through the same applied functor, so one list carries both to the cycle
+            # walk and the ancestor map. A declared parent is published as `tree.${p}`, the value a
+            # caller reads off the tree, whether the desugar or `evalSchema` composed it: the parent
+            # `evalSchema` injected is read off the one tree it returns, so it is the value read (K3a).
+            # Published as `__kindImports`.
+            kindParents =
+              kindImports
+              ++ declaredValues
+              ++ (
+                if tree == null then
                   [ ]
                 else
-                  builtins.filter (
-                    p: !(builtins.any (resolvedBy kind p) defs) && !(builtins.elem p spelledNames)
-                  ) declaredInherits;
-              # Sited on the COMPOSED value (`merged`, `treeModule`), never the kind's WHNF: `evalSchema`
-              # reads `inherits` off its names read, where no parent is injected, and the collections, `kind`
-              # and `_kindNames` stay readable. It carries two refusals, each at every read that would
-              # compose the parent: `options`, `refs` (so `_edges`), the mark, an instance. An
-              # inheritance cycle, in either spelling, on any tree; and a declared parent on an entry
-              # type built outside a tree, which has no parent to read.
-              # A computed field is caller-built from the raw defs as well, so it is read through the
-              # guard on both branches, as the `mkType` result's own fields are.
-              guardedComputed = prelude.mapAttrs (_: resolvedOnly) computedFields;
-              # THE WALK'S REFUSAL STATES WHAT THE WALK KNOWS (den-hoag-4i0o5). The walk compares content
-              # witnesses, and a witness is read before composition, so it cannot tell this kind from
-              # another kind of the same name declared from the same source with the same parent names
-              # and directly declared option names (one helper applied in two trees, `t2.base` <-
-              # `t1.base` <- `t0.base`). No pre-composition reading can: a chain of such applications
-              # and a cycle through them agree to any finite depth. So the refusal names both readings,
-              # and the remedy that separates the second: provenance, which the witness reads as each
-              # def's file. A module takes the `_file` its own content sets (a path module's too), else its path.
-              cycleRefusal = throw "gen-schema: kind '${kind}' reaches a kind with its own content witness through its parents (${prelude.concatStringsSep " -> " inheritanceCycle}), among kinds [${
-                prelude.concatStringsSep " " (
-                  prelude.sort (a: b: a < b) (prelude.unique (prelude.init inheritanceCycle))
-                )
-              }]: either it inherits itself, an inheritance cycle, and a kind may inherit only kinds resolved in a strictly earlier pass; or two kinds named '${kind}' were declared from one source with the same parent names and the same directly declared option names, which the witness does not tell apart before composition, and giving each such module its own `_file` separates them (a module imported by path is named by the `_file` its own content sets, else by its path; an importing module's `_file` does not reach it)";
-              resolvedOnly =
-                v:
-                if inheritanceCycle != null then
-                  cycleRefusal
-                else if unresolvedInherits != [ ] && tree == null then
-                  throw "gen-schema: kind '${kind}' inherits '${builtins.head unresolvedInherits}', but nothing resolved it: this entry type was built outside a kind tree, so there is no parent to read. Declare the kind through `mkSchemaOption` or `evalSchema`"
-                else
-                  builtins.seq lineageChecked v;
-
-              # THE LINEAGE REFUSALS, after the cycle walk (the fold forces marks, which a cycle would
-              # recurse through): the ancestor map's diamond refusal and the class check. Read through
-              # `resolvedOnly`, so at the composed reads only; a kind with no parents pays one comparison.
-              lineageChecked =
-                if kindParents == [ ] then
-                  true
-                else if builtins.seq kindAncestors classDefects == [ ] then
-                  true
-                else
-                  let
-                    d = builtins.head classDefects;
-                    show = c: if builtins.isString c then "'${c}'" else "<a ${builtins.typeOf c}>";
-                  in
-                  throw (
-                    "gen-schema: kind '${kind}' inherits ${ancestorName d.ancestor}, whose keySemantics "
-                    + (
-                      if d.own then
-                        "gives the key '${d.key}' the category ${show d.theirs}, and this kind's keySemantics gives it ${show d.ours}"
-                      else
-                        "declares the key '${d.key}', and this kind's keySemantics does not"
-                    )
-                    + ": a subkind's keySemantics must hold every key of each ancestor's, with the same category; build this kind's schema with '${d.key}' in its keySemantics as the ancestor declares it"
-                  );
-
-              # An ancestor that carries this kind's name is a foreign kind value (within one tree a
-              # name is one entry, and this kind reaching its own entry is a cycle), so the lineage
-              # refusals name it as one rather than reading as a kind inheriting itself.
-              ancestorName = n: if n == kind then "the foreign kind value '${n}'" else "'${n}'";
-
-              # THE TRANSITIVE ANCESTOR MAP (den-hoag-l0y): mark -> ancestor kind VALUE, read per kind
-              # value and never memoised by mark, so nodes share one reference per kind. A fold over the
-              # ancestor DAG, linear in the ancestors reached: a mark already present is decided through
-              # `sealedCollisionEq`, the decision `kindEq` makes, with a site naming this kind and both
-              # lineage paths. Equal marks decide `true` (a diamond over one kind: one entry, not walked
-              # again), `false` (two kinds the mark cannot tell apart, differing only at an inert
-              # declared subject such as a registered construction) or refuse by name; `false` is refused
-              # here too, since the map is keyed by the mark and cannot hold both, so two kinds reached
-              # along two paths are never merged last-wins. Distinct marks are two kinds, and composing both is gen-merge's to
-              # refuse where they conflict. A kind value this entry type did not build publishes no
-              # parents, so the walk stops at it. Published as `__kindAncestors`. Each side's subject
-              # is `kindSubject`'s, so a diamond reaching a `//` copy of an ancestor refuses by the
-              # stamp, and an ancestor short of sealed subjects or a stamp is refused naming what it lacks.
-              # COMPOSED FROM THE PARENTS' (den-hoag-f1iza M2, a7c9r V1-c): each parent's own construction
-              # decided and stamped its ancestors behind its `resolvedOnly`, and publishes them by name
-              # (`__kindLineage`), so this kind stamps its direct parents on entry and merges each one's
-              # lineage, deciding only at a name two sources hold. A chain holds none, so a kind pays its
-              # parents, not its ancestry. A refusal names both routes from this kind, in the walk's order
-              # (parents first, each before its own): the first route to each construction, read only
-              # inside the refusal's text.
-              kindAncestors =
-                let
-                  arrow = prelude.concatStringsSep " -> ";
-                  subjectOf = kindSubject "gen-schema: kind '${kind}' inherits";
-                  firstRoute =
-                    v: ps:
-                    builtins.foldl' (
-                      r: q:
-                      if r != null then
-                        r
-                      else if sameConstruction q v then
-                        [ q.kind ]
-                      else
-                        let
-                          t = firstRoute v (q.__kindImports or [ ]);
-                        in
-                        if t == null then null else [ q.kind ] ++ t
-                    ) null ps;
-                  routeOf =
-                    ps: v:
-                    let
-                      r = firstRoute v ps;
-                    in
-                    arrow ([ kind ] ++ (if r == null then [ v.kind ] else r));
-                  # `held`, the values one side holds under a name, absorbs `v`, reached through the
-                  # parents `ps`: the one construction reached again, or an equal mark whose subjects
-                  # agree, is the value already held; an equal mark whose subjects differ is refused; a
-                  # different mark is a second entry
-                  absorb =
-                    ps: held: v:
-                    let
-                      same = builtins.filter (x: sameConstruction x v) held;
-                      met = if same != [ ] then same else builtins.filter (x: x.__mint.minted == v.__mint.minted) held;
-                      x = builtins.head met;
-                    in
-                    if met == [ ] then
-                      held ++ [ v ]
-                    else if
-                      same != [ ]
-                      ||
-                        sealedCollisionEq
-                          "gen-schema: kind '${kind}' reaches ${ancestorName v.kind} along ${routeOf kindParents x} and along ${routeOf ps v}"
-                          (subjectOf x)
-                          (subjectOf v)
-                    then
-                      held
-                    else
-                      throw "gen-schema: kind '${kind}' reaches two kinds named '${v.kind}' that share one mark, along ${routeOf kindParents x} and along ${routeOf ps v}: they differ only at a declared subject (a registered construction), which the mark is blind to, and the ancestor map is keyed by the mark, so it cannot hold both; give the two kinds different names or one construction";
-                  # forced at every name both sides hold, so a refusal fires at this kind's composed read
-                  merge =
-                    ps: a: b:
-                    let
-                      met = builtins.mapAttrs (n: held: builtins.foldl' (absorb ps) held b.${n}) (
-                        builtins.intersectAttrs b a
-                      );
-                    in
-                    if met == { } then
-                      a // b
-                    else
-                      builtins.foldl' (u: n: builtins.seq met.${n} u) (a // b // met) (builtins.attrNames met);
-                  # a parent whose name is held at an equal mark or as one construction is decided
-                  # there (its lineage is the held one's, so it is not merged again); any other parent
-                  # holds its whole stamp on entry and brings its own lineage
-                  stepParent =
-                    acc: p:
-                    let
-                      held = acc.${p.kind} or [ ];
-                    in
-                    if
-                      held != [ ] && builtins.any (x: sameConstruction x p || x.__mint.minted == p.__mint.minted) held
-                    then
-                      merge [ p ] acc { ${p.kind} = [ p ]; }
-                    else if p ? __kindSelf && !(stampImportOk p) then
-                      stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${
-                        arrow [
-                          kind
-                          p.kind
-                        ]
-                      }" p
-                    else
-                      merge [ p ] acc (
-                        merge [ p ] { ${p.kind} = [ p ]; } (
-                          if p ? __kindSelf then (p.__kindSelf null).__kindLineage or { } else { }
-                        )
-                      );
-                in
-                builtins.foldl' stepParent { } kindParents;
-              # THE IDENTITY HALF: each parent holds its whole stamp, after its own identity verdict
-              # (which holds its parents', so by induction every ancestor's).
-              lineageStamped = builtins.foldl' (
-                acc: p:
-                if builtins.seq (p.__kindAncestors or null) (p ? __kindSelf && !(stampOk p)) then
-                  stampRefusal "gen-schema: kind '${kind}' reaches '${p.kind}' along ${kind} -> ${p.kind}" p
-                else
-                  acc
-              ) true kindParents;
-              # the published map, keyed by mark (an identity read): the parents' maps and the parents,
-              # the earlier parent's entry kept
-              kindAncestorsByMark = builtins.seq identityVerdict (
-                builtins.seq kindAncestors (
-                  builtins.foldl' (
-                    acc: p:
-                    acc
-                    // builtins.removeAttrs ((p.__kindAncestors or { }) // { ${p.__mint.minted} = p; }) (
-                      builtins.attrNames acc
-                    )
-                  ) { } kindParents
-                )
+                  map (p: tree.${p}) (
+                    builtins.filter (
+                      p: builtins.elem p tree._kindNames && !(builtins.elem p spelledNames)
+                    ) declaredInherits
+                  )
               );
 
-              # THE CLASS RULE IS A CHECK (den-hoag-l0y C2): `keySemantics` is a construction formal,
-              # fixed before the tree resolves `inherits`, so a subkind cannot take a union of its
-              # ancestors' — that would make the formal read the tree it constructs. Each ancestor's key
-              # must be present with the same `category`; categories are compared as values, never
-              # interpreted (the vocabulary is the consumer's).
-              classDefects =
-                let
-                  bad = builtins.filter (x: x.ds != [ ]) (
-                    map (a: {
-                      inherit a;
-                      ds = classDefectsOf a;
-                    }) kindParents
-                  );
-                in
-                prelude.concatMap (x: x.ds) (
-                  if builtins.length bad <= 1 then
-                    bad
-                  else
-                    prelude.sort (x: y: x.a.__mint.minted < y.a.__mint.minted) bad
-                );
-              classDefectsOf =
-                let
-                  catOf = e: if builtins.isAttrs e then e.category or null else null;
-                in
-                (
-                  a:
-                  let
-                    theirs = a.keySemantics or { };
-                  in
-                  prelude.concatMap (
-                    k:
-                    if !(keySemantics ? ${k}) then
-                      [
-                        {
-                          ancestor = a.kind;
-                          key = k;
-                          own = false;
-                        }
-                      ]
-                    else if catOf keySemantics.${k} != catOf theirs.${k} then
-                      [
-                        {
-                          ancestor = a.kind;
-                          key = k;
-                          own = true;
-                          ours = catOf keySemantics.${k};
-                          theirs = catOf theirs.${k};
-                        }
-                      ]
-                    else
-                      [ ]
-                  ) (prelude.attrNames theirs)
-                );
-
-              # THE PARENTS THIS KIND COMPOSES, as kind VALUES, in either spelling: the spelled ones
-              # (`kindImports`) and, on a tree, each declared name the tree holds and nothing spelled.
-              # Both compose through the same applied functor, so one list carries both to the cycle
-              # walk and the ancestor map. A declared parent is published as `tree.${p}`, the value a
-              # caller reads off the tree, whether the desugar or `evalSchema` composed it: the parent
-              # `evalSchema` injected is read off the one tree it returns, so it is the value read (K3a).
-              # Published as `__kindImports`.
-              kindParents =
-                kindImports
-                ++ declaredValues
-                ++ (
-                  if tree == null then
-                    [ ]
-                  else
-                    map (p: tree.${p}) (
-                      builtins.filter (
-                        p: builtins.elem p tree._kindNames && !(builtins.elem p spelledNames)
-                      ) declaredInherits
-                    )
-                );
-
-              # THE PARENTS AS WRITTEN, before `formOf` decides any of them: the spelled values, the
-              # declared values and the declared names the tree holds. Read by the witness and by the
-              # cycle walk of every kind, which run before composition and so force no mark: a cycle
-              # through a same-tree VALUE entry would otherwise need each partner's mark to classify
-              # it, and recurse uncatchably. Published as `__kindCycleParents`.
-              cycleParents =
-                kindImports
-                ++ builtins.filter isSchemaKind declaredRaw
-                ++ (
-                  if tree == null then
-                    [ ]
-                  else
-                    map (p: tree.${p}) (
-                      builtins.filter (p: builtins.isString p && builtins.elem p tree._kindNames) declaredRaw
-                    )
-                );
-
-              # THE CONTENT WITNESS: the kind's name, each def's file and first-attribute position, its
-              # parents' names and its declared option names, read before composition. Its one reader
-              # is the inheritance-cycle walk, which runs before composition and so cannot read a mark;
-              # its other reader is gen's engine: it is the declaration node gen-merge keys every kind by
-              # (`__moduleKey`, below). Published as `__kindWitness`. It is held as the string it already
-              # reads, its JSON, never minted (den-hoag-a7c9r W0): a node key by nixpkgs' rule, a string
-              # the declaration already holds, so it costs no hash per kind.
-              kindWitness =
-                "w:"
-                + builtins.toJSON ({
-                  inherit kind;
-                  defs = map (d: {
-                    file = builtins.unsafeDiscardStringContext (toString (d.file or "?"));
-                    pos = witnessPos d.value;
-                  }) defs;
-                  parents = map (k: k.kind) cycleParents;
-                  options = prelude.concatMap (
-                    d:
-                    if builtins.isAttrs d.value && builtins.isAttrs (d.value.options or null) then
-                      builtins.attrNames d.value.options
-                    else
-                      [ ]
-                  ) defs;
-                });
-
-              # THE ONE INHERITANCE-CYCLE WALK (8c8pr Q-b arm (i), 2026-09-30), for both spellings: a
-              # kind that reaches its own witness through its parents' `__kindCycleParents` would import
-              # itself into itself, and the module system recurses uncatchably. It is refused by name,
-              # in `evalSchema`'s wording, because a kind may inherit only kinds strictly earlier in the
-              # name graph (ADR-0016 ruling 7, by analogy). A parent reached twice is a diamond, not a cycle: the
-              # visited set is keyed by witness, so the walk is linear in the parents reached. Compared
-              # by witness, never by name, so another tree's same-named kind is not this one. The
-              # answer is the path, first member to its return, or `null`. The refusal names the members
-              # sorted, as `evalSchema`'s `kindNames` order does, so its bracket does not depend on which
-              # member is read; the path is in walk order from the kind read.
-              # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1, den-hoag-4i0o5): keyed by witness, the visited
-              # set conflates witness twins (see `cycleRefusal`), so a cycle reached only through the
-              # second of two twins, the first visited with no cycle behind it, is MISSED by this walk.
-              # Where some member's own walk reaches the cycle, that member refuses by name at
-              # composition on every evaluator (`formOf` classifies nothing on a cycle), pinned by
-              # `witness-collision-refusals.test-a-cycle-behind-an-untagged-twin-refuses-by-a-member`. Where EVERY
-              # member's walk is shadowed by a twin listed first, no walk finds it and composition
-              # recurses uncatchably on all three evaluators, a PERMANENT ARGUED PRICE (den-hoag-95cv0 Arm A
-              # via den-hoag-yqz1j), pinned by `witness-collision-refusals.test-a-fully-shadowed-cycle-aborts`.
-              # Giving each twin its own provenance (`_file`) dissolves it. No key closes it: the walk reads values, not
-              # addresses, so a key that tells twins apart (a name path) never repeats on a cycle not
-              # through this kind and the walk diverges there, and a walk with no visited set pays every
-              # path through a diamond lattice.
-              # ponytail: each kind walks its own ancestry (nothing is shared across kinds, since a
-              # shared reach set would itself recurse on a cycle) and copies the path per step, so a
-              # depth-n chain costs O(n²) in total, the same order as composing it; carry the path as
-              # a cons list if a deep spelling-heavy tree ever makes that dominate.
-              cycleGo =
-                acc: stack: v:
-                let
-                  w = v.__kindWitness;
-                in
-                # A kind value this entry type did not build (`isSchemaKind` admits any value with a
-                # `kind` and a mark) publishes no parents, so the walk has nothing past it to read.
-                if acc.found != null || !(v ? __kindCycleParents) then
-                  acc
-                else if w == kindWitness then
-                  acc // { found = stack ++ [ v.kind ]; }
-                else if acc.seen ? ${w} then
-                  acc
+            # THE PARENTS AS WRITTEN, before `formOf` decides any of them: the spelled values, the
+            # declared values and the declared names the tree holds. Read by the witness and by the
+            # cycle walk of every kind, which run before composition and so force no mark: a cycle
+            # through a same-tree VALUE entry would otherwise need each partner's mark to classify
+            # it, and recurse uncatchably. Published as `__kindCycleParents`.
+            cycleParents =
+              kindImports
+              ++ builtins.filter isSchemaKind declaredRaw
+              ++ (
+                if tree == null then
+                  [ ]
                 else
-                  builtins.foldl' (a: cycleGo a (stack ++ [ v.kind ])) (
-                    acc
-                    // {
-                      seen = acc.seen // {
-                        ${w} = true;
-                      };
-                    }
-                  ) v.__kindCycleParents;
-              walkFrom =
-                vs:
-                (builtins.foldl' (a: cycleGo a [ kind ]) {
-                  found = null;
-                  seen = { };
-                } vs).found;
-              # The entry at this kind's own name IS this kind, decided by the name and never by
-              # forcing it: on the `mkType` arm this kind's value is the caller's result, which reads
-              # these very defs, so it has no WHNF while `inherits` is classified.
-              reachesThis = name: name == kind || walkFrom [ tree.${name} ] != null;
-              inheritanceCycle = if cycleParents == [ ] then null else walkFrom cycleParents;
+                  map (p: tree.${p}) (
+                    builtins.filter (p: builtins.isString p && builtins.elem p tree._kindNames) declaredRaw
+                  )
+              );
 
-              # THE DESUGAR (den-hoag-8c8pr): on a tree, a declared parent nothing else composed is
-              # imported into this kind exactly as the deprecated spelling `imports = [ config.schema.<p> ]`
-              # imports it, read off the same tree. The def is the one `evalSchema`'s pass contributes
-              # (`inheritedModule`), so a staged and an unstaged tree compose one module; no name graph,
-              # no pass: the module system's import composes it, as it composes the spelling.
-              # A foreign VALUE entry composes as itself, through the same applied functor, on any tree
-              # or none: it is already minted, so nothing resolves it. One def per composed parent, so
-              # this list's spine is the parents' classification; the `mkType` caller receives it
-              # nested under one def instead (at `custom`).
-              desugaredDefs =
-                map (v: {
-                  file = "<gen-schema: kind '${kind}' inherits the kind value '${v.kind}'>";
-                  value.imports = [ (inheritedModule kind v.kind v) ];
-                }) declaredValues
-                ++ (
-                  if tree == null then
-                    [ ]
-                  else
-                    map (p: {
-                      file = inheritsDesugaredFile kind p;
-                      value = {
-                        imports = [
-                          (
-                            if !(builtins.elem p tree._kindNames) then
-                              throw "gen-schema: kind '${kind}' inherits '${p}' which is not a declared kind"
-                            else
-                              inheritedModule kind p tree.${p}
-                          )
-                        ];
-                      };
-                    }) unresolvedInherits
-                );
-
-              # THE DEPRECATED INHERITANCE SPELLING, READ AS `inherits` (den-hoag-cxlc0): each kind
-              # value the walk below finds in this entry's `imports`/`require` contributes the entry
-              # `inherits = [ <value> ]` would (den-hoag-l0y K1): through `formOf`, its NAME if it is
-              # the tree's own and the VALUE if it is foreign, after the declared parents, in walk
-              # order, once, and never an entry already declared. The value still composes where it
-              # was written: that is the parent's module, the same one `evalSchema`'s injection
-              # composes for a declared `inherits`. The warning rides the `inherits` value, so it fires
-              # where the entry is read: the collection itself, `_edges`, and every mark and
-              # `id_hash`, whose preimage carries the collections.
-              #
-              # ★ NOT AT THE KIND'S WHNF. `formOf` forces each spelled value's mark, and so the other
-              # kind's composition, where `inherits` is read. A CYCLE is therefore refused by the
-              # cycle walk over `cycleParents` (above), which forces no mark, in the entry type's
-              # wording — under `evalSchema` too, whose names read reads `inherits` and so meets the
-              # partner's own guard before its name graph does.
-              aliasedInherits =
-                declared:
-                let
-                  entryKey = e: if builtins.isString e then "n:${e}" else "m:${e.__mint.minted}";
-                  spelled =
-                    (builtins.foldl'
-                      (
-                        acc: e:
-                        if acc.seen ? ${entryKey e} then
-                          acc
-                        else
-                          {
-                            seen = acc.seen // {
-                              ${entryKey e} = true;
-                            };
-                            out = acc.out ++ [ e ];
-                          }
-                      )
-                      {
-                        seen = { };
-                        out = [ ];
-                      }
-                      (map rendered kindImports)
-                    ).out;
-                  declaredKeys = map entryKey declared;
-                  names = builtins.filter (e: !(builtins.elem (entryKey e) declaredKeys)) spelled;
-                  quoted = prelude.concatStringsSep " " (prelude.unique (map (k: "'${k.kind}'") kindImports));
-                  literal = prelude.concatStringsSep " " (
-                    map (e: if builtins.isString e then "\"${e}\"" else "<the kind value '${e.kind}'>") spelled
-                  );
-                in
-                if kindImports == [ ] then
-                  declared
-                else
-                  warn
-                    "gen-schema: kind '${kind}': its `imports` carries the kind value ${quoted}, the deprecated spelling of kind inheritance, read as `inherits = [ ${literal} ]`; declare `inherits`"
-                    (declared ++ names);
-
-              # Computed fields from extracted collections + raw defs
-              # kind (prelude.last loc) is passed so computed can produce entry-specific fields
-              computedFields =
-                let
-                  fields = if computed != null then computed extractedCollections defs else { };
-                  # Every other name this library writes onto the kind value, read off `kindResultKeys`
-                  # so the door moves with the record. The computed fields are splatted OVER the written
-                  # record on both branches, so a computed `options` or `refs` silently replaced the
-                  # published plane (den-hoag-ciu4r, ADR-0025).
-                  #
-                  # ★ UNIFORM ACROSS BOTH BRANCHES, at a stated cost — the same shape as
-                  # `reservedCollectionKeys` above (den-hoag-ciu4r P1, den-hoag-3x3bi). On the `mkType`
-                  # branch `mkSchemaEntryType` never writes `mixins` (the mixin pipeline runs only on
-                  # the default branch), so refusing a computed `mixins` there over-fires ALWAYS: it
-                  # protects nothing this library wrote. `__functor` is written on that branch only
-                  # when the `mkType` result is itself a functor (`custom ? __functor`, above), so
-                  # refusing a computed `__functor` over-fires whenever it is not. `kind` is written
-                  # UNCONDITIONALLY on both branches (the `inherit kind;` beside `__mint`, below) — it
-                  # is NOT in the over-fire set. One list is taken over two rather than a per-branch
-                  # set, so a computed `mixins` cannot read back differently between branches for a
-                  # reason no caller could see.
-                  shadowing = builtins.filter (k: fields ? ${k}) kindResultKeys;
-                in
-                # `__mint` is refused here for the reason `mkAllCollections` refuses it as a collection
-                # key: the stamp is applied last and would overwrite a computed field of that name
-                # without saying so.
-                if fields ? __mint then
-                  throw "gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType"
-                else if fields ? __sealed then
-                  throw "gen-schema: computed field '__sealed' is reserved — the sealed subjects are written by mkSchemaEntryType"
-                else if shadowing != [ ] then
-                  throw "gen-schema: computed field '${builtins.head shadowing}' is reserved — it is part of the kind-value contract; reserved computed-field names: ${builtins.concatStringsSep ", " kindResultKeys}"
-                else
-                  fields;
-
-              # THE COMPUTED FIELDS AS THE IDENTITY READS THEM (den-hoag-ux9xg C1): `computed` over the
-              # declaration with every collection declared `identity = false` taken out, from `defs` and
-              # so from the collections, which fall to their defaults. A mark component must agree on two
-              # declarations the quotient identifies, and a computed field is the caller's function of
-              # the collections and the raw defs, so it enters the plane composed with that projection:
-              # a field over a declared collection carries none of its contents into a mark, and the kind
-              # value keeps the field as computed. A schema declaring none, or with no `computed`, reads
-              # `computedFields` itself.
-              minted =
-                if !projected then
-                  computedFields
-                else
-                  computed
-                    (
-                      extractedCollections
-                      // builtins.listToAttrs (
-                        map (n: {
-                          name = n;
-                          value =
-                            if allCollections.${n} ? default then
-                              seeds.${n} or allCollections.${n}.default
-                            else if (allCollections.${n}.type.emptyValue or { }) ? value then
-                              allCollections.${n}.type.emptyValue.value
-                            else
-                              throw "gen-schema: `${
-                                merge.showOption (loc ++ [ n ])
-                              }': collection '${n}' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`";
-                        }) dropped
-                      )
-                    )
-                    (
-                      map (
-                        d:
-                        if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) dropped then
-                          d // { value = builtins.removeAttrs d.value dropped; }
-                        else
-                          d
-                      ) defs
-                    );
-
-              # Strip all collection keys before deferredModule merge. The desugared parents join here,
-              # where `evalSchema`'s injected defs arrive: the default branch composes this list and both
-              # planes read it, while the `mkType` caller receives the parents nested (at `custom`).
-              strippedDefs =
-                map (
+            # THE CONTENT WITNESS: the kind's name, each def's file and first-attribute position, its
+            # parents' names and its declared option names, read before composition. Its one reader
+            # is the inheritance-cycle walk, which runs before composition and so cannot read a mark;
+            # its other reader is gen's engine: it is the declaration node gen-merge keys every kind by
+            # (`__moduleKey`, below). Published as `__kindWitness`. It is held as the string it already
+            # reads, its JSON, never minted (den-hoag-a7c9r W0): a node key by nixpkgs' rule, a string
+            # the declaration already holds, so it costs no hash per kind.
+            kindWitness =
+              "w:"
+              + builtins.toJSON ({
+                inherit kind;
+                defs = map (d: {
+                  file = builtins.unsafeDiscardStringContext (toString (d.file or "?"));
+                  pos = witnessPos d.value;
+                }) defs;
+                parents = map (k: k.kind) cycleParents;
+                options = prelude.concatMap (
                   d:
-                  if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
-                    d // { value = builtins.removeAttrs d.value collectionKeys; }
+                  if builtins.isAttrs d.value && builtins.isAttrs (d.value.options or null) then
+                    builtins.attrNames d.value.options
                   else
-                    d
-                ) defs
-                ++ desugaredDefs;
-
-              # Resolve baseModule value (may be a function of kind name)
-              resolvedBase =
-                if baseModule == null then
-                  null
-                else if builtins.isFunction baseModule then
-                  baseModule kind
-                else
-                  baseModule;
-
-              # Mixins are applied via the record algebra and emitted through the bridge. An absent base
-              # is the unit record (a mixin maps a base record to a record), so `null` and `{ }` carry
-              # alike (den-hoag-8kdu2). A base the algebra cannot read as a record (a function module or
-              # a path, after resolution) is refused by name here, so every reader that pools a mixin's
-              # contribution meets one refusal. The `mkType` arm is refused at its WHNF (below).
-              mixinResult =
-                if mixins == [ ] || mkType != null then
-                  null
-                else if resolvedBase != null && !(builtins.isAttrs resolvedBase) then
-                  throw "gen-schema: kind '${kind}' declares mixins, and its baseModule is not an attrset (a ${builtins.typeOf resolvedBase}), so the mixin pipeline cannot read it as a record; declare the base as an inline attrset, or define the contribution on the kind"
-                else
-                  let
-                    baseRecord = record.fromAttrs (if resolvedBase == null then { } else resolvedBase);
-                    withMixins = builtins.foldl' (acc: m: applyMixin m acc kind) baseRecord mixins;
-                  in
-                  emitModule collectionKeys withMixins;
-
-              # ── THE DECLARATION-KEY GUARD (den-hoag-nn4) ──────────────────────────────────────────
-              #
-              # ★ PLACEMENT, which is what applying it to the merge RESULT buys — not coverage. The
-              # conditional IS the result, so forcing any field of the kind meets it, and both branches
-              # are reached the same way. It does not follow that both branches REFUSE: clause A stands
-              # the unknown-key predicate down whenever `computed` or `mkType` is present, so on the
-              # `mkType` branch no input is ever named. What is live on both branches is the
-              # construction-formal door and the reserved door below, because the formals and
-              # `__mint` belong to both.
-              #
-              # Forcing the result to WHNF forces the conditional, which is what makes a `builtins.seq`
-              # unnecessary. The guard is sited HERE, in the descriptor's own `merge` body, rather than
-              # on a completed type: gen-merge's `mkOptionType` maps a foreign descriptor's `merge` onto
-              # the internal `mergeDefs` and every container dispatches on that, so a `t // { merge = …; }`
-              # override is silently ignored.
-              topKeysIn =
-                names:
-                prelude.concatMap (
-                  d: if builtins.isAttrs d.value then builtins.filter (k: d.value ? ${k}) names else [ ]
+                    [ ]
                 ) defs;
-              reservedNamed = topKeysIn (reservedDeclarationKeysFor mkType);
-              # The construction-formal door (den-hoag-q17cc, at `publishedEntryKeys`). Same site and
-              # same per-def test as `reservedNamed`, so it is live on both branches; it runs FIRST,
-              # so a structured def gets the formal's text and not the surplus clause's "declare an
-              # option" remedy, which points at the wrong surface.
-              formalNamed = topKeysIn schemaEntryFormals;
-              publishedNamed = topKeysIn publishedEntryKeys;
+              });
 
-              # THE DEPRECATED INHERITANCE SPELLING (den-hoag-cxlc0), found for `aliasedInherits`
-              # above: a kind VALUE in a kind entry's `imports` (or a shorthand def's `require`), found
-              # by the walk `modulesOf` makes for the plane. Inheritance travels as a NAME in
-              # `inherits`, resolved by `evalSchema`, which imports the parent's applied functor rather
-              # than its kind value. A VALUE test: a path or string member is imported, which needs no
-              # argument and yields the value gen-merge would compose, and an imported attrset module
-              # is walked in turn, so a kind reached through files is read too. Each file is imported
-              # once per kind entry (a visited set keyed by the resolved path, as the module system
-              # dedupes), so a cycle of files terminates. It applies no function, so a function module
-              # and a hand-applied functor compose unaliased and unwarned — the README's declared
-              # ADR-0025 exception. What it forces, where `inherits` is read: every `imports` and
-              # `require` list of every attrset module reachable from the defs, every member of those
-              # lists, the `__mint` record of any member carrying `kind` and `__mint`, and the import
-              # of every reachable path or string member. The module system imports those files
-              # anyway; what moves is when.
-              declListOf =
-                v:
-                let
-                  i = v.imports or [ ];
-                in
-                (if v ? require && !(isStructuredDecl v) then v.require else [ ])
-                ++ (if builtins.isList i then i else [ i ]);
-              # ponytail: `found ++ [ … ]` is quadratic in the members reached; a kind entry's module
-              # tree is small. Accumulate a list of lists if that stops being true.
-              walkKindMembers =
-                acc: xs:
-                builtins.foldl' (
-                  acc: m:
-                  if m ? opaque && (builtins.isPath m.opaque || builtins.isString m.opaque) then
-                    let
-                      # the path as an attribute name: a store path carries string context, which a name cannot
-                      key = builtins.unsafeDiscardStringContext (toString m.opaque);
-                      v = import m.opaque;
-                      acc' = acc // {
-                        seen = acc.seen // {
-                          ${key} = true;
-                        };
-                        found = acc.found ++ [ v ];
-                      };
-                    in
-                    if acc.seen ? ${key} then
-                      acc
-                    else if builtins.isAttrs v && !(v ? __functor) then
-                      walkKindMembers acc' (declListOf v)
-                    else
-                      acc'
-                  else
-                    acc // { found = acc.found ++ [ (m.open or m.opaque) ]; }
-                ) acc (modulesOf xs);
-              kindImports =
-                builtins.filter isSchemaKind
+            # THE ONE INHERITANCE-CYCLE WALK (8c8pr Q-b arm (i), 2026-09-30), for both spellings: a
+            # kind that reaches its own witness through its parents' `__kindCycleParents` would import
+            # itself into itself, and the module system recurses uncatchably. It is refused by name,
+            # in `evalSchema`'s wording, because a kind may inherit only kinds strictly earlier in the
+            # name graph (ADR-0016 ruling 7, by analogy). A parent reached twice is a diamond, not a cycle: the
+            # visited set is keyed by witness, so the walk is linear in the parents reached. Compared
+            # by witness, never by name, so another tree's same-named kind is not this one. The
+            # answer is the path, first member to its return, or `null`. The refusal names the members
+            # sorted, as `evalSchema`'s `kindNames` order does, so its bracket does not depend on which
+            # member is read; the path is in walk order from the kind read.
+            # ★ ENUMERATED, NOT CLOSED (ADR-0025 item 1, den-hoag-4i0o5): keyed by witness, the visited
+            # set conflates witness twins (see `cycleRefusal`), so a cycle reached only through the
+            # second of two twins, the first visited with no cycle behind it, is MISSED by this walk.
+            # Where some member's own walk reaches the cycle, that member refuses by name at
+            # composition on every evaluator (`formOf` classifies nothing on a cycle), pinned by
+            # `witness-collision-refusals.test-a-cycle-behind-an-untagged-twin-refuses-by-a-member`. Where EVERY
+            # member's walk is shadowed by a twin listed first, no walk finds it and composition
+            # recurses uncatchably on all three evaluators, a PERMANENT ARGUED PRICE (den-hoag-95cv0 Arm A
+            # via den-hoag-yqz1j), pinned by `witness-collision-refusals.test-a-fully-shadowed-cycle-aborts`.
+            # Giving each twin its own provenance (`_file`) dissolves it. No key closes it: the walk reads values, not
+            # addresses, so a key that tells twins apart (a name path) never repeats on a cycle not
+            # through this kind and the walk diverges there, and a walk with no visited set pays every
+            # path through a diamond lattice.
+            # ponytail: each kind walks its own ancestry (nothing is shared across kinds, since a
+            # shared reach set would itself recurse on a cycle) and copies the path per step, so a
+            # depth-n chain costs O(n²) in total, the same order as composing it; carry the path as
+            # a cons list if a deep spelling-heavy tree ever makes that dominate.
+            cycleGo =
+              acc: stack: v:
+              let
+                w = v.__kindWitness;
+              in
+              # A kind value this entry type did not build (`isSchemaKind` admits any value with a
+              # `kind` and a mark) publishes no parents, so the walk has nothing past it to read.
+              if acc.found != null || !(v ? __kindCycleParents) then
+                acc
+              else if w == kindWitness then
+                acc // { found = stack ++ [ v.kind ]; }
+              else if acc.seen ? ${w} then
+                acc
+              else
+                builtins.foldl' (a: cycleGo a (stack ++ [ v.kind ])) (
+                  acc
+                  // {
+                    seen = acc.seen // {
+                      ${w} = true;
+                    };
+                  }
+                ) v.__kindCycleParents;
+            walkFrom =
+              vs:
+              (builtins.foldl' (a: cycleGo a [ kind ]) {
+                found = null;
+                seen = { };
+              } vs).found;
+            # The entry at this kind's own name IS this kind, decided by the name and never by
+            # forcing it: on the `mkType` arm this kind's value is the caller's result, which reads
+            # these very defs, so it has no WHNF while `inherits` is classified.
+            reachesThis = name: name == kind || walkFrom [ tree.${name} ] != null;
+            inheritanceCycle = if cycleParents == [ ] then null else walkFrom cycleParents;
+
+            # THE DESUGAR (den-hoag-8c8pr): on a tree, a declared parent nothing else composed is
+            # imported into this kind exactly as the deprecated spelling `imports = [ config.schema.<p> ]`
+            # imports it, read off the same tree. The def is the one `evalSchema`'s pass contributes
+            # (`inheritedModule`), so a staged and an unstaged tree compose one module; no name graph,
+            # no pass: the module system's import composes it, as it composes the spelling.
+            # A foreign VALUE entry composes as itself, through the same applied functor, on any tree
+            # or none: it is already minted, so nothing resolves it. One def per composed parent, so
+            # this list's spine is the parents' classification; the `mkType` caller receives it
+            # nested under one def instead (at `custom`).
+            desugaredDefs =
+              map (v: {
+                file = "<gen-schema: kind '${kind}' inherits the kind value '${v.kind}'>";
+                value.imports = [ (inheritedModule kind v.kind v) ];
+              }) declaredValues
+              ++ (
+                if tree == null then
+                  [ ]
+                else
+                  map (p: {
+                    file = inheritsDesugaredFile kind p;
+                    value = {
+                      imports = [
+                        (
+                          if !(builtins.elem p tree._kindNames) then
+                            throw "gen-schema: kind '${kind}' inherits '${p}' which is not a declared kind"
+                          else
+                            inheritedModule kind p tree.${p}
+                        )
+                      ];
+                    };
+                  }) unresolvedInherits
+              );
+
+            # THE DEPRECATED INHERITANCE SPELLING, READ AS `inherits` (den-hoag-cxlc0): each kind
+            # value the walk below finds in this entry's `imports`/`require` contributes the entry
+            # `inherits = [ <value> ]` would (den-hoag-l0y K1): through `formOf`, its NAME if it is
+            # the tree's own and the VALUE if it is foreign, after the declared parents, in walk
+            # order, once, and never an entry already declared. The value still composes where it
+            # was written: that is the parent's module, the same one `evalSchema`'s injection
+            # composes for a declared `inherits`. The warning rides the `inherits` value, so it fires
+            # where the entry is read: the collection itself, `_edges`, and every mark and
+            # `id_hash`, whose preimage carries the collections.
+            #
+            # ★ NOT AT THE KIND'S WHNF. `formOf` forces each spelled value's mark, and so the other
+            # kind's composition, where `inherits` is read. A CYCLE is therefore refused by the
+            # cycle walk over `cycleParents` (above), which forces no mark, in the entry type's
+            # wording — under `evalSchema` too, whose names read reads `inherits` and so meets the
+            # partner's own guard before its name graph does.
+            aliasedInherits =
+              declared:
+              let
+                entryKey = e: if builtins.isString e then "n:${e}" else "m:${e.__mint.minted}";
+                spelled =
                   (builtins.foldl'
                     (
-                      acc: d:
-                      if builtins.isAttrs d.value && !(d.value ? __functor) then
-                        walkKindMembers acc (declListOf d.value)
-                      else
+                      acc: e:
+                      if acc.seen ? ${entryKey e} then
                         acc
+                      else
+                        {
+                          seen = acc.seen // {
+                            ${entryKey e} = true;
+                          };
+                          out = acc.out ++ [ e ];
+                        }
                     )
                     {
                       seen = { };
-                      found = [ ];
+                      out = [ ];
                     }
-                    defs
-                  ).found;
+                    (map rendered kindImports)
+                  ).out;
+                declaredKeys = map entryKey declared;
+                names = builtins.filter (e: !(builtins.elem (entryKey e) declaredKeys)) spelled;
+                quoted = prelude.concatStringsSep " " (prelude.unique (map (k: "'${k.kind}'") kindImports));
+                literal = prelude.concatStringsSep " " (
+                  map (e: if builtins.isString e then "\"${e}\"" else "<the kind value '${e.kind}'>") spelled
+                );
+              in
+              if kindImports == [ ] then
+                declared
+              else
+                warn
+                  "gen-schema: kind '${kind}': its `imports` carries the kind value ${quoted}, the deprecated spelling of kind inheritance, read as `inherits = [ ${literal} ]`; declare `inherits`"
+                  (declared ++ names);
 
-              surplusOffenders = builtins.filter (
-                d: surplusDeclarationKeys { inherit computed mkType; } collectionKeys d.value != [ ]
-              ) defs;
+            # Computed fields from extracted collections + raw defs
+            # kind (prelude.last loc) is passed so computed can produce entry-specific fields
+            computedFields =
+              let
+                fields = if computed != null then computed extractedCollections defs else { };
+                # Every other name this library writes onto the kind value, read off `kindResultKeys`
+                # so the door moves with the record. The computed fields are splatted OVER the written
+                # record on both branches, so a computed `options` or `refs` silently replaced the
+                # published plane (den-hoag-ciu4r, ADR-0025).
+                #
+                # ★ UNIFORM ACROSS BOTH BRANCHES, at a stated cost — the same shape as
+                # `reservedCollectionKeys` above (den-hoag-ciu4r P1, den-hoag-3x3bi). On the `mkType`
+                # branch `mkSchemaEntryType` never writes `mixins` (the mixin pipeline runs only on
+                # the default branch), so refusing a computed `mixins` there over-fires ALWAYS: it
+                # protects nothing this library wrote. `__functor` is written on that branch only
+                # when the `mkType` result is itself a functor (`custom ? __functor`, above), so
+                # refusing a computed `__functor` over-fires whenever it is not. `kind` is written
+                # UNCONDITIONALLY on both branches (the `inherit kind;` beside `__mint`, below) — it
+                # is NOT in the over-fire set. One list is taken over two rather than a per-branch
+                # set, so a computed `mixins` cannot read back differently between branches for a
+                # reason no caller could see.
+                shadowing = builtins.filter (k: fields ? ${k}) kindResultKeys;
+              in
+              # `__mint` is refused here for the reason `mkAllCollections` refuses it as a collection
+              # key: the stamp is applied last and would overwrite a computed field of that name
+              # without saying so.
+              if fields ? __mint then
+                throw "gen-schema: computed field '__mint' is reserved — the provenance mark is minted by mkSchemaEntryType"
+              else if fields ? __sealed then
+                throw "gen-schema: computed field '__sealed' is reserved — the sealed subjects are written by mkSchemaEntryType"
+              else if shadowing != [ ] then
+                throw "gen-schema: computed field '${builtins.head shadowing}' is reserved — it is part of the kind-value contract; reserved computed-field names: ${builtins.concatStringsSep ", " kindResultKeys}"
+              else
+                fields;
 
-              checkDeclarationKeys =
-                result:
-                if formalNamed != [ ] then
-                  throw "gen-schema: kind '${kind}': declaration key '${builtins.head formalNamed}' is a construction formal of this schema — it is fixed by the call that builds the schema option (`mkSchemaOption`, `mkSchemaEntryType`), and written on a kind entry it is not read as one; pass '${builtins.head formalNamed}' to that constructor, or write `config.${builtins.head formalNamed}` for an instance field of that name, which a strict instance must declare as an option"
-                else if publishedNamed != [ ] then
-                  throw "gen-schema: kind '${kind}': declaration key '${builtins.head publishedNamed}' is a name gen-schema writes onto the kind value — written on a kind entry it lands on every instance, while reading `config.schema.${kind}.${builtins.head publishedNamed}` returns the published one; write `config.${builtins.head publishedNamed}` for an instance field of that name, which a strict instance must declare as an option"
-                else if reservedNamed != [ ] then
-                  throw (
-                    if builtins.head reservedNamed == "__keyEq" then
-                      "gen-schema: kind '${kind}': declaration key '__keyEq' is reserved — gen-schema publishes the key comparison of every kind, beside the key it derives from the kind's mark, and a declaration does not choose it"
-                    else
-                      "gen-schema: kind '${kind}': declaration key '${builtins.head reservedNamed}' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread"
-                  )
-                else if surplusOffenders != [ ] then
-                  let
-                    offender = builtins.head surplusOffenders;
-                  in
-                  throw (
-                    unknownDeclarationKeyRefusal kind collectionKeys (surplusDeclarationKeys {
-                      inherit computed mkType;
-                    } collectionKeys offender.value) (isStructuredDecl offender.value) (offender.file or "<unknown>")
-                  )
-                else
-                  result;
-            in
-            completed (
-              checkDeclarationKeys (
-                # The collection door is read at this arm's WHNF: its result publishes no collection, so
-                # a schema the door refuses (an `identity = false` beside `mkType`) would otherwise be
-                # served on every read that forces no collection, its `kind` among them. `mixins` is
-                # refused at the same WHNF: the `mkType` result is what an instance imports, so a
-                # mixin's module half would reach an instance only through caller code this library
-                # cannot see, and its pooled collections would disagree with the instance (den-hoag-8kdu2).
-                if
-                  mkType != null
-                  && builtins.seq allCollections true
-                  && (
-                    mixins == [ ]
-                    || throw "gen-schema: a schema built with `mkType` cannot take `mixins`: the `mkType` result is the module an instance imports, and the mixin pipeline has no place in it; define the contribution in the `mkType` result, or drop `mkType`"
-                  )
-                then
-                  # Custom entry type: collection extraction runs first (above),
-                  # then mkType controls the result. Mixins are refused (above) and the __functor
-                  # wrapping is skipped; `options`, `refs` and `refinements` are DERIVED, from the
-                  # option plane of the value an instance of this kind imports.
-                  # Precedence: computedFields wins over mkType result for same-named keys,
-                  # so computed topology/meta fields remain authoritative.
-                  # strippedDefs are passed so mkType implementations can wire user-declared
-                  # options/config from the schema kind entry into their own type systems.
-                  let
-                    # THE CALLER'S `defs` HAVE A DECLARATION-LEVEL SHAPE (den-hoag-24zdh): the raw defs,
-                    # stripped, then the parents as ONE def, present iff `inherits` is non-empty, nesting
-                    # each parent under its own `_file`, whichever of the desugar or `evalSchema`
-                    # composed it (den-hoag-4d2zs). `strippedDefs`' spine is the
-                    # parents' classification, and the caller's result is this kind's WHNF, so a caller
-                    # reading that spine made each kind on a value cycle consume its partner's WHNF before
-                    # any guard ran. Scoped to this arm: the default arm's key set reads no parent, so it
-                    # keeps `strippedDefs` and pays nothing, and the plane below keeps it on both arms,
-                    # so no mark moves. A kind that inherits nothing has no desugared def, so it hands
-                    # the caller `strippedDefs` itself.
-                    custom = mkType {
-                      kindModule = resolvedBase;
-                      collections = extractedCollections;
-                      defs =
-                        if declaredRaw == [ ] then
-                          strippedDefs
-                        else
-                          let
-                            # a parent `evalSchema` resolved arrives as a raw def; it joins the nested
-                            # def, decided by its `file` alone, so the spine reads no classification.
-                            # Any module may set `_file`, so a nested def keeps its value less the collection keys.
-                            resolved = d: prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or ""));
-                          in
-                          map (
-                            d:
-                            if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
-                              d // { value = builtins.removeAttrs d.value collectionKeys; }
-                            else
-                              d
-                          ) (builtins.filter (d: !(resolved d)) defs)
-                          ++ [
-                            {
-                              file = "<gen-schema: kind '${kind}' inherits>";
-                              value.imports = map (d: builtins.removeAttrs d.value collectionKeys // { _file = d.file; }) (
-                                builtins.filter resolved defs ++ desugaredDefs
-                              );
-                            }
-                          ];
-                      inherit kind;
-                    };
-                    # The keys the arm applies over the `mkType` result. `options = { }` and `refs = { }`
-                    # stand in the TREE MODULE only: the kind value publishes the evaluated plane under
-                    # those names, and a module built over the kind value itself would be circular for any
-                    # reader of `options` (gen-merge's reader of a non-functor module, or a functor that
-                    # reads its `self`). The pinned refusal of a non-functor result names `keySemantics`
-                    # from exactly this module.
-                    published = {
-                      inherit strict keySemantics;
-                      options = { };
-                      refs = { };
-                    };
-                    # The module an instance imports: the `mkType` result with the published keys and
-                    # computed fields applied. The derived fields (`options`, `refs`, `refinements`,
-                    # `__mint`, `__sealed`) are left out; none is a module declaration.
-                    #
-                    # LAZY, and load-bearing: one `evalModuleTree` per `mkType` kind, memoised in the
-                    # kind record and forced only by a read of `options`, `refs`, `refinements` or the
-                    # mark — never by `kind` or `strict`.
-                    #
-                    # The module is named for its kind, so a refusal of its syntax (a surplus key beside
-                    # the published `options`) says which kind to fix; a `_file` of the result's own wins.
-                    treeModule = resolvedOnly (
-                      {
-                        _file = "<gen-schema mkType kind ${kind}>";
-                      }
-                      // custom
-                      // published
-                      // computedFields
-                    );
-                    introspect = introspectOf treeModule;
-                    # THIS construction's token (the default arm's `constructionToken`, and its two invariants)
-                    mkTypeConstructionToken = {
-                      t = _: null;
-                    };
-                    # ONE plane for the published fields, the mark and `kindEq` (c+): this arm's option
-                    # plane is the tree an instance imports, so it enters the preimage, an option a parent
-                    # publishes by that parent's mark (`planeOf`'s own options, den-hoag-a7c9r).
-                    plane = planeOf {
-                      inherit
-                        kind
-                        kept
-                        guard
-                        projected
-                        ;
-                      inherit (introspect) options refs;
-                      collections = extractedCollections;
-                      inherit keySemantics;
-                      computed = minted;
-                      modules =
-                        (
-                          if kindParents == [ ] then
-                            map (d: d.value) strippedDefs
+            # THE COMPUTED FIELDS AS THE IDENTITY READS THEM (den-hoag-ux9xg C1): `computed` over the
+            # declaration with every collection declared `identity = false` taken out, from `defs` and
+            # so from the collections, which fall to their defaults. A mark component must agree on two
+            # declarations the quotient identifies, and a computed field is the caller's function of
+            # the collections and the raw defs, so it enters the plane composed with that projection:
+            # a field over a declared collection carries none of its contents into a mark, and the kind
+            # value keeps the field as computed. A schema declaring none, or with no `computed`, reads
+            # `computedFields` itself.
+            minted =
+              if !projected then
+                computedFields
+              else
+                computed
+                  (
+                    extractedCollections
+                    // builtins.listToAttrs (
+                      map (n: {
+                        name = n;
+                        value =
+                          if allCollections.${n} ? default then
+                            seeds.${n} or allCollections.${n}.default
+                          else if (allCollections.${n}.type.emptyValue or { }) ? value then
+                            allCollections.${n}.type.emptyValue.value
                           else
-                            map (d: d.value) (ownDefsOf kind kindImports (builtins.length defs) strippedDefs)
-                        )
-                        ++ [
-                          resolvedBase
-                        ];
-                      functions = { inherit mkType computed; };
-                      parents = kindParents;
-                    };
-                    # minted once, read by `__mint` and the node record (gen-merge forces `__keyEq.key` at a
-                    # meeting, so two calls would mint twice)
-                    mkTypeMark = builtins.seq identityVerdict (markOf {
-                      inherit kind strict plane;
-                    });
-                  in
-                  # Every field the caller's `mkType` built is read THROUGH the guard (den-hoag-8c8pr): the
-                  # result is the caller's key space (`__defsModule`, or anything else built from `defs`),
-                  # which gen-schema cannot enumerate, so each value is guarded rather than each name.
-                  # Names stay lazy; a kind that inherits nothing pays one thunk per field.
-                  prelude.mapAttrs (_: resolvedOnly) custom
-                  # The two containment and inheritance relations are WRITTEN here, over the result,
-                  # because their readers take them off the kind value — `evalSchema` reads `inherits`,
-                  # `_topology` reads `parent` — and a result that publishes no collections would otherwise
-                  # lose a declared edge without a word (den-hoag-fwoa8). Unguarded: both are read on an
-                  # unresolved kind (`evalSchema`'s names read). Before the computed fields, which win over a
-                  # collection on both branches.
-                  // {
-                    inherit (extractedCollections) inherits parent;
-                  }
-                  // published
-                  // {
-                    inherit (introspect) options refs;
-                    refinements = refinementsOfOptions introspect.options;
-                  }
-                  # The result's functor is applied to `treeModule`, so the tree and an instance hand it
-                  # the same `self` and a functor that reads `self.options` declares one plane in both.
-                  # Applied before the computed fields, which still win for same-named keys.
-                  // prelude.optionalAttrs (custom ? __functor) {
-                    # Guarded over the APPLIED module, not only through `treeModule`: a functor that
-                    # ignores its `self` never forces the tree module, and would compose unguarded.
-                    __functor = _: resolvedOnly (custom.__functor treeModule);
-                  }
-                  // guardedComputed
-                  // {
-                    # `kind` is the LET-BOUND `prelude.last loc` — the option path, which is
-                    # authoritative — never the `mkType` result's echo of it, which is caller data.
-                    # WRITTEN here (den-hoag-3x3bi, ADR-0025): before this, nothing on this arm wrote
-                    # `kind` at all, so a result carrying none made `.kind` abort uncatchably
-                    # (`attribute 'kind' missing`, not a `throw` `tryEval` can catch) and
-                    # `mkInstanceType` refused with the FALSE reason "no mark" (`isSchemaKind` reads
-                    # `v ? kind` first); a result echoing a WRONG name published that name while the
-                    # mark stayed keyed to the option path, silently disagreeing with it. Applied AFTER
-                    # `// computedFields`, beside `__mint`, so a computed `kind` cannot re-open what this
-                    # write closes — `kind` is refused as a computed-field name below regardless.
-                    # The mark reads `plane`, the one plane the arm publishes as `options` and `refs`
-                    # (den-hoag-mx07b §4 Q1 ruled). `ci/tests/mktype-refinements.nix` pins that the mark
-                    # reads it. An option a parent publishes with an exact mark enters by that parent's
-                    # mark rather than again (den-hoag-a7c9r): the same plane, factored.
-                    inherit kind;
-                    __mint = {
-                      minted = mkTypeMark;
-                    };
-                    __sealed = builtins.seq identityVerdict plane.sealed;
-                    __okAt = kindOkAt { inherit (introspect) options refs; };
-                    __kindImports = resolvedOnly kindParents;
-                    __kindCycleParents = cycleParents;
-                    __kindWitness = kindWitness;
-                    __kindAncestors = resolvedOnly kindAncestorsByMark;
-                    __kindLineage = resolvedOnly kindAncestors;
-                  }
-                  // kindNodeRecord kind kindWitness mkTypeMark plane mkTypeConstructionToken (
-                    guard
-                    && builtins.any (
-                      d: builtins.isAttrs d.value && builtins.any (c: d.value ? ${c}) (kindGuardedNames kept)
-                    ) defs
-                  ) null
-                else
-                  let
-                    # Effective base module: bridge output when mixins applied, original otherwise
-                    effectiveBase = if mixinResult != null then mixinResult.module else resolvedBase;
-
-                    # Refinements are a PROJECTION of the option plane, read off the same `introspect.options`
-                    # `refs` is, so `attrNames refinements ⊆ attrNames options` holds by construction and no
-                    # option can land without its contract, nor a contract without its option. A second,
-                    # syntactic reader of the raw defs is what let the two planes disagree. On the mixin path
-                    # the bridge's record refinements are unioned in: its keys are lifted into `options`, so
-                    # the inclusion still holds, and a contract declared in the kind entry itself is read too.
-                    # Lazy: forced only when `refinements` is, and that must stay so.
-                    # Stored on the kind result so mkInstanceRegistry can consume them automatically.
-                    extractedRefinements =
-                      if layer != null then
-                        layer.refinements
+                            throw "gen-schema: `${
+                              merge.showOption (loc ++ [ n ])
+                            }': collection '${n}' declares no `default`, so it has no value where no definition of it survives (or where its `merge` reads the fold's seed); define it, or declare a `default`";
+                      }) dropped
+                    )
+                  )
+                  (
+                    map (
+                      d:
+                      if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) dropped then
+                        d // { value = builtins.removeAttrs d.value dropped; }
                       else
-                        (if mixinResult != null then mixinResult.refinements else { })
-                        // prelude.filterAttrs (_: v: v != [ ]) (
-                          prelude.mapAttrs (_: o: getRefinements o.type) (
-                            prelude.filterAttrs (_: o: isOptionDecl o && o ? type) introspect.options
-                          )
-                        );
+                        d
+                    ) defs
+                  );
 
-                    # Inject baseModule + methods module (methods is the only collection
-                    # that generates instance-level options via mkMethodsModule)
-                    injected =
-                      prelude.optional (effectiveBase != null) {
-                        file = "gen-schema/base";
-                        value = if keyedBase != null then keyedBase else effectiveBase;
-                      }
-                      ++ prelude.optional (extractedCollections.methods != { }) {
-                        file = "gen-schema/methods";
-                        value = mkMethodsModule kind extractedCollections.methods;
+            # Strip all collection keys before deferredModule merge. The desugared parents join here,
+            # where `evalSchema`'s injected defs arrive: the default branch composes this list and both
+            # planes read it, while the `mkType` caller receives the parents nested (at `custom`).
+            strippedDefs =
+              map (
+                d:
+                if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
+                  d // { value = builtins.removeAttrs d.value collectionKeys; }
+                else
+                  d
+              ) defs
+              ++ desugaredDefs;
+
+            # Resolve baseModule value (may be a function of kind name)
+            resolvedBase = resolvedBaseOf kind;
+
+            # Mixins are applied via the record algebra and emitted through the bridge. An absent base
+            # is the unit record (a mixin maps a base record to a record), so `null` and `{ }` carry
+            # alike (den-hoag-8kdu2). A base the algebra cannot read as a record (a function module or
+            # a path, after resolution) is refused by name here, so every reader that pools a mixin's
+            # contribution meets one refusal. The `mkType` arm is refused at its WHNF (below).
+            mixinResult = mixinResultOf kind;
+
+            # ── THE DECLARATION-KEY GUARD (den-hoag-nn4) ──────────────────────────────────────────
+            #
+            # ★ PLACEMENT, which is what applying it to the merge RESULT buys — not coverage. The
+            # conditional IS the result, so forcing any field of the kind meets it, and both branches
+            # are reached the same way. It does not follow that both branches REFUSE: clause A stands
+            # the unknown-key predicate down whenever `computed` or `mkType` is present, so on the
+            # `mkType` branch no input is ever named. What is live on both branches is the
+            # construction-formal door and the reserved door below, because the formals and
+            # `__mint` belong to both.
+            #
+            # Forcing the result to WHNF forces the conditional, which is what makes a `builtins.seq`
+            # unnecessary. The guard is sited HERE, in the descriptor's own `merge` body, rather than
+            # on a completed type: gen-merge's `mkOptionType` maps a foreign descriptor's `merge` onto
+            # the internal `mergeDefs` and every container dispatches on that, so a `t // { merge = …; }`
+            # override is silently ignored.
+            topKeysIn =
+              names:
+              prelude.concatMap (
+                d: if builtins.isAttrs d.value then builtins.filter (k: d.value ? ${k}) names else [ ]
+              ) defs;
+            reservedNamed = topKeysIn (reservedDeclarationKeysFor mkType);
+            # The construction-formal door (den-hoag-q17cc, at `publishedEntryKeys`). Same site and
+            # same per-def test as `reservedNamed`, so it is live on both branches; it runs FIRST,
+            # so a structured def gets the formal's text and not the surplus clause's "declare an
+            # option" remedy, which points at the wrong surface.
+            formalNamed = topKeysIn schemaEntryFormals;
+            publishedNamed = topKeysIn publishedEntryKeys;
+
+            # THE DEPRECATED INHERITANCE SPELLING (den-hoag-cxlc0), found for `aliasedInherits`
+            # above: a kind VALUE in a kind entry's `imports` (or a shorthand def's `require`), found
+            # by the walk `modulesOf` makes for the plane. Inheritance travels as a NAME in
+            # `inherits`, resolved by `evalSchema`, which imports the parent's applied functor rather
+            # than its kind value. A VALUE test: a path or string member is imported, which needs no
+            # argument and yields the value gen-merge would compose, and an imported attrset module
+            # is walked in turn, so a kind reached through files is read too. Each file is imported
+            # once per kind entry (a visited set keyed by the resolved path, as the module system
+            # dedupes), so a cycle of files terminates. It applies no function, so a function module
+            # and a hand-applied functor compose unaliased and unwarned — the README's declared
+            # ADR-0025 exception. What it forces, where `inherits` is read: every `imports` and
+            # `require` list of every attrset module reachable from the defs, every member of those
+            # lists, the `__mint` record of any member carrying `kind` and `__mint`, and the import
+            # of every reachable path or string member. The module system imports those files
+            # anyway; what moves is when.
+            declListOf =
+              v:
+              let
+                i = v.imports or [ ];
+              in
+              (if v ? require && !(isStructuredDecl v) then v.require else [ ])
+              ++ (if builtins.isList i then i else [ i ]);
+            # ponytail: `found ++ [ … ]` is quadratic in the members reached; a kind entry's module
+            # tree is small. Accumulate a list of lists if that stops being true.
+            walkKindMembers =
+              acc: xs:
+              builtins.foldl' (
+                acc: m:
+                if m ? opaque && (builtins.isPath m.opaque || builtins.isString m.opaque) then
+                  let
+                    # the path as an attribute name: a store path carries string context, which a name cannot
+                    key = builtins.unsafeDiscardStringContext (toString m.opaque);
+                    v = import m.opaque;
+                    acc' = acc // {
+                      seen = acc.seen // {
+                        ${key} = true;
                       };
+                      found = acc.found ++ [ v ];
+                    };
+                  in
+                  if acc.seen ? ${key} then
+                    acc
+                  else if builtins.isAttrs v && !(v ? __functor) then
+                    walkKindMembers acc' (declListOf v)
+                  else
+                    acc'
+                else
+                  acc // { found = acc.found ++ [ (m.open or m.opaque) ]; }
+              ) acc (modulesOf xs);
+            kindImports =
+              builtins.filter isSchemaKind
+                (builtins.foldl'
+                  (
+                    acc: d:
+                    if builtins.isAttrs d.value && !(d.value ? __functor) then
+                      walkKindMembers acc (declListOf d.value)
+                    else
+                      acc
+                  )
+                  {
+                    seen = { };
+                    found = [ ];
+                  }
+                  defs
+                ).found;
 
-                    # The defs `merged` imports carry `entryReservation` (den-hoag-8x97u), so a
-                    # reserved name in a module they import refuses at gen-merge's collector. The
-                    # marker rides on the RECORD of a functor wrapping the def, never in a module's
-                    # content (den-hoag-r05lc): the kind value is a module a foreign evaluator also
-                    # imports, and nixpkgs applies the functor and reads only its result. A plain
-                    # attrset def is that result itself, so its own top level stays this library's
-                    # door; a function, functor or path def is imported by it. A plain attrset def
-                    # naming no `imports` or `require` imports nothing, so the reservation has nothing
-                    # to scope and it is passed as it stands: the wrapper is applied once per
-                    # instance, and only where it has work. The plane's `modules` stay the unmarked
-                    # `strippedDefs`, so no kind's mark moves.
-                    reservation = entryReservation kind;
-                    merged = resolvedOnly (
-                      base.merge loc (
-                        map (
-                          d:
-                          let
-                            plain = builtins.isAttrs d.value && !(d.value ? __functor);
-                          in
-                          if plain && !(d.value ? imports || d.value ? require) then
-                            d
-                          else
-                            d
-                            // {
-                              value = {
-                                __reservedKeys = reservation;
-                                __functionArgs = { };
-                                __functor =
-                                  _: _:
-                                  if !mergeReadsRecordReservation then
-                                    throw "gen-schema: kind '${kind}' reserves its construction formals in every module its entry imports, on the record of the module it wraps each definition in (`__reservedKeys'), and the gen-merge it is evaluated with does not read that record (its `moduleSyntax.functorRecord' does not list `__reservedKeys'). gen-schema requires a gen-merge reading the reservation off a functor module's record; update the gen-merge input gen-schema is built with."
-                                  else if plain then
-                                    d.value
-                                  else
-                                    { imports = [ d.value ]; };
-                              };
-                            }
-                        ) strippedDefs
-                        ++ injected
-                      )
-                    );
+            surplusOffenders = builtins.filter (
+              d: surplusDeclarationKeys { inherit computed mkType; } collectionKeys d.value != [ ]
+            ) defs;
 
-                    # THE LAYERED INTROSPECTION (den-hoag-f1iza M1). A parented kind whose own defs
-                    # each declare from their own text (refusing `layerRefusedKeys`), with no injected base or
-                    # methods module and only context-free parents, is evaluated over its own defs
-                    # alone and unioned with each parent construction's published plane (itself
-                    # layered or full); a leaf two sources declare falls back to the full evaluation.
-                    # The cycle verdict is read before any parent: on an inheritance cycle a parent's
-                    # flag is this kind's own, in flight, and the cycle walk (witnesses only) refuses
-                    # it by name at `resolvedOnly`. A def carrying the resolver's file prefix is
-                    # context-free only where it is the resolver's own (`resolvedBy`, the exact file
-                    # and value), so the layer leaves out every prefixed def and drops nothing else.
-                    # The def test is a lambda applied here and the layer is spelled in place, since a
-                    # library-scope binding of either costs a thunk per evaluation.
-                    contextFree =
-                      inheritanceCycle == null
-                      && injected == [ ]
-                      && builtins.all (
-                        d:
-                        if prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")) then
-                          builtins.any (p: resolvedBy kind p d) declaredInherits
-                        else
-                          (v: builtins.isAttrs v && builtins.intersectAttrs layerRefusedKeys v == { }) d.value
-                      ) defs
-                      && builtins.all (p: p ? __kindSelf && (p.__kindSelf null).__kindContextFree or false) kindParents;
-                    layer =
-                      if kindParents == [ ] || !contextFree then
-                        null
+            checkDeclarationKeys =
+              result:
+              if formalNamed != [ ] then
+                throw "gen-schema: kind '${kind}': declaration key '${builtins.head formalNamed}' is a construction formal of this schema — it is fixed by the call that builds the schema option (`mkSchemaOption`, `mkSchemaEntryType`), and written on a kind entry it is not read as one; pass '${builtins.head formalNamed}' to that constructor, or write `config.${builtins.head formalNamed}` for an instance field of that name, which a strict instance must declare as an option"
+              else if publishedNamed != [ ] then
+                throw "gen-schema: kind '${kind}': declaration key '${builtins.head publishedNamed}' is a name gen-schema writes onto the kind value — written on a kind entry it lands on every instance, while reading `config.schema.${kind}.${builtins.head publishedNamed}` returns the published one; write `config.${builtins.head publishedNamed}` for an instance field of that name, which a strict instance must declare as an option"
+              else if reservedNamed != [ ] then
+                throw (
+                  if builtins.head reservedNamed == "__keyEq" then
+                    "gen-schema: kind '${kind}': declaration key '__keyEq' is reserved — gen-schema publishes the key comparison of every kind, beside the key it derives from the kind's mark, and a declaration does not choose it"
+                  else
+                    "gen-schema: kind '${kind}': declaration key '${builtins.head reservedNamed}' is reserved — gen-schema writes it onto every kind value and a declared one is discarded unread"
+                )
+              else if surplusOffenders != [ ] then
+                let
+                  offender = builtins.head surplusOffenders;
+                in
+                throw (
+                  unknownDeclarationKeyRefusal kind collectionKeys (surplusDeclarationKeys {
+                    inherit computed mkType;
+                  } collectionKeys offender.value) (isStructuredDecl offender.value) (offender.file or "<unknown>")
+                )
+              else
+                result;
+          in
+          completed (
+            checkDeclarationKeys (
+              # The collection door is read at this arm's WHNF: its result publishes no collection, so
+              # a schema the door refuses (an `identity = false` beside `mkType`) would otherwise be
+              # served on every read that forces no collection, its `kind` among them. `mixins` is
+              # refused at the same WHNF: the `mkType` result is what an instance imports, so a
+              # mixin's module half would reach an instance only through caller code this library
+              # cannot see, and its pooled collections would disagree with the instance (den-hoag-8kdu2).
+              if
+                mkType != null
+                && builtins.seq allCollections true
+                && (
+                  mixins == [ ]
+                  || throw "gen-schema: a schema built with `mkType` cannot take `mixins`: the `mkType` result is the module an instance imports, and the mixin pipeline has no place in it; define the contribution in the `mkType` result, or drop `mkType`"
+                )
+              then
+                # Custom entry type: collection extraction runs first (above),
+                # then mkType controls the result. Mixins are refused (above) and the __functor
+                # wrapping is skipped; `options`, `refs` and `refinements` are DERIVED, from the
+                # option plane of the value an instance of this kind imports.
+                # Precedence: computedFields wins over mkType result for same-named keys,
+                # so computed topology/meta fields remain authoritative.
+                # strippedDefs are passed so mkType implementations can wire user-declared
+                # options/config from the schema kind entry into their own type systems.
+                let
+                  # THE CALLER'S `defs` HAVE A DECLARATION-LEVEL SHAPE (den-hoag-24zdh): the raw defs,
+                  # stripped, then the parents as ONE def, present iff `inherits` is non-empty, nesting
+                  # each parent under its own `_file`, whichever of the desugar or `evalSchema`
+                  # composed it (den-hoag-4d2zs). `strippedDefs`' spine is the
+                  # parents' classification, and the caller's result is this kind's WHNF, so a caller
+                  # reading that spine made each kind on a value cycle consume its partner's WHNF before
+                  # any guard ran. Scoped to this arm: the default arm's key set reads no parent, so it
+                  # keeps `strippedDefs` and pays nothing, and the plane below keeps it on both arms,
+                  # so no mark moves. A kind that inherits nothing has no desugared def, so it hands
+                  # the caller `strippedDefs` itself.
+                  custom = mkType {
+                    kindModule = resolvedBase;
+                    collections = extractedCollections;
+                    defs =
+                      if declaredRaw == [ ] then
+                        strippedDefs
                       else
                         let
-                          ownDefsL = builtins.filter (
-                            d: !(prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")))
-                          ) (builtins.genList (builtins.elemAt strippedDefs) (builtins.length defs));
-                          # The parents' constructions' published planes first, so a collision between
-                          # two parents (a diamond, a redeclared ancestor leaf) falls back before this
-                          # kind's own layer is evaluated; then the own defs' declared top-level option
-                          # names (`ownDecls`, each def's `options` as written: a context-free def is an
-                          # attrset read without evaluation) against the parents' plane, so an own leaf
-                          # redeclaring a parent's falls back unevaluated too; then `own`, this kind's own
-                          # defs evaluated alone (den-hoag-f1iza C3, CF-1). `null` selects the full
-                          # evaluation.
-                          ownDecls = map (d: d.value.options or { }) ownDefsL;
-                          own = introspectOf (resolvedOnly (base.merge loc ownDefsL));
-                          parentCons = map (p: p.__kindSelf null) kindParents;
-                          parents = builtins.foldl' unionDisjoint (builtins.head parentCons).options (
-                            map (c: c.options) (builtins.tail parentCons)
-                          );
-                          collides = builtins.any (
-                            o:
-                            builtins.isAttrs o
-                            && builtins.any (
-                              n:
-                              parents ? ${n} && (isOptionDecl parents.${n} || !(builtins.isAttrs o.${n}) || isOptionDecl o.${n})
-                            ) (builtins.attrNames o)
-                          ) ownDecls;
-                          options = if parents == null || collides then null else unionDisjoint parents own.options;
+                          # a parent `evalSchema` resolved arrives as a raw def; it joins the nested
+                          # def, decided by its `file` alone, so the spine reads no classification.
+                          # Any module may set `_file`, so a nested def keeps its value less the collection keys.
+                          resolved = d: prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or ""));
                         in
-                        if options == null then
-                          null
-                        else
-                          {
-                            options = resolvedOnly options;
-                            refs = resolvedOnly (builtins.foldl' (a: c: c.refs // a) own.refs parentCons);
-                            refinements = builtins.foldl' (
-                              a: c: c.refinements // a
-                            ) (refinementsOfOptions own.options) parentCons;
-                            inherit own;
-                          };
-                    introspect = if layer == null then introspectOf merged else layer;
-                    plane = planeOf {
-                      inherit
-                        kind
-                        kept
-                        guard
-                        projected
-                        ;
-                      # A layered kind's plane walks its own layer only (den-hoag-f1iza M3): every path
-                      # a parent publishes is that parent's record, entering by the parent's mark.
-                      options = if layer == null then introspect.options else resolvedOnly layer.own.options;
-                      refs = if layer == null then introspect.refs else resolvedOnly layer.own.refs;
-                      collections = extractedCollections;
-                      inherit keySemantics;
-                      computed = minted;
-                      modules =
-                        (
-                          if kindParents == [ ] then
-                            map (d: d.value) strippedDefs
+                        map (
+                          d:
+                          if builtins.isAttrs d.value && prelude.any (k: d.value ? ${k}) collectionKeys then
+                            d // { value = builtins.removeAttrs d.value collectionKeys; }
                           else
-                            map (d: d.value) (ownDefsOf kind kindImports (builtins.length defs) strippedDefs)
-                        )
+                            d
+                        ) (builtins.filter (d: !(resolved d)) defs)
                         ++ [
-                          effectiveBase
+                          {
+                            file = "<gen-schema: kind '${kind}' inherits>";
+                            value.imports = map (d: builtins.removeAttrs d.value collectionKeys // { _file = d.file; }) (
+                              builtins.filter resolved defs ++ desugaredDefs
+                            );
+                          }
                         ];
-                      functions = { inherit mkType computed; };
-                      parents = kindParents;
-                    };
-                    # Bound ONCE per kind and read by both the module key and `__mint`: the key is
-                    # built on every application of `__functor` (every instance, every child), and a
-                    # mint inside it would run once per application.
-                    ownMark = builtins.seq identityVerdict (markOf {
-                      inherit kind strict plane;
-                    });
-                    # The keyed module's fields, bound once per kind: the key, in the functor's result,
-                    # and on the kind value's RECORD the comparison gen-merge's key dedup applies when
-                    # another occurrence shares the key (`__keyEq`, gen-merge's protocol, read off the
-                    # unapplied module; `keyEqRecord`): `sealedCollisionEq` over `kindEq`'s subject, the
-                    # decision the ancestor map makes, so the one construction reached twice is one
-                    # module and two constructions sharing the mark are refused by name, in either order.
-                    #
-                    # The comparison rides on the record, never in the result, because the kind value is
-                    # a module a foreign evaluator also imports: nixpkgs applies the functor and collects
-                    # only its result, where `__keyEq` is an unsupported attribute (den-hoag-e5whp). The
-                    # record is present on every kind, parentless or not, and reads nothing of
-                    # `kindParents`, so reading the record's names never forces the parents ahead of the
-                    # cycle walk. Residue, stated:
-                    # `mergeReadsKeyEq` sees only the gen-merge gen-schema is built with, and the engine
-                    # evaluating the instance can be another (a consumer whose gen-merge predates the
-                    # record protocol); that engine never reads the record and deduplicates the key
-                    # silently.
-                    keyed =
-                      if !mergeReadsKeyEq then
-                        throw "gen-schema: kind '${kind}' publishes its node key `__moduleKey' and the key comparison `__keyEq' (with its `key', `onDistinct' and `conflicts') on its record, and the gen-merge it is evaluated with does not read them there (its `moduleSyntax.functorRecord' does not list both `__moduleKey' and `__keyEq', or its `moduleSyntax.keyEqFields' does not list `key', `onDistinct' and `conflicts'). gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
-                      else
-                        {
-                          # the reference key, for a foreign evaluator: nixpkgs dedups and removes the kind by
-                          # it; gen reads the record's (`__keyEq.key`), so it never forces this one at load.
-                          # THE SEPARATION KEY (den-hoag-a7c9r arm B′, owner 2026-10-31): where the kind's
-                          # defs reach no opaque (function or path) module, the key is a syntactic reading
-                          # of what the mark mints (the schema's construction digest, each def's declared
-                          # option paths with their types' marks, the non-default kept collections, the
-                          # computed field and freeform types, the parents' own keys), so nixpkgs' load
-                          # forces no mark. Where an opaque module is reached no syntactic reader sees its
-                          # declarations, and the key is the mark: a fallback stated and chosen by
-                          # constructor shape. The key must split exactly where the mark splits; a mark
-                          # component with no twin here is a coarser key, which would merge two kinds the
-                          # mark tells apart.
-                          key =
-                            let
-                              markOrQ =
-                                t:
-                                if builtins.isAttrs t && t ? __mint && builtins.isAttrs t.__mint && t.__mint ? minted then
-                                  t.__mint.minted
-                                else
-                                  "?";
-                              walkedK = modulesOf (map (d: d.value) strippedDefs);
-                              openK = builtins.catAttrs "open" walkedK;
-                              optsOf = m: if builtins.isAttrs (m.options or null) then m.options else { };
-                              renderTag =
-                                t:
-                                if t ? inert then
-                                  "i" + t.inert
-                                else if t ? minted then
-                                  "m" + t.minted
-                                else if t ? sealed then
-                                  "s"
-                                else
-                                  "u";
-                              render =
-                                tags:
-                                builtins.concatStringsSep ";" (map (n: "${n}=${renderTag tags.${n}}") (builtins.attrNames tags));
-                              parentsKey = builtins.concatStringsSep "|" (map (p: (p.__functor p { }).key or "?") kindParents);
-                              optsKey =
-                                pre: os:
-                                prelude.concatMap (
-                                  n:
-                                  let
-                                    o = os.${n};
-                                  in
-                                  if isOptionDecl o then
-                                    [ "${pre}${n}=${markOrQ (o.type or null)}" ]
-                                  else if builtins.isAttrs o then
-                                    optsKey "${pre}${n}." o
-                                  else
-                                    [ "${pre}${n}=?" ]
-                                ) (builtins.attrNames os);
-                              defKey = builtins.concatStringsSep ";" (
-                                prelude.concatLists (prelude.imap0 (i: m: optsKey "${toString i}:" (optsOf m)) openK)
-                                ++ [ "opaque=${toString (builtins.length (builtins.catAttrs "opaque" walkedK))}" ]
-                              );
-                              atDefault =
-                                c:
-                                let
-                                  r = builtins.tryEval (
-                                    allCollections.${c} ? default
-                                    && extractedCollections.${c} == (seeds.${c} or allCollections.${c}.default)
-                                  );
-                                in
-                                r.success && r.value;
-                              defaultsKey = builtins.concatStringsSep "," (
-                                builtins.filter (c: extractedCollections ? ${c} && atDefault c) kept
-                              );
-                              restKey =
-                                defaultsKey
-                                + "!"
-                                + render (
-                                  (preimageOf (
-                                    (
-                                      if computed == null then
-                                        [ ]
-                                      else
-                                        [
-                                          {
-                                            path = [ "computed" ];
-                                            value = minted;
-                                          }
-                                        ]
-                                    )
-                                    ++ (
-                                      let
-                                        ffs = builtins.filter (t: t != null) (
-                                          prelude.concatMap (m: [
-                                            (m.freeformType or null)
-                                            ((m._module or { }).freeformType or null)
-                                            (((m.config or { })._module or { }).freeformType or null)
-                                          ]) openK
-                                        );
-                                      in
-                                      if ffs == [ ] then
-                                        [ ]
-                                      else
-                                        [
-                                          {
-                                            path = [ "freeformType" ];
-                                            value = ffs;
-                                          }
-                                        ]
-                                    )
-                                    ++ map (c: {
-                                      path = [
-                                        "collections"
-                                        c
-                                      ];
-                                      value = extractedCollections.${c};
-                                    }) (builtins.filter (c: extractedCollections ? ${c} && !(atDefault c)) kept)
-                                  )).tags
-                                );
-                            in
-                            if builtins.catAttrs "opaque" walkedK != [ ] then
-                              "gen-schema-kind:${kind}#${kindWitness}#${ownMark}"
-                            else
-                              "gen-schema-kind:${kind}#${kindWitness}#${
-                                builtins.replaceStrings [ "#" ] [ "%23" ] "${schemaDigest}/${defKey}/${restKey}/${parentsKey}"
-                              }";
-                          config = { };
-                        };
-                    # THIS construction's token, compared as one attrset (`a.token == b.token`): the one
-                    # construction reached twice reads true, two constructions false, on every evaluator.
-                    # Two invariants hold it:
-                    # 1. The lambda stays inline here, one per construction. Hoisted (one lambda shared by
-                    #    every construction), two constructions' tokens compare true and merge silently.
-                    # 2. The token attrset is only ever selected or copied (`//`, `inherit`, passed as a
-                    #    value), never rebuilt: `{ inherit (token) t; }` compares false on Nix and
-                    #    Determinate and true on Lix, so one construction would read as two by evaluator.
-                    constructionToken = {
-                      t = _: null;
-                    };
-                    # the guard's flag narrowed to THIS kind: it defines a value for a declared collection
-                    # the schema keeps in identity (a kind that defines none mints only the schema's defaults)
-                    guardedNames = kindGuardedNames kept;
-                    # a mixin may supply the collection's value too (read by name off the emitted
-                    # collections, never by value)
-                    kindGuarded =
-                      guard
-                      && (
-                        builtins.any (d: builtins.isAttrs d.value && builtins.any (c: d.value ? ${c}) guardedNames) defs
-                        || (mixinResult != null && builtins.any (c: (mixinResult.collections or { }) ? ${c}) guardedNames)
-                      );
-                    # one result value per kind construction, shared by every application of the functor
-                    kindResult = {
-                      imports = [ merged ];
+                    inherit kind;
+                  };
+                  # The keys the arm applies over the `mkType` result. `options = { }` and `refs = { }`
+                  # stand in the TREE MODULE only: the kind value publishes the evaluated plane under
+                  # those names, and a module built over the kind value itself would be circular for any
+                  # reader of `options` (gen-merge's reader of a non-functor module, or a functor that
+                  # reads its `self`). The pinned refusal of a non-functor result names `keySemantics`
+                  # from exactly this module.
+                  published = {
+                    inherit strict keySemantics;
+                    options = { };
+                    refs = { };
+                  };
+                  # The module an instance imports: the `mkType` result with the published keys and
+                  # computed fields applied. The derived fields (`options`, `refs`, `refinements`,
+                  # `__mint`, `__sealed`) are left out; none is a module declaration.
+                  #
+                  # LAZY, and load-bearing: one `evalModuleTree` per `mkType` kind, memoised in the
+                  # kind record and forced only by a read of `options`, `refs`, `refinements` or the
+                  # mark — never by `kind` or `strict`.
+                  #
+                  # The module is named for its kind, so a refusal of its syntax (a surplus key beside
+                  # the published `options`) says which kind to fix; a `_file` of the result's own wins.
+                  treeModule = resolvedOnly (
+                    {
+                      _file = "<gen-schema mkType kind ${kind}>";
                     }
-                    // keyed;
-                    keyEqRecord = kindNodeRecord kind kindWitness ownMark plane constructionToken kindGuarded keyed;
-                  in
-                  # Precedence: computed overrides collections of the same name.
-                  # __functor is reserved — collections/computed must not use it as a key.
-                  {
-                    # Every kind is a node of gen's module graph by its DECLARATION NODE (`__moduleKey`,
-                    # the content witness as its held string; den-hoag-9zyp7 OQ2), so an ancestor
-                    # reached on two branches (a diamond) is composed once. gen-merge reads the record's
-                    # reference key only where two occurrences of one node meet (`__keyEq.meeting`), so
-                    # the import of a lone kind demands no mark. The result's `key`,
-                    # `gen-schema-kind:<kind>#<witness>#<separation>` (the separation key, `keyed`), is
-                    # read by foreign evaluators and at a meeting:
-                    # nixpkgs dedups the kind and removes it by that key (`keyed`, `keyEqRecord`).
-                    # Inside a kind the ancestor map's fold decides the pair.
-                    __functor = _: { ... }: kindResult;
+                    // custom
+                    // published
+                    // computedFields
+                  );
+                  introspect = introspectOf treeModule;
+                  # THIS construction's token (the default arm's `constructionToken`, and its two invariants)
+                  mkTypeConstructionToken = {
+                    t = _: null;
+                  };
+                  # ONE plane for the published fields, the mark and `kindEq` (c+): this arm's option
+                  # plane is the tree an instance imports, so it enters the preimage, an option a parent
+                  # publishes by that parent's mark (`planeOf`'s own options, den-hoag-a7c9r).
+                  plane = planeOf {
                     inherit
                       kind
-                      mixins
-                      strict
-                      keySemantics
+                      kept
+                      guard
+                      projected
                       ;
                     inherit (introspect) options refs;
-                    refinements = extractedRefinements;
-                  }
-                  // extractedCollections
-                  // guardedComputed
-                  // {
-                    # Applied LAST so the mark cannot be shadowed by a collection or a computed field;
-                    # both are refused by name above rather than left to win silently here.
-                    __mint = {
-                      minted = ownMark;
+                    collections = extractedCollections;
+                    inherit keySemantics;
+                    computed = minted;
+                    modules =
+                      (
+                        if kindParents == [ ] then
+                          map (d: d.value) strippedDefs
+                        else
+                          map (d: d.value) (ownDefsOf kind kindImports (builtins.length defs) strippedDefs)
+                      )
+                      ++ [
+                        resolvedBase
+                      ];
+                    functions = { inherit mkType computed; };
+                    parents = kindParents;
+                  };
+                  # minted once, read by `__mint` and the node record (gen-merge forces `__keyEq.key` at a
+                  # meeting, so two calls would mint twice)
+                  mkTypeMark = builtins.seq identityVerdict (markOf {
+                    inherit kind strict plane;
+                  });
+                in
+                # Every field the caller's `mkType` built is read THROUGH the guard (den-hoag-8c8pr): the
+                # result is the caller's key space (`__defsModule`, or anything else built from `defs`),
+                # which gen-schema cannot enumerate, so each value is guarded rather than each name.
+                # Names stay lazy; a kind that inherits nothing pays one thunk per field.
+                prelude.mapAttrs (_: resolvedOnly) custom
+                # The two containment and inheritance relations are WRITTEN here, over the result,
+                # because their readers take them off the kind value — `evalSchema` reads `inherits`,
+                # `_topology` reads `parent` — and a result that publishes no collections would otherwise
+                # lose a declared edge without a word (den-hoag-fwoa8). Unguarded: both are read on an
+                # unresolved kind (`evalSchema`'s names read). Before the computed fields, which win over a
+                # collection on both branches.
+                // {
+                  inherit (extractedCollections) inherits parent;
+                }
+                // published
+                // {
+                  inherit (introspect) options refs;
+                  refinements = refinementsOfOptions introspect.options;
+                }
+                # The result's functor is applied to `treeModule`, so the tree and an instance hand it
+                # the same `self` and a functor that reads `self.options` declares one plane in both.
+                # Applied before the computed fields, which still win for same-named keys.
+                // prelude.optionalAttrs (custom ? __functor) {
+                  # Guarded over the APPLIED module, not only through `treeModule`: a functor that
+                  # ignores its `self` never forces the tree module, and would compose unguarded.
+                  __functor = _: resolvedOnly (custom.__functor treeModule);
+                }
+                // guardedComputed
+                // {
+                  # `kind` is the LET-BOUND `prelude.last loc` — the option path, which is
+                  # authoritative — never the `mkType` result's echo of it, which is caller data.
+                  # WRITTEN here (den-hoag-3x3bi, ADR-0025): before this, nothing on this arm wrote
+                  # `kind` at all, so a result carrying none made `.kind` abort uncatchably
+                  # (`attribute 'kind' missing`, not a `throw` `tryEval` can catch) and
+                  # `mkInstanceType` refused with the FALSE reason "no mark" (`isSchemaKind` reads
+                  # `v ? kind` first); a result echoing a WRONG name published that name while the
+                  # mark stayed keyed to the option path, silently disagreeing with it. Applied AFTER
+                  # `// computedFields`, beside `__mint`, so a computed `kind` cannot re-open what this
+                  # write closes — `kind` is refused as a computed-field name below regardless.
+                  # The mark reads `plane`, the one plane the arm publishes as `options` and `refs`
+                  # (den-hoag-mx07b §4 Q1 ruled). `ci/tests/mktype-refinements.nix` pins that the mark
+                  # reads it. An option a parent publishes with an exact mark enters by that parent's
+                  # mark rather than again (den-hoag-a7c9r): the same plane, factored.
+                  inherit kind;
+                  __mint = {
+                    minted = mkTypeMark;
+                  };
+                  __sealed = builtins.seq identityVerdict plane.sealed;
+                  __okAt = kindOkAt { inherit (introspect) options refs; };
+                  __kindImports = resolvedOnly kindParents;
+                  __kindCycleParents = cycleParents;
+                  __kindWitness = kindWitness;
+                  __kindAncestors = resolvedOnly kindAncestorsByMark;
+                  __kindLineage = resolvedOnly kindAncestors;
+                }
+                // kindNodeRecord kind kindWitness mkTypeMark plane mkTypeConstructionToken (
+                  guard
+                  && builtins.any (
+                    d: builtins.isAttrs d.value && builtins.any (c: d.value ? ${c}) (kindGuardedNames kept)
+                  ) defs
+                ) null
+              else
+                let
+                  # Effective base module: bridge output when mixins applied, original otherwise
+                  effectiveBase = if mixinResult != null then mixinResult.module else resolvedBase;
+
+                  # Refinements are a PROJECTION of the option plane, read off the same `introspect.options`
+                  # `refs` is, so `attrNames refinements ⊆ attrNames options` holds by construction and no
+                  # option can land without its contract, nor a contract without its option. A second,
+                  # syntactic reader of the raw defs is what let the two planes disagree. On the mixin path
+                  # the bridge's record refinements are unioned in: its keys are lifted into `options`, so
+                  # the inclusion still holds, and a contract declared in the kind entry itself is read too.
+                  # Lazy: forced only when `refinements` is, and that must stay so.
+                  # Stored on the kind result so mkInstanceRegistry can consume them automatically.
+                  extractedRefinements =
+                    if layer != null then
+                      layer.refinements
+                    else
+                      (if mixinResult != null then mixinResult.refinements else { })
+                      // prelude.filterAttrs (_: v: v != [ ]) (
+                        prelude.mapAttrs (_: o: getRefinements o.type) (
+                          prelude.filterAttrs (_: o: isOptionDecl o && o ? type) introspect.options
+                        )
+                      );
+
+                  # Inject baseModule + methods module (methods is the only collection
+                  # that generates instance-level options via mkMethodsModule)
+                  injected =
+                    prelude.optional (effectiveBase != null) {
+                      file = "gen-schema/base";
+                      value = if keyedBase != null then keyedBase else effectiveBase;
+                    }
+                    ++ prelude.optional (extractedCollections.methods != { }) {
+                      file = "gen-schema/methods";
+                      value = mkMethodsModule kind extractedCollections.methods;
                     };
-                    __sealed = builtins.seq identityVerdict plane.sealed;
-                    __okAt = kindOkAt { inherit (introspect) options refs; };
-                    # the parents as VALUES, read by the ancestor map; the parents as written and the
-                    # witness, read by the cycle walk of every kind below
-                    __kindImports = resolvedOnly kindParents;
-                    __kindCycleParents = cycleParents;
-                    __kindWitness = kindWitness;
-                    __kindAncestors = resolvedOnly kindAncestorsByMark;
-                    __kindContextFree = contextFree;
-                    __kindLineage = resolvedOnly kindAncestors;
+
+                  # The defs `merged` imports carry `entryReservation` (den-hoag-8x97u), so a
+                  # reserved name in a module they import refuses at gen-merge's collector. The
+                  # marker rides on the RECORD of a functor wrapping the def, never in a module's
+                  # content (den-hoag-r05lc): the kind value is a module a foreign evaluator also
+                  # imports, and nixpkgs applies the functor and reads only its result. A plain
+                  # attrset def is that result itself, so its own top level stays this library's
+                  # door; a function, functor or path def is imported by it. A plain attrset def
+                  # naming no `imports` or `require` imports nothing, so the reservation has nothing
+                  # to scope and it is passed as it stands: the wrapper is applied once per
+                  # instance, and only where it has work. The plane's `modules` stay the unmarked
+                  # `strippedDefs`, so no kind's mark moves.
+                  reservation = entryReservation kind;
+                  merged = resolvedOnly (
+                    base.merge loc (
+                      map (
+                        d:
+                        let
+                          plain = builtins.isAttrs d.value && !(d.value ? __functor);
+                        in
+                        if plain && !(d.value ? imports || d.value ? require) then
+                          d
+                        else
+                          d
+                          // {
+                            value = {
+                              __reservedKeys = reservation;
+                              __functionArgs = { };
+                              __functor =
+                                _: _:
+                                if !mergeReadsRecordReservation then
+                                  throw "gen-schema: kind '${kind}' reserves its construction formals in every module its entry imports, on the record of the module it wraps each definition in (`__reservedKeys'), and the gen-merge it is evaluated with does not read that record (its `moduleSyntax.functorRecord' does not list `__reservedKeys'). gen-schema requires a gen-merge reading the reservation off a functor module's record; update the gen-merge input gen-schema is built with."
+                                else if plain then
+                                  d.value
+                                else
+                                  { imports = [ d.value ]; };
+                            };
+                          }
+                      ) strippedDefs
+                      ++ injected
+                    )
+                  );
+
+                  # THE LAYERED INTROSPECTION (den-hoag-f1iza M1). A parented kind whose own defs
+                  # each declare from their own text (refusing `layerRefusedKeys`), with no injected base or
+                  # methods module and only context-free parents, is evaluated over its own defs
+                  # alone and unioned with each parent construction's published plane (itself
+                  # layered or full); a leaf two sources declare falls back to the full evaluation.
+                  # The cycle verdict is read before any parent: on an inheritance cycle a parent's
+                  # flag is this kind's own, in flight, and the cycle walk (witnesses only) refuses
+                  # it by name at `resolvedOnly`. A def carrying the resolver's file prefix is
+                  # context-free only where it is the resolver's own (`resolvedBy`, the exact file
+                  # and value), so the layer leaves out every prefixed def and drops nothing else.
+                  # The def test is a lambda applied here and the layer is spelled in place, since a
+                  # library-scope binding of either costs a thunk per evaluation.
+                  contextFree =
+                    inheritanceCycle == null
+                    && injected == [ ]
+                    && builtins.all (
+                      d:
+                      if prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")) then
+                        builtins.any (p: resolvedBy kind p d) declaredInherits
+                      else
+                        (v: builtins.isAttrs v && builtins.intersectAttrs layerRefusedKeys v == { }) d.value
+                    ) defs
+                    && builtins.all (p: p ? __kindSelf && (p.__kindSelf null).__kindContextFree or false) kindParents;
+                  layer =
+                    if kindParents == [ ] || !contextFree then
+                      null
+                    else
+                      let
+                        ownDefsL = builtins.filter (
+                          d: !(prelude.hasPrefix (inheritsResolvedPrefix kind) (toString (d.file or "")))
+                        ) (builtins.genList (builtins.elemAt strippedDefs) (builtins.length defs));
+                        # The parents' constructions' published planes first, so a collision between
+                        # two parents (a diamond, a redeclared ancestor leaf) falls back before this
+                        # kind's own layer is evaluated; then the own defs' declared top-level option
+                        # names (`ownDecls`, each def's `options` as written: a context-free def is an
+                        # attrset read without evaluation) against the parents' plane, so an own leaf
+                        # redeclaring a parent's falls back unevaluated too; then `own`, this kind's own
+                        # defs evaluated alone (den-hoag-f1iza C3, CF-1). `null` selects the full
+                        # evaluation.
+                        ownDecls = map (d: d.value.options or { }) ownDefsL;
+                        own = introspectOf (resolvedOnly (base.merge loc ownDefsL));
+                        parentCons = map (p: p.__kindSelf null) kindParents;
+                        parents = builtins.foldl' unionDisjoint (builtins.head parentCons).options (
+                          map (c: c.options) (builtins.tail parentCons)
+                        );
+                        collides = builtins.any (
+                          o:
+                          builtins.isAttrs o
+                          && builtins.any (
+                            n:
+                            parents ? ${n} && (isOptionDecl parents.${n} || !(builtins.isAttrs o.${n}) || isOptionDecl o.${n})
+                          ) (builtins.attrNames o)
+                        ) ownDecls;
+                        options = if parents == null || collides then null else unionDisjoint parents own.options;
+                      in
+                      if options == null then
+                        null
+                      else
+                        {
+                          options = resolvedOnly options;
+                          refs = resolvedOnly (builtins.foldl' (a: c: c.refs // a) own.refs parentCons);
+                          refinements = builtins.foldl' (
+                            a: c: c.refinements // a
+                          ) (refinementsOfOptions own.options) parentCons;
+                          inherit own;
+                        };
+                  introspect = if layer == null then introspectOf merged else layer;
+                  plane = planeOf {
+                    inherit
+                      kind
+                      kept
+                      guard
+                      projected
+                      ;
+                    # A layered kind's plane walks its own layer only (den-hoag-f1iza M3): every path
+                    # a parent publishes is that parent's record, entering by the parent's mark.
+                    options = if layer == null then introspect.options else resolvedOnly layer.own.options;
+                    refs = if layer == null then introspect.refs else resolvedOnly layer.own.refs;
+                    collections = extractedCollections;
+                    inherit keySemantics;
+                    computed = minted;
+                    modules =
+                      (
+                        if kindParents == [ ] then
+                          map (d: d.value) strippedDefs
+                        else
+                          map (d: d.value) (ownDefsOf kind kindImports (builtins.length defs) strippedDefs)
+                      )
+                      ++ [
+                        effectiveBase
+                      ];
+                    functions = { inherit mkType computed; };
+                    parents = kindParents;
+                  };
+                  # Bound ONCE per kind and read by both the module key and `__mint`: the key is
+                  # built on every application of `__functor` (every instance, every child), and a
+                  # mint inside it would run once per application.
+                  ownMark = builtins.seq identityVerdict (markOf {
+                    inherit kind strict plane;
+                  });
+                  # The keyed module's fields, bound once per kind: the key, in the functor's result,
+                  # and on the kind value's RECORD the comparison gen-merge's key dedup applies when
+                  # another occurrence shares the key (`__keyEq`, gen-merge's protocol, read off the
+                  # unapplied module; `keyEqRecord`): `sealedCollisionEq` over `kindEq`'s subject, the
+                  # decision the ancestor map makes, so the one construction reached twice is one
+                  # module and two constructions sharing the mark are refused by name, in either order.
+                  #
+                  # The comparison rides on the record, never in the result, because the kind value is
+                  # a module a foreign evaluator also imports: nixpkgs applies the functor and collects
+                  # only its result, where `__keyEq` is an unsupported attribute (den-hoag-e5whp). The
+                  # record is present on every kind, parentless or not, and reads nothing of
+                  # `kindParents`, so reading the record's names never forces the parents ahead of the
+                  # cycle walk. Residue, stated:
+                  # `mergeReadsKeyEq` sees only the gen-merge gen-schema is built with, and the engine
+                  # evaluating the instance can be another (a consumer whose gen-merge predates the
+                  # record protocol); that engine never reads the record and deduplicates the key
+                  # silently.
+                  keyed =
+                    if !mergeReadsKeyEq then
+                      throw "gen-schema: kind '${kind}' publishes its node key `__moduleKey' and the key comparison `__keyEq' (with its `key', `onDistinct' and `conflicts') on its record, and the gen-merge it is evaluated with does not read them there (its `moduleSyntax.functorRecord' does not list both `__moduleKey' and `__keyEq', or its `moduleSyntax.keyEqFields' does not list `key', `onDistinct' and `conflicts'). gen-schema requires a gen-merge carrying the `__moduleKey' node-key and `__keyEq' key-comparison protocol; update the gen-merge input gen-schema is built with."
+                    else
+                      {
+                        # the reference key, for a foreign evaluator: nixpkgs dedups and removes the kind by
+                        # it; gen reads the record's (`__keyEq.key`), so it never forces this one at load.
+                        # THE SEPARATION KEY (den-hoag-a7c9r arm B′, owner 2026-10-31): where the kind's
+                        # defs reach no opaque (function or path) module, the key is a syntactic reading
+                        # of what the mark mints (the schema's construction digest, each def's declared
+                        # option paths with their types' marks, the non-default kept collections, the
+                        # computed field and freeform types, the parents' own keys), so nixpkgs' load
+                        # forces no mark. Where an opaque module is reached no syntactic reader sees its
+                        # declarations, and the key is the mark: a fallback stated and chosen by
+                        # constructor shape. The key must split exactly where the mark splits; a mark
+                        # component with no twin here is a coarser key, which would merge two kinds the
+                        # mark tells apart.
+                        key =
+                          let
+                            markOrQ =
+                              t:
+                              if builtins.isAttrs t && t ? __mint && builtins.isAttrs t.__mint && t.__mint ? minted then
+                                t.__mint.minted
+                              else
+                                "?";
+                            walkedK = modulesOf (map (d: d.value) strippedDefs);
+                            openK = builtins.catAttrs "open" walkedK;
+                            optsOf = m: if builtins.isAttrs (m.options or null) then m.options else { };
+                            renderTag =
+                              t:
+                              if t ? inert then
+                                "i" + t.inert
+                              else if t ? minted then
+                                "m" + t.minted
+                              else if t ? sealed then
+                                "s"
+                              else
+                                "u";
+                            render =
+                              tags:
+                              builtins.concatStringsSep ";" (map (n: "${n}=${renderTag tags.${n}}") (builtins.attrNames tags));
+                            parentsKey = builtins.concatStringsSep "|" (map (p: (p.__functor p { }).key or "?") kindParents);
+                            optsKey =
+                              pre: os:
+                              prelude.concatMap (
+                                n:
+                                let
+                                  o = os.${n};
+                                in
+                                if isOptionDecl o then
+                                  [ "${pre}${n}=${markOrQ (o.type or null)}" ]
+                                else if builtins.isAttrs o then
+                                  optsKey "${pre}${n}." o
+                                else
+                                  [ "${pre}${n}=?" ]
+                              ) (builtins.attrNames os);
+                            defKey = builtins.concatStringsSep ";" (
+                              prelude.concatLists (prelude.imap0 (i: m: optsKey "${toString i}:" (optsOf m)) openK)
+                              ++ [ "opaque=${toString (builtins.length (builtins.catAttrs "opaque" walkedK))}" ]
+                            );
+                            atDefault =
+                              c:
+                              let
+                                r = builtins.tryEval (
+                                  allCollections.${c} ? default
+                                  && extractedCollections.${c} == (seeds.${c} or allCollections.${c}.default)
+                                );
+                              in
+                              r.success && r.value;
+                            defaultsKey = builtins.concatStringsSep "," (
+                              builtins.filter (c: extractedCollections ? ${c} && atDefault c) kept
+                            );
+                            restKey =
+                              defaultsKey
+                              + "!"
+                              + render (
+                                (preimageOf (
+                                  (
+                                    if computed == null then
+                                      [ ]
+                                    else
+                                      [
+                                        {
+                                          path = [ "computed" ];
+                                          value = minted;
+                                        }
+                                      ]
+                                  )
+                                  ++ (
+                                    let
+                                      ffs = builtins.filter (t: t != null) (
+                                        prelude.concatMap (m: [
+                                          (m.freeformType or null)
+                                          ((m._module or { }).freeformType or null)
+                                          (((m.config or { })._module or { }).freeformType or null)
+                                        ]) openK
+                                      );
+                                    in
+                                    if ffs == [ ] then
+                                      [ ]
+                                    else
+                                      [
+                                        {
+                                          path = [ "freeformType" ];
+                                          value = ffs;
+                                        }
+                                      ]
+                                  )
+                                  ++ map (c: {
+                                    path = [
+                                      "collections"
+                                      c
+                                    ];
+                                    value = extractedCollections.${c};
+                                  }) (builtins.filter (c: extractedCollections ? ${c} && !(atDefault c)) kept)
+                                )).tags
+                              );
+                          in
+                          if builtins.catAttrs "opaque" walkedK != [ ] then
+                            "gen-schema-kind:${kind}#${kindWitness}#${ownMark}"
+                          else
+                            "gen-schema-kind:${kind}#${kindWitness}#${
+                              builtins.replaceStrings [ "#" ] [ "%23" ] "${schemaDigest}/${defKey}/${restKey}/${parentsKey}"
+                            }";
+                        config = { };
+                      };
+                  # THIS construction's token, compared as one attrset (`a.token == b.token`): the one
+                  # construction reached twice reads true, two constructions false, on every evaluator.
+                  # Two invariants hold it:
+                  # 1. The lambda stays inline here, one per construction. Hoisted (one lambda shared by
+                  #    every construction), two constructions' tokens compare true and merge silently.
+                  # 2. The token attrset is only ever selected or copied (`//`, `inherit`, passed as a
+                  #    value), never rebuilt: `{ inherit (token) t; }` compares false on Nix and
+                  #    Determinate and true on Lix, so one construction would read as two by evaluator.
+                  constructionToken = {
+                    t = _: null;
+                  };
+                  # the guard's flag narrowed to THIS kind: it defines a value for a declared collection
+                  # the schema keeps in identity (a kind that defines none mints only the schema's defaults)
+                  guardedNames = kindGuardedNames kept;
+                  # a mixin may supply the collection's value too (read by name off the emitted
+                  # collections, never by value)
+                  kindGuarded =
+                    guard
+                    && (
+                      builtins.any (d: builtins.isAttrs d.value && builtins.any (c: d.value ? ${c}) guardedNames) defs
+                      || (mixinResult != null && builtins.any (c: (mixinResult.collections or { }) ? ${c}) guardedNames)
+                    );
+                  # one result value per kind construction, shared by every application of the functor
+                  kindResult = {
+                    imports = [ merged ];
                   }
-                  // keyEqRecord
-              )
-            );
-        };
+                  // keyed;
+                  keyEqRecord = kindNodeRecord kind kindWitness ownMark plane constructionToken kindGuarded keyed;
+                in
+                # Precedence: computed overrides collections of the same name.
+                # __functor is reserved — collections/computed must not use it as a key.
+                {
+                  # Every kind is a node of gen's module graph by its DECLARATION NODE (`__moduleKey`,
+                  # the content witness as its held string; den-hoag-9zyp7 OQ2), so an ancestor
+                  # reached on two branches (a diamond) is composed once. gen-merge reads the record's
+                  # reference key only where two occurrences of one node meet (`__keyEq.meeting`), so
+                  # the import of a lone kind demands no mark. The result's `key`,
+                  # `gen-schema-kind:<kind>#<witness>#<separation>` (the separation key, `keyed`), is
+                  # read by foreign evaluators and at a meeting:
+                  # nixpkgs dedups the kind and removes it by that key (`keyed`, `keyEqRecord`).
+                  # Inside a kind the ancestor map's fold decides the pair.
+                  __functor = _: { ... }: kindResult;
+                  inherit
+                    kind
+                    mixins
+                    strict
+                    keySemantics
+                    ;
+                  inherit (introspect) options refs;
+                  refinements = extractedRefinements;
+                }
+                // extractedCollections
+                // guardedComputed
+                // {
+                  # Applied LAST so the mark cannot be shadowed by a collection or a computed field;
+                  # both are refused by name above rather than left to win silently here.
+                  __mint = {
+                    minted = ownMark;
+                  };
+                  __sealed = builtins.seq identityVerdict plane.sealed;
+                  __okAt = kindOkAt { inherit (introspect) options refs; };
+                  # the parents as VALUES, read by the ancestor map; the parents as written and the
+                  # witness, read by the cycle walk of every kind below
+                  __kindImports = resolvedOnly kindParents;
+                  __kindCycleParents = cycleParents;
+                  __kindWitness = kindWitness;
+                  __kindAncestors = resolvedOnly kindAncestorsByMark;
+                  __kindContextFree = contextFree;
+                  __kindLineage = resolvedOnly kindAncestors;
+                }
+                // keyEqRecord
+            )
+          );
       in
       self
     );
