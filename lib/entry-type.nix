@@ -1763,6 +1763,21 @@ let
                   }
                 ];
               }
+            # a list or attrset default is the fold's seed, so where no definition survives the
+            # value is the seed alone, as nixpkgs serves the default alone: the fold's empty case
+            # is `++`/`//`'s identity, never the type's own empty value (which may state none, or
+            # one of another shape)
+            else if collection ? default then
+              collection.type
+              // (
+                let
+                  e = if builtins.isList collection.default then [ ] else { };
+                in
+                {
+                  emptyValue.value = e;
+                  whenEmpty.value = e;
+                }
+              )
             else
               collection.type
           else if collection ? merge then
