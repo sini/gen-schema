@@ -1688,13 +1688,13 @@ let
                 if builtins.elem n dropped then
                   null
                 else
-                  inertOr (if !(builtins.isAttrs c) then c else seedOf n ? value)
+                  inertOr (if !(builtins.isAttrs c) then c else seedOf.${n} ? value)
               ) collections;
               seeds =
                 (preimageOf (
-                  prelude.concatMap (n: spread [ "collections" n ] (_: [ ]) (seedOf n).value) (
+                  prelude.concatMap (n: spread [ "collections" n ] (_: [ ]) seedOf.${n}.value) (
                     builtins.filter (
-                      n: !(builtins.elem n dropped) && builtins.isAttrs allCollections.${n} && seedOf n ? value
+                      n: !(builtins.elem n dropped) && builtins.isAttrs allCollections.${n} && seedOf.${n} ? value
                     ) (builtins.attrNames collections)
                   )
                 )).tags;
@@ -1967,13 +1967,11 @@ let
         dropped = builtins.filter (n: !(allCollections.${n}.identity or true)) collectionKeys;
         # The value a collection holds where no definition reaches it, as `declaredOf` serves it and the
         # mark reads it: its resolved `default`, else its declared type's own `emptyValue` (the type
-        # protocol's record, `{ }` where it states none). The key reads the seed through this alone.
-        seedOf =
-          n:
-          let
-            c = allCollections.${n};
-          in
-          if c ? default then { value = seeds.${n} or c.default; } else c.type.emptyValue or { };
+        # protocol's record, `{ }` where it states none). The key reads the seed through this alone,
+        # resolved once per schema, so a kind's at-default test is a lookup.
+        seedOf = builtins.mapAttrs (
+          n: c: if c ? default then { value = seeds.${n} or c.default; } else c.type.emptyValue or { }
+        ) allCollections;
         # whether the computed fields enter the plane through the projection (`minted`)
         projected = computed != null && dropped != [ ];
         guard = builtins.any (
@@ -3366,7 +3364,7 @@ let
                               atDefault =
                                 c:
                                 let
-                                  r = builtins.tryEval (seedOf c ? value && extractedCollections.${c} == (seedOf c).value);
+                                  r = builtins.tryEval (seedOf.${c} ? value && extractedCollections.${c} == seedOf.${c}.value);
                                 in
                                 r.success && r.value;
                               defaultsKey = builtins.concatStringsSep "," (
