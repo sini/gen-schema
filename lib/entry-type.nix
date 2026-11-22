@@ -3440,8 +3440,15 @@ let
                                       else
                                         let
                                           names = prelude.attrNames v;
+                                          # a member the mint refuses at the top (a function, a path) or reads by its mark is seen here,
+                                          # so the value goes to the spread without an encoder walk
+                                          vals = builtins.attrValues v;
                                           whole = builtins.tryEval (
-                                            if builtins.any (k: v.${k} ? __mint) names then
+                                            if
+                                              builtins.any builtins.isFunction vals
+                                              || builtins.any builtins.isPath vals
+                                              || builtins.any (m: m ? __mint) vals
+                                            then
                                               null
                                             else
                                               identity.hashIdentity "component" [ "value" ] (_: v)
