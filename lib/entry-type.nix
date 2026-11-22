@@ -1927,11 +1927,9 @@ let
         # mixin's contribution. `addr` is the definition record a definition the host does not hold
         # carries (the default, a mixin's contribution): PROTO, see the spec's fork on the split's
         # synthetic definitions.
+        # `mr` is the kind's mixin result (`mixinResultOf`, read once by each caller).
         nestingDefsOf =
-          addr: kind: name: defs:
-          let
-            mr = mixinResultOf kind;
-          in
+          addr: mr: name: defs:
           map (d: d // { file = addr d.file; }) (nestingHead name)
           ++ map (d: {
             inherit (d) file;
@@ -2078,6 +2076,8 @@ let
         self = merge.types.defineType {
           name = "schemaKindEntry";
           description = "schema kind entry — options, config, collections and computed fields";
+          # deferredModule's domain: a definition is a module (an attrset, a function or a path)
+          inherit (base) admits;
           retainedRelation = { inherit functor typeMerge; };
           typeMergeRel =
             other:
@@ -2089,6 +2089,9 @@ let
                 refused = "`schemaKindEntry' and `${
                   if builtins.isAttrs other then other.name or "<unnamed>" else builtins.typeOf other
                 }', which are not one construction";
+                # gen-merge's `foreignRel` reading, as the foreign door gave it: a refusal of a
+                # partner stating its author's relation is this relation's answer as the decider only
+                vetoes = builtins.isAttrs other && other ? typeMergeRel && !(other ? retainedRelation);
               }
             else
               { merged = m; };
@@ -2101,6 +2104,9 @@ let
           };
           split =
             loc: defs:
+            let
+              mr = mixinResultOf (prelude.last loc);
+            in
             map (name: {
               step = [ name ];
               loc = loc ++ [ name ];
@@ -2109,7 +2115,7 @@ let
                 at = throw "gen-schema: `${
                   merge.showOption (loc ++ [ name ])
                 }': a definition gen-schema adds (`${f}') has no declaration address";
-              }) (prelude.last loc) name defs;
+              }) mr name defs;
               type = collections.${name}.type;
             }) nestingNames;
           mergeDefs = {
@@ -2151,7 +2157,7 @@ let
             declaredOf =
               name: collection: stacks:
               if ev != null && builtins.elem name nestingNames then
-                merge.mergeDefs (loc ++ [ name ]) (threadedAt ev name) (nestingDefsOf (f: f) kind name defs)
+                merge.mergeDefs (loc ++ [ name ]) (threadedAt ev name) (nestingDefsOf (f: f) mixinResult name defs)
               # tested before it is filtered, so a kind that never defines the collection binds nothing
               else if
                 stacks == [ ] && !(builtins.any (d: builtins.isAttrs d.value && d.value ? ${name}) defs)
