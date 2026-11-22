@@ -21,7 +21,8 @@ let
       ) attrs
     );
 
-  # Emit a record-algebra record as a NixOS module
+  # Emit a record-algebra record as a NixOS module, an attrset: its whole effect is the option
+  # and config plane, so the module is open and a reader walks it without applying it.
   # collectionLabels: which labels to extract with full stacks
   emitModule =
     collectionLabels: record':
@@ -36,14 +37,12 @@ let
       refinements = extractRefinements content;
     in
     {
-      module =
-        { ... }:
-        {
-          # A refined type is published as declared: it enforces its own refinements
-          # (`refined.nix`, `verify`), so a registry argument cannot drop them.
-          inherit options;
-          config = config;
-        };
+      module = {
+        # A refined type is published as declared: it enforces its own refinements
+        # (`refined.nix`, `verify`), so a registry argument cannot drop them.
+        inherit options;
+        config = config;
+      };
       inherit collections refinements;
     };
 in

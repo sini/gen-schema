@@ -7,12 +7,15 @@
 # declaration node), marks equal, foreign keys equal. Only one-node rows (`w`) are the property's; the
 # others compose by node and are carried as rows only.
 #
-# The corpus: 21 constructed shapes, each as a differing pair and as a twin, the granularity razor's
+# The corpus: 46 constructed shapes, each as a differing pair and as a twin, the granularity razor's
 # default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`), 11 declared-collection
 # pairs under both identity settings, 2 rows over an `identity = false` collection and 2 over a kept
 # collection the kind does not define. The `mkType` arm writes no foreign key. Four shapes redeclare one
 # option embedding an instance type (twice, beside a plain submodule in either order, thrice), a join
-# gen-merge mints over its declarations (den-hoag-2vtgj).
+# gen-merge mints over its declarations (den-hoag-2vtgj). Twenty-five vary one construction parameter: the
+# base (absent, empty, attrset at one or two literals, positionless, function, path), the mixins, a
+# sealed leaf beside an inert one (keySemantics, a seed, a computed field, a kept value), specialArgs,
+# and a declaration's open paths and module order (den-hoag-y9j03).
 #
 # PLANTED RED, in the suite: the same predicate over a node-only key (the witness alone, no content)
 # reads every one-node row whose marks differ as coarser, so a zero on the real key is read with the
@@ -65,7 +68,220 @@ let
     args = { };
     decl = lib.mkMerge (map (t: { options.owner = opt t; }) tys);
   };
+  # the construction-parameter shapes (den-hoag-y9j03): a schema's base, mixins, sealed parameters and
+  # specialArgs, and a declaration's open paths and module order, each one kind declaration `trail`
+  noopMixin = genSchema.mkMixin { } (_: { });
+  addMixin =
+    t: d:
+    genSchema.mkMixin { } (_: {
+      mx = genMerge.mkOption {
+        type = t;
+        default = d;
+      };
+    });
+  # one literal position, two contents: a base built by a function of its type
+  baseOf = t: { options.bx = opt t; };
+  # no attribute position at all: `listToAttrs` mints none
+  positionlessBaseOf =
+    t:
+    builtins.listToAttrs [
+      {
+        name = "options";
+        value = {
+          bx = opt t;
+        };
+      }
+    ];
+  sealedFn = _: null;
+  # a function base resolving to a function module that reads a specialArg
+  specialArgBase = _: { baseType, ... }: { options.bx = opt baseType; };
+  withArgs = args: {
+    inherit args;
+    decl = {
+      options.trail = opt T.str;
+    };
+  };
+  importedPair = {
+    p = {
+      options.p = opt T.str;
+    };
+    q = {
+      options.q = opt T.str;
+    };
+  };
   shapes = {
+    # ── construction parameters (den-hoag-y9j03): the key reads the base as a def, the sealed
+    # parameters per leaf, the open paths, and no module index ──
+    mixinsDiffer =
+      tag:
+      withArgs {
+        baseModule = { };
+        mixins = [ (if tag == "a" then noopMixin else addMixin T.str "") ];
+      };
+    mixinsTypeDiffer =
+      tag:
+      withArgs {
+        baseModule = { };
+        mixins = [ (if tag == "a" then addMixin T.str "" else addMixin T.int 0) ];
+      };
+    mixinNoopVsNone =
+      tag: withArgs ({ baseModule = { }; } // (if tag == "a" then { } else { mixins = [ noopMixin ]; }));
+    # two mixin lists that fold to one record: the later `mx` shadows the earlier
+    mixinShadowed =
+      tag:
+      withArgs {
+        baseModule = { };
+        mixins =
+          if tag == "a" then
+            [ (addMixin T.str "") ]
+          else
+            [
+              (addMixin T.int 0)
+              (addMixin T.str "")
+            ];
+      };
+    baseFnDiffer =
+      tag:
+      withArgs {
+        baseModule =
+          if tag == "a" then (_: { options.bx = opt T.str; }) else (_: { options.bx = opt T.int; });
+      };
+    baseFnTwoSame =
+      tag:
+      withArgs {
+        baseModule =
+          if tag == "a" then (_: { options.bx = opt T.str; }) else (_: { options.bx = opt T.str; });
+      };
+    baseFnVsAttrs =
+      tag:
+      withArgs {
+        baseModule = if tag == "a" then (_: { options.bx = opt T.str; }) else { options.bx = opt T.str; };
+      };
+    baseSpecialArgsDiffer =
+      tag:
+      withArgs {
+        baseModule = specialArgBase;
+        specialArgs.baseType = if tag == "a" then T.str else T.int;
+      };
+    specialArgsOnly = tag: withArgs { specialArgs.baseType = if tag == "a" then T.str else T.int; };
+    baseAttrsOnePos = tag: withArgs { baseModule = baseOf (if tag == "a" then T.str else T.int); };
+    baseNoPosDiffer =
+      tag: withArgs { baseModule = positionlessBaseOf (if tag == "a" then T.str else T.int); };
+    basePathDiffer =
+      tag:
+      withArgs {
+        baseModule =
+          if tag == "a" then ../test-fixtures/key-base-bx.nix else ../test-fixtures/key-base-by.nix;
+      };
+    basePathVsInline =
+      tag:
+      withArgs {
+        baseModule =
+          if tag == "a" then
+            ../test-fixtures/key-base-bx.nix
+          else
+            {
+              options.bx = {
+                _type = "option";
+              };
+            };
+      };
+    baseEmptyVsAbsent = tag: withArgs (if tag == "a" then { } else { baseModule = { }; });
+    baseModulePos =
+      tag:
+      withArgs {
+        baseModule = if tag == "a" then { options.bx = opt T.str; } else { options.bx = opt T.str; };
+      };
+    baseTwoPosDiffer =
+      tag:
+      withArgs {
+        baseModule = if tag == "a" then { options.bx = opt T.str; } else { options.bx = opt T.int; };
+      };
+    keySemSealedDiffer =
+      tag:
+      withArgs {
+        keySemantics = {
+          f = sealedFn;
+          c = tag;
+        };
+      };
+    collSealedAttrsDiffer =
+      tag:
+      withArgs {
+        collections.extra.default = {
+          f = sealedFn;
+          v = tag;
+        };
+      };
+    collSealedListDiffer =
+      tag:
+      withArgs {
+        collections.extra.default = [
+          sealedFn
+          tag
+        ];
+      };
+    computedSealedLeaf =
+      tag:
+      withArgs {
+        computed = _: _: {
+          f = sealedFn;
+          c = tag;
+        };
+      };
+    keptCollectionSealedAttrs = tag: {
+      args = {
+        collections.tags.default = { };
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags = {
+          f = sealedFn;
+          v = tag;
+        };
+      };
+    };
+    mkTypeDiffer =
+      tag:
+      withArgs {
+        mkType =
+          { defs, ... }:
+          {
+            __functor = _: { ... }: { imports = map (d: d.value) defs; };
+          };
+      };
+    computedDiffer = tag: withArgs { computed = _: _: { c = tag; }; };
+    defConfigPresence = tag: {
+      args = { };
+      decl = {
+        options.trail = opt T.str;
+        config = if tag == "a" then { } else { trail = "x"; };
+      };
+    };
+    optDefaultPresence = tag: {
+      args = { };
+      decl = {
+        options.trail = genMerge.mkOption (
+          { type = T.str; } // (if tag == "a" then { } else { default = ""; })
+        );
+      };
+    };
+    importOrderSwap = tag: {
+      args = { };
+      decl = {
+        imports =
+          if tag == "a" then
+            [
+              importedPair.p
+              importedPair.q
+            ]
+          else
+            [
+              importedPair.q
+              importedPair.p
+            ];
+      };
+    };
     instanceTwice =
       tag:
       redeclared [
@@ -639,8 +855,8 @@ in
     test-the-foreign-key-splits-exactly-where-the-mark-splits = {
       expr = verdict (n: rows.${n}.k);
       expected = {
-        rows = 88;
-        oneNode = 74;
+        rows = 140;
+        oneNode = 126;
         nonBool = [ ];
         coarser = [ ];
         finer = [ ];
@@ -650,12 +866,23 @@ in
     test-a-node-only-key-reads-coarser-wherever-the-marks-differ = {
       expr = (verdict (_: true)).coarser;
       expected = [
+        "baseAttrsOnePos"
+        "baseFnDiffer"
+        "baseNoPosDiffer"
+        "basePathDiffer"
+        "basePathVsInline"
+        "baseSpecialArgsDiffer"
+        "baseTwoPosDiffer"
+        "collSealedAttrsDiffer"
+        "computedDiffer"
         "computedField"
+        "computedSealedLeaf"
         "declared-defaultPresence"
         "declared-defaultValue"
         "declared-idFalseCollectionNamed"
         "declared-idFalseDefaultComputed"
         "declared-mergeChangesValue"
+        "defConfigPresence"
         "functionModuleDef"
         "importedAttrsetModule"
         "importedFunctionModule"
@@ -663,8 +890,13 @@ in
         "instancePlusRev"
         "instanceThrice"
         "instanceTwice"
+        "keptCollectionSealedAttrs"
         "keptCollectionValue"
+        "keySemSealedDiffer"
+        "mixinsDiffer"
+        "mixinsTypeDiffer"
         "nestedOption"
+        "optDefaultPresence"
         "parentType"
         "razor-diamondAncestorDefault"
         "razor-diamondShortcut"

@@ -1026,9 +1026,12 @@ declare the collection `identity = false`). A declaration may not carry `__keyEq
 gen-schema over a gen-merge that does not read `__keyEq` and `__moduleKey` off a functor record, or
 `key`, `onDistinct` and `conflicts` off the comparison (`moduleSyntax.keyEqFields`), is refused by
 name. The separation part is a reading of what the mark mints, taken off the definitions without
-minting: the schema's construction parameters, each definition's declared option paths with their
-types' marks, the kept collections that differ from their defaults, the computed field and freeform
-types, and the parents' own keys. Where a definition reaches a function or path module, whose
+minting: the schema's construction parameters, with its base and mixins read as the definition they
+resolve to (a function base applied to the kind name) and each sealed parameter read leaf by leaf as
+the mark spreads it; each definition's declared option paths with their types' marks, and the other
+open paths it sets; the kept collections that differ from their defaults, the computed field and
+freeform types, and the parents' own keys. Definition order enters no part of it, as it enters no
+part of the mark. Where a definition reaches a function or path module, whose
 declarations no such reading sees, the separation part is the mark itself. Either way the key splits
 exactly where the mark does, and a cell over every one-node shape holds that. The module the functor
 returns carries `imports`, `config` and the same reference key, so a
@@ -2059,7 +2062,7 @@ Bridges record-algebra records to NixOS modules (§ Cardelli 1997). Publishes op
 
 ```nix
 emitted = genSchema.emitModule [ "validators" "methods" ] recordAlgebraRecord;
-# → { module = <NixOS module>; collections = { ... }; refinements = { ... }; }
+# → { module = <NixOS module, an attrset>; collections = { ... }; refinements = { ... }; }
 ```
 
 #### `mkSchemaEntryType` `mixins` parameter

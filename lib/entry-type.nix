@@ -168,6 +168,165 @@ let
   # defaulted, reversible.
   comparedTyped = records: v: merge.closuresFirst records v;
 
+  markOrQ =
+    t:
+    if builtins.isAttrs t && t ? __mint && builtins.isAttrs t.__mint && t.__mint ? minted then
+      t.__mint.minted
+    else
+      "?";
+  optsOf = m: if builtins.isAttrs (m.options or null) then m.options else { };
+  optsKey =
+    pre: os:
+    prelude.concatMap (
+      n:
+      let
+        o = os.${n};
+      in
+      if isOptionDecl o then
+        [ "${pre}${n}=${markOrQ (o.type or null)}" ]
+      else if builtins.isAttrs o then
+        optsKey "${pre}${n}." o
+      else
+        [ "${pre}${n}=?" ]
+    ) (builtins.attrNames os);
+
+  # An attrset-valued component is spread one level, so a refusal names the member (a method,
+  # a category) rather than the whole collection; its key set stays a component of its own.
+  # `recordsOf` names the type records a member's grammar holds; a member holding a sealed one is
+  # declared sealed and compared through `comparedTyped`, and every other member is left to the mint.
+  spread =
+    prefix: recordsOf: v:
+    let
+      # `{ }` is a record by construction (`identityOf { }` answers `unmigrated`), so it skips the read
+      isRecord = builtins.tryEval (
+        builtins.isAttrs v && (v == { } || identityOf v ? unmigrated && (v.type or null) != "derivation")
+      );
+    in
+    if isRecord.success && isRecord.value then
+      # an empty record is one component, its empty key list, with no member to walk
+      if v == { } then
+        [
+          {
+            path = prefix;
+            value = [ ];
+          }
+        ]
+      else
+        let
+          names = prelude.attrNames v;
+        in
+        [
+          {
+            path = prefix;
+            value = names;
+          }
+        ]
+        ++ map (
+          k:
+          let
+            records = recordsOf v.${k};
+            typed = builtins.tryEval (builtins.any isSealedType records);
+          in
+          if typed.success && typed.value then
+            {
+              path = prefix ++ [ k ];
+              value = comparedTyped records v.${k};
+              sealed = true;
+            }
+          else
+            {
+              path = prefix ++ [ k ];
+              value = v.${k};
+            }
+        ) names
+    else
+      [
+        {
+          path = prefix;
+          value = v;
+        }
+      ];
+
+  # The PATHS of an open module's content beyond an option's `type` (den-hoag-egei0): another
+  # attribute of a declaration, a kind-level definition (a structured module's `meta` included,
+  # which gen-merge's `configOf` folds into its config), and every kind-level `_module` key but
+  # `freeformType` (a component of its own, below). Presence only, read by `attrNames`,
+  # `isOptionDecl` and `isAttrs`: no definition value is forced, and the config half stops at the
+  # top-level key set, so nothing past the `m.config` WHNF `freeforms` already takes is read.
+  # A path carries NO module index and the set is deduplicated: which module states a key is not
+  # identity, so a reordered or regrouped twin reaches the same paths and is refused on the
+  # subject rather than split by the mark.
+  openPathsByName =
+    open:
+    builtins.listToAttrs (
+      map (p: {
+        name = builtins.concatStringsSep "." p;
+        value = p;
+      }) (prelude.concatMap openPathsOf open)
+    );
+  openPathsOf =
+    m:
+    let
+      s = isStructuredDecl m;
+      # gen-merge's `configOf`, at the key level: a structured module's config plus its `meta`,
+      # a shorthand module less its module-syntax keys.
+      defs =
+        if s then
+          (m.config or { }) // (if m ? meta then { inherit (m) meta; } else { })
+        else
+          builtins.removeAttrs m merge.moduleSyntax.shorthandMeta;
+      whole = !(builtins.isAttrs defs) || defs ? _type;
+      attrsOf =
+        pre: t:
+        prelude.concatMap (
+          n:
+          let
+            o = t.${n};
+            q = pre ++ [ n ];
+          in
+          if isOptionDecl o then
+            map (a: q ++ [ a ]) (builtins.filter (a: a != "type" && a != "_type") (prelude.attrNames o))
+          else if builtins.isAttrs o then
+            attrsOf q o
+          else
+            [ ]
+        ) (prelude.attrNames t);
+      moduleKeys =
+        let
+          top = m._module or { };
+          inner = if whole then { } else defs._module or { };
+        in
+        builtins.filter (k: k != "freeformType") (
+          prelude.attrNames (
+            (if builtins.isAttrs top then top else { }) // (if builtins.isAttrs inner then inner else { })
+          )
+        );
+    in
+    attrsOf [
+      "open"
+      "options"
+    ] (if s then m.options or { } else { })
+    ++ (
+      if whole then
+        [
+          [
+            "open"
+            "config"
+          ]
+        ]
+      else
+        map (n: [
+          "open"
+          "config"
+          n
+        ]) (builtins.filter (n: n != "_module") (prelude.attrNames defs))
+    )
+    ++ map (k: [
+      "open"
+      "_module"
+      k
+    ]) moduleKeys;
+
   # ★ THE OWN OPTIONS (den-hoag-a7c9r). The tree is the MERGED one, evaluated with the parents present
   # as every instance evaluates it, so a declaration reading its parent (`options.x.type`,
   # `config.flag`) is as total as the published plane. An option a parent publishes at the same
@@ -337,143 +496,9 @@ let
           else
             optionComponents p o
         ) (prelude.attrNames opts);
-      # An attrset-valued component is spread one level, so a refusal names the member (a method,
-      # a category) rather than the whole collection; its key set stays a component of its own.
-      # `recordsOf` names the type records a member's grammar holds; a member holding a sealed one is
-      # declared sealed and compared through `comparedTyped`, and every other member is left to the mint.
-      spread =
-        prefix: recordsOf: v:
-        let
-          # `{ }` is a record by construction (`identityOf { }` answers `unmigrated`), so it skips the read
-          isRecord = builtins.tryEval (
-            builtins.isAttrs v && (v == { } || identityOf v ? unmigrated && (v.type or null) != "derivation")
-          );
-        in
-        if isRecord.success && isRecord.value then
-          # an empty record is one component, its empty key list, with no member to walk
-          if v == { } then
-            [
-              {
-                path = prefix;
-                value = [ ];
-              }
-            ]
-          else
-            let
-              names = prelude.attrNames v;
-            in
-            [
-              {
-                path = prefix;
-                value = names;
-              }
-            ]
-            ++ map (
-              k:
-              let
-                records = recordsOf v.${k};
-                typed = builtins.tryEval (builtins.any isSealedType records);
-              in
-              if typed.success && typed.value then
-                {
-                  path = prefix ++ [ k ];
-                  value = comparedTyped records v.${k};
-                  sealed = true;
-                }
-              else
-                {
-                  path = prefix ++ [ k ];
-                  value = v.${k};
-                }
-            ) names
-        else
-          [
-            {
-              path = prefix;
-              value = v;
-            }
-          ];
       walked = modulesOf modules;
       open = map (m: m.open) (builtins.filter (m: m ? open) walked);
-      # The PATHS of an open module's content beyond an option's `type` (den-hoag-egei0): another
-      # attribute of a declaration, a kind-level definition (a structured module's `meta` included,
-      # which gen-merge's `configOf` folds into its config), and every kind-level `_module` key but
-      # `freeformType` (a component of its own, below). Presence only, read by `attrNames`,
-      # `isOptionDecl` and `isAttrs`: no definition value is forced, and the config half stops at the
-      # top-level key set, so nothing past the `m.config` WHNF `freeforms` already takes is read.
-      # A path carries NO module index and the set is deduplicated: which module states a key is not
-      # identity, so a reordered or regrouped twin reaches the same paths and is refused on the
-      # subject rather than split by the mark.
-      openPaths = builtins.attrValues (
-        builtins.listToAttrs (
-          map (p: {
-            name = builtins.concatStringsSep "." p;
-            value = p;
-          }) (prelude.concatMap openPathsOf open)
-        )
-      );
-      openPathsOf =
-        m:
-        let
-          s = isStructuredDecl m;
-          # gen-merge's `configOf`, at the key level: a structured module's config plus its `meta`,
-          # a shorthand module less its module-syntax keys.
-          defs =
-            if s then
-              (m.config or { }) // (if m ? meta then { inherit (m) meta; } else { })
-            else
-              builtins.removeAttrs m merge.moduleSyntax.shorthandMeta;
-          whole = !(builtins.isAttrs defs) || defs ? _type;
-          attrsOf =
-            pre: t:
-            prelude.concatMap (
-              n:
-              let
-                o = t.${n};
-                q = pre ++ [ n ];
-              in
-              if isOptionDecl o then
-                map (a: q ++ [ a ]) (builtins.filter (a: a != "type" && a != "_type") (prelude.attrNames o))
-              else if builtins.isAttrs o then
-                attrsOf q o
-              else
-                [ ]
-            ) (prelude.attrNames t);
-          moduleKeys =
-            let
-              top = m._module or { };
-              inner = if whole then { } else defs._module or { };
-            in
-            builtins.filter (k: k != "freeformType") (
-              prelude.attrNames (
-                (if builtins.isAttrs top then top else { }) // (if builtins.isAttrs inner then inner else { })
-              )
-            );
-        in
-        attrsOf [
-          "open"
-          "options"
-        ] (if s then m.options or { } else { })
-        ++ (
-          if whole then
-            [
-              [
-                "open"
-                "config"
-              ]
-            ]
-          else
-            map (n: [
-              "open"
-              "config"
-              n
-            ]) (builtins.filter (n: n != "_module") (prelude.attrNames defs))
-        )
-        ++ map (k: [
-          "open"
-          "_module"
-          k
-        ]) moduleKeys;
+      openPaths = builtins.attrValues (openPathsByName open);
       # Each is a SEALED component, as a schema's own `functions` are: the mark carries the marker at
       # its path, and its subject is a closure allocated by this call, never equal to another
       # construction's. The content itself is never the subject: comparing it would force it, and a
@@ -1631,7 +1656,9 @@ let
       let
         base = merge.types.deferredModule;
         # The schema's construction parameters, minted once per schema evaluation and shared by every
-        # kind's separation key (arm B′, below); a non-inert parameter enters as "sealed".
+        # kind's separation key (arm B′, below). `keySemantics` and every kept seed are read leaf by leaf
+        # through the mark's own `spread`, so a sealed leaf seals only itself. The base and the mixins
+        # are not here: the key walks the def they resolve to (`effectiveBase`), as the mark does.
         # A collection enters as the mark reads it: its name always, its resolved `default` only where it
         # is kept in identity; its `merge` and `type` mint nothing and its `identity` only chooses between the two.
         schemaDigest =
@@ -1643,7 +1670,7 @@ let
               in
               if r.success then r.value else "sealed";
           in
-          identity.hashIdentity "schemaconstruction" [ "collections" "flags" "keySemantics" ] (
+          identity.hashIdentity "schemaconstruction" [ "collections" "flags" "keySemantics" "seeds" ] (
             l:
             {
               collections = builtins.mapAttrs (
@@ -1651,29 +1678,42 @@ let
                 let
                   c = allCollections.${n};
                 in
-                if builtins.elem n dropped then
-                  null
-                else
-                  inertOr (
-                    if !(builtins.isAttrs c) then
-                      c
-                    else if c ? default then
-                      { default = seeds.${n}; }
-                    else
-                      { }
-                  )
+                if builtins.elem n dropped then null else inertOr (if !(builtins.isAttrs c) then c else c ? default)
               ) collections;
-              keySemantics = inertOr keySemantics;
+              seeds =
+                (preimageOf (
+                  prelude.concatMap (n: spread [ "collections" n ] (_: [ ]) seeds.${n}) (
+                    builtins.filter (
+                      n:
+                      !(builtins.elem n dropped) && builtins.isAttrs allCollections.${n} && allCollections.${n} ? default
+                    ) (builtins.attrNames collections)
+                  )
+                )).tags;
+              keySemantics =
+                (preimageOf (spread [ "keySemantics" ] (e: keySemanticsRecords { inherit e; }) keySemantics)).tags;
               flags = {
                 mkType = mkType != null;
                 computed = computed != null;
-                baseModule = if baseModule == null then "none" else witnessPos baseModule;
-                mixins = builtins.length mixins;
                 inherit strict;
               };
             }
             .${l}
           );
+
+        # an attrset base with no mixins is one def for every kind: its key reading is bound once per schema
+        sharedBase =
+          if baseModule != null && !(builtins.isFunction baseModule) && mixins == [ ] then
+            let
+              walked = modulesOf [ baseModule ];
+              open = builtins.catAttrs "open" walked;
+            in
+            {
+              inherit walked;
+              opts = prelude.concatMap (m: optsKey "" (optsOf m)) open;
+              paths = openPathsByName open;
+            }
+          else
+            null;
 
         # A plain base module (an attrset, not a functor, no mixin emission) is keyed by its declaration
         # node: gen meets it there and decides it by its VALUE seal (ADR-0034's sealed limb compares the
@@ -3251,9 +3291,11 @@ let
                           # it; gen reads the record's (`__keyEq.key`), so it never forces this one at load.
                           # THE SEPARATION KEY (den-hoag-a7c9r arm B′, owner 2026-10-31): where the kind's
                           # defs reach no opaque (function or path) module, the key is a syntactic reading
-                          # of what the mark mints (the schema's construction digest, each def's declared
-                          # option paths with their types' marks, the non-default kept collections, the
-                          # computed field and freeform types, the parents' own keys), so nixpkgs' load
+                          # of what the mark mints (the schema's construction digest; the kind's defs and
+                          # its effective base, each def's declared option paths with their types' marks
+                          # and its other open paths, with no module index; the non-default kept
+                          # collections and the computed field, read per leaf; the freeform types; the
+                          # parents' own keys), so nixpkgs' load
                           # forces no mark. Where an opaque module is reached no syntactic reader sees its
                           # declarations, and the key is the mark: a fallback stated and chosen by
                           # constructor shape. The key must split exactly where the mark splits; a mark
@@ -3261,15 +3303,12 @@ let
                           # mark tells apart.
                           key =
                             let
-                              markOrQ =
-                                t:
-                                if builtins.isAttrs t && t ? __mint && builtins.isAttrs t.__mint && t.__mint ? minted then
-                                  t.__mint.minted
-                                else
-                                  "?";
-                              walkedK = modulesOf (map (d: d.value) strippedDefs);
+                              walkedOwn = modulesOf (
+                                map (d: d.value) strippedDefs ++ (if sharedBase != null then [ ] else [ effectiveBase ])
+                              );
+                              walkedK = walkedOwn ++ (if sharedBase != null then sharedBase.walked else [ ]);
                               openK = builtins.catAttrs "open" walkedK;
-                              optsOf = m: if builtins.isAttrs (m.options or null) then m.options else { };
+                              openOwn = builtins.catAttrs "open" walkedOwn;
                               renderTag =
                                 t:
                                 if t ? inert then
@@ -3284,24 +3323,28 @@ let
                                 tags:
                                 builtins.concatStringsSep ";" (map (n: "${n}=${renderTag tags.${n}}") (builtins.attrNames tags));
                               parentsKey = builtins.concatStringsSep "|" (map (p: (p.__functor p { }).key or "?") kindParents);
-                              optsKey =
-                                pre: os:
-                                prelude.concatMap (
-                                  n:
-                                  let
-                                    o = os.${n};
-                                  in
-                                  if isOptionDecl o then
-                                    [ "${pre}${n}=${markOrQ (o.type or null)}" ]
-                                  else if builtins.isAttrs o then
-                                    optsKey "${pre}${n}." o
-                                  else
-                                    [ "${pre}${n}=?" ]
-                                ) (builtins.attrNames os);
-                              defKey = builtins.concatStringsSep ";" (
-                                prelude.concatLists (prelude.imap0 (i: m: optsKey "${toString i}:" (optsOf m)) openK)
-                                ++ [ "opaque=${toString (builtins.length (builtins.catAttrs "opaque" walkedK))}" ]
-                              );
+                              defKey =
+                                builtins.concatStringsSep ";" (
+                                  builtins.attrNames (
+                                    builtins.listToAttrs (
+                                      map
+                                        (o: {
+                                          name = o;
+                                          value = null;
+                                        })
+                                        (
+                                          prelude.concatMap (m: optsKey "" (optsOf m)) openOwn
+                                          ++ (if sharedBase != null then sharedBase.opts else [ ])
+                                        )
+                                    )
+                                  )
+                                )
+                                + "/"
+                                + builtins.concatStringsSep ";" (
+                                  builtins.attrNames (
+                                    openPathsByName openOwn // (if sharedBase != null then sharedBase.paths else { })
+                                  )
+                                );
                               atDefault =
                                 c:
                                 let
@@ -3319,17 +3362,7 @@ let
                                 + "!"
                                 + render (
                                   (preimageOf (
-                                    (
-                                      if computed == null then
-                                        [ ]
-                                      else
-                                        [
-                                          {
-                                            path = [ "computed" ];
-                                            value = minted;
-                                          }
-                                        ]
-                                    )
+                                    (if computed == null then [ ] else spread [ "computed" ] (_: [ ]) minted)
                                     ++ (
                                       let
                                         ffs = builtins.filter (t: t != null) (
@@ -3350,13 +3383,9 @@ let
                                           }
                                         ]
                                     )
-                                    ++ map (c: {
-                                      path = [
-                                        "collections"
-                                        c
-                                      ];
-                                      value = extractedCollections.${c};
-                                    }) (builtins.filter (c: extractedCollections ? ${c} && !(atDefault c)) kept)
+                                    ++ prelude.concatMap (c: spread [ "collections" c ] (_: [ ]) extractedCollections.${c}) (
+                                      builtins.filter (c: extractedCollections ? ${c} && !(atDefault c)) kept
+                                    )
                                   )).tags
                                 );
                             in
