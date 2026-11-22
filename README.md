@@ -1029,7 +1029,8 @@ name. The separation part is a reading of what the mark mints, taken off the def
 minting: the schema's construction parameters, with its base and mixins read as the definition they
 resolve to (a function base applied to the kind name) and each sealed parameter read leaf by leaf as
 the mark spreads it; each definition's declared option paths with their types' marks, and the other
-open paths it sets; the kept collections that differ from their defaults, the computed field and
+open paths it sets; the kept collections that differ from their seeds (the default, or else a declared
+type's own empty value, as the collection serves where no definition reaches it), the computed field and
 freeform types, and the parents' own keys. Definition order enters no part of it, as it enters no
 part of the mark. Where a definition reaches a function or path module, whose
 declarations no such reading sees, the separation part is the mark itself. Either way the key splits

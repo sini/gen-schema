@@ -1665,8 +1665,9 @@ let
         # kind's separation key (arm B′, below). `keySemantics` and every kept seed are read leaf by leaf
         # through the mark's own `spread`, so a sealed leaf seals only itself. The base and the mixins
         # are not here: the key walks the def they resolve to (`effectiveBase`), as the mark does.
-        # A collection enters as the mark reads it: its name always, its resolved `default` only where it
-        # is kept in identity; its `merge` and `type` mint nothing and its `identity` only chooses between the two.
+        # A collection enters as the mark reads it: its name always, its seed (`seedOf`) only where it is
+        # kept in identity; its `merge` and `type` mint nothing but that seed, and its `identity` only
+        # chooses between the two.
         schemaDigest =
           let
             inertOr =
@@ -1684,14 +1685,16 @@ let
                 let
                   c = allCollections.${n};
                 in
-                if builtins.elem n dropped then null else inertOr (if !(builtins.isAttrs c) then c else c ? default)
+                if builtins.elem n dropped then
+                  null
+                else
+                  inertOr (if !(builtins.isAttrs c) then c else seedOf n ? value)
               ) collections;
               seeds =
                 (preimageOf (
-                  prelude.concatMap (n: spread [ "collections" n ] (_: [ ]) seeds.${n}) (
+                  prelude.concatMap (n: spread [ "collections" n ] (_: [ ]) (seedOf n).value) (
                     builtins.filter (
-                      n:
-                      !(builtins.elem n dropped) && builtins.isAttrs allCollections.${n} && allCollections.${n} ? default
+                      n: !(builtins.elem n dropped) && builtins.isAttrs allCollections.${n} && seedOf n ? value
                     ) (builtins.attrNames collections)
                   )
                 )).tags;
@@ -1962,6 +1965,15 @@ let
         # those of them the schema declared itself (the guard's, in `planeOf`).
         kept = builtins.filter (n: allCollections.${n}.identity or true) collectionKeys;
         dropped = builtins.filter (n: !(allCollections.${n}.identity or true)) collectionKeys;
+        # The value a collection holds where no definition reaches it, as `declaredOf` serves it and the
+        # mark reads it: its resolved `default`, else its declared type's own `emptyValue` (the type
+        # protocol's record, `{ }` where it states none). The key reads the seed through this alone.
+        seedOf =
+          n:
+          let
+            c = allCollections.${n};
+          in
+          if c ? default then { value = seeds.${n} or c.default; } else c.type.emptyValue or { };
         # whether the computed fields enter the plane through the projection (`minted`)
         projected = computed != null && dropped != [ ];
         guard = builtins.any (
@@ -3354,10 +3366,7 @@ let
                               atDefault =
                                 c:
                                 let
-                                  r = builtins.tryEval (
-                                    allCollections.${c} ? default
-                                    && extractedCollections.${c} == (seeds.${c} or allCollections.${c}.default)
-                                  );
+                                  r = builtins.tryEval (seedOf c ? value && extractedCollections.${c} == (seedOf c).value);
                                 in
                                 r.success && r.value;
                               defaultsKey = builtins.concatStringsSep "," (

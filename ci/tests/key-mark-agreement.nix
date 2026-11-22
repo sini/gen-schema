@@ -7,16 +7,17 @@
 # declaration node), marks equal, foreign keys equal. Only one-node rows (`w`) are the property's; the
 # others compose by node and are carried as rows only.
 #
-# The corpus: 47 constructed shapes, each as a differing pair and as a twin, the granularity razor's
+# The corpus: 55 constructed shapes, each as a differing pair and as a twin, the granularity razor's
 # default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`), 11 declared-collection
 # pairs under both identity settings, 2 rows over an `identity = false` collection and 2 over a kept
 # collection the kind does not define. The `mkType` arm writes no foreign key. Four shapes redeclare one
 # option embedding an instance type (twice, beside a plain submodule in either order, thrice), a join
-# gen-merge mints over its declarations (den-hoag-2vtgj). Twenty-six vary one construction parameter: the
+# gen-merge mints over its declarations (den-hoag-2vtgj). Thirty-four vary one construction parameter: the
 # base (absent, empty, attrset at one or two literals, positionless, function, path), the mixins (two
-# lists that fold to one record among them), a
-# sealed leaf beside an inert one (keySemantics, a seed, a computed field, a kept value), specialArgs,
-# and a declaration's open paths and module order (den-hoag-y9j03).
+# lists that fold to one record among them, a no-op mixin once, twice or not at all), a
+# sealed leaf beside an inert one (keySemantics, a seed, a computed field, a kept value), `{ }` against
+# `[ ]` (a seed, a kept value, a typed default), a typed collection's seed resolved from its type's
+# empty value, specialArgs, and a declaration's open paths and module order (den-hoag-y9j03).
 #
 # PLANTED RED, in the suite: the same predicate over a node-only key (the witness alone, no content)
 # reads every one-node row whose marks differ as coarser, so a zero on the real key is read with the
@@ -127,6 +128,81 @@ let
       };
     mixinNoopVsNone =
       tag: withArgs ({ baseModule = { }; } // (if tag == "a" then { } else { mixins = [ noopMixin ]; }));
+    # a no-op mixin is the unit of mixin composition, so its multiplicity is no component
+    mixinNoopTwoVsOne =
+      tag:
+      withArgs {
+        baseModule = { };
+        mixins =
+          if tag == "a" then
+            [ noopMixin ]
+          else
+            [
+              noopMixin
+              noopMixin
+            ];
+      };
+    # the mark spreads `{ }` and `[ ]` to one component (den-hoag-0pwbu), so the key reading its
+    # spellings per leaf adopts that class: a seed, a kept value, a typed default
+    seedEmptyAttrsVsList =
+      tag: withArgs { collections.extra.default = if tag == "a" then { } else [ ]; };
+    keptEmptyAttrsVsList = tag: {
+      args = {
+        collections.tags.default = "d";
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags = if tag == "a" then { } else [ ];
+      };
+    };
+    typedListVsAttrsDefault =
+      tag:
+      withArgs {
+        collections.p =
+          if tag == "a" then
+            {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+            }
+          else
+            {
+              type = lib.types.attrsOf lib.types.str;
+              default = { };
+            };
+      };
+    # a typed collection no kind defines and with no default holds its type's own empty value, so it
+    # marks as a `default` of that value: the key reads the same resolved seed
+    typedUndefVsDefault =
+      tag:
+      withArgs {
+        collections.p = {
+          type = lib.types.listOf lib.types.str;
+        }
+        // (if tag == "a" then { } else { default = [ ]; });
+      };
+    # and where a kind defines it, the seed both hold is one, so its presence is no component
+    typedDefaultPresenceDefined = tag: {
+      args.collections.tags = {
+        type = lib.types.listOf lib.types.str;
+      }
+      // (if tag == "a" then { } else { default = [ ]; });
+      decl = {
+        options.trail = opt T.str;
+        tags = [ "x" ];
+      };
+    };
+    typedUndefListVsAttrs =
+      tag:
+      withArgs {
+        collections.p.type =
+          if tag == "a" then lib.types.listOf lib.types.str else lib.types.attrsOf lib.types.str;
+      };
+    typedUndefNullVsList =
+      tag:
+      withArgs {
+        collections.p.type =
+          if tag == "a" then lib.types.nullOr lib.types.str else lib.types.listOf lib.types.str;
+      };
     # two mixin lists that fold to one record: the later `mx` shadows the earlier
     mixinShadowed =
       tag:
@@ -853,11 +929,22 @@ let
 in
 {
   flake.tests.key-mark-agreement = {
+    # A no-op mixin's delta is the empty record, the unit of mixin composition, so a kind built with it
+    # equals one built with none, and one built with it twice (kindEq, the door the mark answers)
+    test-a-no-op-mixin-kind-equals-the-kind-without-it = {
+      expr = lib.genAttrs [ "mixinNoopVsNone" "mixinNoopTwoVsOne" ] (
+        n: try (genSchema.kindEq (build shapes.${n} "a") (build shapes.${n} "b"))
+      );
+      expected = {
+        mixinNoopVsNone = true;
+        mixinNoopTwoVsOne = true;
+      };
+    };
     test-the-foreign-key-splits-exactly-where-the-mark-splits = {
       expr = verdict (n: rows.${n}.k);
       expected = {
-        rows = 140;
-        oneNode = 126;
+        rows = 156;
+        oneNode = 142;
         nonBool = [ ];
         coarser = [ ];
         finer = [ ];
@@ -905,6 +992,7 @@ in
         "schemaCollection"
         "topOption"
         "twoDeclsMerged"
+        "typedUndefNullVsList"
       ];
     };
   };
