@@ -344,35 +344,48 @@ let
       spread =
         prefix: recordsOf: v:
         let
+          # `{ }` is a record by construction (`identityOf { }` answers `unmigrated`), so it skips the read
           isRecord = builtins.tryEval (
-            builtins.isAttrs v && identityOf v ? unmigrated && (v.type or null) != "derivation"
+            builtins.isAttrs v && (v == { } || identityOf v ? unmigrated && (v.type or null) != "derivation")
           );
         in
         if isRecord.success && isRecord.value then
-          [
-            {
-              path = prefix;
-              value = prelude.attrNames v;
-            }
-          ]
-          ++ map (
-            k:
+          # an empty record is one component, its empty key list, with no member to walk
+          if v == { } then
+            [
+              {
+                path = prefix;
+                value = [ ];
+              }
+            ]
+          else
             let
-              records = recordsOf v.${k};
-              typed = builtins.tryEval (builtins.any isSealedType records);
+              names = prelude.attrNames v;
             in
-            if typed.success && typed.value then
+            [
               {
-                path = prefix ++ [ k ];
-                value = comparedTyped records v.${k};
-                sealed = true;
+                path = prefix;
+                value = names;
               }
-            else
-              {
-                path = prefix ++ [ k ];
-                value = v.${k};
-              }
-          ) (prelude.attrNames v)
+            ]
+            ++ map (
+              k:
+              let
+                records = recordsOf v.${k};
+                typed = builtins.tryEval (builtins.any isSealedType records);
+              in
+              if typed.success && typed.value then
+                {
+                  path = prefix ++ [ k ];
+                  value = comparedTyped records v.${k};
+                  sealed = true;
+                }
+              else
+                {
+                  path = prefix ++ [ k ];
+                  value = v.${k};
+                }
+            ) names
         else
           [
             {
