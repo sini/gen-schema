@@ -1667,47 +1667,61 @@ let
         # are not here: the key walks the def they resolve to (`effectiveBase`), as the mark does.
         # A collection enters as the mark reads it: its name always, its seed (`seedOf`) only where it is
         # kept in identity; its `merge` and `type` mint nothing but that seed, and its `identity` only
-        # chooses between the two.
-        schemaDigest =
+        # chooses between the two. The record is the key's alone, so a schema evaluation that forces no
+        # key allocates it as one binding, never its seeds (den-hoag-y9j03).
+        keySchema =
           let
-            inertOr =
-              v:
-              let
-                r = builtins.tryEval (identity.hashIdentity "component" [ "value" ] (_: v));
-              in
-              if r.success then r.value else "sealed";
+            # The value a collection holds where no definition reaches it, as `declaredOf` serves it and
+            # the mark reads it: its resolved `default`, else its declared type's own `emptyValue` (the
+            # type protocol's record, `{ }` where it states none). The key reads the seed through this
+            # alone, resolved once per schema, so a kind's at-default test is a lookup.
+            seedOf = builtins.mapAttrs (
+              n: c: if c ? default then { value = seeds.${n} or c.default; } else c.type.emptyValue or { }
+            ) allCollections;
           in
-          identity.hashIdentity "schemaconstruction" [ "collections" "flags" "keySemantics" "seeds" ] (
-            l:
-            {
-              collections = builtins.mapAttrs (
-                n: _:
-                let
-                  c = allCollections.${n};
-                in
-                if builtins.elem n dropped then
-                  null
-                else
-                  inertOr (if !(builtins.isAttrs c) then c else seedOf.${n} ? value)
-              ) collections;
-              seeds =
-                (preimageOf (
-                  prelude.concatMap (n: spread [ "collections" n ] (_: [ ]) seedOf.${n}.value) (
-                    builtins.filter (
-                      n: !(builtins.elem n dropped) && builtins.isAttrs allCollections.${n} && seedOf.${n} ? value
-                    ) (builtins.attrNames collections)
-                  )
-                )).tags;
-              keySemantics =
-                (preimageOf (spread [ "keySemantics" ] (e: keySemanticsRecords { inherit e; }) keySemantics)).tags;
-              flags = {
-                mkType = mkType != null;
-                computed = computed != null;
-                inherit strict;
-              };
-            }
-            .${l}
-          );
+          {
+            inherit seedOf;
+            digest =
+              let
+                inertOr =
+                  v:
+                  let
+                    r = builtins.tryEval (identity.hashIdentity "component" [ "value" ] (_: v));
+                  in
+                  if r.success then r.value else "sealed";
+              in
+              identity.hashIdentity "schemaconstruction" [ "collections" "flags" "keySemantics" "seeds" ] (
+                l:
+                {
+                  collections = builtins.mapAttrs (
+                    n: _:
+                    let
+                      c = allCollections.${n};
+                    in
+                    if builtins.elem n dropped then
+                      null
+                    else
+                      inertOr (if !(builtins.isAttrs c) then c else seedOf.${n} ? value)
+                  ) collections;
+                  seeds =
+                    (preimageOf (
+                      prelude.concatMap (n: spread [ "collections" n ] (_: [ ]) seedOf.${n}.value) (
+                        builtins.filter (
+                          n: !(builtins.elem n dropped) && builtins.isAttrs allCollections.${n} && seedOf.${n} ? value
+                        ) (builtins.attrNames collections)
+                      )
+                    )).tags;
+                  keySemantics =
+                    (preimageOf (spread [ "keySemantics" ] (e: keySemanticsRecords { inherit e; }) keySemantics)).tags;
+                  flags = {
+                    mkType = mkType != null;
+                    computed = computed != null;
+                    inherit strict;
+                  };
+                }
+                .${l}
+              );
+          };
 
         # an attrset base with no mixins is one def for every kind: its key reading is bound once per schema
         sharedBase =
@@ -1965,13 +1979,6 @@ let
         # those of them the schema declared itself (the guard's, in `planeOf`).
         kept = builtins.filter (n: allCollections.${n}.identity or true) collectionKeys;
         dropped = builtins.filter (n: !(allCollections.${n}.identity or true)) collectionKeys;
-        # The value a collection holds where no definition reaches it, as `declaredOf` serves it and the
-        # mark reads it: its resolved `default`, else its declared type's own `emptyValue` (the type
-        # protocol's record, `{ }` where it states none). The key reads the seed through this alone,
-        # resolved once per schema, so a kind's at-default test is a lookup.
-        seedOf = builtins.mapAttrs (
-          n: c: if c ? default then { value = seeds.${n} or c.default; } else c.type.emptyValue or { }
-        ) allCollections;
         # whether the computed fields enter the plane through the projection (`minted`)
         projected = computed != null && dropped != [ ];
         guard = builtins.any (
@@ -3364,7 +3371,9 @@ let
                               atDefault =
                                 c:
                                 let
-                                  r = builtins.tryEval (seedOf.${c} ? value && extractedCollections.${c} == seedOf.${c}.value);
+                                  r = builtins.tryEval (
+                                    keySchema.seedOf.${c} ? value && extractedCollections.${c} == keySchema.seedOf.${c}.value
+                                  );
                                 in
                                 r.success && r.value;
                               defaultsKey = builtins.concatStringsSep "," (
@@ -3396,9 +3405,66 @@ let
                                           }
                                         ]
                                     )
-                                    ++ prelude.concatMap (c: spread [ "collections" c ] (_: [ ]) extractedCollections.${c}) (
-                                      builtins.filter (c: extractedCollections ? ${c} && !(atDefault c)) kept
-                                    )
+                                    # A kept collection as `spread` reads it, the key's member reading being the mint's
+                                    # (no member type test). A non-empty record no member of which carries a mint enters
+                                    # by ONE digest of the whole value where the encoder takes it: that digest is equal
+                                    # exactly where the names and every member's inert tag are, and a member the mint
+                                    # would refuse, or one entering by its mark, sends the value to the spread, so the
+                                    # two readings never meet on one mark. `{ }` stays the spread's empty key list.
+                                    ++ prelude.concatMap (
+                                      c:
+                                      let
+                                        v = extractedCollections.${c};
+                                        prefix = [
+                                          "collections"
+                                          c
+                                        ];
+                                        isRecord = builtins.tryEval (
+                                          builtins.isAttrs v && (v == { } || identityOf v ? unmigrated && (v.type or null) != "derivation")
+                                        );
+                                        names = prelude.attrNames v;
+                                        whole = builtins.tryEval (
+                                          if builtins.any (k: v.${k} ? __mint) names then
+                                            null
+                                          else
+                                            identity.hashIdentity "component" [ "value" ] (_: v)
+                                        );
+                                      in
+                                      if !(isRecord.success && isRecord.value) then
+                                        [
+                                          {
+                                            path = prefix;
+                                            value = v;
+                                          }
+                                        ]
+                                      else if v == { } then
+                                        [
+                                          {
+                                            path = prefix;
+                                            value = [ ];
+                                          }
+                                        ]
+                                      else if whole.success && whole.value != null then
+                                        [
+                                          {
+                                            path = prefix;
+                                            value = {
+                                              whole = whole.value;
+                                            };
+                                          }
+                                        ]
+                                      else
+                                        [
+                                          {
+                                            path = prefix;
+                                            value = names;
+                                          }
+                                        ]
+                                        ++ map (k: {
+                                          path = prefix ++ [ k ];
+                                          value = v.${k};
+                                        }) names
+                                    ) (builtins.filter (c: extractedCollections ? ${c} && !(atDefault c)) kept)
                                   )).tags
                                 );
                             in
@@ -3406,7 +3472,7 @@ let
                               "gen-schema-kind:${kind}#${kindWitness}#${ownMark}"
                             else
                               "gen-schema-kind:${kind}#${kindWitness}#${
-                                builtins.replaceStrings [ "#" ] [ "%23" ] "${schemaDigest}/${defKey}/${restKey}/${parentsKey}"
+                                builtins.replaceStrings [ "#" ] [ "%23" ] "${keySchema.digest}/${defKey}/${restKey}/${parentsKey}"
                               }";
                           config = { };
                         };

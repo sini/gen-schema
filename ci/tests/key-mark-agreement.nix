@@ -7,7 +7,7 @@
 # declaration node), marks equal, foreign keys equal. Only one-node rows (`w`) are the property's; the
 # others compose by node and are carried as rows only.
 #
-# The corpus: 55 constructed shapes, each as a differing pair and as a twin, the granularity razor's
+# The corpus: 59 constructed shapes, each as a differing pair and as a twin, the granularity razor's
 # default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`), 11 declared-collection
 # pairs under both identity settings, 2 rows over an `identity = false` collection and 2 over a kept
 # collection the kind does not define. The `mkType` arm writes no foreign key. Four shapes redeclare one
@@ -17,7 +17,9 @@
 # lists that fold to one record among them, a no-op mixin once, twice or not at all), a
 # sealed leaf beside an inert one (keySemantics, a seed, a computed field, a kept value), `{ }` against
 # `[ ]` (a seed, a kept value, a typed default), a typed collection's seed resolved from its type's
-# empty value, specialArgs, and a declaration's open paths and module order (den-hoag-y9j03).
+# empty value, specialArgs, and a declaration's open paths and module order (den-hoag-y9j03). Four
+# read a kept record: one the key digests whole, one whose sealed member sends it to the spread, and
+# one holding a kind, against another kind and against the same kind from a second schema evaluation.
 #
 # PLANTED RED, in the suite: the same predicate over a node-only key (the witness alone, no content)
 # reads every one-node row whose marks differ as coarser, so a zero on the real key is read with the
@@ -61,6 +63,11 @@ let
     );
   # the redeclaration shapes: `owner` embeds an instance type of `user` (tag "a") or `grp`, declared more than once
   embedded = schema { } (_: {
+    user.options.uname = opt T.str;
+    grp.options.gid = opt T.int;
+  });
+  # the same declarations, a second schema evaluation
+  embeddedAgain = schema { } (_: {
     user.options.uname = opt T.str;
     grp.options.gid = opt T.int;
   });
@@ -315,6 +322,55 @@ let
         tags = {
           f = sealedFn;
           v = tag;
+        };
+      };
+    };
+    # a kept record the key reads by one digest of its members, against a value, and against a record
+    # whose sealed member sends it to the spread
+    keptRecordValue = tag: {
+      args = {
+        collections.tags.default = { };
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags.v = tag;
+      };
+    };
+    keptRecordWholeVsSpread = tag: {
+      args = {
+        collections.tags.default = { };
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags = {
+          v = "a";
+        }
+        // (if tag == "a" then { } else { f = sealedFn; });
+      };
+    };
+    # a kept record holding a kind enters by the member's mark: two kinds, and one kind built by two
+    # schema evaluations
+    keptMintedMember = tag: {
+      args = {
+        collections.tags.default = { };
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags = {
+          v = "a";
+          k = if tag == "a" then embedded.user else embedded.grp;
+        };
+      };
+    };
+    keptMintedMemberRebuilt = tag: {
+      args = {
+        collections.tags.default = { };
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags = {
+          v = "a";
+          k = if tag == "a" then embedded.user else embeddedAgain.user;
         };
       };
     };
@@ -943,8 +999,8 @@ in
     test-the-foreign-key-splits-exactly-where-the-mark-splits = {
       expr = verdict (n: rows.${n}.k);
       expected = {
-        rows = 156;
-        oneNode = 142;
+        rows = 164;
+        oneNode = 150;
         nonBool = [ ];
         coarser = [ ];
         finer = [ ];
@@ -980,6 +1036,9 @@ in
         "instanceTwice"
         "keptCollectionSealedAttrs"
         "keptCollectionValue"
+        "keptMintedMember"
+        "keptRecordValue"
+        "keptRecordWholeVsSpread"
         "keySemSealedDiffer"
         "mixinsDiffer"
         "mixinsTypeDiffer"
