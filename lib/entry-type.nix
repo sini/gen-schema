@@ -1555,6 +1555,19 @@ let
   };
   mkSchemaEntryType = mkSchemaEntryTypeIn null;
 
+  # The seeded fold's empty case, `++`'s and `//`'s identity, in both type protocols' fields
+  # (nixpkgs' `emptyValue`, gen-merge's `whenEmpty`): bound once, so a schema pays no thunk for it
+  seedIdentity = {
+    list = {
+      emptyValue.value = [ ];
+      whenEmpty.value = [ ];
+    };
+    attrs = {
+      emptyValue.value = { };
+      whenEmpty.value = { };
+    };
+  };
+
   # THE ENTRY TYPE OF ONE KIND TREE (den-hoag-8c8pr, owner-ruled 2026-09-30: `inherits` on a tree
   # `evalSchema` did not build means what `imports = [ config.schema.<p> ]` means there). `tree` is
   # the tree's own `config` — the kind values the deprecated spelling reads — or `null` for an entry
@@ -1770,13 +1783,10 @@ let
             else if collection ? default then
               collection.type
               // (
-                let
-                  e = if builtins.isList collection.default then [ ] else { };
-                in
-                {
-                  emptyValue.value = e;
-                  whenEmpty.value = e;
-                }
+                if (({ default, ... }: builtins.isList default) collection) then
+                  seedIdentity.list
+                else
+                  seedIdentity.attrs
               )
             else
               collection.type
