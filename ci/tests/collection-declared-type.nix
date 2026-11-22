@@ -2,8 +2,8 @@
 # merged by that type through gen-merge, so its element checks, its property resolution at every depth
 # and its discharged-element count are the type's, as an option of that type gives them. A list or
 # attrset `default` is still the fold's seed (resolved and checked through the type, then folded on by
-# its shape, outside the definitions' priority pool), so a declared and an undeclared collection agree
-# on every seed case; any other `default` is one definition at `mkOptionDefault`, as an option's is.
+# its shape, outside the definitions' priority pool, and is the value alone where no definition
+# survives); any other `default` is one definition at `mkOptionDefault`, as an option's is.
 # Omitted, a collection keeps the inferred lazy container (`collection-element.nix`). Each value cell
 # runs one fixture through both engines where nixpkgs has a twin: the gen arm is the collection on a
 # schema kind, the nixpkgs arm an option of the declared type on an `attrsOf (submodule …)` entry, one
@@ -276,6 +276,18 @@ let
     gen = (user { p.type = g; } [ ]).p;
     nixpkgs = twin n { } [ ];
   };
+  # A typed collection seeded by `default`, every definition discharged, against an option of the type
+  # with that default (`twin`); `defs` builds the definitions with its engine's properties
+  seededCase = g: n: default: defs: {
+    gen = seedOf (typed default g) (defs gm);
+    nixpkgs = twin n { inherit default; } (defs lib);
+  };
+  disc1 = l: [ (l.mkIf false [ "v" ]) ];
+  disc3 = l: [
+    (l.mkIf false [ "v1" ])
+    (l.mkIf false [ "v2" ])
+    (l.mkIf false [ "v3" ])
+  ];
   emptyBoth = v: {
     gen = v;
     nixpkgs = v;
@@ -603,6 +615,73 @@ in
       test-undefined-untyped-mints-apart-from-a-defaulted-one = {
         expr = markOf { collections.p = { }; } == markOf { collections.p.default = [ ]; };
         expected = false;
+      };
+
+      # ── a seed and every definition discharged: the seed alone (ADR-0039 rule (1)) ───────────────
+      # A list or attrset default is the fold's seed, so where no definition survives the collection
+      # is its seed alone, as an option of the type serves its default alone, whatever empty value the
+      # type states. RED before: a type stating none (`nonEmptyListOf`, `anything`, `raw`, `either`)
+      # was refused, "has no definitions after priority resolution"; `nullOr (listOf …)` aborted,
+      # `seed ++ null`; a list type stating `[ "E" ]` read the seed followed by it.
+      test-discharged-seeded-non-empty-list-is-its-seed = {
+        expr = seededCase (NT.nonEmptyListOf NT.str) (NT.nonEmptyListOf NT.str) [ "d" ] disc1;
+        expected = emptyBoth [ "d" ];
+      };
+      test-discharged-seeded-anything-list-is-its-seed = {
+        expr = seededCase T.anything NT.anything [ "d" ] disc3;
+        expected = emptyBoth [ "d" ];
+      };
+      test-discharged-seeded-anything-attrs-is-its-seed = {
+        expr = seededCase T.anything NT.anything { d = "d"; } (l: [ (l.mkIf false { k = "v"; }) ]);
+        expected = emptyBoth { d = "d"; };
+      };
+      test-discharged-seeded-raw-empty-is-its-seed = {
+        expr = seededCase T.raw NT.raw [ ] disc1;
+        expected = emptyBoth [ ];
+      };
+      test-discharged-seeded-either-is-its-seed = {
+        expr = seededCase (T.either lsStr (T.attrsOf T.str)) (NT.either (NT.listOf NT.str) (
+          NT.attrsOf NT.str
+        )) [ "d" ] disc3;
+        expected = emptyBoth [ "d" ];
+      };
+      test-discharged-seeded-nullor-list-is-its-seed = {
+        expr = seededCase (T.nullOr lsStr) (NT.nullOr (NT.listOf NT.str)) [ "d" ] disc1;
+        expected = emptyBoth [ "d" ];
+      };
+      test-discharged-seeded-foreign-nullor-list-is-its-seed = {
+        expr = seededCase (NT.nullOr (NT.listOf NT.str)) (NT.nullOr (NT.listOf NT.str)) [ ] disc3;
+        expected = emptyBoth [ ];
+      };
+      test-discharged-seeded-list-stating-another-empty-value-is-its-seed = {
+        expr = seededCase (
+          lsStr
+          // {
+            emptyValue.value = [ "E" ];
+            whenEmpty.value = [ "E" ];
+          }
+        ) (NT.listOf NT.str // { emptyValue.value = [ "E" ]; }) [ "d" ] disc1;
+        expected = emptyBoth [ "d" ];
+      };
+      # gen's own non-empty list construction: its `whenEmpty` is `[ ]`, its `emptyValue` states none, so
+      # the seed alone must not read either (a fold reading `emptyValue` first refuses it)
+      test-discharged-seeded-list-without-empty-value-is-its-seed = {
+        expr = seededCase (lsStr // { emptyValue = { }; }) (NT.listOf NT.str // { emptyValue = { }; }) [
+          "d"
+        ] disc3;
+        expected = emptyBoth [ "d" ];
+      };
+      # control: a surviving definition still folds onto the seed
+      test-discharged-seeded-surviving-definition-folds-on = {
+        expr =
+          (user { c = typed [ "d" ] (NT.nonEmptyListOf NT.str); } [
+            { c = gm.mkIf false [ "a" ]; }
+            { c = [ "b" ]; }
+          ]).c;
+        expected = [
+          "d"
+          "b"
+        ];
       };
 
       # ── a scalar default is an option default (ADR-0039 rule (1)) ────────────────────────────────

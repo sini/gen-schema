@@ -6396,5 +6396,31 @@ in
             } [ ]).p;
         expectedError = undefinedP;
       };
+      # A seed alone answers only where no definition survives: a surviving definition the type
+      # refuses, and a seed the type refuses, are still refused (a fold that swallowed the refusal
+      # would serve the seed here)
+      test-seeded-surviving-definition-the-type-refuses-is-refused = {
+        expr =
+          read
+            (user { c = typed [ "d" ] (lib.types.nonEmptyListOf lib.types.str); } [ { c = [ ]; } ]).c;
+        expectedError = err "gen-merge: a definition for option `schema.user.c' is not of type `non-empty (list of string)'.";
+      };
+      test-seeded-conflicting-surviving-definitions-are-refused = {
+        expr =
+          read
+            (user { c = typed [ "d" ] T.raw; } [
+              { c = [ "a" ]; }
+              { c = [ "b" ]; }
+            ]).c;
+        expectedError = err "gen-merge: the option `schema.user.c' has conflicting definitions:";
+      };
+      test-seeded-discharged-with-a-refused-seed-is-refused = {
+        expr =
+          read
+            (user { c = typed [ ] (lib.types.nonEmptyListOf lib.types.str); } [
+              { c = genMerge.mkIf false [ "a" ]; }
+            ]).c;
+        expectedError = err "gen-merge: a definition for option `collections.c.default' is not of type `non-empty (list of string)'.";
+      };
     };
 }
