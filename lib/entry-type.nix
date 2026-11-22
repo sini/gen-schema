@@ -3422,13 +3422,6 @@ let
                                         isRecord = builtins.tryEval (
                                           builtins.isAttrs v && (v == { } || identityOf v ? unmigrated && (v.type or null) != "derivation")
                                         );
-                                        names = prelude.attrNames v;
-                                        whole = builtins.tryEval (
-                                          if builtins.any (k: v.${k} ? __mint) names then
-                                            null
-                                          else
-                                            identity.hashIdentity "component" [ "value" ] (_: v)
-                                        );
                                       in
                                       if !(isRecord.success && isRecord.value) then
                                         [
@@ -3444,26 +3437,36 @@ let
                                             value = [ ];
                                           }
                                         ]
-                                      else if whole.success && whole.value != null then
-                                        [
-                                          {
-                                            path = prefix;
-                                            value = {
-                                              whole = whole.value;
-                                            };
-                                          }
-                                        ]
                                       else
-                                        [
-                                          {
-                                            path = prefix;
-                                            value = names;
-                                          }
-                                        ]
-                                        ++ map (k: {
-                                          path = prefix ++ [ k ];
-                                          value = v.${k};
-                                        }) names
+                                        let
+                                          names = prelude.attrNames v;
+                                          whole = builtins.tryEval (
+                                            if builtins.any (k: v.${k} ? __mint) names then
+                                              null
+                                            else
+                                              identity.hashIdentity "component" [ "value" ] (_: v)
+                                          );
+                                        in
+                                        if whole.success && whole.value != null then
+                                          [
+                                            {
+                                              path = prefix;
+                                              value = {
+                                                whole = whole.value;
+                                              };
+                                            }
+                                          ]
+                                        else
+                                          [
+                                            {
+                                              path = prefix;
+                                              value = names;
+                                            }
+                                          ]
+                                          ++ map (k: {
+                                            path = prefix ++ [ k ];
+                                            value = v.${k};
+                                          }) names
                                     ) (builtins.filter (c: extractedCollections ? ${c} && !(atDefault c)) kept)
                                   )).tags
                                 );
