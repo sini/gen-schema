@@ -225,6 +225,93 @@ let
         }
       ];
 
+  # A kept collection as the key reads it, the key's member reading being the mint's
+  # (no member type test). A non-empty record no member of which carries a mint enters by ONE
+  # digest of the whole value where the encoder takes it: that digest is equal exactly where
+  # the names and every member's inert tag are, and a member the mint would refuse, or one
+  # entering by its mark, sends the value to the spread, so the two readings never meet on one
+  # mark. `{ }` stays the spread's empty key list.
+  readKept =
+    c: v:
+    let
+      prefix = [
+        "collections"
+        c
+      ];
+      isRecord = builtins.tryEval (
+        builtins.isAttrs v && (v == { } || identityOf v ? unmigrated && (v.type or null) != "derivation")
+      );
+    in
+    if !(isRecord.success && isRecord.value) then
+      [
+        {
+          path = prefix;
+          value = v;
+        }
+      ]
+    else if v == { } then
+      [
+        {
+          path = prefix;
+          value = [ ];
+        }
+      ]
+    else
+      let
+        names = prelude.attrNames v;
+        # a member the mint refuses at the top (a function, a path) or reads by its mark is seen here,
+        # so the value goes to the spread without an encoder walk
+        vals = builtins.attrValues v;
+        whole = builtins.tryEval (
+          if
+            builtins.any builtins.isFunction vals
+            || builtins.any builtins.isPath vals
+            || builtins.any (m: m ? __mint) vals
+          then
+            null
+          else
+            identity.hashIdentity "component" [ "value" ] (_: v)
+        );
+      in
+      if whole.success && whole.value != null then
+        [
+          {
+            path = prefix;
+            value = {
+              whole = whole.value;
+            };
+          }
+        ]
+      else
+        [
+          {
+            path = prefix;
+            value = names;
+          }
+        ]
+        ++ map (k: {
+          path = prefix ++ [ k ];
+          value = v.${k};
+        }) names;
+  # The tags a kept collection holding `v` reads as, as name/value pairs a kind's key joins in one `listToAttrs`.
+  seedTagsOf =
+    n: v:
+    let
+      tags = (preimageOf (readKept n v)).tags;
+    in
+    map (name: {
+      inherit name;
+      value = tags.${name};
+    }) (builtins.attrNames tags);
+  # The built-in collections' seeds, constants of the library: a kept value equal to one names it in every schema,
+  # so a kind's key reads such a value by the collection's name (`constNamed`), never by a per-schema seed reading.
+  builtinSeeds = {
+    methods = { };
+    validators = [ ];
+    parent = null;
+    inherits = [ ];
+  };
+
   # The PATHS of an open module's content beyond an option's `type` (den-hoag-egei0): another
   # attribute of a declaration, a kind-level definition (a structured module's `meta` included,
   # which gen-merge's `configOf` folds into its config), and every kind-level `_module` key but
@@ -1068,13 +1155,13 @@ let
     let
       merged = {
         methods = {
-          default = { };
+          default = builtinSeeds.methods;
         };
         validators = {
-          default = [ ];
+          default = builtinSeeds.validators;
         };
         parent = {
-          default = null;
+          default = builtinSeeds.parent;
           # The collection is untyped, so either side may be any value: a string is quoted, anything
           # else is named by its type, as gen-graph's `renderId` does. Interpolating a non-string
           # would abort in the act of refusing.
@@ -1096,7 +1183,7 @@ let
         # `_topology`/`_roots`/`_leaves`, inheritance is composition, and a kind may be nested under
         # one container while inheriting from another.
         inherits = {
-          default = [ ];
+          default = builtinSeeds.inherits;
         };
       }
       # A default is the fold's seed. As with an option's default, one `mkOrder` at its top is
@@ -1681,6 +1768,11 @@ let
           in
           {
             inherit seedOf;
+            # A seed's reading, once per schema: a kind holding a collection at its seed reads these tags,
+            # the ones its own value's reading would give, so the seed enters a key only as a kind's value.
+            seedTags = builtins.mapAttrs (n: s: seedTagsOf n s.value) (
+              builtins.intersectAttrs collections seedOf
+            );
             digest =
               let
                 inertOr =
@@ -1690,27 +1782,19 @@ let
                   in
                   if r.success then r.value else "sealed";
               in
-              identity.hashIdentity "schemaconstruction" [ "collections" "flags" "keySemantics" "seeds" ] (
+              identity.hashIdentity "schemaconstruction" [ "collections" "flags" "keySemantics" ] (
                 l:
                 {
+                  # every collection the kind's value holds, built in or declared, as the mark's `collectionNames` reads them
                   collections = builtins.mapAttrs (
-                    n: _:
-                    let
-                      c = allCollections.${n};
-                    in
+                    n: c:
                     if builtins.elem n dropped then
                       null
+                    else if !(builtins.isAttrs c) then
+                      inertOr c
                     else
-                      inertOr (if !(builtins.isAttrs c) then c else seedOf.${n} ? value)
-                  ) collections;
-                  seeds =
-                    (preimageOf (
-                      prelude.concatMap (n: spread [ "collections" n ] (_: [ ]) seedOf.${n}.value) (
-                        builtins.filter (
-                          n: !(builtins.elem n dropped) && builtins.isAttrs allCollections.${n} && seedOf.${n} ? value
-                        ) (builtins.attrNames collections)
-                      )
-                    )).tags;
+                      true
+                  ) allCollections;
                   keySemantics =
                     (preimageOf (spread [ "keySemantics" ] (e: keySemanticsRecords { inherit e; }) keySemantics)).tags;
                   flags = {
@@ -3376,11 +3460,20 @@ let
                                   );
                                 in
                                 r.success && r.value;
-                              defaultsKey = builtins.concatStringsSep "," (
-                                builtins.filter (c: extractedCollections ? ${c} && atDefault c) kept
-                              );
+                              # every kept collection the kind holds, split by whether it holds it at its seed
+                              constNamed = builtins.partition (
+                                c:
+                                builtinSeeds ? ${c}
+                                && (
+                                  let
+                                    r = builtins.tryEval (extractedCollections.${c} == builtinSeeds.${c});
+                                  in
+                                  r.success && r.value
+                                )
+                              ) kept;
+                              atSeed = builtins.partition atDefault constNamed.wrong;
                               restKey =
-                                defaultsKey
+                                builtins.concatStringsSep "," constNamed.right
                                 + "!"
                                 + render (
                                   (preimageOf (
@@ -3405,77 +3498,11 @@ let
                                           }
                                         ]
                                     )
-                                    # A kept collection as `spread` reads it, the key's member reading being the mint's
-                                    # (no member type test). A non-empty record no member of which carries a mint enters
-                                    # by ONE digest of the whole value where the encoder takes it: that digest is equal
-                                    # exactly where the names and every member's inert tag are, and a member the mint
-                                    # would refuse, or one entering by its mark, sends the value to the spread, so the
-                                    # two readings never meet on one mark. `{ }` stays the spread's empty key list.
-                                    ++ prelude.concatMap (
-                                      c:
-                                      let
-                                        v = extractedCollections.${c};
-                                        prefix = [
-                                          "collections"
-                                          c
-                                        ];
-                                        isRecord = builtins.tryEval (
-                                          builtins.isAttrs v && (v == { } || identityOf v ? unmigrated && (v.type or null) != "derivation")
-                                        );
-                                      in
-                                      if !(isRecord.success && isRecord.value) then
-                                        [
-                                          {
-                                            path = prefix;
-                                            value = v;
-                                          }
-                                        ]
-                                      else if v == { } then
-                                        [
-                                          {
-                                            path = prefix;
-                                            value = [ ];
-                                          }
-                                        ]
-                                      else
-                                        let
-                                          names = prelude.attrNames v;
-                                          # a member the mint refuses at the top (a function, a path) or reads by its mark is seen here,
-                                          # so the value goes to the spread without an encoder walk
-                                          vals = builtins.attrValues v;
-                                          whole = builtins.tryEval (
-                                            if
-                                              builtins.any builtins.isFunction vals
-                                              || builtins.any builtins.isPath vals
-                                              || builtins.any (m: m ? __mint) vals
-                                            then
-                                              null
-                                            else
-                                              identity.hashIdentity "component" [ "value" ] (_: v)
-                                          );
-                                        in
-                                        if whole.success && whole.value != null then
-                                          [
-                                            {
-                                              path = prefix;
-                                              value = {
-                                                whole = whole.value;
-                                              };
-                                            }
-                                          ]
-                                        else
-                                          [
-                                            {
-                                              path = prefix;
-                                              value = names;
-                                            }
-                                          ]
-                                          ++ map (k: {
-                                            path = prefix ++ [ k ];
-                                            value = v.${k};
-                                          }) names
-                                    ) (builtins.filter (c: extractedCollections ? ${c} && !(atDefault c)) kept)
+                                    # every kept collection the kind holds away from its seed, read as the mark reads it
+                                    ++ prelude.concatMap (c: readKept c extractedCollections.${c}) atSeed.wrong
                                   )).tags
+                                  # and every one it holds at its seed, by the seed's reading: the tags its own value gives
+                                  // builtins.listToAttrs (prelude.concatMap (c: keySchema.seedTags.${c}) atSeed.right)
                                 );
                             in
                             if builtins.catAttrs "opaque" walkedK != [ ] then

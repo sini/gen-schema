@@ -7,7 +7,7 @@
 # declaration node), marks equal, foreign keys equal. Only one-node rows (`w`) are the property's; the
 # others compose by node and are carried as rows only.
 #
-# The corpus: 59 constructed shapes, each as a differing pair and as a twin, the granularity razor's
+# The corpus: 71 constructed shapes, each as a differing pair and as a twin, the granularity razor's
 # default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`), 11 declared-collection
 # pairs under both identity settings, 2 rows over an `identity = false` collection and 2 over a kept
 # collection the kind does not define. The `mkType` arm writes no foreign key. Four shapes redeclare one
@@ -17,7 +17,9 @@
 # lists that fold to one record among them, a no-op mixin once, twice or not at all), a
 # sealed leaf beside an inert one (keySemantics, a seed, a computed field, a kept value), `{ }` against
 # `[ ]` (a seed, a kept value, a typed default), a typed collection's seed resolved from its type's
-# empty value, specialArgs, and a declaration's open paths and module order (den-hoag-y9j03). Four
+# empty value, specialArgs, and a declaration's open paths and module order (den-hoag-y9j03). Twelve vary a
+# collection's seed (den-hoag-isxgb): eleven where the kind's value does not read it (its presence, its value, a
+# built-in redeclared as the library declares it or with another seed), and one control whose `merge` reads it. Four
 # read a kept record: one the key digests whole, one whose sealed member sends it to the spread, and
 # one holding a kind, against another kind and against the same kind from a second schema evaluation.
 #
@@ -80,6 +82,9 @@ let
   # the construction-parameter shapes (den-hoag-y9j03): a schema's base, mixins, sealed parameters and
   # specialArgs, and a declaration's open paths and module order, each one kind declaration `trail`
   noopMixin = genSchema.mkMixin { } (_: { });
+  # a collection `merge` the seed does not reach, and one it does (den-hoag-isxgb)
+  seedKeepLast = _: v: v;
+  seedNullCat = acc: v: (if acc == null then [ ] else acc) ++ v;
   addMixin =
     t: d:
     genSchema.mkMixin { } (_: {
@@ -119,6 +124,132 @@ let
     };
   };
   shapes = {
+    # ── default presence and the seed (den-hoag-isxgb): the seed enters the key only as a kind's value ──
+    # an untyped collection with no default against `default = [ ]`, where the kind defines it
+    defaultPresenceDefined = tag: {
+      args.collections.tags = if tag == "a" then { } else { default = [ ]; };
+      decl = {
+        options.trail = opt T.str;
+        tags = [ "x" ];
+      };
+    };
+    defaultPresenceAtSeed = tag: {
+      args.collections.tags = if tag == "a" then { } else { default = [ ]; };
+      decl = {
+        options.trail = opt T.str;
+        tags = [ ];
+      };
+    };
+    # the class beyond the two relayed rows: an attrset and a scalar default, and a seed the value never reads
+    defaultPresenceAttrs = tag: {
+      args.collections.tags = if tag == "a" then { } else { default = { }; };
+      decl = {
+        options.trail = opt T.str;
+        tags = {
+          x = 1;
+        };
+      };
+    };
+    defaultPresenceScalar = tag: {
+      args.collections.tags = if tag == "a" then { } else { default = 0; };
+      decl = {
+        options.trail = opt T.str;
+        tags = 5;
+      };
+    };
+    seedScalarOverridden = tag: {
+      args.collections.tags.default = if tag == "a" then 1 else 2;
+      decl = {
+        options.trail = opt T.str;
+        tags = 5;
+      };
+    };
+    seedDiscardedByMerge = tag: {
+      args.collections.tags = {
+        merge = seedKeepLast;
+        default = if tag == "a" then [ 1 ] else [ 2 ];
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags = [ 3 ];
+      };
+    };
+    defaultPresenceMergeDiscards = tag: {
+      args.collections.tags = {
+        merge = seedKeepLast;
+      }
+      // (if tag == "a" then { } else { default = [ 2 ]; });
+      decl = {
+        options.trail = opt T.str;
+        tags = [ 3 ];
+      };
+    };
+    # a record at its seed in one schema and read as a definition in the other: the seed's reading is the value's
+    atSeedRecord = tag: {
+      args.collections.tags = {
+        merge = seedKeepLast;
+      }
+      // (
+        if tag == "a" then
+          { }
+        else
+          {
+            default = {
+              x = 1;
+            };
+          }
+      );
+      decl = {
+        options.trail = opt T.str;
+        tags = {
+          x = 1;
+        };
+      };
+    };
+    # a built-in redeclared exactly as the library declares it: one collection set, one seed
+    builtinRedeclaredSame = tag: {
+      args.collections = if tag == "a" then { } else { methods.default = { }; };
+      decl = {
+        options.trail = opt T.str;
+      };
+    };
+    builtinRedeclaredDefined = tag: {
+      args.collections = if tag == "a" then { } else { validators.default = [ ]; };
+      decl = {
+        options.trail = opt T.str;
+        validators = [ "v" ];
+      };
+    };
+    # a built-in redeclared with another seed, held at the library's constant by definition
+    builtinRedeclaredHeldConst = tag: {
+      args.collections =
+        if tag == "a" then
+          { }
+        else
+          {
+            methods = {
+              merge = seedKeepLast;
+              default = {
+                x = 1;
+              };
+            };
+          };
+      decl = {
+        options.trail = opt T.str;
+        methods = { };
+      };
+    };
+    # control, same family: the seed reaches the value, so the marks differ and the key must stay split
+    defaultPresenceMergeReads = tag: {
+      args.collections.tags = {
+        merge = seedNullCat;
+      }
+      // (if tag == "a" then { } else { default = [ 2 ]; });
+      decl = {
+        options.trail = opt T.str;
+        tags = [ 3 ];
+      };
+    };
     # ── construction parameters (den-hoag-y9j03): the key reads the base as a def, the sealed
     # parameters per leaf, the open paths, and no module index ──
     mixinsDiffer =
@@ -999,8 +1130,8 @@ in
     test-the-foreign-key-splits-exactly-where-the-mark-splits = {
       expr = verdict (n: rows.${n}.k);
       expected = {
-        rows = 164;
-        oneNode = 150;
+        rows = 188;
+        oneNode = 174;
         nonBool = [ ];
         coarser = [ ];
         finer = [ ];
@@ -1027,6 +1158,7 @@ in
         "declared-idFalseDefaultComputed"
         "declared-mergeChangesValue"
         "defConfigPresence"
+        "defaultPresenceMergeReads"
         "functionModuleDef"
         "importedAttrsetModule"
         "importedFunctionModule"
