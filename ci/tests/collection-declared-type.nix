@@ -671,6 +671,22 @@ in
         ] disc3;
         expected = emptyBoth [ "d" ];
       };
+      test-discharged-once-seeded-list-without-empty-value-is-its-seed = {
+        expr = seededCase (lsStr // { emptyValue = { }; }) (NT.listOf NT.str // { emptyValue = { }; }) [
+          "d"
+        ] disc1;
+        expected = emptyBoth [ "d" ];
+      };
+      test-discharged-empty-seeded-list-without-empty-value-is-its-seed = {
+        expr = seededCase (lsStr // { emptyValue = { }; }) (NT.listOf NT.str // { emptyValue = { }; }) [
+        ] disc3;
+        expected = emptyBoth [ ];
+      };
+      test-discharged-once-empty-seeded-list-without-empty-value-is-its-seed = {
+        expr = seededCase (lsStr // { emptyValue = { }; }) (NT.listOf NT.str // { emptyValue = { }; }) [
+        ] disc1;
+        expected = emptyBoth [ ];
+      };
       # control: a surviving definition still folds onto the seed
       test-discharged-seeded-surviving-definition-folds-on = {
         expr =
