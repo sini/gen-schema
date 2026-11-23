@@ -1175,6 +1175,17 @@ let
     else
       merged;
 
+  # The built-in collections' seeds, constants of the library, as the kind key names them (`keySchema`,
+  # `constNamed`). A second literal of `mkAllCollections`' built-in defaults, kept literal because reading it
+  # there costs a select per built-in per schema; a drift between the two aborts every kind holding the
+  # built-in at its seed (at `keySchema.seedTags`), so `ci/tests/collection-builtin-seeds.nix` pins them equal.
+  builtinSeeds = {
+    methods = { };
+    validators = [ ];
+    parent = null;
+    inherits = [ ];
+  };
+
   # ── THE KIND-DECLARATION KEY SPACE (den-hoag-nn4) ─────────────────────────────────────────────
   #
   # A key on a kind declaration that NO reader consumes is discarded unread, and the discard is
@@ -1668,7 +1679,11 @@ let
         # digest as the mark's `collectionNames` reads it, built in or declared, with whether it is kept,
         # and no seed: the mark reads a seed only as a kind's value, so each kind's key reads every kept
         # value (`readKept`), one at a declared seed by that seed's reading (`seedTags`) and one equal to
-        # a built-in's library seed by its name (`constNamed`). The record is the key's alone, so a schema
+        # a built-in's library seed by its name (`constNamed`). "At" and "equal" are Nix `==`, so the key
+        # agrees with the mark where `==` on a kept value is at least as fine as the mark's reading of it.
+        # A derivation-shaped seed is outside that: `==` reads its `outPath` alone and the mark the whole
+        # record, so the key is coarser there; whether such a value's identity is its
+        # `outPath` is den-hoag-5x8xu's open question. The record is the key's alone, so a schema
         # evaluation that forces no key allocates it as one binding (den-hoag-y9j03, den-hoag-isxgb).
         keySchema =
           let
@@ -1762,12 +1777,7 @@ let
               }) (builtins.attrNames tags);
             # The built-in collections' seeds, constants of the library: a kept value equal to one names it in every
             # schema, so a kind's key reads such a value by the collection's name (`constNamed`), never by a seed reading.
-            builtinSeeds = {
-              methods = { };
-              validators = [ ];
-              parent = null;
-              inherits = [ ];
-            };
+            inherit builtinSeeds;
             # A seed's reading, once per schema: a kind holding a collection at its seed reads these tags,
             # the ones its own value's reading would give, so the seed enters a key only as a kind's value.
             seedTags = builtins.mapAttrs (n: s: seedTagsOf n s.value) (
@@ -3400,8 +3410,8 @@ let
                           # defs reach no opaque (function or path) module, the key is a syntactic reading
                           # of what the mark mints (the schema's construction digest; the kind's defs and
                           # its effective base, each def's declared option paths with their types' marks
-                          # and its other open paths, with no module index; the non-default kept
-                          # collections and the computed field, read per leaf; the freeform types; the
+                          # and its other open paths, with no module index; the kept collections'
+                          # values and the computed field, read per leaf; the freeform types; the
                           # parents' own keys), so nixpkgs' load
                           # forces no mark. Where an opaque module is reached no syntactic reader sees its
                           # declarations, and the key is the mark: a fallback stated and chosen by
@@ -3949,5 +3959,7 @@ in
     inheritsResolvedFile
     inheritedModule
     entryReservation
+    builtinSeeds
+    mkAllCollections
     ;
 }

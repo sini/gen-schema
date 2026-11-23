@@ -1029,12 +1029,17 @@ name. The separation part is a reading of what the mark mints, taken off the def
 minting: the schema's construction parameters, with its base and mixins read as the definition they
 resolve to (a function base applied to the kind name) and each sealed parameter read leaf by leaf as
 the mark spreads it; each definition's declared option paths with their types' marks, and the other
-open paths it sets; every kept collection's value as the mark reads it (one held at a declared seed by
+open paths it sets; every kept collection's value as the mark reads it (one equal by `==` to a declared seed by
 that seed's reading, bound once per schema, and one equal to a built-in collection's library seed by the
 collection's name, so a seed enters the key only as a kind's value), the computed field and freeform types, and the parents' own keys. Definition order enters no part of it, as it enters no
 part of the mark. Where a definition reaches a function or path module, whose
 declarations no such reading sees, the separation part is the mark itself. Either way the key splits
-exactly where the mark does, and a cell over every one-node shape holds that. The module the functor
+exactly where the mark does wherever Nix `==` on a kept collection's value is at least as fine as the
+mark's reading of it, and a cell over every one-node shape in that domain holds that. A value carrying
+`type = "derivation"` and held at its collection's seed lies outside it: `==` compares such a value by
+its `outPath` alone, while the mark reads the whole record, so two kinds whose values differ only off
+the `outPath` share a key while their marks differ. Whether such a value is identified by its `outPath`
+or by its whole structure is an open design question, and the key moves with its answer. The module the functor
 returns carries `imports`, `config` and the same reference key, so a
 nixpkgs `lib.evalModules` mount of the kind value dedups one construction reached twice as gen does
 and collects nothing it does not know; at one node it keeps one construction where gen refuses.
@@ -2084,6 +2089,8 @@ mkSchemaEntryType {
 
 ```nix
 genSchema._internal.mkMethodsModule   # methods option/config wiring
+genSchema._internal.builtinSeeds      # the built-in collections' seeds, as the kind key names them
+genSchema._internal.mkAllCollections  # door: mkType: collections: the built-in and declared collections
 ```
 
 Not part of the public API contract. Available for testing and advanced use.

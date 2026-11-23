@@ -93,7 +93,10 @@ construction of an equal mark; a kind setting a collection its schema keeps in i
 per-construction token and refuses a second construction by name, the branch read on either side
 (den-hoag-xh14j, ADR-0034). Where a kind's defs reach no opaque module, its reference key is the syntactic separation
 key (den-hoag-a7c9r B′, `keyed` in `lib/entry-type.nix`), which must split exactly where the mark splits; the
-key-vs-mark razor is `ci/tests/key-mark-agreement.nix`. A plain positioned `baseModule` is keyed `gen-schema-base:<pos>#base` and
+key-vs-mark razor is `ci/tests/key-mark-agreement.nix`. Its domain is the kept values on which Nix `==` is at least as fine as the
+mark's reading: a derivation-shaped value held at its seed is COARSER there (`==` reads its `outPath` alone; den-hoag-5x8xu,
+open), and the key's second literal of the built-in seeds is pinned to `mkAllCollections`' by
+`ci/tests/collection-builtin-seeds.nix` (den-hoag-isxgb). A plain positioned `baseModule` is keyed `gen-schema-base:<pos>#base` and
 sealed by its value (K2 (b)). A kind is removed by its computed key (`{ key = (k { }).key; }`), never
 a literal: the key's digests are internal addressing (ADR-0016 ruling 5), and the act renamed main's
 `gen-schema-kind:<kind>#<mark>` and a parentless kind's positional `<parent>:anon-<i>` (den-hoag-xh14j
@@ -232,7 +235,8 @@ because gen-settings, the incumbent consumer, addresses aspects; it is the targe
 A codec is `{ encode; decode; encodeAll; decodeAll; serialize; deserialize; serializeAll; deserializeAll; json; }`, where `json` is the four `*` functions pre-applied to
 `{ encode = toJSON; decode = fromJSON; }`.
 
-**Internal**: `_internal.mkMethodsModule` — the only member.
+**Internal**: `_internal.mkMethodsModule`, and `_internal.builtinSeeds` / `_internal.mkAllCollections`, read by
+`ci/tests/collection-builtin-seeds.nix`.
 
 **Kind value shape** (produced, not exported). Each `config.schema.<name>` is
 `{ __functor; __kindAncestors; __kindContextFree; __kindCycleParents; __kindImports; __kindLineage; __kindSelf; __kindWitness; __mint; __sealed; __witness; kind; options; refs; refinements; strict; keySemantics; mixins; methods; validators; parent; }` plus user collections and computed fields. `__functor` makes the kind directly importable
@@ -490,7 +494,7 @@ nix eval --json .#lib --apply 'l: { top = builtins.attrNames l; internal = built
 Current output (verbatim):
 
 ```json
-{"internal":["mkMethodsModule"],"top":["_internal","ancestorsForKind","applyMixin","beta","blame","checkRefinements","composeMixins","constructionRelation","declarationOf","defaultOnError","emitModule","entryReservation","evalSchema","fieldDeclarationMarker","fieldDeclarationsIn","fieldRef","fieldRefMarker","fieldRefsIn","filterValidators","formatErrors","identityHashForKind","identityKeysForKind","isFieldDeclaration","isFieldRef","keySemanticsRecords","kindEq","mkCodec","mkFieldDeclaration","mkFieldValidator","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMixin","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","validateInstances"]}
+{"internal":["builtinSeeds","mkAllCollections","mkMethodsModule"],"top":["_internal","ancestorsForKind","applyMixin","beta","blame","checkRefinements","composeMixins","constructionRelation","declarationOf","defaultOnError","emitModule","entryReservation","evalSchema","fieldDeclarationMarker","fieldDeclarationsIn","fieldRef","fieldRefMarker","fieldRefsIn","filterValidators","formatErrors","identityHashForKind","identityKeysForKind","isFieldDeclaration","isFieldRef","keySemanticsRecords","kindEq","mkCodec","mkFieldDeclaration","mkFieldValidator","mkIdentityModule","mkInstanceRegistry","mkInstanceType","mkMixin","mkSchemaEntryType","mkSchemaOption","mkStrictModule","mkValidator","ref","refined","refinements","renderDocs","runValidators","schemaFn","setOf","toSet","validateInstances"]}
 ```
 
 **Checks.** Test-runner invocation (from the repo root; CI runs the same command with

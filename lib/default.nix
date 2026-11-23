@@ -299,5 +299,6 @@ in
 
   _internal = {
     inherit (methods) mkMethodsModule;
+    inherit (entryType) builtinSeeds mkAllCollections;
   };
 }
