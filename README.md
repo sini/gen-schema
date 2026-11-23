@@ -2089,8 +2089,6 @@ mkSchemaEntryType {
 
 ```nix
 genSchema._internal.mkMethodsModule   # methods option/config wiring
-genSchema._internal.builtinSeeds      # the built-in collections' seeds, as the kind key names them
-genSchema._internal.mkAllCollections  # door: mkType: collections: the built-in and declared collections
 ```
 
 Not part of the public API contract. Available for testing and advanced use.

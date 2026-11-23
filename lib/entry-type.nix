@@ -1175,17 +1175,6 @@ let
     else
       merged;
 
-  # The built-in collections' seeds, constants of the library, as the kind key names them (`keySchema`,
-  # `constNamed`). A second literal of `mkAllCollections`' built-in defaults, kept literal because reading it
-  # there costs a select per built-in per schema; a drift between the two aborts every kind holding the
-  # built-in at its seed (at `keySchema.seedTags`), so `ci/tests/collection-builtin-seeds.nix` pins them equal.
-  builtinSeeds = {
-    methods = { };
-    validators = [ ];
-    parent = null;
-    inherits = [ ];
-  };
-
   # ── THE KIND-DECLARATION KEY SPACE (den-hoag-nn4) ─────────────────────────────────────────────
   #
   # A key on a kind declaration that NO reader consumes is discarded unread, and the discard is
@@ -1777,7 +1766,15 @@ let
               }) (builtins.attrNames tags);
             # The built-in collections' seeds, constants of the library: a kept value equal to one names it in every
             # schema, so a kind's key reads such a value by the collection's name (`constNamed`), never by a seed reading.
-            inherit builtinSeeds;
+            # A second literal of `mkAllCollections`' built-in defaults: a drift between the two leaves a kind at the
+            # served default unnamed and at its seed, and its key aborts at `seedTags`, which holds no built-in, so
+            # `ci/tests/collection-builtin-seeds.nix` pins both to the library constants.
+            builtinSeeds = {
+              methods = { };
+              validators = [ ];
+              parent = null;
+              inherits = [ ];
+            };
             # A seed's reading, once per schema: a kind holding a collection at its seed reads these tags,
             # the ones its own value's reading would give, so the seed enters a key only as a kind's value.
             seedTags = builtins.mapAttrs (n: s: seedTagsOf n s.value) (
@@ -3959,7 +3956,5 @@ in
     inheritsResolvedFile
     inheritedModule
     entryReservation
-    builtinSeeds
-    mkAllCollections
     ;
 }
