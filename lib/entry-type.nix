@@ -1662,13 +1662,14 @@ let
       let
         base = merge.types.deferredModule;
         # The schema's construction parameters, minted once per schema evaluation and shared by every
-        # kind's separation key (arm B′, below). `keySemantics` and every kept seed are read leaf by leaf
-        # through the mark's own `spread`, so a sealed leaf seals only itself. The base and the mixins
-        # are not here: the key walks the def they resolve to (`effectiveBase`), as the mark does.
-        # A collection enters as the mark reads it: its name always, its seed (`seedOf`) only where it is
-        # kept in identity; its `merge` and `type` mint nothing but that seed, and its `identity` only
-        # chooses between the two. The record is the key's alone, so a schema evaluation that forces no
-        # key allocates it as one binding, never its seeds (den-hoag-y9j03).
+        # kind's separation key (arm B′, below). `keySemantics` is read leaf by leaf through the mark's
+        # own `spread`, so a sealed leaf seals only itself. The base and the mixins are not here: the key
+        # walks the def they resolve to (`effectiveBase`), as the mark does. A collection enters the
+        # digest as the mark's `collectionNames` reads it, built in or declared, with whether it is kept,
+        # and no seed: the mark reads a seed only as a kind's value, so each kind's key reads every kept
+        # value (`readKept`), one at a declared seed by that seed's reading (`seedTags`) and one equal to
+        # a built-in's library seed by its name (`constNamed`). The record is the key's alone, so a schema
+        # evaluation that forces no key allocates it as one binding (den-hoag-y9j03, den-hoag-isxgb).
         keySchema =
           let
             # The value a collection holds where no definition reaches it, as `declaredOf` serves it and
