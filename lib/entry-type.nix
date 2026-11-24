@@ -1127,6 +1127,7 @@ let
                   "merge"
                   "override"
                   "order"
+                  "definition"
                 ]
                 # with no `merge`, a term is pooled (`topProperty`, `collectionTypes`): refused alone, unread beside a definition
                 && c ? merge
@@ -1588,9 +1589,10 @@ let
     };
   };
 
-  # A `default` whose top is a condition, a merge, a priority or a second order is a module-system
-  # term, not a value: resolved as an option's default it yields none, so it seeds no fold and is one
-  # definition at `mkOptionDefault` (`poolHead`). One `mkOrder` at the top is stripped before this test.
+  # A `default` whose top is a condition, a merge, a priority, a second order or a `mkDefinition` is a
+  # module-system term, not a value: resolved as an option's default it yields none, so it seeds no fold
+  # and is one definition at `mkOptionDefault` (`poolHead`). One `mkOrder` at the top is stripped before
+  # this test.
   topProperty =
     d:
     builtins.isAttrs d
@@ -1599,6 +1601,7 @@ let
       "merge"
       "override"
       "order"
+      "definition"
     ];
   # its refusal, read where it would be the value: alone, or as the pool's winner
   topPropertyRefusal =
@@ -1619,6 +1622,8 @@ let
       ]
     then
       peelProperty d.content
+    else if d._type == "definition" then
+      peelProperty d.value
     else
       d;
 

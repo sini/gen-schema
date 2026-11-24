@@ -6479,6 +6479,25 @@ in
           msg = top "metadata" "if";
         };
       };
+      test-top-typed-mkdefinition-beside-a-definition-it-outranks-refuses = {
+        expr =
+          userOf
+            {
+              type = genMerge.types.listOf genMerge.types.str;
+              default = genMerge.mkDefinition {
+                file = "d";
+                value = [ "a" ];
+              };
+            }
+            "classes"
+            [
+              (genMerge.mkOverride 1600 [ "b" ])
+            ];
+        expectedError = {
+          type = "ThrownError";
+          msg = top "classes" "definition";
+        };
+      };
       test-type-refused-default-alone-refuses = {
         expr = userOf ne "classes" [ ];
         expectedError = {

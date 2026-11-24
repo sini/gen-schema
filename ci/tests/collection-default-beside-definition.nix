@@ -132,6 +132,26 @@ in
       expr = bothLaws listT (l: { default = l.mkAfter (l.mkAfter [ "a" ]); }) "classes" kindB null;
       expected = same [ "b" ];
     };
+    # a `mkDefinition` at the top is a term too, untyped and on a declared type
+    test-top-mkdefinition-beside-kind = {
+      expr = bothLaws listT (l: {
+        default = l.mkDefinition {
+          file = "d";
+          value = [ "a" ];
+        };
+      }) "classes" kindB null;
+      expected = same [ "b" ];
+    };
+    test-top-typed-mkdefinition-beside-kind = {
+      expr = bothLaws listT (l: {
+        type = l.types.listOf l.types.str;
+        default = l.mkDefinition {
+          file = "d";
+          value = [ "a" ];
+        };
+      }) "classes" kindB null;
+      expected = same [ "b" ];
+    };
     # a default its declared type refuses (`[ ]` for `nonEmptyListOf`) beside a surviving definition
     test-type-refused-default-beside-kind = {
       expr = bothLaws neT (_: {
