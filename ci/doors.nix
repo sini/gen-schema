@@ -8,8 +8,9 @@
 #     `mkValidator` and `schemaFn` (one required record, R7(a) and the keyed-record ruling);
 #   · an OPTIONS step (`required = [ ]`, closed, first in the call): every other row. Its operands
 #     follow it positionally (`evalSchema opts modules`, `mkInstanceRegistry opts kind`, `mkCodec opts
-#     kind`, `mkInstanceType opts kind`, `mkMixin opts define`, `constructionRelation opts name self`,
-#     `identityKeysForKind opts kind`), so `call` applies the options step alone, where its check runs.
+#     kind`, `mkInstanceType opts kind`, `evalInstance opts type loc defs`, `mkMixin opts define`,
+#     `constructionRelation opts name self`, `identityKeysForKind opts kind`), so `call` applies the
+#     options step alone, where its check runs.
 # `call valid` must answer: that is each row's live control, so a refusal below is the check firing
 # and not a broken fixture.
 

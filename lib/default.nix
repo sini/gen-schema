@@ -265,11 +265,14 @@ in
   inherit (instance) mkInstanceType mkInstanceRegistry;
   # THE CALLER-OWNED INSTANCE EVALUATION (den-hoag-t5ndo; working name, no public spelling committed): the one
   # nested evaluation an instance type's exported `merge` makes over `defs` at `loc`, retained by the caller as
-  # `{ config; provenance; }` (gen-merge `evalNested`, which refuses a type whose `merge` is not that fold). An
-  # OPTIONS step, closed and first (none are stated yet), then the merge protocol's own operands in its order:
-  # the type, the location, the definitions. The type is the caller's `mkInstanceType` value, so the
-  # construction is that one, built once by the caller and applied here per evaluation. Bound in this literal
-  # rather than in instance.nix and inherited, which is one thunk more on every process (den-hoag-t5ndo phase 2).
+  # `{ config; provenance; }` (gen-merge `evalNested`, which refuses a type whose `merge` is not that fold). Both
+  # projections read from this result are one evaluation; a caller that also reads the typed option's value
+  # evaluates the instance a second time. The caller hands the definitions the element's merge receives (under
+  # nixpkgs' `attrsOf`, after its per-key property push-down); the route cannot see a selection. An OPTIONS step, closed and first (none are stated yet), then the merge
+  # protocol's own operands in its order: the type, the location, the definitions last. The type is the caller's
+  # `mkInstanceType` value, so the construction is that one, built once by the caller and applied here per
+  # evaluation. Bound in this literal rather than in instance.nix and inherited, which is one thunk more on every
+  # process (den-hoag-t5ndo phase 2).
   evalInstance =
     prelude.door
       {

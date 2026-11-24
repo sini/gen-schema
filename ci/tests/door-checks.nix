@@ -4,7 +4,9 @@
 # A native closed formal (`{ define }:`) aborts UNCATCHABLY on an unknown or a missing argument —
 # not even `builtins.tryEval` sees it, which is ADR-0025 item 1's named defect. Each row of
 # `../doors.nix` is a `prelude.door` step: a RECORD step (open, R5) or an OPTIONS step (closed, first
-# in the call), so the same violations are NAMED and CATCHABLE. Per row, generated:
+# in the call), so the same violations are NAMED and CATCHABLE. A row is a RECORD step exactly when it has a
+# required field (its one record's), so an OPTIONS step that states no option yet (`evalInstance`) is closed,
+# never read as a record by its empty `options`. Per row, generated:
 #   - valid call answers                 (the row's live control)
 #   - missing required field refused     (every RECORD step)
 #   - extra field admitted               (RECORD steps — R5's stated price)
@@ -63,7 +65,7 @@ let
         }
     )
     // (
-      if row.options == [ ] then
+      if row.required != [ ] then
         {
           "test-${k}-extra-field-on-a-record-is-admitted" = {
             expr = outcome (row.call (row.valid // { bogus = 1; }));
@@ -87,7 +89,7 @@ let
         expected = {
           inherit (row) required;
           optional = row.options;
-          open = row.options == [ ];
+          open = row.required != [ ];
           args =
             builtins.listToAttrs (map (f: lib.nameValuePair f false) row.required)
             // builtins.listToAttrs (map (f: lib.nameValuePair f true) row.options);
@@ -110,7 +112,7 @@ in
     # The table is the subject; a row dropped from it would drop its cells silently.
     test-door-table-rows = {
       expr = builtins.length (builtins.attrNames doors);
-      expected = 12;
+      expected = 13;
     };
 
     # ── P2: the old one-record shapes are refused at their first application ──

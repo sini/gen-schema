@@ -75,6 +75,7 @@ The authoring surface is small — most schemas are built from these constructor
 | `mkSchemaOption`                    | Declares the `schema` option (holds all kinds; carries `strict`, `baseModule`, `collections`, `computed` settings) |
 | `mkInstanceRegistry`                | Turns a kind into an `attrsOf` registry of instances, with `refs`, `derive`, and validator pipeline                |
 | `mkInstanceType`                    | The single-instance submodule type (identity + strict injected), used by registries                                |
+| `evalInstance`                      | One instance's evaluation kept by its caller as `{ config; provenance; }` (one for both; a typed read is another)  |
 | `declarationOf` / `setOf` / `toSet` | Cross-instance references (deferred or direct) and identity-deduplicated collections                               |
 | `schemaFn`                          | Declarative methods on a kind, with named args auto-resolved from instance config                                  |
 | `mkValidator` / `mkFieldValidator`  | Cross-field constraints that travel with a kind and fire on every registry                                         |
