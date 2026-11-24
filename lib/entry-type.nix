@@ -2018,6 +2018,17 @@ let
             # value is the seed alone, as nixpkgs serves the default alone: the fold's empty case
             # is `++`/`//`'s identity, never the type's own empty value (which may state none, or
             # one of another shape)
+            # an identity default (`[ ]`/`{ }`) contributes nothing beside a surviving definition, so
+            # there it is unread; where none survives the collection is the seed, read alone and checked
+            else if
+              collection ? default && (({ default, ... }: default == [ ] || default == { }) collection)
+            then
+              collection.type
+              // {
+                poolHead = [ ];
+                emptyValue.value = seeds.${name};
+                whenEmpty.value = seeds.${name};
+              }
             else if collection ? default then
               collection.type
               // (
