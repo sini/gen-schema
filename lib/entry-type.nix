@@ -2119,7 +2119,7 @@ let
             collection = allCollections.${name};
           in
           # a pooled term (`topProperty`) is read alone only, where it yields no value
-          if !(collection ? merge) && collection ? default && topProperty collection.default then
+          if !(collection ? merge) && collection ? default && (({ default, ... }: topProperty default) collection) then
             topPropertyRefusal name collection.default
           else if collection ? type then
             merge.mergeDefs [ "collections" name "default" ] collection.type [
