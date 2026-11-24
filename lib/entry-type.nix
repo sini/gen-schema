@@ -1128,8 +1128,8 @@ let
                   "override"
                   "order"
                 ]
-                # any other is pooled (`topProperty`, `collectionTypes`): refused alone, unread beside a definition
-                && (c ? merge || !(topProperty d))
+                # with no `merge`, a term is pooled (`topProperty`, `collectionTypes`): refused alone, unread beside a definition
+                && c ? merge
               then
                 topPropertyRefusal name d
               else
@@ -1623,8 +1623,7 @@ let
       d;
 
   # An untyped collection's container types, closed over the library alone, so bound once for it.
-  # A list element is `merge.raw`, per definition and per index, one element thunk resolved on read;
-  # the location segment is gen-merge's `listOf` segment. An attrset key keeps `//`'s last-wins.
+  # An attrset key keeps `//`'s last-wins.
   untypedListType = merge.mkOptionType {
     name = "list";
     check = builtins.isList;
