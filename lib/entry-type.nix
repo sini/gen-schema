@@ -2010,6 +2010,8 @@ let
                   topProperty default
                   || !(builtins.isList default || builtins.isAttrs default)
                   || !(collection.type.check default)
+                  # Q2 arm (ii), catch-and-drop: a seed whose deep read refuses is no value either
+                  || !(builtins.tryEval (builtins.deepSeq seeds.${name} true)).success
                 )
                   collection
               )
