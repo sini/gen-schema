@@ -1128,6 +1128,8 @@ let
                   "override"
                   "order"
                 ]
+                # any other is pooled (`topProperty`, `collectionTypes`): refused alone, unread beside a definition
+                && (c ? merge || !(topProperty d))
               then
                 throw "gen-schema: collection '${name}': a property (`${d._type}`) at the top of its `default` is not resolved, as no property at the top of an option's default is; write it on the default's elements or on a definition"
               else
@@ -1586,6 +1588,72 @@ let
     };
   };
 
+  # A `default` whose top is a condition, a merge or a priority is a module-system term, not a value:
+  # resolved as an option's default it yields none, so it seeds no fold and is one definition at
+  # `mkOptionDefault` (`poolHead`). One `mkOrder` at the top is stripped before this test.
+  topProperty =
+    d:
+    builtins.isAttrs d
+    && builtins.elem (d._type or null) [
+      "if"
+      "merge"
+      "override"
+    ];
+  # the value shape under such a term, which types an untyped collection's definitions
+  peelProperty =
+    d:
+    if !(builtins.isAttrs d && d ? _type) then
+      d
+    else if d._type == "merge" then
+      (if d.contents == [ ] then null else peelProperty (builtins.head d.contents))
+    else if
+      builtins.elem d._type [
+        "if"
+        "override"
+        "order"
+      ]
+    then
+      peelProperty d.content
+    else
+      d;
+
+  # An untyped collection's container types, closed over the library alone, so bound once for it.
+  # A list element is `merge.raw`, per definition and per index, one element thunk resolved on read;
+  # the location segment is gen-merge's `listOf` segment. An attrset key keeps `//`'s last-wins.
+  untypedListType = merge.mkOptionType {
+    name = "list";
+    check = builtins.isList;
+    emptyValue.value = [ ];
+    # per definition and per index, one element thunk resolved on read; the location
+    # segment is gen-merge's `listOf` segment
+    merge =
+      loc: defs:
+      builtins.concatLists (
+        builtins.genList (
+          n:
+          let
+            d = builtins.elemAt defs n;
+          in
+          builtins.genList (
+            i:
+            merge.mergeDefs (loc ++ [ "[definition ${toString (n + 1)}-entry ${toString (i + 1)}]" ]) merge.raw
+              [
+                {
+                  inherit (d) file;
+                  value = builtins.elemAt d.value i;
+                }
+              ]
+          ) (builtins.length d.value)
+        ) (builtins.length defs)
+      );
+  };
+  untypedAttrsType = merge.lazyAttrsOf (
+    merge.mkOptionType {
+      name = "value";
+      merge = _: defs: (prelude.last defs).value;
+    }
+  );
+
   # THE ENTRY TYPE OF ONE KIND TREE (den-hoag-8c8pr, owner-ruled 2026-09-30: `inherits` on a tree
   # `evalSchema` did not build means what `imports = [ config.schema.<p> ]` means there). `tree` is
   # the tree's own `config` — the kind values the deprecated spelling reads — or `null` for an entry
@@ -1932,7 +2000,10 @@ let
             # the default is pattern-bound: a select passed to a primop is thunked, a variable is not
             if
               collection ? default
-              && (({ default, ... }: !(builtins.isList default || builtins.isAttrs default)) collection)
+              && (
+                ({ default, ... }: topProperty default || !(builtins.isList default || builtins.isAttrs default))
+                  collection
+              )
             then
               collection.type
               // {
@@ -1983,41 +2054,27 @@ let
           # declaring neither a shape nor a fold, it is an option declaring no type and no default
           else if !(collection ? default) then
             merge.types.unspecified
-          else if builtins.isList collection.default then
-            merge.mkOptionType {
-              name = "list";
-              check = builtins.isList;
-              emptyValue.value = [ ];
-              # per definition and per index, one element thunk resolved on read; the location
-              # segment is gen-merge's `listOf` segment
-              merge =
-                loc: defs:
-                builtins.concatLists (
-                  builtins.genList (
-                    n:
-                    let
-                      d = builtins.elemAt defs n;
-                    in
-                    builtins.genList (
-                      i:
-                      merge.mergeDefs (loc ++ [ "[definition ${toString (n + 1)}-entry ${toString (i + 1)}]" ]) merge.raw
-                        [
-                          {
-                            inherit (d) file;
-                            value = builtins.elemAt d.value i;
-                          }
-                        ]
-                    ) (builtins.length d.value)
-                  ) (builtins.length defs)
-                );
-            }
-          else if builtins.isAttrs collection.default then
-            merge.lazyAttrsOf (
-              merge.mkOptionType {
-                name = "value";
-                merge = _: defs: (prelude.last defs).value;
-              }
+          else if (({ default, ... }: topProperty default) collection) then
+            (
+              if builtins.isList (peelProperty collection.default) then
+                untypedListType
+              else if builtins.isAttrs (peelProperty collection.default) then
+                untypedAttrsType
+              else
+                merge.types.unspecified
             )
+            // {
+              poolHead = [
+                {
+                  file = "gen-schema/default";
+                  value = merge.mkOptionDefault collection.default;
+                }
+              ];
+            }
+          else if builtins.isList collection.default then
+            untypedListType
+          else if builtins.isAttrs collection.default then
+            untypedAttrsType
           # any other default is an option's default with no type: its definitions fold untyped, and
           # the default is one definition at `mkOptionDefault` (`poolHead`)
           else
@@ -2042,7 +2099,10 @@ let
           let
             collection = allCollections.${name};
           in
-          if collection ? type then
+          # a pooled term (`topProperty`) is read alone only, where it yields no value
+          if !(collection ? merge) && collection ? default && topProperty collection.default then
+            throw "gen-schema: collection '${name}': a property (`${collection.default._type}`) at the top of its `default` is not resolved, as no property at the top of an option's default is; write it on the default's elements or on a definition"
+          else if collection ? type then
             merge.mergeDefs [ "collections" name "default" ] collection.type [
               {
                 file = "gen-schema/default";
