@@ -82,79 +82,81 @@ let
   kindB = _: [ [ "b" ] ];
 in
 {
-  # the plane's positive control: a plain default stays the seed (`../tests/collection-default-properties.nix`)
-  test-plain-seed-kept = {
-    expr = genOf (_: { default = [ "base" ]; }) "classes" kindB null;
-    expected = [
-      "base"
-      "b"
-    ];
-  };
-  test-top-list-mkif-true-beside-kind = {
-    expr = bothLaws listT (l: { default = l.mkIf true [ "a" ]; }) "classes" kindB null;
-    expected = same [ "b" ];
-  };
-  test-top-list-mkif-false-beside-kind = {
-    expr = bothLaws listT (l: { default = l.mkIf false [ "a" ]; }) "classes" kindB null;
-    expected = same [ "b" ];
-  };
-  test-top-list-mkforce-beside-kind = {
-    expr = bothLaws listT (l: { default = l.mkForce [ "a" ]; }) "classes" kindB null;
-    expected = same [ "b" ];
-  };
-  test-top-attrs-mkif-true-beside-kind = {
-    expr = bothLaws lazyAttrsT (l: { default = l.mkIf true { r = "eu"; }; }) "metadata" (_: [
-      { t = "x"; }
-    ]) null;
-    expected = same { t = "x"; };
-  };
-  # the same beside a mixin's contribution, on a declared type, and beside a definition that survives a discharged one
-  test-top-typed-list-mkmerge-beside-mixin = {
-    expr = bothLaws listT (l: {
-      type = l.types.listOf l.types.str;
-      default = l.mkMerge [
-        [ "a" ]
-        [ "c" ]
+  flake.tests.collection-default-beside-definition = {
+    # the plane's positive control: a plain default stays the seed (`../tests/collection-default-properties.nix`)
+    test-plain-seed-kept = {
+      expr = genOf (_: { default = [ "base" ]; }) "classes" kindB null;
+      expected = [
+        "base"
+        "b"
       ];
-    }) "classes" (_: [ ]) [ "m" ];
-    expected = same [ "m" ];
-  };
-  test-top-list-mkdefault-beside-surviving-kind = {
-    expr = bothLaws listT (l: { default = l.mkDefault [ "a" ]; }) "classes" (l: [
-      (l.mkIf false [ "x" ])
-      [ "b" ]
-    ]) null;
-    expected = same [ "b" ];
-  };
-  # a default its declared type refuses (`[ ]` for `nonEmptyListOf`) beside a surviving definition
-  test-type-refused-default-beside-kind = {
-    expr = bothLaws neT (_: {
-      type = lib.types.nonEmptyListOf lib.types.str;
-      default = [ ];
-    }) "classes" kindB null;
-    expected = same [ "b" ];
-  };
-  test-type-refused-default-beside-mixin = {
-    expr = bothLaws neT (_: {
-      type = lib.types.nonEmptyListOf lib.types.str;
-      default = [ ];
-    }) "classes" (_: [ ]) [ "m" ];
-    expected = same [ "m" ];
-  };
-  # guards: a value default is still the seed beside a definition (one `mkOrder` at its top is stripped,
-  # and an element's property resolves inside it), so these keep gen-schema's seed law
-  test-top-mkafter-stays-the-seed = {
-    expr = genOf (l: { default = l.mkAfter [ "a" ]; }) "classes" kindB null;
-    expected = [
-      "a"
-      "b"
-    ];
-  };
-  test-typed-identity-default-the-type-accepts-stays-the-seed = {
-    expr = genOf (l: {
-      type = l.types.listOf l.types.str;
-      default = [ ];
-    }) "classes" (l: [ (l.mkOverride 1600 [ "b" ]) ]) null;
-    expected = [ "b" ];
+    };
+    test-top-list-mkif-true-beside-kind = {
+      expr = bothLaws listT (l: { default = l.mkIf true [ "a" ]; }) "classes" kindB null;
+      expected = same [ "b" ];
+    };
+    test-top-list-mkif-false-beside-kind = {
+      expr = bothLaws listT (l: { default = l.mkIf false [ "a" ]; }) "classes" kindB null;
+      expected = same [ "b" ];
+    };
+    test-top-list-mkforce-beside-kind = {
+      expr = bothLaws listT (l: { default = l.mkForce [ "a" ]; }) "classes" kindB null;
+      expected = same [ "b" ];
+    };
+    test-top-attrs-mkif-true-beside-kind = {
+      expr = bothLaws lazyAttrsT (l: { default = l.mkIf true { r = "eu"; }; }) "metadata" (_: [
+        { t = "x"; }
+      ]) null;
+      expected = same { t = "x"; };
+    };
+    # the same beside a mixin's contribution, on a declared type, and beside a definition that survives a discharged one
+    test-top-typed-list-mkmerge-beside-mixin = {
+      expr = bothLaws listT (l: {
+        type = l.types.listOf l.types.str;
+        default = l.mkMerge [
+          [ "a" ]
+          [ "c" ]
+        ];
+      }) "classes" (_: [ ]) [ "m" ];
+      expected = same [ "m" ];
+    };
+    test-top-list-mkdefault-beside-surviving-kind = {
+      expr = bothLaws listT (l: { default = l.mkDefault [ "a" ]; }) "classes" (l: [
+        (l.mkIf false [ "x" ])
+        [ "b" ]
+      ]) null;
+      expected = same [ "b" ];
+    };
+    # a default its declared type refuses (`[ ]` for `nonEmptyListOf`) beside a surviving definition
+    test-type-refused-default-beside-kind = {
+      expr = bothLaws neT (_: {
+        type = lib.types.nonEmptyListOf lib.types.str;
+        default = [ ];
+      }) "classes" kindB null;
+      expected = same [ "b" ];
+    };
+    test-type-refused-default-beside-mixin = {
+      expr = bothLaws neT (_: {
+        type = lib.types.nonEmptyListOf lib.types.str;
+        default = [ ];
+      }) "classes" (_: [ ]) [ "m" ];
+      expected = same [ "m" ];
+    };
+    # guards: a value default is still the seed beside a definition (one `mkOrder` at its top is stripped,
+    # and an element's property resolves inside it), so these keep gen-schema's seed law
+    test-top-mkafter-stays-the-seed = {
+      expr = genOf (l: { default = l.mkAfter [ "a" ]; }) "classes" kindB null;
+      expected = [
+        "a"
+        "b"
+      ];
+    };
+    test-typed-identity-default-the-type-accepts-stays-the-seed = {
+      expr = genOf (l: {
+        type = l.types.listOf l.types.str;
+        default = [ ];
+      }) "classes" (l: [ (l.mkOverride 1600 [ "b" ]) ]) null;
+      expected = [ "b" ];
+    };
   };
 }
