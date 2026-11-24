@@ -1588,9 +1588,9 @@ let
     };
   };
 
-  # A `default` whose top is a condition, a merge or a priority is a module-system term, not a value:
-  # resolved as an option's default it yields none, so it seeds no fold and is one definition at
-  # `mkOptionDefault` (`poolHead`). One `mkOrder` at the top is stripped before this test.
+  # A `default` whose top is a condition, a merge, a priority or a second order is a module-system
+  # term, not a value: resolved as an option's default it yields none, so it seeds no fold and is one
+  # definition at `mkOptionDefault` (`poolHead`). One `mkOrder` at the top is stripped before this test.
   topProperty =
     d:
     builtins.isAttrs d
@@ -1598,6 +1598,7 @@ let
       "if"
       "merge"
       "override"
+      "order"
     ];
   # its refusal, read where it would be the value: alone, or as the pool's winner
   topPropertyRefusal =
