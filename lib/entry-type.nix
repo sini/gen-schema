@@ -1671,7 +1671,8 @@ let
         # a built-in's library seed by its name (`constNamed`). "At" and "equal" are Nix `==`, so the key
         # agrees with the mark where `==` on a kept value is at least as fine as the mark's reading of it.
         # A derivation (`type = "derivation"` with `outPath`) is where `==` reads `outPath` alone; the mint
-        # refuses it, so the mark seals it and decides it by `==`, as the key does (den-hoag-5x8xu). The record is the key's alone, so a schema
+        # refuses it, so the mark seals it and decides it by `==`, as the key does
+        # (den-hoag-5x8xu). The record is the key's alone, so a schema
         # evaluation that forces no key allocates it as one binding (den-hoag-y9j03, den-hoag-isxgb).
         keySchema =
           let
