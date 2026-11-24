@@ -127,6 +127,11 @@ in
       ]) null;
       expected = same [ "b" ];
     };
+    # a second `mkOrder` under the one stripped is a term as well
+    test-top-double-mkafter-beside-kind = {
+      expr = bothLaws listT (l: { default = l.mkAfter (l.mkAfter [ "a" ]); }) "classes" kindB null;
+      expected = same [ "b" ];
+    };
     # a default its declared type refuses (`[ ]` for `nonEmptyListOf`) beside a surviving definition
     test-type-refused-default-beside-kind = {
       expr = bothLaws neT (_: {
