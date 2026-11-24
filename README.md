@@ -1035,11 +1035,10 @@ collection's name, so a seed enters the key only as a kind's value), the compute
 part of the mark. Where a definition reaches a function or path module, whose
 declarations no such reading sees, the separation part is the mark itself. Either way the key splits
 exactly where the mark does wherever Nix `==` on a kept collection's value is at least as fine as the
-mark's reading of it, and a cell over every one-node shape in that domain holds that. A value carrying
-`type = "derivation"` and held at its collection's seed lies outside it: `==` compares such a value by
-its `outPath` alone, while the mark reads the whole record, so two kinds whose values differ only off
-the `outPath` share a key while their marks differ. Whether such a value is identified by its `outPath`
-or by its whole structure is an open design question, and the key moves with its answer. The module the functor
+mark's reading of it, and a cell over every one-node shape in that domain holds that. A derivation (a
+value carrying `type = "derivation"` and `outPath`), which `==` compares by its `outPath` alone, has no
+identity: the mint refuses it, so the mark seals it and two kinds whose values differ only off the
+`outPath` share their mark as they share their key, at the seed and away from it. The module the functor
 returns carries `imports`, `config` and the same reference key, so a
 nixpkgs `lib.evalModules` mount of the kind value dedups one construction reached twice as gen does
 and collects nothing it does not know; at one node it keeps one construction where gen refuses.

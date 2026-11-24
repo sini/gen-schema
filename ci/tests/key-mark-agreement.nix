@@ -7,7 +7,7 @@
 # declaration node), marks equal, foreign keys equal. Only one-node rows (`w`) are the property's; the
 # others compose by node and are carried as rows only.
 #
-# The corpus: 71 constructed shapes, each as a differing pair and as a twin, the granularity razor's
+# The corpus: 75 constructed shapes, each as a differing pair and as a twin, the granularity razor's
 # default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`), 11 declared-collection
 # pairs under both identity settings, 2 rows over an `identity = false` collection and 2 over a kept
 # collection the kind does not define. The `mkType` arm writes no foreign key. Four shapes redeclare one
@@ -22,6 +22,9 @@
 # built-in redeclared as the library declares it or with another seed), and one control whose `merge` reads it. Four
 # read a kept record: one the key digests whole, one whose sealed member sends it to the spread, and
 # one holding a kind, against another kind and against the same kind from a second schema evaluation.
+# Four hold a derivation (`type = "derivation"` with `outPath`, the shape `==` compares by `outPath`
+# alone and the mint refuses) differing off its `outPath`: at its seed, in a list and a record there, and
+# away from it (den-hoag-5x8xu). Both marks are sealed, so the key agrees by `==` as the mark does.
 #
 # PLANTED RED, in the suite: the same predicate over a node-only key (the witness alone, no content)
 # reads every one-node row whose marks differ as coarser, so a zero on the real key is read with the
@@ -85,6 +88,12 @@ let
   # a collection `merge` the seed does not reach, and one it does (den-hoag-isxgb)
   seedKeepLast = _: v: v;
   seedNullCat = acc: v: (if acc == null then [ ] else acc) ++ v;
+  # a derivation without `drvPath`, two of which `==` joins whatever their `name`
+  drvNamed = name: {
+    type = "derivation";
+    outPath = "/x";
+    inherit name;
+  };
   addMixin =
     t: d:
     genSchema.mkMixin { } (_: {
@@ -708,6 +717,52 @@ let
         inherits = [ "par" ];
       };
     };
+    # ── a derivation (`type = "derivation"` with `outPath`), which `==` compares by `outPath` alone and the
+    # mint refuses (den-hoag-5x8xu): at its seed, nested there, and away from it ──
+    gateDrvAtSeed = tag: {
+      args.collections.tags = {
+        merge = seedKeepLast;
+        default = drvNamed "a";
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags = drvNamed tag;
+      };
+    };
+    gateDrvInListAtSeed = tag: {
+      args.collections.tags = {
+        merge = seedKeepLast;
+        default = [ (drvNamed "a") ];
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags = [ (drvNamed tag) ];
+      };
+    };
+    gateDrvInRecordAtSeed = tag: {
+      args.collections.tags = {
+        merge = seedKeepLast;
+        default = {
+          p = drvNamed "a";
+        };
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags = {
+          p = drvNamed tag;
+        };
+      };
+    };
+    gateDrvAway = tag: {
+      args.collections.tags = {
+        merge = seedKeepLast;
+        default = 7;
+      };
+      decl = {
+        options.trail = opt T.str;
+        tags = drvNamed tag;
+      };
+    };
   };
   build =
     shape: tag:
@@ -1130,8 +1185,8 @@ in
     test-the-foreign-key-splits-exactly-where-the-mark-splits = {
       expr = verdict (n: rows.${n}.k);
       expected = {
-        rows = 188;
-        oneNode = 174;
+        rows = 196;
+        oneNode = 182;
         nonBool = [ ];
         coarser = [ ];
         finer = [ ];

@@ -1670,9 +1670,8 @@ let
         # value (`readKept`), one at a declared seed by that seed's reading (`seedTags`) and one equal to
         # a built-in's library seed by its name (`constNamed`). "At" and "equal" are Nix `==`, so the key
         # agrees with the mark where `==` on a kept value is at least as fine as the mark's reading of it.
-        # A derivation-shaped seed is outside that: `==` reads its `outPath` alone and the mark the whole
-        # record, so the key is coarser there; whether such a value's identity is its
-        # `outPath` is den-hoag-5x8xu's open question. The record is the key's alone, so a schema
+        # A derivation (`type = "derivation"` with `outPath`) is where `==` reads `outPath` alone; the mint
+        # refuses it, so the mark seals it and decides it by `==`, as the key does (den-hoag-5x8xu). The record is the key's alone, so a schema
         # evaluation that forces no key allocates it as one binding (den-hoag-y9j03, den-hoag-isxgb).
         keySchema =
           let

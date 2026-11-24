@@ -94,8 +94,8 @@ per-construction token and refuses a second construction by name, the branch rea
 (den-hoag-xh14j, ADR-0034). Where a kind's defs reach no opaque module, its reference key is the syntactic separation
 key (den-hoag-a7c9r B′, `keyed` in `lib/entry-type.nix`), which must split exactly where the mark splits; the
 key-vs-mark razor is `ci/tests/key-mark-agreement.nix`. Its domain is the kept values on which Nix `==` is at least as fine as the
-mark's reading: a derivation-shaped value held at its seed is COARSER there (`==` reads its `outPath` alone; den-hoag-5x8xu,
-open), and the built-in seeds' two literals (`mkAllCollections`' defaults, `keySchema.builtinSeeds`) are pinned to
+mark's reading. A derivation (`type = "derivation"` with `outPath`, which `==` reads by its `outPath` alone) is refused
+by the mint, so the mark seals it and the key agrees at its seed (den-hoag-5x8xu), and the built-in seeds' two literals (`mkAllCollections`' defaults, `keySchema.builtinSeeds`) are pinned to
 the library constants by `ci/tests/collection-builtin-seeds.nix` (den-hoag-isxgb). A plain positioned `baseModule` is keyed `gen-schema-base:<pos>#base` and
 sealed by its value (K2 (b)). A kind is removed by its computed key (`{ key = (k { }).key; }`), never
 a literal: the key's digests are internal addressing (ADR-0016 ruling 5), and the act renamed main's
