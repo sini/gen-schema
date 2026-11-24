@@ -143,6 +143,13 @@
     call = genSchema.mkInstanceType;
   };
 
+  evalInstance = {
+    required = [ ];
+    options = [ ];
+    valid = { };
+    call = genSchema.evalInstance;
+  };
+
   mkInstanceRegistry = {
     required = [ ];
     options = [
