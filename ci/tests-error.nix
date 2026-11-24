@@ -6423,4 +6423,84 @@ in
         expectedError = err "gen-merge: a definition for option `collections.c.default' is not of type `non-empty (list of string)'.";
       };
     };
+
+  # A collection default that is no value of the collection (a term at its top, or a container its declared
+  # type refuses) is one definition at `mkOptionDefault`: it is unread beside a surviving definition
+  # (`tests/collection-default-beside-definition.nix`), and refused where it wins, as nixpkgs refuses it.
+  # A fold that swallowed the refusal would serve the definitions, or nothing, here.
+  flake.testsError.collection-default-pooled-refusals =
+    let
+      userOf =
+        coll: field: defs:
+        builtins.deepSeq
+          (genMerge.evalModuleTree { } (
+            [
+              { options.schema = mkSchemaOption { collections.${field} = coll; }; }
+              { config.schema.user = { }; }
+            ]
+            ++ map (v: { config.schema.user.${field} = v; }) defs
+          )).config.schema.user.${field}
+          null;
+      top =
+        field: t:
+        "^"
+        + escapeRegex "gen-schema: collection '${field}': a property (`${t}`) at the top of its `default` is not resolved";
+      ne = {
+        type = lib.types.nonEmptyListOf lib.types.str;
+        default = [ ];
+      };
+      neRefused =
+        "^"
+        + escapeRegex "gen-merge: a definition for option `collections.classes.default' is not of type `non-empty (list of string)'.";
+    in
+    {
+      test-top-beside-a-discharged-definition-refuses = {
+        expr = userOf { default = genMerge.mkIf true [ "a" ]; } "classes" [ (genMerge.mkIf false [ "b" ]) ];
+        expectedError = {
+          type = "ThrownError";
+          msg = top "classes" "if";
+        };
+      };
+      test-top-beside-a-definition-it-outranks-refuses = {
+        expr = userOf { default = genMerge.mkIf true [ "a" ]; } "classes" [
+          (genMerge.mkOverride 1600 [ "b" ])
+        ];
+        expectedError = {
+          type = "ThrownError";
+          msg = top "classes" "if";
+        };
+      };
+      test-top-attrs-beside-a-discharged-definition-refuses = {
+        expr = userOf { default = genMerge.mkIf true { r = "eu"; }; } "metadata" [
+          (genMerge.mkIf false { t = "x"; })
+        ];
+        expectedError = {
+          type = "ThrownError";
+          msg = top "metadata" "if";
+        };
+      };
+      test-type-refused-default-alone-refuses = {
+        expr = userOf ne "classes" [ ];
+        expectedError = {
+          type = "ThrownError";
+          msg = neRefused;
+        };
+      };
+      test-type-refused-default-beside-a-definition-it-outranks-refuses = {
+        expr = userOf ne "classes" [ (genMerge.mkOverride 1600 [ "b" ]) ];
+        expectedError = {
+          type = "ThrownError";
+          msg = neRefused;
+        };
+      };
+      test-type-refused-default-beside-a-refused-definition-refuses = {
+        expr = userOf ne "classes" [ [ ] ];
+        expectedError = {
+          type = "ThrownError";
+          msg =
+            "^"
+            + escapeRegex "gen-merge: a definition for option `schema.user.classes' is not of type `non-empty (list of string)'.";
+        };
+      };
+    };
 }
