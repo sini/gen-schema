@@ -2010,7 +2010,7 @@ let
                   { default, ... }:
                   topProperty default
                   || !(builtins.isList default || builtins.isAttrs default)
-                  || !(collection.type.check default)
+                  || ((default == [ ] || default == { }) && !(collection.type.check default))
                 )
                   collection
               )
