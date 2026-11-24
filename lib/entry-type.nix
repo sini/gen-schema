@@ -1932,7 +1932,13 @@ let
             # the default is pattern-bound: a select passed to a primop is thunked, a variable is not
             if
               collection ? default
-              && (({ default, ... }: !(builtins.isList default || builtins.isAttrs default)) collection)
+              && (
+                (
+                  { default, ... }:
+                  !(builtins.isList default || builtins.isAttrs default) || !(collection.type.check default)
+                )
+                  collection
+              )
             then
               collection.type
               // {
