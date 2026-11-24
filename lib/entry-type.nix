@@ -1131,7 +1131,7 @@ let
                 # any other is pooled (`topProperty`, `collectionTypes`): refused alone, unread beside a definition
                 && (c ? merge || !(topProperty d))
               then
-                throw "gen-schema: collection '${name}': a property (`${d._type}`) at the top of its `default` is not resolved, as no property at the top of an option's default is; write it on the default's elements or on a definition"
+                topPropertyRefusal name d
               else
                 d;
           }
@@ -1599,6 +1599,10 @@ let
       "merge"
       "override"
     ];
+  # its refusal, read where it would be the value: alone, or as the pool's winner
+  topPropertyRefusal =
+    name: d:
+    throw "gen-schema: collection '${name}': a property (`${d._type}`) at the top of its `default` is not resolved, as no property at the top of an option's default is; write it on the default's elements or on a definition";
   # the value shape under such a term, which types an untyped collection's definitions
   peelProperty =
     d:
@@ -2001,7 +2005,11 @@ let
             if
               collection ? default
               && (
-                ({ default, ... }: topProperty default || !(builtins.isList default || builtins.isAttrs default))
+                (
+                  { default, ... }:
+                  topProperty default
+                  || !(builtins.isList default || builtins.isAttrs default)
+                )
                   collection
               )
             then
@@ -2010,7 +2018,12 @@ let
                 poolHead = [
                   {
                     file = "gen-schema/default";
-                    value = merge.mkOptionDefault collection.default;
+                    value = merge.mkOptionDefault (
+                      if topProperty collection.default then
+                        topPropertyRefusal name collection.default
+                      else
+                        collection.default
+                    );
                   }
                 ];
               }
@@ -2067,7 +2080,7 @@ let
               poolHead = [
                 {
                   file = "gen-schema/default";
-                  value = merge.mkOptionDefault collection.default;
+                  value = merge.mkOptionDefault (topPropertyRefusal name collection.default);
                 }
               ];
             }
@@ -2101,7 +2114,7 @@ let
           in
           # a pooled term (`topProperty`) is read alone only, where it yields no value
           if !(collection ? merge) && collection ? default && topProperty collection.default then
-            throw "gen-schema: collection '${name}': a property (`${collection.default._type}`) at the top of its `default` is not resolved, as no property at the top of an option's default is; write it on the default's elements or on a definition"
+            topPropertyRefusal name collection.default
           else if collection ? type then
             merge.mergeDefs [ "collections" name "default" ] collection.type [
               {
