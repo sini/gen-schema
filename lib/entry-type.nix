@@ -2019,9 +2019,13 @@ let
                 poolHead = [
                   {
                     file = "gen-schema/default";
+                    # a term refuses by name, and a container its type refuses by the seed's own check
+                    # (at `collections.<name>.default`), read only where the default wins
                     value = merge.mkOptionDefault (
                       if topProperty collection.default then
                         topPropertyRefusal name collection.default
+                      else if builtins.isList collection.default || builtins.isAttrs collection.default then
+                        seeds.${name}
                       else
                         collection.default
                     );
