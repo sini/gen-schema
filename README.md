@@ -1029,9 +1029,11 @@ name. The separation part is a reading of what the mark mints, taken off the def
 minting: the schema's construction parameters, with its base and mixins read as the definition they
 resolve to (a function base applied to the kind name) and each sealed parameter read leaf by leaf as
 the mark spreads it; each definition's declared option paths with their types' marks, and the other
-open paths it sets; every kept collection's value as the mark reads it (one equal by `==` to a declared seed by
-that seed's reading, bound once per schema, and one equal to a built-in collection's library seed by the
-collection's name, so a seed enters the key only as a kind's value), the computed field and freeform types, and the parents' own keys. Definition order enters no part of it, as it enters no
+open paths it sets; every kept collection's value as the mark reads it (one at a declared seed by that
+seed's reading, bound once per schema: held because no definition or mixin of the kind sets it, or equal by `==`
+to a seed that is a scalar or an empty list or record, which `==` decides without reaching a derivation's
+`outPath`; and one equal to a built-in collection's library seed by the collection's name, so a seed enters the
+key only as a kind's value), the computed field and freeform types, and the parents' own keys. Definition order enters no part of it, as it enters no
 part of the mark. Where a definition reaches a function or path module, whose
 declarations no such reading sees, the separation part is the mark itself. Either way the key splits
 exactly where the mark does wherever Nix `==` on a kept collection's value is at least as fine as the
