@@ -51,14 +51,15 @@ let
       "strict"
       "specialArgs"
     ];
-  } (o: kindValue: mkInstanceCoreWith merge.refusingSubmodulePaired kindValue o);
+  } (o: kindValue: mkInstanceCoreWith "mkInstancePaired" merge.refusingSubmodulePaired kindValue o);
   # The legacy finish: mkInstanceType's own expression, `(refusingSubmodule stated refused module).withArgs args`.
   finishType =
     stated: refused: args: module:
     (merge.refusingSubmodule stated refused module).withArgs args;
-  mkInstanceTypeCore = mkInstanceCoreWith finishType;
+  mkInstanceTypeCore = mkInstanceCoreWith "mkInstanceType" finishType;
+  # `site` is the entry the caller called; the refusals below name it.
   mkInstanceCoreWith =
-    finish: kindValue:
+    site: finish: kindValue:
     {
       extraModules ? [ ],
       strict ? kindValue.strict,
@@ -76,7 +77,7 @@ let
       _ =
         assert
           isSchemaKind kindValue
-          || throw "gen-schema: mkInstanceType: expected a kind value carrying a mint-backed mark (`__mint.minted`); got an attrset with no mark";
+          || throw "gen-schema: ${site}: expected a kind value carrying a mint-backed mark (`__mint.minted`); got an attrset with no mark";
         null;
       kind = kindValue.kind;
 
@@ -105,7 +106,7 @@ let
       # (`stampImportOk`, den-hoag-9zyp7): no identity cell (`__mint`, `__sealed`, `__kindAncestors`) is read, so none is demanded.
       importedKind =
         if kindValue ? __kindSelf && !(stampOk kindValue) then
-          stampRefusal "gen-schema: mkInstanceType" kindValue
+          stampRefusal "gen-schema: ${site}" kindValue
         else
           kindValue;
       # THE INSTANCE TYPE IS MINTED OVER WHAT ITS MODULE SET IS BUILT FROM (den-hoag-dwln8, ADR-0034):
@@ -159,7 +160,7 @@ let
       ];
     in
     if specialArgs ? config then
-      throw "gen-schema: mkInstanceType: `specialArgs' cannot supply `config' to kind '${kind}': the instance's own module reads its `config' to bind the kind argument `${kind}' and its identity, so a caller's value would replace the instance's own"
+      throw "gen-schema: ${site}: `specialArgs' cannot supply `config' to kind '${kind}': the instance's own module reads its `config' to bind the kind argument `${kind}' and its identity, so a caller's value would replace the instance's own"
     else
       finish stated refused specialArgs (
         # The stated set, enforced where it protects: the instance's own evaluation, whichever engine runs it

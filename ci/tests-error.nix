@@ -2769,6 +2769,7 @@ in
         ]).config.h0;
       routes = sa: {
         door = one (genSchema.mkInstanceType { specialArgs = sa; } routeHost);
+        paired = one (genSchema.mkInstancePaired { specialArgs = sa; } routeHost).type;
         reg =
           (genMerge.evalModuleTree { } [
             {
@@ -2840,7 +2841,10 @@ in
         type = "ThrownError";
         msg = "^" + escapeRegex m + "$";
       };
-      door = exact "gen-schema: mkInstanceType: `specialArgs' cannot supply `config' to kind 'host': the instance's own module reads its `config' to bind the kind argument `host' and its identity, so a caller's value would replace the instance's own";
+      doorOf =
+        site:
+        exact "gen-schema: ${site}: `specialArgs' cannot supply `config' to kind 'host': the instance's own module reads its `config' to bind the kind argument `host' and its identity, so a caller's value would replace the instance's own";
+      door = doorOf "mkInstanceType";
       withArgsRefusal = k: exact ("gen-merge: " + reason "`withArgs'" k);
       unionRefusal =
         k:
@@ -2860,6 +2864,9 @@ in
           config = door;
           options = withArgsRefusal "options";
           prefix = withArgsRefusal "prefix";
+        };
+        paired = expect.door // {
+          config = doorOf "mkInstancePaired";
         };
         reg = expect.door;
         wa = {
