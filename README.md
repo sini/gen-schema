@@ -75,6 +75,7 @@ The authoring surface is small — most schemas are built from these constructor
 | `mkSchemaOption`                    | Declares the `schema` option (holds all kinds; carries `strict`, `baseModule`, `collections`, `computed` settings) |
 | `mkInstanceRegistry`                | Turns a kind into an `attrsOf` registry of instances, with `refs`, `derive`, and validator pipeline                |
 | `mkInstanceType`                    | The single-instance submodule type (identity + strict injected), used by registries                                |
+| `mkInstancePaired`                  | `mkInstanceType`'s construction returned beside an evaluator of it, `{ type; evaluate; }`                          |
 | `declarationOf` / `setOf` / `toSet` | Cross-instance references (deferred or direct) and identity-deduplicated collections                               |
 | `schemaFn`                          | Declarative methods on a kind, with named args auto-resolved from instance config                                  |
 | `mkValidator` / `mkFieldValidator`  | Cross-field constraints that travel with a kind and fire on every registry                                         |
@@ -1735,6 +1736,22 @@ mkInstanceType {
 ```
 
 Returns `lib.types.submodule` — the type for a single instance of a kind.
+
+### `mkInstancePaired`
+
+```nix
+mkInstancePaired {
+  extraModules ? [],
+  strict ? kindValue.strict,
+  specialArgs ? {},
+} kindValue
+```
+
+Returns `{ type; evaluate; }` from ONE construction (gen-merge `refusingSubmodulePaired`): `type` is the type
+`mkInstanceType` makes from the same options and kind, and `evaluate loc defs` is one evaluation of it,
+`{ config; provenance; }`, kept by the caller beside the instance's value. `config` is `type`'s typed merge's value.
+`evaluate` takes no type, so a type edited, rebuilt, joined or `withArgs`-derived from `type` carries no evaluator, and
+each call is one evaluation, never shared with a typed read of `type`.
 
 ### `mkInstanceRegistry`
 

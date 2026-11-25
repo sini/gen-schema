@@ -3275,6 +3275,37 @@ in
       };
     };
 
+    test-mkinstancepaired-non-attrset-argument-names-the-door = {
+      expr = doors.mkInstancePaired.call 1;
+      expectedError = {
+        type = "ThrownError";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.optionsNotASet "gen-schema.mkInstancePaired" [ "extraModules" "strict" "specialArgs" ] 1
+          )
+          + "$"
+        );
+      };
+    };
+    test-mkinstancepaired-unknown-option-names-the-door = {
+      expr = doors.mkInstancePaired.call (doors.mkInstancePaired.valid // { bogus = 1; });
+      expectedError = {
+        type = "ThrownError";
+        msg = (
+          "^"
+          + escapeRegex (
+            refusals.unknownOption "gen-schema.mkInstancePaired" [
+              "extraModules"
+              "strict"
+              "specialArgs"
+            ] "bogus"
+          )
+          + "$"
+        );
+      };
+    };
+
     test-mkinstanceregistry-non-attrset-argument-names-the-door = {
       expr = doors.mkInstanceRegistry.call 1;
       expectedError = {

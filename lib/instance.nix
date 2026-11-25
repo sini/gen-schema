@@ -40,8 +40,25 @@ let
       "specialArgs"
     ];
   } (o: kindValue: mkInstanceTypeCore kindValue o);
-  mkInstanceTypeCore =
-    kindValue:
+  # THE PAIRED SIBLING (den-hoag-t5ndo 1b H1): the same closed options and the same kind, one construction, returned
+  # as `{ type; evaluate; }`. `type` is the construction mkInstanceType makes from these inputs; `evaluate loc defs` is
+  # one evaluation OF IT (gen-merge `refusingSubmodulePaired`), `{ config; provenance; }`, retained by the caller. It
+  # takes no type: a type edited, rebuilt, joined or `withArgs`-derived from `type` has no evaluator.
+  mkInstancePaired = prelude.door {
+    name = "gen-schema.mkInstancePaired";
+    optional = [
+      "extraModules"
+      "strict"
+      "specialArgs"
+    ];
+  } (o: kindValue: mkInstanceCoreWith merge.refusingSubmodulePaired kindValue o);
+  # The legacy finish: mkInstanceType's own expression, `(refusingSubmodule stated refused module).withArgs args`.
+  finishType =
+    stated: refused: args: module:
+    (merge.refusingSubmodule stated refused module).withArgs args;
+  mkInstanceTypeCore = mkInstanceCoreWith finishType;
+  mkInstanceCoreWith =
+    finish: kindValue:
     {
       extraModules ? [ ],
       strict ? kindValue.strict,
@@ -144,7 +161,7 @@ let
     if specialArgs ? config then
       throw "gen-schema: mkInstanceType: `specialArgs' cannot supply `config' to kind '${kind}': the instance's own module reads its `config' to bind the kind argument `${kind}' and its identity, so a caller's value would replace the instance's own"
     else
-      (merge.refusingSubmodule stated refused (
+      finish stated refused specialArgs (
         # The stated set, enforced where it protects: the instance's own evaluation, whichever engine runs it
         # and whichever join reached it, including a redeclaration beside a nixpkgs `submoduleWith', whose join
         # is nixpkgs' record and carries no set (den-hoag-b7v1h). The test spells the three keys rather than
@@ -197,8 +214,7 @@ let
             description = "The closed identity-key set this kind's instances are minted over.";
           };
         }
-      )).withArgs
-        specialArgs;
+      );
 
   # Type-tree predicates for coercion chain dispatch.
   isRefLeaf = t: (t.refKind or null) != null;
@@ -789,5 +805,5 @@ let
     };
 in
 {
-  inherit mkInstanceType mkInstanceRegistry;
+  inherit mkInstanceType mkInstancePaired mkInstanceRegistry;
 }

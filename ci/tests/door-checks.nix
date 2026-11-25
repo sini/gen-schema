@@ -110,7 +110,7 @@ in
     # The table is the subject; a row dropped from it would drop its cells silently.
     test-door-table-rows = {
       expr = builtins.length (builtins.attrNames doors);
-      expected = 12;
+      expected = 13;
     };
 
     # ── P2: the old one-record shapes are refused at their first application ──

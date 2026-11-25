@@ -143,6 +143,17 @@
     call = genSchema.mkInstanceType;
   };
 
+  mkInstancePaired = {
+    required = [ ];
+    options = [
+      "extraModules"
+      "strict"
+      "specialArgs"
+    ];
+    valid = { };
+    call = genSchema.mkInstancePaired;
+  };
+
   mkInstanceRegistry = {
     required = [ ];
     options = [

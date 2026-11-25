@@ -262,7 +262,7 @@ in
     entryReservation
     ;
   inherit (evalSchemaLib) evalSchema;
-  inherit (instance) mkInstanceType mkInstanceRegistry;
+  inherit (instance) mkInstanceType mkInstancePaired mkInstanceRegistry;
   inherit (validate) validateInstances mkFieldValidator filterValidators;
   inherit (refLib)
     declarationOf
