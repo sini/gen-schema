@@ -3,7 +3,7 @@ let
   # The library constants the built-in collections are seeded with. The library writes them twice: as
   # `mkAllCollections`' defaults, which a kind holds where it defines none, and as `keySchema.builtinSeeds`, by which
   # the kind key names a built-in held at its constant (`constNamed`). Drift between the two leaves a kind at the
-  # served default unnamed and at its seed, and its key aborts at `keySchema.seedTags`, which holds no built-in.
+  # served default unnamed, read by its value.
   constants = {
     methods = { };
     validators = [ ];
@@ -30,10 +30,17 @@ in
     expr = builtins.intersectAttrs constants served;
     expected = constants;
   };
-  # `builtinSeeds`' side: the kind at the served defaults keys as the kind stating the constants. A drift on either
-  # side aborts this cell, uncatchably, at `keySchema.seedTags`.
+  # `builtinSeeds`' side: the kind at the served defaults keys as the kind stating the constants. A drift on
+  # `mkAllCollections`' side reds this cell, and one on `builtinSeeds`' side reds the next.
   flake.tests.collection-builtin-seeds.test-a-kind-at-the-served-defaults-keys-as-one-stating-the-constants = {
     expr = key served != null && key served == key stated;
     expected = true;
+  };
+  # the kind at the served defaults names every built-in in its key, so neither literal has drifted from the constants
+  flake.tests.collection-builtin-seeds.test-a-kind-at-the-served-defaults-names-every-built-in = {
+    expr = builtins.match ".*/${builtins.concatStringsSep "," (builtins.attrNames constants)}!.*" (
+      builtins.head (key served)
+    );
+    expected = [ ];
   };
 }
