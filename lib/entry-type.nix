@@ -181,12 +181,12 @@ let
       );
     in
     if isRecord.success && isRecord.value then
-      # an empty record is one component, its empty key list, with no member to walk
+      # an empty record has no member to walk, so it enters whole, where the encoder tags it apart from `[ ]`
       if v == { } then
         [
           {
             path = prefix;
-            value = [ ];
+            value = v;
           }
         ]
       else
@@ -1693,7 +1693,7 @@ let
             # digest of the whole value where the encoder takes it: that digest is equal exactly where
             # the names and every member's inert tag are, and a member the mint would refuse, or one
             # entering by its mark, sends the value to the spread, so the two readings never meet on one
-            # mark. `{ }` stays the spread's empty key list.
+            # mark. `{ }` enters whole, as the spread enters it.
             readKept =
               c: v:
               let
@@ -1716,7 +1716,7 @@ let
                 [
                   {
                     path = prefix;
-                    value = [ ];
+                    value = v;
                   }
                 ]
               else
@@ -2201,7 +2201,7 @@ let
                     seeds.${name} or collection.default
                   # a declared type answers its own empty value, as an option of it does (nixpkgs `mergedValue`).
                   # The kind's mark moves with it, to the mark of a `default` of that value: ADR-0016 ruling 5
-                  # ("internal addressing only") admits the move. It joins the mark's `{ }`/`[ ]` class (den-hoag-0pwbu).
+                  # ("internal addressing only") admits the move. A `{ }` and a `[ ]` default mint apart (den-hoag-0pwbu).
                   else if (collection.type.emptyValue or { }) ? value then
                     collection.type.emptyValue.value
                   else

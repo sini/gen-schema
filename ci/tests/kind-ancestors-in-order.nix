@@ -220,18 +220,18 @@ in
       };
       expected = {
         chain = {
-          "schemakind:42567102824bdbf49c7b15301297c887d43699879136574e87e1d4cbdb02e2f5" = "b";
-          "schemakind:ff1105f30503ae8e687e3a3e3982d9d6e6f31cf4fda602114a0754ef03f5b06b" = "a";
+          "schemakind:8b9c29f6ca3dc4302373cb806c6d1c485247e845aff3a99db4e442d98c4ad781" = "b";
+          "schemakind:840b39c7494c7ddd1e6d97e0bd88b5ea328a7629b952f47c02e4f1b24d3fe9f7" = "a";
         };
         diamond = {
-          "schemakind:3797d0918e49b7635ec9e1330dfbe47d63c036788452b4f5941a4d943fed867a" = "c";
-          "schemakind:42567102824bdbf49c7b15301297c887d43699879136574e87e1d4cbdb02e2f5" = "b";
-          "schemakind:ff1105f30503ae8e687e3a3e3982d9d6e6f31cf4fda602114a0754ef03f5b06b" = "a";
+          "schemakind:21ea32f7615b5d50c736112aca2eae54187029502f9c27b7361e0cb9cb60a8ff" = "c";
+          "schemakind:8b9c29f6ca3dc4302373cb806c6d1c485247e845aff3a99db4e442d98c4ad781" = "b";
+          "schemakind:840b39c7494c7ddd1e6d97e0bd88b5ea328a7629b952f47c02e4f1b24d3fe9f7" = "a";
         };
         foreign = {
-          "schemakind:193ef77bc6cf63adb8f5105b50810ded9407ed3dc8ee9b6641bdd13905dcd472" = "p";
-          "schemakind:550c3a0f225af7a6ce75efa02ef96e23c5e3641d701a2ca6058f9f12cf655cb4" = "x";
-          "schemakind:1817fd5676cf7665b77048c5ea92de954b3fd1d57d0da713c10d91def6db5065" = "y";
+          "schemakind:4a91da85087e3796e273a46daec831bce3650039b7e63b2ed733acfbd680691c" = "p";
+          "schemakind:489fad87cf5d87f79f8da6e709591d14efc0527e1912a8c8f7f41378138152a3" = "x";
+          "schemakind:745be3316f5271ee77319e2723619c4b06faff04814bab7d8c31566291702575" = "y";
         };
       };
     };

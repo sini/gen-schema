@@ -210,11 +210,11 @@ in
         submodule = digest (T.submodule { });
       };
       expected = {
-        user = "schemakind:0258d16213206c7cacd5927961719ae699e70148d0fe6d2ba71ff678564d91f6";
-        grp = "schemakind:8dedeeadc91d4e5e1f2845d770bafca6e9e0e0e9c6fc1d6e49a0f43430fc1357";
-        hostStr = "schemakind:e27bf5dac712da7d5b54bbb410fd8c38544362d89ed58b7616d6eefd7c67928d";
-        hostInt = "schemakind:0b9be9b995eb22cbfc2ac1e0e28ba838edfd342acad2cd085fe72dab05c33aa7";
-        hostSub = "schemakind:44199e2176586913d3bee67018ee0efe4e7a060ba0d8faf84128cf579acfbb78";
+        user = "schemakind:c4c1e8f08a3c525775b92f4ba75ffb2d1ab60013a66b49c293e02e9416955b0a";
+        grp = "schemakind:29bccb712d8dc47aa53887815e73e1dbd8941c562dc2d5467f2eb44176a9ac97";
+        hostStr = "schemakind:1dd572bd8c8837079005bf42279ed75d7d9d311e365eb59f165e1e66513aab44";
+        hostInt = "schemakind:f83d147b774fc7ea457339e36b8765f6a3e8bdd8e8cc29066534f72f67f457dd";
+        hostSub = "schemakind:88d7b6e856db4c8e62675ed8999c514aa72f86b89b16573de922ff626ea3694a";
         submodule = "type:155fcba8d4e089844a5e5371bc1c52651ca44d1353e6b3b155e4b3940f437baf";
       };
     };
@@ -230,20 +230,20 @@ in
         ];
       };
       expected = {
-        self = "schemakind:4c6287dfc0acdab89e55abc61d0421d09cae2cd6d49b8f37510546295f803098";
-        mutualHost = "schemakind:9d4dbfc15a4614e2db4fbf2791b10522d4912b64e586ad426f1bdb0b41e92540";
-        mutualUser = "schemakind:7a99a030586bccd64162065b044741fd8e546fe4f9aac769e2ed1e60412f2a5e";
+        self = "schemakind:8f856f8224a8ace98403a096889198a1cc611d310bbc1d8c309bfb92cf21b00b";
+        mutualHost = "schemakind:5342285ce63a741f4c681748ebd48118c4b2739e4ec1370e5d6ada91f7d4548a";
+        mutualUser = "schemakind:c29cf1efd9fbb086dc46ae99410fee893822e2682912d3e7eb467527a5693fef";
         instance = [
           "1"
           "2"
-          "host:94e7bbbbcf8fae27b8d069f841652ecb3a427f2cd2f59b9d4d66be6990195021"
+          "host:01134493456f59afc53e37ce0f433d84be01b931b26125f498722620748f13f1"
         ];
       };
     };
     # a kind embedding a registry over itself mints too
     test-a8-a-kind-embedding-a-registry-over-itself-mints = {
       expr = selfRegS.host.__mint.minted;
-      expected = "schemakind:bd1f5487fdab4dd3ded0e0a86bf9f1f8ad9ffc074cf40a00d39fcf1c87b7bd3d";
+      expected = "schemakind:41069a9427a5e7221e0a0543f6ea853d0220c96e19d5147b13fe2bd505aa8022";
     };
     test-a8-a-self-referential-instance-type-has-no-identity = {
       expr = (mkInstanceType { } selfS.host).__mint;

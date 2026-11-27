@@ -109,12 +109,12 @@ in
       };
     };
 
-    # G9 · the door moves no mark of a kind that writes no formal: the clean kind's mark is the one it
-    # minted before the door existed.
+    # G9 · the door moves no mark of a kind that writes no formal: the clean kind's mark is the one
+    # pinned before the door existed, re-pinned when the mark came to tell `{ }` from `[ ]` (den-hoag-0pwbu).
     test-clean-kind-mark-unmoved = {
       expr =
         (kindOf { } { options.role = genMerge.mkOption { type = genMerge.types.str; }; }).__mint.minted;
-      expected = "schemakind:c169721a65681877bd243ac69b88eab4d51e86838217149f4e14278515a4aa95";
+      expected = "schemakind:85529627eee24c66d9bd169b2fea10cac29df7518d51ce915dd5b3869bee043b";
     };
 
     # ★ THE IMPORTS ROUTE IS REFUSED (den-hoag-8x97u). A formal at the top level of a module the entry

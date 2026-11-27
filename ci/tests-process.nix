@@ -89,7 +89,8 @@
         control=$n
 
         # den-hoag-a7c9r U1 · the constant component tags are minted once per evaluation: one component
-        # mint per parentless kind beside them, so four kinds mint three more than one kind does.
+        # mint per parentless kind beside them, so four kinds mint three more than one kind does. The empty
+        # record's tag is one of the constants since the mark came to tell `{ }` from `[ ]` (den-hoag-0pwbu).
         evalArm component-mints-one-kind
         [ "$val" = "1" ] || die component-mints-one-kind "expected value 1, got '$val'"
         c1=$(grep -c "trace: $label-component\$" "$TMPDIR/err" || true)
@@ -97,8 +98,8 @@
         [ "$val" = "4" ] || die component-mints-four-kinds "expected value 4, got '$val'"
         c4=$(grep -c "trace: $label-component\$" "$TMPDIR/err" || true)
         [ "$c1" -ge 1 ] || die component-mints-one-kind "the spy counted no component mint at all"
-        [ "$c1" = "3" ] && [ "$c4" = "6" ] ||
-          die component-mints-four-kinds "expected 3 component mints for 1 kind and 6 for 4 (one per kind and the two constants once), counted $c1 and $c4"
+        [ "$c1" = "4" ] && [ "$c4" = "7" ] ||
+          die component-mints-four-kinds "expected 4 component mints for 1 kind and 7 for 4 (one per kind and the three constants once), counted $c1 and $c4"
 
         # den-hoag-a7c9r V1-a C2 · an `mkType`-arm kind's mark is bound once, read by `__mint` and by
         # the node record gen-merge reads where two constructions meet: two constructions mint two marks.

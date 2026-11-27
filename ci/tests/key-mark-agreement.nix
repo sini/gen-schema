@@ -7,16 +7,16 @@
 # declaration node), marks equal, foreign keys equal. Only one-node rows (`w`) are the property's; the
 # others compose by node and are carried as rows only.
 #
-# The corpus: 75 constructed shapes, each as a differing pair and as a twin, the granularity razor's
+# The corpus: 76 constructed shapes, each as a differing pair and as a twin, the granularity razor's
 # default-arm rows (`kind-preimage-razor.nix`, read here for `{ w; m; k; }`), 11 declared-collection
 # pairs under both identity settings, 2 rows over an `identity = false` collection and 2 over a kept
 # collection the kind does not define. The `mkType` arm writes no foreign key. Four shapes redeclare one
 # option embedding an instance type (twice, beside a plain submodule in either order, thrice), a join
-# gen-merge mints over its declarations (den-hoag-2vtgj). Thirty-four vary one construction parameter: the
+# gen-merge mints over its declarations (den-hoag-2vtgj). Thirty-five vary one construction parameter: the
 # base (absent, empty, attrset at one or two literals, positionless, function, path), the mixins (two
 # lists that fold to one record among them, a no-op mixin once, twice or not at all), a
 # sealed leaf beside an inert one (keySemantics, a seed, a computed field, a kept value), `{ }` against
-# `[ ]` (a seed, a kept value, a typed default), a typed collection's seed resolved from its type's
+# `[ ]` (a seed, a kept value, a typed default, keySemantics), a typed collection's seed resolved from its type's
 # empty value, specialArgs, and a declaration's open paths and module order (den-hoag-y9j03). Twelve vary a
 # collection's seed (den-hoag-isxgb): eleven where the kind's value does not read it (its presence, its value, a
 # built-in redeclared as the library declares it or with another seed), and one control whose `merge` reads it. Four
@@ -289,8 +289,8 @@ let
               noopMixin
             ];
       };
-    # the mark spreads `{ }` and `[ ]` to one component (den-hoag-0pwbu), so the key reading its
-    # spellings per leaf adopts that class: a seed, a kept value, a typed default
+    # `{ }` and `[ ]` are two values, so the mark reads them apart, and so does the key: a seed, a kept
+    # value, a typed default, keySemantics
     seedEmptyAttrsVsList =
       tag: withArgs { collections.extra.default = if tag == "a" then { } else [ ]; };
     keptEmptyAttrsVsList = tag: {
@@ -302,6 +302,7 @@ let
         tags = if tag == "a" then { } else [ ];
       };
     };
+    keySemEmptyAttrsVsList = tag: withArgs { keySemantics = if tag == "a" then { } else [ ]; };
     typedListVsAttrsDefault =
       tag:
       withArgs {
@@ -1185,8 +1186,8 @@ in
     test-the-foreign-key-splits-exactly-where-the-mark-splits = {
       expr = verdict (n: rows.${n}.k);
       expected = {
-        rows = 196;
-        oneNode = 182;
+        rows = 198;
+        oneNode = 184;
         nonBool = [ ];
         coarser = [ ];
         finer = [ ];
@@ -1223,9 +1224,11 @@ in
         "instanceTwice"
         "keptCollectionSealedAttrs"
         "keptCollectionValue"
+        "keptEmptyAttrsVsList"
         "keptMintedMember"
         "keptRecordValue"
         "keptRecordWholeVsSpread"
+        "keySemEmptyAttrsVsList"
         "keySemSealedDiffer"
         "mixinsDiffer"
         "mixinsTypeDiffer"
@@ -1236,8 +1239,11 @@ in
         "razor-diamondShortcut"
         "razor-schemaCollection"
         "schemaCollection"
+        "seedEmptyAttrsVsList"
         "topOption"
         "twoDeclsMerged"
+        "typedListVsAttrsDefault"
+        "typedUndefListVsAttrs"
         "typedUndefNullVsList"
       ];
     };

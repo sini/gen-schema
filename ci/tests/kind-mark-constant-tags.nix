@@ -43,9 +43,9 @@ in
       "c"
     ];
     expected = [
-      "schemakind:c4e7c77da23e322efa37fa53f7fa058eb44788347e1853ec848a7de8c74d2ec8"
-      "schemakind:7793b6622232711e3ff39fc62749501cb32a79f2c52c5c5ebde6b5f8f8ed5715"
-      "schemakind:f8b854de59c36bf5892b316c688bb8dc668956193ef4611bf266ede289cfb0ce"
+      "schemakind:8d96a587a9c2e8390db667f7f00a1c13443192019313534ea48317f309873d83"
+      "schemakind:26b4aa6920840172870bc2b0b547c352b31f207fde0c5bdac4522bcf272132f9"
+      "schemakind:06f8332b968f37f049f1d29c86444de9f6bd69d6f05924d19b878464ecec2a1f"
     ];
   };
 }

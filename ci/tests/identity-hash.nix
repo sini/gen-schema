@@ -221,6 +221,6 @@ in
   # moved would red here.
   flake.tests.identity-hash.test-control-no-underscore-field-hash-unchanged = {
     expr = evalNoUnderscore.config.id_hash;
-    expected = "host:47afe0be1a5e0eac8c2e20d68889cfc7ebb56c220ae13bec63c08412a8436a92";
+    expected = "host:b4fe35f8ca22308cdd7f36941004638c724e6d32d49718ee023bcd33f89a5dfe";
   };
 }

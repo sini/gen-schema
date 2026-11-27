@@ -78,8 +78,8 @@ let
       id = "site:5c282668c9f807858fd80454ae716be6fb1f2782bad636c2d8ed7516a8f927d6";
     };
     ctl = {
-      mark = "schemakind:78b932f081142e7852c5468cb649839cf7c6b0001cf771f8fbd6eeb0dd65899d";
-      id = "ctl:24388322fe7a1017f2902c374051def96a9d0cb7a6e21b856b66b0ce889fe6ed";
+      mark = "schemakind:3f5b55373a1a2b2d7bf0e7d48cb70a9ca8c2029b1c28db33a283607ba937c057";
+      id = "ctl:8a14574ebb5fce5b8a03633a1b9d0d320794a261aa3510bd415d9a229d038158";
     };
   };
 in
@@ -115,16 +115,16 @@ in
       expr = read;
       expected = {
         host = {
-          mark = "schemakind:addf2cef43e79d5398311bc1adc314f45b703bb8c0fd6fac9d41b752dbbf2bb4";
-          id = "host:fc31f5c0f4fdaa0265a9b3a6a9ed3437e7b623b8a1eda34282ec8f7ed09dd120";
+          mark = "schemakind:6143a1a8ea1262e81a557456e2e48ec45ff6e95cbed9ff255b86865f760c3c11";
+          id = "host:6e386c2559937cebc7f05e196b69ef9803284f5a0b772a55f0a81ae299a35a04";
         };
         farm = {
-          mark = "schemakind:573c97354d2bdd02d1d8f72730c5d77bf25bfb7153fa70962bfb9d50cb688e59";
-          id = "farm:e127c49753c985690b3285bacae029397097a05c27e6c2252795da9d95e9d463";
+          mark = "schemakind:7c5ec2de20adc54d11d675eab9247b7f68c8082051ccc118ce3210ecc79a4f4e";
+          id = "farm:29073a8e2164b9e6e2470497116b3322129b2796f4321b35cea8c36f7a5b1d1a";
         };
         site = {
-          mark = "schemakind:9e4a3887578f67c238980cd18f86fea23cb0c2785e40480879d3cbcdc286b217";
-          id = "site:e6f7726a5c3c10352b3dd62c62cac769c21114c5670e097ccf82fa3bd51b08cf";
+          mark = "schemakind:1b2980f5b267e09ccde172d15c1aaf4bc284c5114ee849a152d623a79a1dd6fb";
+          id = "site:ffd8cff68b0f7050bbe181c4b0af58ee569993077e1abd80c214c674f0800c0e";
         };
         inherit (before) ctl;
       };
